@@ -26,7 +26,7 @@ $filter_pinjaman = $_GET['pinjaman_id'] ?? '';
 $filter_status = $_GET['status'] ?? '';
 
 // Get pinjaman dengan perhitungan sisa yang benar (termasuk bunga)
-$query_pinjaman = "SELECT p.*, jp.nama_jenis,
+$query_pinjaman = "SELECT p.*, jp.nama_jenis, jp.memerlukan_jaminan,
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') as angsuran_lunas,
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) as total_angsuran,
                           (SELECT COALESCE(SUM(pokok), 0) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') as total_pokok_dibayar,
@@ -49,10 +49,22 @@ foreach ($pinjaman_list as &$pinjaman_row) {
 }
 unset($pinjaman_row);
 
+// Pisahkan pinjaman supaya pinjaman biasa dan gadai tidak tercampur.
+$pinjaman_tanpa_jaminan = [];
+$pinjaman_jaminan = [];
+foreach ($pinjaman_list as $pinjaman_row) {
+    if (!empty($pinjaman_row['memerlukan_jaminan'])) {
+        $pinjaman_jaminan[] = $pinjaman_row;
+    } else {
+        $pinjaman_tanpa_jaminan[] = $pinjaman_row;
+    }
+}
+
 error_log("Jumlah pinjaman ditemukan: " . count($pinjaman_list));
 
 // Get riwayat angsuran
-$query_angsuran = "SELECT a.*, p.kode_pinjaman, p.jumlah_pinjaman, jp.nama_jenis as jenis_pinjaman
+$query_angsuran = "SELECT a.*, p.kode_pinjaman, p.jumlah_pinjaman, jp.nama_jenis as jenis_pinjaman,
+                          jp.memerlukan_jaminan
                    FROM angsuran a
                    JOIN pinjaman p ON a.pinjaman_id = p.id
                    JOIN jenis_pinjaman jp ON p.jenis_pinjaman_id = jp.id
@@ -153,11 +165,26 @@ function tabelAngsuranAnggota($rows, $pesan_kosong) {
 // Pisahkan: belum lunas (urut jatuh tempo terdekat) dan lunas (urut pembayaran terbaru)
 $angsuran_belum = [];
 $angsuran_lunas = [];
+$angsuran_tanpa_jaminan_belum = [];
+$angsuran_tanpa_jaminan_lunas = [];
+$angsuran_jaminan_belum = [];
+$angsuran_jaminan_lunas = [];
 foreach ($angsuran_list as $row_angsuran) {
+    $adalah_jaminan = !empty($row_angsuran['memerlukan_jaminan']);
     if ($row_angsuran['status'] == 'lunas') {
         $angsuran_lunas[] = $row_angsuran;
+        if ($adalah_jaminan) {
+            $angsuran_jaminan_lunas[] = $row_angsuran;
+        } else {
+            $angsuran_tanpa_jaminan_lunas[] = $row_angsuran;
+        }
     } else {
         $angsuran_belum[] = $row_angsuran;
+        if ($adalah_jaminan) {
+            $angsuran_jaminan_belum[] = $row_angsuran;
+        } else {
+            $angsuran_tanpa_jaminan_belum[] = $row_angsuran;
+        }
     }
 }
 usort($angsuran_belum, function ($x, $y) {
@@ -166,6 +193,18 @@ usort($angsuran_belum, function ($x, $y) {
 usort($angsuran_lunas, function ($x, $y) {
     return strcmp($y['tanggal_bayar'] . sprintf('%06d', $y['angsuran_ke']), $x['tanggal_bayar'] . sprintf('%06d', $x['angsuran_ke']));
 });
+foreach ([&$angsuran_tanpa_jaminan_belum, &$angsuran_jaminan_belum] as &$daftar_belum) {
+    usort($daftar_belum, function ($x, $y) {
+        return strcmp($x['tanggal_jatuh_tempo'] . sprintf('%06d', $x['angsuran_ke']), $y['tanggal_jatuh_tempo'] . sprintf('%06d', $y['angsuran_ke']));
+    });
+}
+unset($daftar_belum);
+foreach ([&$angsuran_tanpa_jaminan_lunas, &$angsuran_jaminan_lunas] as &$daftar_lunas) {
+    usort($daftar_lunas, function ($x, $y) {
+        return strcmp($y['tanggal_bayar'] . sprintf('%06d', $y['angsuran_ke']), $x['tanggal_bayar'] . sprintf('%06d', $x['angsuran_ke']));
+    });
+}
+unset($daftar_lunas);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -409,18 +448,26 @@ usort($angsuran_lunas, function ($x, $y) {
                 </div>
 
                 <div class="row">
-                    <!-- Daftar Pinjaman -->
+                    <!-- Daftar pinjaman dipisah berdasarkan jenis jaminan -->
                     <div class="col-lg-12">
+                        <?php
+                        $kelompok_pinjaman = [
+                            ['judul' => 'Pinjaman Tanpa Jaminan', 'ikon' => 'fa-hand-holding-usd', 'warna' => 'primary', 'data' => $pinjaman_tanpa_jaminan, 'kosong' => 'Belum ada pinjaman tanpa jaminan.'],
+                            ['judul' => 'Pinjaman Jaminan / Gadai', 'ikon' => 'fa-shield-alt', 'warna' => 'warning', 'data' => $pinjaman_jaminan, 'kosong' => 'Belum ada pinjaman jaminan atau gadai.']
+                        ];
+                        foreach ($kelompok_pinjaman as $kelompok):
+                        ?>
                         <div class="card mb-3">
                             <div class="card-header py-2">
                                 <h6 class="card-title mb-0">
-                                    <i class="fas fa-list me-2"></i>Daftar Pinjaman
+                                    <i class="fas <?php echo $kelompok['ikon']; ?> me-2 text-<?php echo $kelompok['warna']; ?>"></i><?php echo $kelompok['judul']; ?>
+                                    <span class="badge bg-<?php echo $kelompok['warna']; ?> ms-2"><?php echo count($kelompok['data']); ?></span>
                                 </h6>
                             </div>
                             <div class="card-body p-3">
-                                <?php if (!empty($pinjaman_list)): ?>
+                                <?php if (!empty($kelompok['data'])): ?>
                                     <div class="row">
-                                        <?php foreach ($pinjaman_list as $pinjaman): 
+                                        <?php foreach ($kelompok['data'] as $pinjaman):
                                             $status_class = $pinjaman['status'] == 'aktif' ? 'success' : ($pinjaman['status'] == 'lunas' ? 'secondary' : 'danger');
                                             $pokok_dibayar = $pinjaman['total_pokok_dibayar'];
                                             
@@ -500,13 +547,13 @@ usort($angsuran_lunas, function ($x, $y) {
                                     </div>
                                 <?php else: ?>
                                     <div class="text-center py-3">
-                                        <i class="fas fa-hand-holding-usd fa-3x text-muted mb-2"></i>
-                                        <h6 class="text-muted">Belum ada pinjaman</h6>
-                                        <p class="text-muted mb-2">Anda belum memiliki pinjaman.</p>
+                                        <i class="fas <?php echo $kelompok['ikon']; ?> fa-2x text-muted mb-2"></i>
+                                        <p class="text-muted mb-0"><?php echo $kelompok['kosong']; ?></p>
                                     </div>
                                 <?php endif; ?>
                             </div>
                         </div>
+                        <?php endforeach; ?>
 
                         <!-- Riwayat Angsuran: dipisah antara belum lunas dan lunas -->
                         <div class="card mb-3">
@@ -556,29 +603,30 @@ usort($angsuran_lunas, function ($x, $y) {
                             </div>
                         </div>
 
-                        <div class="card mb-3">
-                            <div class="card-header py-2">
+                        <?php
+                        $kelompok_angsuran = [
+                            ['judul' => 'Angsuran Pinjaman Tanpa Jaminan', 'ikon' => 'fa-hand-holding-usd', 'warna' => 'primary', 'belum' => $angsuran_tanpa_jaminan_belum, 'lunas' => $angsuran_tanpa_jaminan_lunas],
+                            ['judul' => 'Angsuran Pinjaman Jaminan / Gadai', 'ikon' => 'fa-shield-alt', 'warna' => 'warning', 'belum' => $angsuran_jaminan_belum, 'lunas' => $angsuran_jaminan_lunas]
+                        ];
+                        foreach ($kelompok_angsuran as $kelompok):
+                        ?>
+                        <div class="card mb-3 border-<?php echo $kelompok['warna']; ?>">
+                            <div class="card-header py-2 bg-light">
                                 <h6 class="card-title mb-0">
-                                    <i class="fas fa-hourglass-half me-2 text-warning"></i>Angsuran Belum Lunas / Akan Datang
-                                    <span class="badge bg-warning text-dark ms-2"><?php echo count($angsuran_belum); ?></span>
+                                    <i class="fas <?php echo $kelompok['ikon']; ?> me-2 text-<?php echo $kelompok['warna']; ?>"></i><?php echo $kelompok['judul']; ?>
+                                    <span class="badge bg-warning text-dark ms-2"><?php echo count($kelompok['belum']); ?> belum lunas</span>
+                                    <span class="badge bg-success ms-1"><?php echo count($kelompok['lunas']); ?> lunas</span>
                                 </h6>
                             </div>
                             <div class="card-body p-3">
-                                <?php tabelAngsuranAnggota($angsuran_belum, 'Tidak ada angsuran yang belum lunas'); ?>
+                                <h6 class="small mb-2"><i class="fas fa-hourglass-half me-1 text-warning"></i>Belum Lunas / Akan Datang</h6>
+                                <?php tabelAngsuranAnggota($kelompok['belum'], 'Tidak ada angsuran yang belum lunas pada kelompok ini'); ?>
+                                <hr>
+                                <h6 class="small mb-2"><i class="fas fa-check-circle me-1 text-success"></i>Sudah Lunas</h6>
+                                <?php tabelAngsuranAnggota($kelompok['lunas'], 'Belum ada angsuran lunas pada kelompok ini'); ?>
                             </div>
                         </div>
-
-                        <div class="card mb-3">
-                            <div class="card-header py-2">
-                                <h6 class="card-title mb-0">
-                                    <i class="fas fa-check-circle me-2 text-success"></i>Angsuran Lunas
-                                    <span class="badge bg-success ms-2"><?php echo count($angsuran_lunas); ?></span>
-                                </h6>
-                            </div>
-                            <div class="card-body p-3">
-                                <?php tabelAngsuranAnggota($angsuran_lunas, 'Belum ada angsuran yang lunas'); ?>
-                            </div>
-                        </div>
+                        <?php endforeach; ?>
 
                         <!-- Pengajuan Pinjaman -->
                         <div class="card mt-3">
