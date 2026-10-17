@@ -796,6 +796,8 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             const tenorSelect = document.getElementById('tenorSelect');
             tenorSelect.innerHTML = '<option value="">-- Pilih Tenor --</option>';
             if (!selectedOption.value) {
+                document.getElementById('jumlahPinjaman').value = '';
+                document.getElementById('jumlahPinjaman').removeAttribute('max');
                 document.getElementById('jaminanFields').style.display = 'none';
                 document.querySelectorAll('.kategori-jaminan, .jaminan-common-required, .detail-required').forEach(function (el) { el.required = false; });
                 document.getElementById('hariAngsuranGroup').style.display = '';
@@ -810,6 +812,9 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             document.getElementById('maxInfo').textContent = 'Maksimal: Rp ' + parseInt(maksimal).toLocaleString('id-ID');
             document.getElementById('tenorInfo').textContent = 'Tenor tersedia: ' + Object.keys(tarif).join(', ') + ' bulan';
             document.getElementById('jumlahPinjaman').max = parseInt(maksimal);
+            // Semua jenis pinjaman langsung memakai nominal yang diatur Admin.
+            // Teller tetap dapat mengubah nominal selama tidak melebihi batas tersebut.
+            document.getElementById('jumlahPinjaman').value = parseInt(maksimal) || '';
 
             Object.keys(tarif).forEach(function (t) {
                 tenorSelect.innerHTML += '<option value="' + t + '">' + t + ' bulan (bunga ' + tarif[t] + '%)</option>';
@@ -840,12 +845,6 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             hariSelect.required = !wajibJaminan;
             if (wajibJaminan) {
                 hariSelect.value = '';
-                // Isi otomatis dari maksimal jenis, tetapi Teller masih boleh mengubahnya.
-                document.getElementById('jumlahPinjaman').value = parseInt(maksimal) || '';
-                document.getElementById('jumlahPinjaman').dataset.autoGadai = '1';
-            } else if (document.getElementById('jumlahPinjaman').dataset.autoGadai === '1') {
-                document.getElementById('jumlahPinjaman').value = '';
-                document.getElementById('jumlahPinjaman').dataset.autoGadai = '0';
             }
 
             updateCalculation();

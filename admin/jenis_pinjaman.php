@@ -600,8 +600,20 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
 
         function aturFormGadai(prefix) {
             var checked = document.getElementById(prefix + '_jaminan').checked;
-            document.getElementById(prefix + '_tarif_section').style.display = checked ? 'none' : '';
-            document.getElementById(prefix + '_frekuensi_section').style.display = checked ? 'none' : '';
+            var tarifSection = document.getElementById(prefix + '_tarif_section');
+            var frekuensiSection = document.getElementById(prefix + '_frekuensi_section');
+            tarifSection.style.display = checked ? 'none' : '';
+            frekuensiSection.style.display = checked ? 'none' : '';
+
+            // Input yang disembunyikan tidak boleh tetap required. Jika masih required,
+            // browser membatalkan submit gadai tanpa dapat memfokuskan kolom tersebut.
+            tarifSection.querySelectorAll('input').forEach(function (input) {
+                input.required = !checked;
+                input.disabled = checked;
+            });
+            frekuensiSection.querySelectorAll('input').forEach(function (input) {
+                input.disabled = checked;
+            });
         }
 
         ['add', 'edit'].forEach(function (prefix) {
