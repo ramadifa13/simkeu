@@ -71,19 +71,39 @@ if ($_POST) {
     }
 }
 
+// Filter daftar pelunasan
+$filter_q = trim($_GET['q'] ?? '');
+$filter_jenis = (int) ($_GET['jenis'] ?? 0);
+$filter_jaminan = $_GET['jaminan'] ?? '';
+$filter_frekuensi = $_GET['frekuensi'] ?? '';
+$filter_mulai = $_GET['mulai'] ?? '';
+$filter_sampai = $_GET['sampai'] ?? '';
+$filter_params = [];
+$filter_where = ["p.status = 'aktif'"];
+if ($filter_q !== '') {
+    $filter_where[] = '(a.nama_lengkap LIKE :q_nama OR a.kode_anggota LIKE :q_anggota OR p.kode_pinjaman LIKE :q_pinjaman)';
+    $filter_params[':q_nama'] = $filter_params[':q_anggota'] = $filter_params[':q_pinjaman'] = '%' . $filter_q . '%';
+}
+if ($filter_jenis > 0) { $filter_where[] = 'p.jenis_pinjaman_id = :jenis'; $filter_params[':jenis'] = $filter_jenis; }
+if (in_array($filter_jaminan, ['0', '1'], true)) { $filter_where[] = 'COALESCE(jp.memerlukan_jaminan, 0) = :jaminan'; $filter_params[':jaminan'] = (int) $filter_jaminan; }
+if (in_array($filter_frekuensi, ['bulanan', 'mingguan', 'dua_mingguan'], true)) { $filter_where[] = 'p.frekuensi = :frekuensi'; $filter_params[':frekuensi'] = $filter_frekuensi; }
+if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filter_mulai)) { $filter_where[] = 'DATE(p.tanggal_pencairan) >= :mulai'; $filter_params[':mulai'] = $filter_mulai; }
+if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filter_sampai)) { $filter_where[] = 'DATE(p.tanggal_pencairan) <= :sampai'; $filter_params[':sampai'] = $filter_sampai; }
+
 // Get active loans that can be settled early
-$query = "SELECT p.*, a.nama_lengkap, a.kode_anggota, jp.nama_jenis,
+$query = "SELECT p.*, a.nama_lengkap, a.kode_anggota, jp.nama_jenis, jp.memerlukan_jaminan,
                  (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status IN ('belum_bayar','telat')) as sisa_angsuran,
                  (SELECT SUM(jumlah_angsuran + denda) FROM angsuran WHERE pinjaman_id = p.id AND status IN ('belum_bayar','telat')) as total_sisa_bayar
           FROM pinjaman p 
           JOIN anggota a ON p.anggota_id = a.id 
           JOIN jenis_pinjaman jp ON p.jenis_pinjaman_id = jp.id 
-          WHERE p.status = 'aktif' 
+          WHERE " . implode(' AND ', $filter_where) . "
           ORDER BY p.tanggal_pencairan DESC";
 
 $stmt = $db->prepare($query);
-$stmt->execute();
+$stmt->execute($filter_params);
 $pinjaman_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$jenis_filter = $db->query("SELECT id, nama_jenis FROM jenis_pinjaman ORDER BY nama_jenis")->fetchAll(PDO::FETCH_ASSOC);
 
 // Get statistics
 $query_stats = "SELECT 
@@ -226,6 +246,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         </div>
                     </div>
                     <div class="card-body">
+                        <?php include '../includes/filter_pelunasan.php'; ?>
                         <?php if (empty($pinjaman_list)): ?>
                         <div class="text-center py-5">
                             <i class="fas fa-check-circle fa-4x text-success mb-3"></i>

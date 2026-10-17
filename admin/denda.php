@@ -64,6 +64,27 @@ if ($_POST) {
     }
 }
 
+// Filter daftar denda
+$filter_q = trim($_GET['q'] ?? '');
+$filter_jenis = (int) ($_GET['jenis'] ?? 0);
+$filter_jaminan = $_GET['jaminan'] ?? '';
+$filter_telat = $_GET['telat'] ?? '';
+$filter_mulai = $_GET['mulai'] ?? '';
+$filter_sampai = $_GET['sampai'] ?? '';
+$filter_params = [];
+$filter_where = ["(a.denda > 0 OR (a.status IN ('belum_bayar', 'telat') AND a.tanggal_jatuh_tempo < CURDATE()))"];
+if ($filter_q !== '') {
+    $filter_where[] = '(ag.nama_lengkap LIKE :q_nama OR ag.kode_anggota LIKE :q_anggota OR p.kode_pinjaman LIKE :q_pinjaman)';
+    $filter_params[':q_nama'] = $filter_params[':q_anggota'] = $filter_params[':q_pinjaman'] = '%' . $filter_q . '%';
+}
+if ($filter_jenis > 0) { $filter_where[] = 'p.jenis_pinjaman_id = :jenis'; $filter_params[':jenis'] = $filter_jenis; }
+if (in_array($filter_jaminan, ['0', '1'], true)) { $filter_where[] = 'COALESCE(jp.memerlukan_jaminan, 0) = :jaminan'; $filter_params[':jaminan'] = (int) $filter_jaminan; }
+if ($filter_telat === 'ringan') { $filter_where[] = 'DATEDIFF(CURDATE(), a.tanggal_jatuh_tempo) BETWEEN 1 AND 15'; }
+elseif ($filter_telat === 'sedang') { $filter_where[] = 'DATEDIFF(CURDATE(), a.tanggal_jatuh_tempo) BETWEEN 16 AND 30'; }
+elseif ($filter_telat === 'berat') { $filter_where[] = 'DATEDIFF(CURDATE(), a.tanggal_jatuh_tempo) > 30'; }
+if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filter_mulai)) { $filter_where[] = 'a.tanggal_jatuh_tempo >= :mulai'; $filter_params[':mulai'] = $filter_mulai; }
+if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filter_sampai)) { $filter_where[] = 'a.tanggal_jatuh_tempo <= :sampai'; $filter_params[':sampai'] = $filter_sampai; }
+
 // Get late installments - PERBAIKAN: Ambil semua angsuran yang memiliki denda atau telat
 $query = "SELECT a.*, p.kode_pinjaman, p.anggota_id, p.jumlah_pinjaman, ag.nama_lengkap, ag.kode_anggota,
                  DATEDIFF(CURDATE(), a.tanggal_jatuh_tempo) as hari_keterlambatan,
@@ -73,12 +94,13 @@ $query = "SELECT a.*, p.kode_pinjaman, p.anggota_id, p.jumlah_pinjaman, ag.nama_
           JOIN pinjaman p ON a.pinjaman_id = p.id 
           JOIN anggota ag ON p.anggota_id = ag.id
           JOIN jenis_pinjaman jp ON p.jenis_pinjaman_id = jp.id 
-          WHERE (a.denda > 0 OR a.status IN ('belum_bayar', 'telat') AND a.tanggal_jatuh_tempo < CURDATE())
+          WHERE " . implode(' AND ', $filter_where) . "
           ORDER BY a.tanggal_jatuh_tempo ASC";
 
 $stmt = $db->prepare($query);
-$stmt->execute();
+$stmt->execute($filter_params);
 $keterlambatan_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$jenis_filter = $db->query("SELECT id, nama_jenis FROM jenis_pinjaman ORDER BY nama_jenis")->fetchAll(PDO::FETCH_ASSOC);
 
 // Get statistics - PERBAIKAN: Hitung total denda dari semua angsuran
 $query_stats = "SELECT 
@@ -246,6 +268,7 @@ if (isset($_GET['update_auto_denda'])) {
                         </div>
                     </div>
                     <div class="card-body">
+                        <?php include '../includes/filter_denda.php'; ?>
                         <?php if (empty($keterlambatan_list)): ?>
                         <div class="text-center py-5">
                             <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
