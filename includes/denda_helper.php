@@ -82,14 +82,15 @@ if (!function_exists('perbaruiDendaOtomatis')) {
     /**
      * Hitung ulang denda semua cicilan yang terlambat (kecuali yang diinput manual) dan tandai 'telat'.
      * Berjalan paling banyak sekali sehari (settings.denda_dihitung_tanggal) kecuali $paksa.
+     * $pinjaman_id membatasi pembaruan ke satu pinjaman tanpa menandai pembaruan harian selesai.
      * @return int jumlah cicilan yang diperbarui (0 bila sudah dihitung hari ini / migrasi belum jalan)
      */
-    function perbaruiDendaOtomatis($db, $paksa = false) {
+    function perbaruiDendaOtomatis($db, $paksa = false, $pinjaman_id = null) {
         if (!kolomAda($db, 'angsuran', 'denda_manual') || !kolomAda($db, 'denda_tarif', 'denda_per_hari')) {
             return 0;
         }
         $hari_ini = date('Y-m-d');
-        if (!$paksa) {
+        if (!$paksa && $pinjaman_id === null) {
             $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'denda_dihitung_tanggal'");
             $stmt->execute();
             if ($stmt->fetchColumn() === $hari_ini) {
@@ -97,12 +98,18 @@ if (!function_exists('perbaruiDendaOtomatis')) {
             }
         }
 
-        $stmt = $db->prepare("SELECT a.id, a.pinjaman_id, a.angsuran_ke, a.tanggal_jatuh_tempo, a.denda, a.status,
+        $query = "SELECT a.id, a.pinjaman_id, a.angsuran_ke, a.tanggal_jatuh_tempo, a.denda, a.status,
                                      a.keterlambatan_hari, p.jumlah_pinjaman
                               FROM angsuran a JOIN pinjaman p ON a.pinjaman_id = p.id
                               WHERE a.status IN ('belum_bayar', 'telat') AND a.denda_manual = 0
-                                AND a.tanggal_jatuh_tempo < ?");
-        $stmt->execute(array($hari_ini));
+                                AND a.tanggal_jatuh_tempo < ?";
+        $params = array($hari_ini);
+        if ($pinjaman_id !== null) {
+            $query .= " AND a.pinjaman_id = ?";
+            $params[] = (int) $pinjaman_id;
+        }
+        $stmt = $db->prepare($query);
+        $stmt->execute($params);
         $update = $db->prepare("UPDATE angsuran SET denda = ?, keterlambatan_hari = ?, status = 'telat' WHERE id = ?");
         $diperbarui = 0;
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $a) {
@@ -114,8 +121,11 @@ if (!function_exists('perbaruiDendaOtomatis')) {
             }
         }
 
-        $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('denda_dihitung_tanggal', ?)
-                      ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)")->execute(array($hari_ini));
+        // Perhitungan satu pinjaman tidak menggantikan pembaruan harian seluruh pinjaman.
+        if ($pinjaman_id === null) {
+            $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('denda_dihitung_tanggal', ?)
+                          ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)")->execute(array($hari_ini));
+        }
         return $diperbarui;
     }
 }

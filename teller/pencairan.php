@@ -167,10 +167,10 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         $stmtLampiran = $db->prepare("INSERT INTO lampiran_perjanjian (perjanjian_id,file_path,urutan) VALUES (?,?,?)");
         foreach ($lampiran_paths as $i=>$path) $stmtLampiran->execute([$perjanjian_id,$path,$i+1]);
 
+        // Cicilan lama yang sudah lewat jatuh tempo dan belum dibayar langsung kena denda sesuai jatuh tempo aslinya
+        perbaruiDendaOtomatis($db, true, $pinjaman_id);
         $db->commit();
         $committed = true;
-        // Cicilan lama yang sudah lewat jatuh tempo dan belum dibayar langsung kena denda sesuai jatuh tempo aslinya
-        perbaruiDendaOtomatis($db, true);
         $_SESSION['success'] = "Pinjaman berhasil dicairkan tanggal " . date('d/m/Y', strtotime($tgl_cair))
             . ". Jadwal angsuran dibuat dari tanggal tersebut"
             . ($sudah_dibayar > 0 ? ", cicilan 1-$sudah_dibayar ditandai sudah dibayar (tidak masuk kas)" : "")
@@ -941,7 +941,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
         // PHP menolak berkas yang sudah melewati upload_max_filesize sebelum kode
         // server berjalan. Karena itu foto besar dikompres dahulu di browser/HP.
         var BATAS_FOTO = 5 * 1024 * 1024;
-        var TARGET_FOTO = Math.floor(4.8 * 1024 * 1024);
+        var TARGET_FOTO = 300 * 1024;
 
         function canvasKeBlob(canvas, kualitas) {
             return new Promise(function (resolve) {
@@ -956,7 +956,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             input.files = transfer.files;
         }
         async function kompresSatuFoto(file) {
-            if (file.size <= BATAS_FOTO) return file;
+            if (file.size <= TARGET_FOTO) return file;
             var bitmap;
             try {
                 bitmap = await createImageBitmap(file);
@@ -964,7 +964,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                 throw new Error('Foto "' + file.name + '" tidak dapat dikompres. Gunakan format JPG, PNG, atau WEBP.');
             }
 
-            var skala = Math.min(1, 2560 / Math.max(bitmap.width, bitmap.height));
+            var skala = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
             var canvas = document.createElement('canvas');
             canvas.width = Math.max(1, Math.round(bitmap.width * skala));
             canvas.height = Math.max(1, Math.round(bitmap.height * skala));
