@@ -40,6 +40,21 @@ if (!function_exists('buatKodeAnggota')) {
     }
 }
 
+if (!function_exists('buatKodeAnggotaJaminan')) {
+    /** Kode nasabah gadai berikutnya: AGTJ001, AGTJ002, dan seterusnya. */
+    function buatKodeAnggotaJaminan($db) {
+        $max = (int) $db->query("SELECT COALESCE(MAX(CAST(SUBSTRING(kode_anggota_jaminan, 5) AS UNSIGNED)), 0)
+                                 FROM anggota WHERE kode_anggota_jaminan REGEXP '^AGTJ[0-9]+$'")->fetchColumn();
+        $cek = $db->prepare("SELECT COUNT(*) FROM anggota WHERE kode_anggota_jaminan = ?");
+        do {
+            $max++;
+            $kode = 'AGTJ' . str_pad($max, 3, '0', STR_PAD_LEFT);
+            $cek->execute([$kode]);
+        } while ((int) $cek->fetchColumn() > 0);
+        return $kode;
+    }
+}
+
 if (!function_exists('kunciKodeAnggota')) {
     /**
      * Kunci pembuatan kode anggota selama proses simpan (sampai dilepas / koneksi berakhir), supaya Admin dan

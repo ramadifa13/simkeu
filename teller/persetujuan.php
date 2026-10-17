@@ -21,10 +21,11 @@ try {
     $query = "SELECT 
                 pp.*,
                 a.nama_lengkap,
-                a.kode_anggota,
+                CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
                 a.telepon,
                 jp.nama_jenis,
-                jp.maksimal_pinjaman
+                jp.maksimal_pinjaman,
+                jp.memerlukan_jaminan
               FROM pengajuan_pinjaman pp
               JOIN anggota a ON pp.anggota_id = a.id
               JOIN jenis_pinjaman jp ON pp.jenis_pinjaman_id = jp.id

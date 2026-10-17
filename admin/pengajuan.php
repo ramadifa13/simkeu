@@ -77,7 +77,9 @@ if ($_POST) {
 }
 
 // Get all loan applications waiting for approval
-$query = "SELECT pp.*, a.nama_lengkap, a.kode_anggota, jp.nama_jenis, 
+$query = "SELECT pp.*, a.nama_lengkap,
+          CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
+          jp.nama_jenis,
           jp.maksimal_pinjaman, jp.memerlukan_jaminan, u.nama_lengkap as teller_name,
           j.jenis_barang, j.identitas_barang, j.deskripsi_barang, j.nilai_taksiran, j.status_jaminan
           FROM pengajuan_pinjaman pp

@@ -869,6 +869,9 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                             <td><?php echo $index + 1; ?></td>
                                             <td>
                                                 <span class="fw-semibold"><?php echo htmlspecialchars($anggota['kode_anggota']); ?></span>
+                                                <?php if (!empty($anggota['kode_anggota_jaminan'])): ?>
+                                                    <br><span class="badge bg-warning text-dark">Gadai: <?php echo htmlspecialchars($anggota['kode_anggota_jaminan']); ?></span>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <div class="d-flex align-items-center">

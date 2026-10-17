@@ -44,6 +44,61 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
         if (!$jenis_info) {
             throw new Exception("Jenis pinjaman tidak valid atau tidak aktif");
         }
+        $kategori_gadai = !empty($jenis_info['memerlukan_jaminan']) ? 1 : 0;
+
+        // Kunci baris anggota agar dua pengajuan bersamaan tidak lolos validasi.
+        $stmt_anggota_kunci = $db->prepare("SELECT id, kode_anggota, kode_anggota_jaminan
+                                             FROM anggota WHERE id = ? AND status = 'aktif' FOR UPDATE");
+        $stmt_anggota_kunci->execute([$anggota_id]);
+        $anggota_info = $stmt_anggota_kunci->fetch(PDO::FETCH_ASSOC);
+        if (!$anggota_info) {
+            throw new Exception("Anggota tidak valid atau tidak aktif");
+        }
+
+        // Satu anggota maksimal satu pinjaman belum lunas untuk setiap kategori:
+        // satu tanpa jaminan dan satu gadai boleh berjalan bersamaan.
+        $stmt_aktif = $db->prepare("SELECT p.kode_pinjaman
+            FROM pinjaman p
+            JOIN jenis_pinjaman jp ON jp.id = p.jenis_pinjaman_id
+            WHERE p.anggota_id = ? AND p.status <> 'lunas'
+              AND (CASE WHEN jp.memerlukan_jaminan = 1 THEN 1 ELSE 0 END) = ?
+            LIMIT 1");
+        $stmt_aktif->execute([$anggota_id, $kategori_gadai]);
+        $pinjaman_aktif = $stmt_aktif->fetchColumn();
+        if ($pinjaman_aktif) {
+            throw new Exception("Anggota masih mempunyai pinjaman " . ($kategori_gadai ? "gadai" : "tanpa jaminan") .
+                " yang belum lunas ($pinjaman_aktif)");
+        }
+
+        $stmt_proses = $db->prepare("SELECT pp.kode_pengajuan
+            FROM pengajuan_pinjaman pp
+            JOIN jenis_pinjaman jp ON jp.id = pp.jenis_pinjaman_id
+            WHERE pp.anggota_id = ? AND pp.status IN ('menunggu','disetujui')
+              AND (CASE WHEN jp.memerlukan_jaminan = 1 THEN 1 ELSE 0 END) = ?
+            LIMIT 1");
+        $stmt_proses->execute([$anggota_id, $kategori_gadai]);
+        $pengajuan_proses = $stmt_proses->fetchColumn();
+        if ($pengajuan_proses) {
+            throw new Exception("Anggota masih mempunyai pengajuan " . ($kategori_gadai ? "gadai" : "tanpa jaminan") .
+                " yang sedang diproses ($pengajuan_proses)");
+        }
+
+        if ($kategori_gadai && empty($anggota_info['kode_anggota_jaminan'])) {
+            $terkunci = (int) $db->query("SELECT GET_LOCK('kode_anggota_jaminan_koperasi', 10)")->fetchColumn();
+            if ($terkunci !== 1) {
+                throw new Exception("Kode anggota gadai sedang dibuat oleh petugas lain. Silakan coba kembali");
+            }
+            try {
+                $kode_gadai = buatKodeAnggotaJaminan($db);
+                $stmt_kode_gadai = $db->prepare("UPDATE anggota SET kode_anggota_jaminan = ? WHERE id = ?");
+                if (!$stmt_kode_gadai->execute([$kode_gadai, $anggota_id])) {
+                    throw new Exception("Gagal menyimpan kode anggota gadai");
+                }
+                $anggota_info['kode_anggota_jaminan'] = $kode_gadai;
+            } finally {
+                $db->query("SELECT RELEASE_LOCK('kode_anggota_jaminan_koperasi')");
+            }
+        }
         if (!empty($jenis_info['memerlukan_jaminan'])) {
             // Gadai selalu menyediakan ketiga frekuensi dan tenor 1-6 bulan.
             // Ini juga menjaga jenis gadai lama tetap kompatibel tanpa disimpan ulang.
@@ -239,7 +294,9 @@ foreach ($stmt_jenis->fetchAll(PDO::FETCH_ASSOC) as $jenis) {
 $query_pengajuan = "SELECT 
                     pp.*, 
                     a.nama_lengkap, 
-                    a.kode_anggota, 
+                    a.kode_anggota,
+                    a.kode_anggota_jaminan,
+                    jp.memerlukan_jaminan,
                     jp.nama_jenis, 
                     jp.maksimal_pinjaman, 
                     u.nama_lengkap as admin_name,
@@ -615,7 +672,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                 </td>
                                                 <td>
                                                     <div class="fw-semibold"><?php echo $pengajuan['nama_lengkap']; ?></div>
-                                                    <small class="text-muted"><?php echo $pengajuan['kode_anggota']; ?></small>
+                                                    <small class="text-muted"><?php echo !empty($pengajuan['memerlukan_jaminan']) ? $pengajuan['kode_anggota_jaminan'] : $pengajuan['kode_anggota']; ?></small>
                                                 </td>
                                                 <td>
                                                     <small><?php echo $pengajuan['nama_jenis']; ?></small>
@@ -653,7 +710,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                             data-bs-target="#detailModal" 
                                                             data-kode="<?php echo $pengajuan['kode_pengajuan']; ?>"
                                                             data-nama="<?php echo $pengajuan['nama_lengkap']; ?>"
-                                                            data-kode_anggota="<?php echo $pengajuan['kode_anggota']; ?>"
+                                                            data-kode_anggota="<?php echo !empty($pengajuan['memerlukan_jaminan']) ? $pengajuan['kode_anggota_jaminan'] : $pengajuan['kode_anggota']; ?>"
                                                             data-jenis="<?php echo $pengajuan['nama_jenis']; ?>"
                                                             data-jumlah="<?php echo $pengajuan['jumlah_pinjaman']; ?>"
                                                             data-tenor="<?php echo $pengajuan['tenor'] . ' bulan, ' . ringkasanAngsuran(hitungDariPinjaman($pengajuan)); ?>"

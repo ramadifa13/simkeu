@@ -482,7 +482,10 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                         <tr>
                                             <td><?php echo $index + 1; ?></td>
                                             <td>
-                                                <strong><?php echo $anggota['kode_anggota']; ?></strong>
+                                                <strong><?php echo htmlspecialchars($anggota['kode_anggota']); ?></strong>
+                                                <?php if (!empty($anggota['kode_anggota_jaminan'])): ?>
+                                                    <br><span class="badge bg-warning text-dark">Gadai: <?php echo htmlspecialchars($anggota['kode_anggota_jaminan']); ?></span>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <div class="d-flex align-items-center">

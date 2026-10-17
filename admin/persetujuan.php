@@ -83,7 +83,9 @@ $filter_tanggal_mulai = $_GET['tanggal_mulai'] ?? '';
 $filter_tanggal_selesai = $_GET['tanggal_selesai'] ?? '';
 
 // Build query with filters
-$query = "SELECT pp.*, a.nama_lengkap, a.kode_anggota, jp.nama_jenis, 
+$query = "SELECT pp.*, a.nama_lengkap,
+          CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
+          jp.nama_jenis,
           (SELECT COUNT(*) FROM pinjaman pj WHERE pj.pengajuan_id = pp.id) AS sudah_cair,
           jp.maksimal_pinjaman, u.nama_lengkap as admin_name
           FROM pengajuan_pinjaman pp

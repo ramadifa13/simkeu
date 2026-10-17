@@ -118,7 +118,9 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
     exit();
 }
 
-$query = "SELECT pp.*, a.nama_lengkap, a.kode_anggota, jp.nama_jenis,
+$query = "SELECT pp.*, a.nama_lengkap,
+          CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
+          jp.nama_jenis,
           jp.maksimal_pinjaman, u.nama_lengkap as admin_name,
           p.id as pinjaman_id, p.kode_pinjaman, p.tanggal_pencairan, p.status as status_pinjaman,
           p.foto_pencairan, uc.nama_lengkap as teller_name,

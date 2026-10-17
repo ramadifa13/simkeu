@@ -9,7 +9,9 @@
 
 $pinjaman_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $stmt = $db->prepare("SELECT p.*, pp.kode_pengajuan, pp.tujuan_pinjaman,
-                             a.nama_lengkap, a.kode_anggota, jp.nama_jenis
+                             a.nama_lengkap,
+                             CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
+                             jp.nama_jenis
                       FROM pinjaman p
                       JOIN pengajuan_pinjaman pp ON p.pengajuan_id = pp.id
                       JOIN anggota a ON p.anggota_id = a.id
