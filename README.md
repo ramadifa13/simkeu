@@ -69,8 +69,8 @@ Aplikasi koperasi simpan pinjam (PHP + MySQL) dengan 3 level login: Admin, Telle
 4. Sesuaikan koneksi database di `config/database.php` bila user/password MySQL berbeda.
 5. Atur `php.ini` lalu restart Apache:
    ```ini
-   upload_max_filesize = 10M
-   post_max_size = 40M
+   upload_max_filesize = 5M
+   post_max_size = 20M
    extension=fileinfo
    ```
 6. Pastikan folder `uploads/anggota/` bisa ditulis oleh web server.

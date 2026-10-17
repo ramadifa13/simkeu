@@ -72,9 +72,9 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         if ($adalah_gadai && empty($pengajuan['jaminan_id'])) {
             throw new Exception("Data barang jaminan tidak ditemukan");
         }
-        $foto = validasiFotoUpload('foto_nasabah', 'Foto nasabah saat menerima uang', 10 * 1024 * 1024, true);
-        $foto_barang = validasiFotoUpload('foto_barang_jaminan', 'Foto barang jaminan', 10 * 1024 * 1024, $adalah_gadai);
-        $foto_nasabah_barang = validasiFotoUpload('foto_nasabah_barang', 'Foto nasabah dengan barang jaminan', 10 * 1024 * 1024, $adalah_gadai);
+        $foto = validasiFotoUpload('foto_nasabah', 'Foto nasabah saat menerima uang', 5 * 1024 * 1024, true);
+        $foto_barang = validasiFotoUpload('foto_barang_jaminan', 'Foto barang jaminan', 5 * 1024 * 1024, $adalah_gadai);
+        $foto_nasabah_barang = validasiFotoUpload('foto_nasabah_barang', 'Foto nasabah dengan barang jaminan', 5 * 1024 * 1024, $adalah_gadai);
 
         // Tanggal pencairan diisi Teller (boleh tanggal lampau untuk data lama, tidak boleh masa depan
         // dan tidak boleh sebelum tanggal pengajuan). Jatuh tempo dihitung dari tanggal ini.
@@ -673,7 +673,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                             <label class="form-label fw-semibold">Foto Nasabah Saat Menerima Uang <span class="text-danger">*</span></label>
                             <input type="file" name="foto_nasabah" id="foto_nasabah" class="form-control" required
                                    accept="image/*" capture="environment">
-                            <small class="text-muted">JPG/PNG/WEBP, maksimal 10 MB. Di HP bisa langsung memotret.</small>
+                            <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB. Di HP bisa langsung memotret.</small>
                             <img id="foto_nasabah_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau foto">
                         </div>
                         <div id="foto_gadai_fields" class="d-none">
@@ -681,14 +681,14 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                 <label class="form-label fw-semibold" id="label_foto_barang">Foto Barang Jaminan <span class="text-danger">*</span></label>
                                 <input type="file" name="foto_barang_jaminan" id="foto_barang_jaminan" class="form-control"
                                        accept="image/*" capture="environment">
-                                <small class="text-muted">JPG/PNG/WEBP, maksimal 10 MB.</small>
+                                <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB.</small>
                                 <img id="foto_barang_jaminan_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau foto barang jaminan">
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Foto Nasabah dengan Barang Jaminan <span class="text-danger">*</span></label>
                                 <input type="file" name="foto_nasabah_barang" id="foto_nasabah_barang" class="form-control"
                                        accept="image/*" capture="environment">
-                                <small class="text-muted">JPG/PNG/WEBP, maksimal 10 MB.</small>
+                                <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB.</small>
                                 <img id="foto_nasabah_barang_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau nasabah dengan barang jaminan">
                             </div>
                         </div>
