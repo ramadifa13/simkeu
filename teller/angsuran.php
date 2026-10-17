@@ -273,10 +273,19 @@ $stmt_debug = $db->prepare($query_debug_pinjaman);
 $stmt_debug->execute();
 $all_pinjaman = $stmt_debug->fetchAll(PDO::FETCH_ASSOC);
 
-// Get active loans - Tampilkan semua pinjaman yang punya angsuran
-$kolom_hari = kolomAda($db, 'pengajuan_pinjaman', 'hari_angsuran')
-    ? "(SELECT pp.hari_angsuran FROM pengajuan_pinjaman pp WHERE pp.id = p.pengajuan_id) AS hari_angsuran,"
-    : "NULL AS hari_angsuran,";
+// Hari filter harus mengikuti jadwal jatuh tempo nyata. Ini juga membuat pinjaman lama
+// yang belum mempunyai pengajuan_pinjaman.hari_angsuran tetap muncul pada hari yang benar.
+$fallback_hari = kolomAda($db, 'pengajuan_pinjaman', 'hari_angsuran')
+    ? "(SELECT pp.hari_angsuran FROM pengajuan_pinjaman pp WHERE pp.id = p.pengajuan_id),"
+    : "NULL,";
+$kolom_hari = "COALESCE(
+        (SELECT WEEKDAY(ah.tanggal_jatuh_tempo) + 1 FROM angsuran ah
+          WHERE ah.pinjaman_id = p.id AND ah.status <> 'lunas'
+          ORDER BY ah.tanggal_jatuh_tempo, ah.angsuran_ke LIMIT 1),
+        $fallback_hari
+        (SELECT WEEKDAY(ah2.tanggal_jatuh_tempo) + 1 FROM angsuran ah2
+          WHERE ah2.pinjaman_id = p.id ORDER BY ah2.tanggal_jatuh_tempo DESC LIMIT 1)
+    ) AS hari_angsuran,";
 $query_pinjaman = "SELECT p.*, a.nama_lengkap, a.kode_anggota, jp.nama_jenis, $kolom_hari
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) as total_angsuran,
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') as angsuran_lunas
