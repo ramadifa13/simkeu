@@ -82,7 +82,7 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         $foto_barang = validasiFotoUpload('foto_barang_jaminan', 'Foto barang jaminan', 5 * 1024 * 1024, $adalah_gadai);
         $foto_nasabah_barang = validasiFotoUpload('foto_nasabah_barang', 'Foto nasabah dengan barang jaminan', 5 * 1024 * 1024, $adalah_gadai);
         $lampiran_upload = validasiBanyakFotoUpload('surat_tambahan', 'Lampiran surat perjanjian', 5 * 1024 * 1024, 10);
-        $versi_perjanjian = ($_POST['versi_perjanjian'] ?? '') === 'lengkap' ? 'lengkap' : 'ringkas';
+        $versi_perjanjian = 'lengkap';
         $nama_saksi_1 = trim($_POST['nama_saksi_1'] ?? '');
         $nama_saksi_2 = trim($_POST['nama_saksi_2'] ?? '');
         if ($nama_saksi_1 === '' || $nama_saksi_2 === '') throw new Exception('Nama kedua saksi wajib diisi');
@@ -287,6 +287,22 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             background-color: #e7f3ff;
             border-left: 4px solid #3498db;
         }
+        #pencairanModal .modal-dialog {
+            height: calc(100vh - 1rem);
+            margin-top: .5rem;
+            margin-bottom: .5rem;
+        }
+        #pencairanModal .modal-content {
+            max-height: calc(100vh - 1rem);
+            overflow: hidden;
+        }
+        #pencairanModal .modal-body {
+            overflow-y: auto !important;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+        #pencairanModal .modal-header,
+        #pencairanModal .modal-footer { flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -590,7 +606,9 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                                 <i class="fas fa-print"></i>
                                             </a>
                                             <?php if (!empty($pengajuan['perjanjian_id'])): ?>
-                                            <a class="btn btn-sm btn-primary btn-action" target="_blank" rel="noopener" href="cetak_perjanjian.php?id=<?php echo (int)$pengajuan['pinjaman_id']; ?>" title="Cetak Surat Perjanjian & Lampiran"><i class="fas fa-file-signature"></i></a>
+                                            <a class="btn btn-sm btn-primary btn-action" target="_blank" rel="noopener" href="cetak_perjanjian.php?id=<?php echo (int)$pengajuan['pinjaman_id']; ?>" title="Cetak Surat Perjanjian & Lampiran"><i class="fas fa-file-pdf me-1"></i>PDF</a>
+                                            <?php else: ?>
+                                            <button type="button" class="btn btn-sm btn-secondary btn-action" disabled title="PDF tersedia setelah pencairan dan seluruh TTD disimpan"><i class="fas fa-file-pdf me-1"></i>PDF</button>
                                             <?php endif; ?>
                                             <?php endif; ?>
                                         </td>
@@ -810,7 +828,8 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                             <small class="text-muted" id="info_dimuka"></small>
                         </div>
                         <hr><h6><i class="fas fa-file-signature me-1"></i>Surat Perjanjian & Tanda Tangan</h6>
-                        <div class="mb-3"><label class="form-label">Versi Surat</label><select name="versi_perjanjian" class="form-select"><option value="ringkas" <?php echo $aturan_perjanjian_form['template_default']==='ringkas'?'selected':''; ?>>Ringkas</option><option value="lengkap" <?php echo $aturan_perjanjian_form['template_default']==='lengkap'?'selected':''; ?>>Lengkap</option></select></div>
+                        <input type="hidden" name="versi_perjanjian" value="lengkap">
+                        <div class="alert alert-light border py-2"><strong>Surat Perjanjian:</strong> Versi lengkap</div>
                         <div class="mb-3"><label class="form-label">Lampiran surat tambahan (opsional, maksimal 10 halaman)</label><input type="file" class="form-control" id="surat_tambahan" name="surat_tambahan[]" accept="image/*" multiple><small class="text-muted">Setiap gambar maksimal 5 MB dan akan digabung ke PDF.</small></div>
                         <div class="row"><div class="col-md-6 mb-3"><label class="form-label">Nama Saksi 1 *</label><input class="form-control" name="nama_saksi_1" required></div><div class="col-md-6 mb-3"><label class="form-label">Nama Saksi 2 *</label><input class="form-control" name="nama_saksi_2" required></div></div>
                         <?php foreach (['nasabah'=>'Nasabah','teller'=>'Teller','saksi_1'=>'Saksi 1','saksi_2'=>'Saksi 2'] as $key=>$label): ?>

@@ -16,11 +16,11 @@ if ($_POST && isset($_POST['update_perjanjian'])) {
         $nik_pihak_pertama = trim($_POST['nik_pihak_pertama'] ?? '');
         $alamat_pihak_pertama = trim($_POST['alamat_pihak_pertama'] ?? '');
         $telepon_pihak_pertama = trim($_POST['telepon_pihak_pertama'] ?? '');
-        $versi = ($_POST['template_default'] ?? '') === 'lengkap' ? 'lengkap' : 'ringkas';
-        $ringkas = trim($_POST['isi_ringkas'] ?? '');
-        $lengkap = trim($_POST['isi_lengkap'] ?? '');
-        if ($jabatan === '' || $nama_pihak_pertama === '' || $ringkas === '' || $lengkap === '') throw new Exception('Nama pihak pertama, jabatan, dan template surat wajib diisi');
         $lama = pengaturanPerjanjian($db);
+        $versi = 'lengkap';
+        $ringkas = (string)$lama['isi_ringkas'];
+        $lengkap = trim($_POST['isi_lengkap'] ?? '');
+        if ($jabatan === '' || $nama_pihak_pertama === '' || $lengkap === '') throw new Exception('Nama pihak pertama, jabatan, dan template surat wajib diisi');
         $ttd = trim($_POST['ttd_admin'] ?? '');
         if ($ttd === '') $ttd = (string) ($lama['ttd_admin'] ?? '');
         $ttd = validasiTtdDataUrl($ttd, 'Tanda tangan Admin');
@@ -402,10 +402,9 @@ function formatRupiah($angka) {
                                         <div class="col-md-8 mb-3"><label class="form-label">Alamat Pihak Pertama</label><input class="form-control" name="alamat_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['alamat_pihak_pertama'] ?: $koperasi['alamat']); ?>"></div>
                                         <div class="col-md-4 mb-3"><label class="form-label">No. HP Pihak Pertama</label><input class="form-control" name="telepon_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['telepon_pihak_pertama'] ?: $koperasi['telepon']); ?>"></div>
                                         <div class="col-md-6 mb-3"><label class="form-label">Jabatan penandatangan Admin</label><input class="form-control" name="jabatan_admin" required value="<?php echo htmlspecialchars($pengaturan_perjanjian['jabatan_admin']); ?>"></div>
-                                        <div class="col-md-6 mb-3"><label class="form-label">Versi default</label><select class="form-select" name="template_default"><option value="ringkas" <?php echo $pengaturan_perjanjian['template_default']==='ringkas'?'selected':''; ?>>Ringkas</option><option value="lengkap" <?php echo $pengaturan_perjanjian['template_default']==='lengkap'?'selected':''; ?>>Lengkap</option></select></div>
+                                        <div class="col-md-6 mb-3"><label class="form-label">Versi Surat</label><input class="form-control" value="Lengkap" readonly><input type="hidden" name="template_default" value="lengkap"></div>
                                     </div>
-                                    <div class="mb-3"><label class="form-label">Isi versi ringkas</label><textarea class="form-control" rows="7" name="isi_ringkas" required><?php echo htmlspecialchars($pengaturan_perjanjian['isi_ringkas']); ?></textarea></div>
-                                    <div class="mb-3"><label class="form-label">Isi versi lengkap</label><textarea class="form-control" rows="12" name="isi_lengkap" required><?php echo htmlspecialchars($pengaturan_perjanjian['isi_lengkap']); ?></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Isi Surat Perjanjian Lengkap</label><textarea class="form-control" rows="14" name="isi_lengkap" required><?php echo htmlspecialchars($pengaturan_perjanjian['isi_lengkap']); ?></textarea></div>
                                     <label class="form-label">TTD Admin (gambar langsung di layar)</label>
                                     <canvas id="ttdAdminCanvas" class="border rounded w-100" style="height:180px;touch-action:none;background:#fff"></canvas>
                                     <input type="hidden" name="ttd_admin" id="ttd_admin">

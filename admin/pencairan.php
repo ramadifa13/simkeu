@@ -439,7 +439,9 @@ function formatRupiah($angka) {
                                                     <i class="fas fa-print"></i>
                                                 </a>
                                                 <?php if (!empty($p['perjanjian_id'])): ?>
-                                                <a class="btn btn-sm btn-primary" target="_blank" rel="noopener" href="cetak_perjanjian.php?id=<?php echo (int)$p['id']; ?>" title="Cetak Surat Perjanjian & Lampiran"><i class="fas fa-file-signature"></i></a>
+                                                <a class="btn btn-sm btn-primary" target="_blank" rel="noopener" href="cetak_perjanjian.php?id=<?php echo (int)$p['id']; ?>" title="Cetak Surat Perjanjian & Lampiran"><i class="fas fa-file-pdf me-1"></i>PDF</a>
+                                                <?php else: ?>
+                                                <button type="button" class="btn btn-sm btn-secondary" disabled title="PDF tersedia untuk pencairan baru yang sudah menyimpan seluruh TTD"><i class="fas fa-file-pdf me-1"></i>PDF</button>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>

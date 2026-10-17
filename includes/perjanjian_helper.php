@@ -24,7 +24,7 @@ function pengaturanPerjanjian($db) {
     if (!$row) {
         $stmt = $db->prepare("INSERT INTO pengaturan_perjanjian
             (id, jabatan_admin, template_default, isi_ringkas, isi_lengkap)
-            VALUES (1, 'Pengurus Koperasi', 'ringkas', ?, ?)");
+            VALUES (1, 'Pengurus Koperasi', 'lengkap', ?, ?)");
         $stmt->execute([templatePerjanjianDefault('ringkas'), templatePerjanjianDefault('lengkap')]);
         $row = $db->query("SELECT * FROM pengaturan_perjanjian WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
     }
