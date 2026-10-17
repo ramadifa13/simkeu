@@ -33,6 +33,7 @@ if (!$koperasi) {
         'logo' => null
     ];
 }
+$aturan_perjanjian_form = pengaturanPerjanjian($db);
 
 // Upload melebihi post_max_size membuat $_POST kosong; tampilkan pesan yang jelas
 cekPostMelebihiBatas();
@@ -47,14 +48,19 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
     $foto_path = null;
     $foto_barang_path = null;
     $foto_nasabah_barang_path = null;
+    $lampiran_paths = [];
+    $committed = false;
     $errmode = $db->getAttribute(PDO::ATTR_ERRMODE);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     try {
         $db->beginTransaction();
 
-        $stmt = $db->prepare("SELECT pp.*, jp.memerlukan_jaminan, j.id AS jaminan_id, j.jenis_barang
+        $stmt = $db->prepare("SELECT pp.*, jp.memerlukan_jaminan, jp.nama_jenis, j.id AS jaminan_id, j.jenis_barang,
+                                     j.identitas_barang, j.deskripsi_barang, a.nama_lengkap, a.kode_anggota, a.kode_anggota_jaminan,
+                                     a.ktp, a.alamat, a.telepon
                               FROM pengajuan_pinjaman pp
                               JOIN jenis_pinjaman jp ON jp.id = pp.jenis_pinjaman_id
+                              JOIN anggota a ON a.id = pp.anggota_id
                               LEFT JOIN jaminan_pinjaman j ON j.pengajuan_id = pp.id
                               WHERE pp.id = ? AND pp.status = 'disetujui' FOR UPDATE");
         $stmt->execute([$id]);
@@ -75,6 +81,20 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         $foto = validasiFotoUpload('foto_nasabah', 'Foto nasabah saat menerima uang', 5 * 1024 * 1024, true);
         $foto_barang = validasiFotoUpload('foto_barang_jaminan', 'Foto barang jaminan', 5 * 1024 * 1024, $adalah_gadai);
         $foto_nasabah_barang = validasiFotoUpload('foto_nasabah_barang', 'Foto nasabah dengan barang jaminan', 5 * 1024 * 1024, $adalah_gadai);
+        $lampiran_upload = validasiBanyakFotoUpload('surat_tambahan', 'Lampiran surat perjanjian', 5 * 1024 * 1024, 10);
+        $versi_perjanjian = ($_POST['versi_perjanjian'] ?? '') === 'lengkap' ? 'lengkap' : 'ringkas';
+        $nama_saksi_1 = trim($_POST['nama_saksi_1'] ?? '');
+        $nama_saksi_2 = trim($_POST['nama_saksi_2'] ?? '');
+        if ($nama_saksi_1 === '' || $nama_saksi_2 === '') throw new Exception('Nama kedua saksi wajib diisi');
+        $ttd_nasabah = validasiTtdDataUrl($_POST['ttd_nasabah'] ?? '', 'TTD nasabah');
+        $ttd_teller = validasiTtdDataUrl($_POST['ttd_teller'] ?? '', 'TTD Teller');
+        $ttd_saksi_1 = validasiTtdDataUrl($_POST['ttd_saksi_1'] ?? '', 'TTD saksi 1');
+        $ttd_saksi_2 = validasiTtdDataUrl($_POST['ttd_saksi_2'] ?? '', 'TTD saksi 2');
+        $aturan_surat = pengaturanPerjanjian($db);
+        $ttd_admin = validasiTtdDataUrl($aturan_surat['ttd_admin'] ?? '', 'TTD Admin pada menu Pengaturan');
+        $stmtAdmin = $db->prepare("SELECT nama_lengkap FROM users WHERE id = ?");
+        $stmtAdmin->execute([$aturan_surat['updated_by']]);
+        $nama_admin_ttd = $stmtAdmin->fetchColumn() ?: 'Administrator';
 
         // Tanggal pencairan diisi Teller (boleh tanggal lampau untuk data lama, tidak boleh masa depan
         // dan tidak boleh sebelum tanggal pengajuan). Jatuh tempo dihitung dari tanggal ini.
@@ -118,10 +138,31 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
                           WHERE id = ?")
                ->execute([$foto_barang_path, $foto_nasabah_barang_path, $pengajuan['jaminan_id']]);
         }
+        foreach ($lampiran_upload as $info) $lampiran_paths[] = simpanFotoUpload($info, 'perjanjian');
         tandaiCicilanDimuka($db, $pinjaman_id, $sudah_dibayar);
         $db->prepare("UPDATE pengajuan_pinjaman SET status = 'dicairkan' WHERE id = ?")->execute([$id]);
 
+        $nama_teller = $_SESSION['nama_lengkap'] ?? ($_SESSION['username'] ?? 'Teller');
+        $hitung_surat = hitungDariPinjaman($pengajuan);
+        $snapshot = [
+            'koperasi'=>$koperasi, 'anggota'=>['nama'=>$pengajuan['nama_lengkap'],'kode'=>$adalah_gadai?($pengajuan['kode_anggota_jaminan'] ?: $pengajuan['kode_anggota']):$pengajuan['kode_anggota'],'nik'=>$pengajuan['ktp'],'alamat'=>$pengajuan['alamat'],'telepon'=>$pengajuan['telepon']],
+            'pinjaman'=>['id'=>$pinjaman_id,'jenis'=>$pengajuan['nama_jenis'],'jumlah'=>$hitung_surat['pokok'],'tenor'=>$hitung_surat['tenor'],'bunga'=>$hitung_surat['bunga_persen'],'total'=>$hitung_surat['total'],'angsuran'=>$hitung_surat['angsuran'],'frekuensi'=>$hitung_surat['frekuensi'],'tanggal_pencairan'=>$tgl_cair],
+            'jaminan'=>['ada'=>$adalah_gadai,'jenis'=>$pengajuan['jenis_barang'] ?? null,'detail'=>trim(($pengajuan['identitas_barang'] ?? '').' '.($pengajuan['deskripsi_barang'] ?? ''))],
+            'isi_perjanjian'=>$versi_perjanjian==='lengkap'?$aturan_surat['isi_lengkap']:$aturan_surat['isi_ringkas'],
+            'penandatangan'=>['nasabah'=>$pengajuan['nama_lengkap'],'teller'=>$nama_teller,'admin'=>$nama_admin_ttd,'jabatan_admin'=>$aturan_surat['jabatan_admin'],'saksi_1'=>$nama_saksi_1,'saksi_2'=>$nama_saksi_2],
+            'foto'=>['pencairan'=>$foto_path,'barang'=>$foto_barang_path,'nasabah_barang'=>$foto_nasabah_barang_path], 'dibuat_pada'=>date('Y-m-d H:i:s')
+        ];
+        $json = json_encode($snapshot, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+        $nomor = nomorPerjanjian(['id'=>$pinjaman_id,'tanggal_pencairan'=>$tgl_cair]);
+        $hash = hash('sha256', $json.$ttd_nasabah.$ttd_teller.$ttd_admin.$ttd_saksi_1.$ttd_saksi_2);
+        $stmt = $db->prepare("INSERT INTO perjanjian_pinjaman (pinjaman_id,nomor_perjanjian,versi,snapshot_json,nama_saksi_1,nama_saksi_2,ttd_nasabah,ttd_teller,ttd_admin,ttd_saksi_1,ttd_saksi_2,hash_dokumen,ditandatangani_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW())");
+        $stmt->execute([$pinjaman_id,$nomor,$versi_perjanjian,$json,$nama_saksi_1,$nama_saksi_2,$ttd_nasabah,$ttd_teller,$ttd_admin,$ttd_saksi_1,$ttd_saksi_2,$hash]);
+        $perjanjian_id = $db->lastInsertId();
+        $stmtLampiran = $db->prepare("INSERT INTO lampiran_perjanjian (perjanjian_id,file_path,urutan) VALUES (?,?,?)");
+        foreach ($lampiran_paths as $i=>$path) $stmtLampiran->execute([$perjanjian_id,$path,$i+1]);
+
         $db->commit();
+        $committed = true;
         // Cicilan lama yang sudah lewat jatuh tempo dan belum dibayar langsung kena denda sesuai jatuh tempo aslinya
         perbaruiDendaOtomatis($db, true);
         $_SESSION['success'] = "Pinjaman berhasil dicairkan tanggal " . date('d/m/Y', strtotime($tgl_cair))
@@ -132,9 +173,10 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         if ($db->inTransaction()) {
             $db->rollBack();
         }
-        hapusFotoUpload($foto_path);
-        hapusFotoUpload($foto_barang_path);
-        hapusFotoUpload($foto_nasabah_barang_path);
+        if (!$committed) {
+            hapusFotoUpload($foto_path); hapusFotoUpload($foto_barang_path); hapusFotoUpload($foto_nasabah_barang_path);
+            foreach ($lampiran_paths as $path) hapusFotoUpload($path);
+        }
         $_SESSION['error'] = "Gagal memproses pencairan: " . htmlspecialchars($e->getMessage())
             . (migrasiRevisiBelumDijalankan($db) ? " (database belum di-update, jalankan file migrasi)" : "");
     }
@@ -161,6 +203,7 @@ $query = "SELECT pp.*, a.nama_lengkap,
           j.jenis_barang, j.foto_barang, j.foto_nasabah_barang,
           p.id as pinjaman_id, p.kode_pinjaman, p.tanggal_pencairan, p.status as status_pinjaman,
           p.foto_pencairan, uc.nama_lengkap as teller_name,
+          pr.id AS perjanjian_id,
           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status <> 'lunas') AS cicilan_belum,
           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) AS total_cicilan
           FROM pengajuan_pinjaman pp
@@ -170,6 +213,7 @@ $query = "SELECT pp.*, a.nama_lengkap,
           LEFT JOIN jaminan_pinjaman j ON j.pengajuan_id = pp.id
           LEFT JOIN pinjaman p ON pp.id = p.pengajuan_id
           LEFT JOIN users uc ON p.dicairkan_oleh = uc.id
+          LEFT JOIN perjanjian_pinjaman pr ON pr.pinjaman_id = p.id
           WHERE (pp.status IN ('disetujui', 'dicairkan', 'develop')
           OR (pp.status = '' AND pp.tanggal_persetujuan IS NOT NULL))";
 $params_filter = [];
@@ -539,6 +583,9 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                                title="Cetak Slip">
                                                 <i class="fas fa-print"></i>
                                             </a>
+                                            <?php if (!empty($pengajuan['perjanjian_id'])): ?>
+                                            <a class="btn btn-sm btn-primary btn-action" target="_blank" rel="noopener" href="cetak_perjanjian.php?id=<?php echo (int)$pengajuan['pinjaman_id']; ?>" title="Cetak Surat Perjanjian & Lampiran"><i class="fas fa-file-signature"></i></a>
+                                            <?php endif; ?>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -706,7 +753,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
 
     <!-- Proses Pencairan Modal -->
     <div class="modal fade" id="pencairanModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" enctype="multipart/form-data" id="formPencairan">
                     <input type="hidden" name="proses_pencairan" value="1">
@@ -756,6 +803,14 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                             <input type="number" name="sudah_dibayar" id="sudah_dibayar" class="form-control" min="0" value="0">
                             <small class="text-muted" id="info_dimuka"></small>
                         </div>
+                        <hr><h6><i class="fas fa-file-signature me-1"></i>Surat Perjanjian & Tanda Tangan</h6>
+                        <div class="mb-3"><label class="form-label">Versi Surat</label><select name="versi_perjanjian" class="form-select"><option value="ringkas" <?php echo $aturan_perjanjian_form['template_default']==='ringkas'?'selected':''; ?>>Ringkas</option><option value="lengkap" <?php echo $aturan_perjanjian_form['template_default']==='lengkap'?'selected':''; ?>>Lengkap</option></select></div>
+                        <div class="mb-3"><label class="form-label">Lampiran surat tambahan (opsional, maksimal 10 halaman)</label><input type="file" class="form-control" id="surat_tambahan" name="surat_tambahan[]" accept="image/*" multiple><small class="text-muted">Setiap gambar maksimal 5 MB dan akan digabung ke PDF.</small></div>
+                        <div class="row"><div class="col-md-6 mb-3"><label class="form-label">Nama Saksi 1 *</label><input class="form-control" name="nama_saksi_1" required></div><div class="col-md-6 mb-3"><label class="form-label">Nama Saksi 2 *</label><input class="form-control" name="nama_saksi_2" required></div></div>
+                        <?php foreach (['nasabah'=>'Nasabah','teller'=>'Teller','saksi_1'=>'Saksi 1','saksi_2'=>'Saksi 2'] as $key=>$label): ?>
+                        <div class="mb-3"><label class="form-label">TTD <?php echo $label; ?> *</label><canvas id="canvas_<?php echo $key; ?>" class="signature-pad border rounded w-100" style="height:140px;touch-action:none;background:#fff"></canvas><input type="hidden" name="ttd_<?php echo $key; ?>" id="ttd_<?php echo $key; ?>"><button type="button" class="btn btn-sm btn-outline-secondary mt-1 clear-signature" data-key="<?php echo $key; ?>">Hapus</button></div>
+                        <?php endforeach; ?>
+                        <div class="alert alert-secondary"><small>TTD Admin diambil otomatis dari Pengaturan Admin. Seluruh data transaksi disimpan sebagai arsip tetap saat pencairan.</small></div>
                         <div class="alert alert-info mb-0" id="info_jadwal">
                             <i class="fas fa-info-circle me-1"></i>
                             Jadwal angsuran dibuat otomatis dari tanggal pencairan. Cicilan lama yang ditandai sudah dibayar
@@ -836,6 +891,18 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             });
         });
 
+        var signaturePads = {};
+        ['nasabah','teller','saksi_1','saksi_2'].forEach(function(key){
+            var c=document.getElementById('canvas_'+key), ctx=c.getContext('2d'), drawing=false, dirty=false;
+            function resize(){c.width=c.clientWidth*devicePixelRatio;c.height=140*devicePixelRatio;ctx.scale(devicePixelRatio,devicePixelRatio);ctx.lineWidth=2;ctx.lineCap='round'} resize();
+            function pos(e){var r=c.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
+            c.addEventListener('pointerdown',function(e){drawing=true;dirty=true;var p=pos(e);ctx.beginPath();ctx.moveTo(p[0],p[1]);c.setPointerCapture(e.pointerId)});
+            c.addEventListener('pointermove',function(e){if(!drawing)return;var p=pos(e);ctx.lineTo(p[0],p[1]);ctx.stroke()}); c.addEventListener('pointerup',function(){drawing=false});
+            signaturePads[key]={canvas:c,ctx:ctx,resize:resize,isDirty:function(){return dirty},clear:function(){ctx.clearRect(0,0,c.width,c.height);dirty=false;document.getElementById('ttd_'+key).value=''}};
+        });
+        document.querySelectorAll('.clear-signature').forEach(function(b){b.onclick=function(){signaturePads[this.dataset.key].clear()}});
+        pencairanModal.addEventListener('shown.bs.modal', function(){Object.keys(signaturePads).forEach(function(k){signaturePads[k].resize();signaturePads[k].clear();});});
+
         // PHP menolak berkas yang sudah melewati upload_max_filesize sebelum kode
         // server berjalan. Karena itu foto besar dikompres dahulu di browser/HP.
         var BATAS_FOTO = 5 * 1024 * 1024;
@@ -848,8 +915,13 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
         }
 
         async function kompresFoto(input) {
-            if (!input.files.length || input.files[0].size <= BATAS_FOTO) return;
-            var file = input.files[0];
+            if (!input.files.length) return;
+            var transfer = new DataTransfer();
+            for (var f=0; f<input.files.length; f++) transfer.items.add(await kompresSatuFoto(input.files[f]));
+            input.files = transfer.files;
+        }
+        async function kompresSatuFoto(file) {
+            if (file.size <= BATAS_FOTO) return file;
             var bitmap;
             try {
                 bitmap = await createImageBitmap(file);
@@ -886,9 +958,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
 
             var nama = file.name.replace(/\.[^.]+$/, '') + '-kompres.jpg';
             var hasil = new File([blob], nama, {type: 'image/jpeg', lastModified: Date.now()});
-            var transfer = new DataTransfer();
-            transfer.items.add(hasil);
-            input.files = transfer.files;
+            return hasil;
         }
 
         document.getElementById('formPencairan').addEventListener('submit', async function (event) {
@@ -901,6 +971,10 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                 await kompresFoto(document.getElementById('foto_nasabah'));
                 await kompresFoto(document.getElementById('foto_barang_jaminan'));
                 await kompresFoto(document.getElementById('foto_nasabah_barang'));
+                await kompresFoto(document.getElementById('surat_tambahan'));
+                var ttdLengkap=true;
+                Object.keys(signaturePads).forEach(function(k){if(signaturePads[k].isDirty())document.getElementById('ttd_'+k).value=signaturePads[k].canvas.toDataURL('image/png');else ttdLengkap=false});
+                if(!ttdLengkap) throw new Error('TTD nasabah, Teller, dan kedua saksi wajib dibuat langsung pada layar.');
                 tombol.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Mencairkan...';
                 form.submit();
             } catch (e) {

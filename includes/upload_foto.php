@@ -59,6 +59,28 @@ if (!function_exists('simpanFotoUpload')) {
     }
 }
 
+if (!function_exists('validasiBanyakFotoUpload')) {
+    /** Validasi input file multiple dan kembalikan daftar dalam format simpanFotoUpload(). */
+    function validasiBanyakFotoUpload($field, $label, $maks_byte, $maks_jumlah = 10) {
+        if (empty($_FILES[$field]) || !is_array($_FILES[$field]['name'])) return [];
+        $hasil = [];
+        $jumlah = count($_FILES[$field]['name']);
+        if ($jumlah > $maks_jumlah) throw new Exception("$label maksimal $maks_jumlah halaman");
+        for ($i = 0; $i < $jumlah; $i++) {
+            if ($_FILES[$field]['error'][$i] === UPLOAD_ERR_NO_FILE) continue;
+            $tmpField = '__multi_' . $field;
+            $_FILES[$tmpField] = [
+                'name' => $_FILES[$field]['name'][$i], 'type' => $_FILES[$field]['type'][$i],
+                'tmp_name' => $_FILES[$field]['tmp_name'][$i], 'error' => $_FILES[$field]['error'][$i],
+                'size' => $_FILES[$field]['size'][$i]
+            ];
+            try { $hasil[] = validasiFotoUpload($tmpField, "$label halaman " . ($i + 1), $maks_byte, false); }
+            finally { unset($_FILES[$tmpField]); }
+        }
+        return $hasil;
+    }
+}
+
 if (!function_exists('hapusFotoUpload')) {
     function hapusFotoUpload($path) {
         if (empty($path) || strpos($path, '..') !== false) {

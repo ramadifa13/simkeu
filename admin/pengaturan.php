@@ -9,6 +9,24 @@ if (!isAdmin()) {
     exit();
 }
 
+if ($_POST && isset($_POST['update_perjanjian'])) {
+    try {
+        $jabatan = trim($_POST['jabatan_admin'] ?? '');
+        $versi = ($_POST['template_default'] ?? '') === 'lengkap' ? 'lengkap' : 'ringkas';
+        $ringkas = trim($_POST['isi_ringkas'] ?? '');
+        $lengkap = trim($_POST['isi_lengkap'] ?? '');
+        if ($jabatan === '' || $ringkas === '' || $lengkap === '') throw new Exception('Semua pengaturan surat wajib diisi');
+        $lama = pengaturanPerjanjian($db);
+        $ttd = trim($_POST['ttd_admin'] ?? '');
+        if ($ttd === '') $ttd = (string) ($lama['ttd_admin'] ?? '');
+        $ttd = validasiTtdDataUrl($ttd, 'Tanda tangan Admin');
+        $stmt = $db->prepare("UPDATE pengaturan_perjanjian SET jabatan_admin=?, template_default=?, isi_ringkas=?, isi_lengkap=?, ttd_admin=?, updated_by=? WHERE id=1");
+        $stmt->execute([$jabatan, $versi, $ringkas, $lengkap, $ttd, $_SESSION['user_id']]);
+        $_SESSION['success'] = 'Pengaturan surat perjanjian dan TTD Admin berhasil disimpan. Perubahan berlaku untuk pencairan berikutnya.';
+    } catch (Exception $e) { $_SESSION['error'] = 'Gagal menyimpan pengaturan perjanjian: ' . $e->getMessage(); }
+    header('Location: pengaturan.php'); exit();
+}
+
 // Handle form submission for koperasi settings
 if ($_POST && isset($_POST['update_koperasi'])) {
     $nama = $_POST['nama'];
@@ -158,6 +176,7 @@ $koperasi_query = "SELECT * FROM koperasi WHERE id = 1";
 $koperasi_stmt = $db->prepare($koperasi_query);
 $koperasi_stmt->execute();
 $koperasi = $koperasi_stmt->fetch(PDO::FETCH_ASSOC);
+$pengaturan_perjanjian = pengaturanPerjanjian($db);
 
 // If no data exists, create default
 if (!$koperasi) {
@@ -368,6 +387,25 @@ function formatRupiah($angka) {
                             </div>
                         </div>
 
+                        <div class="card settings-card mb-4">
+                            <div class="card-header bg-primary text-white"><h6 class="mb-0"><i class="fas fa-file-signature me-2"></i>Surat Perjanjian & TTD Admin</h6></div>
+                            <div class="card-body">
+                                <div class="alert alert-info">Pengaturan ini berlaku untuk surat baru. Surat yang sudah ditandatangani tetap memakai data saat transaksi.</div>
+                                <form method="POST" id="formPerjanjian">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3"><label class="form-label">Jabatan penandatangan Admin</label><input class="form-control" name="jabatan_admin" required value="<?php echo htmlspecialchars($pengaturan_perjanjian['jabatan_admin']); ?>"></div>
+                                        <div class="col-md-6 mb-3"><label class="form-label">Versi default</label><select class="form-select" name="template_default"><option value="ringkas" <?php echo $pengaturan_perjanjian['template_default']==='ringkas'?'selected':''; ?>>Ringkas</option><option value="lengkap" <?php echo $pengaturan_perjanjian['template_default']==='lengkap'?'selected':''; ?>>Lengkap</option></select></div>
+                                    </div>
+                                    <div class="mb-3"><label class="form-label">Isi versi ringkas</label><textarea class="form-control" rows="7" name="isi_ringkas" required><?php echo htmlspecialchars($pengaturan_perjanjian['isi_ringkas']); ?></textarea></div>
+                                    <div class="mb-3"><label class="form-label">Isi versi lengkap</label><textarea class="form-control" rows="12" name="isi_lengkap" required><?php echo htmlspecialchars($pengaturan_perjanjian['isi_lengkap']); ?></textarea></div>
+                                    <label class="form-label">TTD Admin (gambar langsung di layar)</label>
+                                    <canvas id="ttdAdminCanvas" class="border rounded w-100" style="height:180px;touch-action:none;background:#fff"></canvas>
+                                    <input type="hidden" name="ttd_admin" id="ttd_admin">
+                                    <div class="mt-2"><button type="button" class="btn btn-outline-secondary btn-sm" id="hapusTtdAdmin">Hapus / gambar ulang</button> <button type="submit" name="update_perjanjian" class="btn btn-primary"><i class="fas fa-save me-1"></i>Simpan Pengaturan</button></div>
+                                </form>
+                            </div>
+                        </div>
+
                         <!-- Logo Upload -->
                         <div class="card settings-card">
                             <div class="card-header bg-info text-white">
@@ -415,5 +453,17 @@ function formatRupiah($angka) {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    (function(){
+      var c=document.getElementById('ttdAdminCanvas'); if(!c)return; var x=c.getContext('2d'), drawing=false, dirty=false;
+      function size(){var old=dirty?c.toDataURL():null;c.width=c.clientWidth*devicePixelRatio;c.height=180*devicePixelRatio;x.scale(devicePixelRatio,devicePixelRatio);x.lineWidth=2;x.lineCap='round';if(old){var i=new Image;i.onload=function(){x.drawImage(i,0,0,c.clientWidth,180)};i.src=old;}}
+      function p(e){var r=c.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
+      c.addEventListener('pointerdown',function(e){drawing=true;dirty=true;var a=p(e);x.beginPath();x.moveTo(a[0],a[1]);c.setPointerCapture(e.pointerId)});
+      c.addEventListener('pointermove',function(e){if(!drawing)return;var a=p(e);x.lineTo(a[0],a[1]);x.stroke()}); c.addEventListener('pointerup',function(){drawing=false});
+      size(); var existing=<?php echo json_encode((string)($pengaturan_perjanjian['ttd_admin'] ?? '')); ?>;if(existing){var i=new Image;i.onload=function(){x.drawImage(i,0,0,c.clientWidth,180);dirty=true};i.src=existing}
+      document.getElementById('hapusTtdAdmin').onclick=function(){x.clearRect(0,0,c.width,c.height);dirty=false;document.getElementById('ttd_admin').value=''};
+      document.getElementById('formPerjanjian').addEventListener('submit',function(e){if(dirty)document.getElementById('ttd_admin').value=c.toDataURL('image/png');if(!document.getElementById('ttd_admin').value&&!existing){e.preventDefault();alert('TTD Admin wajib dibuat.')}});
+    })();
+    </script>
 </body>
 </html>

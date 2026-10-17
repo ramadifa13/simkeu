@@ -98,13 +98,14 @@ $pengajuan_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Get disbursed loans dengan JOIN lengkap
 $query_dicairkan = "SELECT p.*, a.nama_lengkap,
                    CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
-                   jp.nama_jenis, j.jenis_barang, j.foto_barang, j.foto_nasabah_barang,
+                   jp.nama_jenis, j.jenis_barang, j.foto_barang, j.foto_nasabah_barang, pr.id AS perjanjian_id,
                    (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status <> 'lunas') AS cicilan_belum,
           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) AS total_cicilan
                    FROM pinjaman p
                    LEFT JOIN anggota a ON p.anggota_id = a.id
                    LEFT JOIN jenis_pinjaman jp ON p.jenis_pinjaman_id = jp.id
                    LEFT JOIN jaminan_pinjaman j ON j.pinjaman_id = p.id
+                   LEFT JOIN perjanjian_pinjaman pr ON pr.pinjaman_id = p.id
                    WHERE 1=1";
 $params_dicairkan = [];
 if ($filter_cari !== '') {
@@ -437,6 +438,9 @@ function formatRupiah($angka) {
                                                    href="cetak_slip_pencairan.php?id=<?php echo (int) $p['id']; ?>" title="Cetak Slip">
                                                     <i class="fas fa-print"></i>
                                                 </a>
+                                                <?php if (!empty($p['perjanjian_id'])): ?>
+                                                <a class="btn btn-sm btn-primary" target="_blank" rel="noopener" href="cetak_perjanjian.php?id=<?php echo (int)$p['id']; ?>" title="Cetak Surat Perjanjian & Lampiran"><i class="fas fa-file-signature"></i></a>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
