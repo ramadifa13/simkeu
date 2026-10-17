@@ -142,6 +142,10 @@ Bug lama yang sebelumnya belum diubah (tabel `pelunasan_dini` dan pembatasan rol
 
 Migrasi: `database/migrations/2026_10f_gadai_tenor_6_bulan.sql`.
 
+Revisi lanjutan gadai: nilai taksiran dihapus dari form dan validasi. Kolom database lama
+tetap disimpan dengan nilai 0 untuk kompatibilitas, sehingga revisi ini tidak memerlukan
+migrasi tambahan selain `2026_10g_batas_pinjaman_kode_gadai.sql` untuk kode AGTJ.
+
 | Isi | Status |
 |---|---|
 | Jenis pinjaman dapat ditandai wajib jaminan/gadai; pengajuan menyimpan jenis, identitas, kondisi, nilai taksiran barang | Selesai |

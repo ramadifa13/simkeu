@@ -73,7 +73,7 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
         $stmt_proses = $db->prepare("SELECT pp.kode_pengajuan
             FROM pengajuan_pinjaman pp
             JOIN jenis_pinjaman jp ON jp.id = pp.jenis_pinjaman_id
-            WHERE pp.anggota_id = ? AND pp.status IN ('menunggu','disetujui')
+            WHERE pp.anggota_id = ? AND pp.status IN ('menunggu','disetujui','dicairkan')
               AND (CASE WHEN jp.memerlukan_jaminan = 1 THEN 1 ELSE 0 END) = ?
             LIMIT 1");
         $stmt_proses->execute([$anggota_id, $kategori_gadai]);
@@ -196,14 +196,10 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
                 'jenis_barang' => $jenis_barang,
                 'identitas_barang' => $identitas_barang,
                 'deskripsi_barang' => $deskripsi_barang,
-                'nilai_taksiran' => parseRupiah($_POST['nilai_taksiran'] ?? ''),
+                // Kolom lama tetap diisi 0 agar kompatibel dengan database yang
+                // mewajibkan nilai, tetapi tidak lagi dipakai oleh proses bisnis.
+                'nilai_taksiran' => 0,
             ];
-            if ($jaminan['nilai_taksiran'] === false || (float) $jaminan['nilai_taksiran'] <= 0) {
-                throw new Exception("Nilai taksiran jaminan harus berupa angka lebih dari 0");
-            }
-            if ((float) $jumlah_pinjaman > (float) $jaminan['nilai_taksiran']) {
-                throw new Exception("Jumlah pinjaman tidak boleh melebihi nilai taksiran barang");
-            }
         }
 
         $hari_angsuran = !empty($jenis_info['memerlukan_jaminan'])
@@ -548,8 +544,6 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                             <div class="col-md-6 mb-2"><label>Jenis barang *</label><input class="form-control detail-required" name="emas_jenis_barang"></div><div class="col-md-6 mb-2"><label>Berat *</label><input class="form-control detail-required" name="emas_berat" placeholder="Contoh: 10 gram"></div>
                                             <div class="col-md-6 mb-2"><label>Kadar *</label><input class="form-control detail-required" name="emas_kadar" placeholder="Contoh: 22 karat"></div><div class="col-md-6 mb-2"><label>Bentuk/ciri *</label><input class="form-control detail-required" name="emas_bentuk_ciri"></div><div class="col-12 mb-2"><label>Surat/nota *</label><input class="form-control detail-required" name="emas_surat_nota"></div>
                                         </div></div>
-                                        <div class="mt-2"><label>Nilai Taksiran (Rp) *</label><input type="number" name="nilai_taksiran" class="form-control jaminan-common-required" min="1" step="1"></div>
-                                        <small class="text-muted">Jumlah pinjaman tidak boleh melebihi nilai taksiran.</small>
                                     </div>
 
                                     <div class="mb-3">

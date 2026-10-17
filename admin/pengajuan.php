@@ -81,7 +81,7 @@ $query = "SELECT pp.*, a.nama_lengkap,
           CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
           jp.nama_jenis,
           jp.maksimal_pinjaman, jp.memerlukan_jaminan, u.nama_lengkap as teller_name,
-          j.jenis_barang, j.identitas_barang, j.deskripsi_barang, j.nilai_taksiran, j.status_jaminan
+          j.jenis_barang, j.identitas_barang, j.deskripsi_barang, j.status_jaminan
           FROM pengajuan_pinjaman pp
           JOIN anggota a ON pp.anggota_id = a.id
           JOIN jenis_pinjaman jp ON pp.jenis_pinjaman_id = jp.id
@@ -318,7 +318,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     data-status="<?php echo $pengajuan['status']; ?>"
                                                     data-tanggal="<?php echo date('d/m/Y H:i', strtotime($pengajuan['tanggal_pengajuan'])); ?>"
                                                     data-teller="<?php echo $pengajuan['teller_name'] ?? 'System'; ?>"
-                                                    data-jaminan="<?php echo htmlspecialchars(!empty($pengajuan['jenis_barang']) ? $pengajuan['jenis_barang'] . ' — ' . $pengajuan['identitas_barang'] . ' — ' . $pengajuan['deskripsi_barang'] . ' (taksiran ' . formatRupiah($pengajuan['nilai_taksiran']) . ')' : '', ENT_QUOTES); ?>"
+                                                    data-jaminan="<?php echo htmlspecialchars(!empty($pengajuan['jenis_barang']) ? $pengajuan['jenis_barang'] . ' — ' . $pengajuan['identitas_barang'] . ' — ' . $pengajuan['deskripsi_barang'] : '', ENT_QUOTES); ?>"
                                                     title="Detail">
                                                 <i class="fas fa-eye"></i>
                                             </button>
