@@ -48,6 +48,7 @@ if ($_POST) {
                 $stmt_angsuran = $db->prepare($query_angsuran);
                 $stmt_angsuran->bindParam(':pinjaman_id', $id);
                 $stmt_angsuran->execute();
+                tandaiLunasBilaSelesai($db, $id);
                 
                 // Record early settlement
                 $query_pelunasan = "INSERT INTO pelunasan_dini (pinjaman_id, jumlah_pelunasan, keterangan, user_id) 

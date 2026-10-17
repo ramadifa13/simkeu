@@ -116,6 +116,17 @@ function checkTeller() {
  * Check anggota access
  */
 function checkAnggota() {
+    global $db;
+    if (isLoggedIn() && isAnggota() && $db) {
+        $stmt = $db->prepare("SELECT status FROM users WHERE id = ? AND role = 'anggota'");
+        $stmt->execute([$_SESSION['user_id']]);
+        if ($stmt->fetchColumn() !== 'aktif') {
+            session_unset();
+            $_SESSION['error'] = 'Akun anggota nonaktif karena pinjaman telah lunas. Ajukan pinjaman baru melalui Teller untuk mengaktifkan kembali akun.';
+            header('Location: ../login.php?role=anggota');
+            exit();
+        }
+    }
     checkRole('anggota');
 }
 

@@ -47,12 +47,12 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
         $kategori_gadai = !empty($jenis_info['memerlukan_jaminan']) ? 1 : 0;
 
         // Kunci baris anggota agar dua pengajuan bersamaan tidak lolos validasi.
-        $stmt_anggota_kunci = $db->prepare("SELECT id, kode_anggota, kode_anggota_jaminan
-                                             FROM anggota WHERE id = ? AND status = 'aktif' FOR UPDATE");
+        $stmt_anggota_kunci = $db->prepare("SELECT id, kode_anggota, kode_anggota_jaminan, status
+                                             FROM anggota WHERE id = ? FOR UPDATE");
         $stmt_anggota_kunci->execute([$anggota_id]);
         $anggota_info = $stmt_anggota_kunci->fetch(PDO::FETCH_ASSOC);
         if (!$anggota_info) {
-            throw new Exception("Anggota tidak valid atau tidak aktif");
+            throw new Exception("Anggota tidak valid");
         }
 
         // Satu anggota maksimal satu pinjaman belum lunas untuk setiap kategori:
@@ -253,6 +253,9 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
             $stmt_jaminan->execute([$pengajuan_id, $jaminan['jenis_barang'], $jaminan['identitas_barang'],
                 $jaminan['deskripsi_barang'], $jaminan['nilai_taksiran']]);
         }
+
+        // Pengajuan baru mengaktifkan kembali akun lama; kode dan akun tetap sama.
+        aktifkanKembaliAnggota($db, $anggota_id);
         
         $db->commit();
         $_SESSION['success'] = "Pengajuan pinjaman berhasil dibuat. Kode: " . $kode_pengajuan . " - Menunggu persetujuan admin";
@@ -267,7 +270,7 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
 }
 
 // Get data for dropdowns
-$query_anggota = "SELECT * FROM anggota WHERE status = 'aktif' ORDER BY nama_lengkap";
+$query_anggota = "SELECT * FROM anggota ORDER BY status = 'aktif' DESC, nama_lengkap";
 $stmt_anggota = $db->prepare($query_anggota);
 $stmt_anggota->execute();
 $anggota_list = $stmt_anggota->fetchAll(PDO::FETCH_ASSOC);
@@ -479,7 +482,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                             <option value="">-- Pilih Anggota --</option>
                                             <?php foreach ($anggota_list as $anggota): ?>
                                             <option value="<?php echo $anggota['id']; ?>">
-                                                <?php echo $anggota['kode_anggota'] . ' - ' . $anggota['nama_lengkap']; ?>
+                                                <?php echo $anggota['kode_anggota'] . ' - ' . $anggota['nama_lengkap']; ?><?php echo $anggota['status'] !== 'aktif' ? ' (Nonaktif - akan diaktifkan saat pengajuan)' : ''; ?>
                                             </option>
                                             <?php endforeach; ?>
                                         </select>

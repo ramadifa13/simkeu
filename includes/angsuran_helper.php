@@ -118,6 +118,7 @@ if (!function_exists('batalkanPembayaranAngsuran')) {
                 $set .= ", tanggal_lunas = NULL";
             }
             $db->prepare("UPDATE pinjaman SET $set WHERE id = ?")->execute([(float) $a['pokok'], $a['pinjaman_id']]);
+            aktifkanKembaliAnggota($db, $a['anggota_id']);
 
             // ---- Admin membatalkan langsung: pengajuan Teller yang masih menunggu ikut ditutup
             if ($tutup_pengajuan && tabelPengajuanPembatalanAda($db)) {

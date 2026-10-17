@@ -419,7 +419,45 @@ if (!function_exists('tandaiLunasBilaSelesai')) {
         if (kolomAda($db, 'pinjaman', 'tanggal_lunas')) {
             $set .= ", tanggal_lunas = COALESCE(tanggal_lunas, CURDATE())";
         }
+        $stmt_pinjaman = $db->prepare("SELECT anggota_id FROM pinjaman WHERE id = ?");
+        $stmt_pinjaman->execute([$pinjaman_id]);
+        $anggota_id = (int) $stmt_pinjaman->fetchColumn();
         $db->prepare("UPDATE pinjaman SET $set WHERE id = ?")->execute([$pinjaman_id]);
+        if ($anggota_id > 0) {
+            nonaktifkanAnggotaBilaSemuaPinjamanLunas($db, $anggota_id);
+        }
         return true;
+    }
+}
+
+if (!function_exists('nonaktifkanAnggotaBilaSemuaPinjamanLunas')) {
+    /**
+     * Nonaktifkan anggota dan akun loginnya hanya bila tidak ada pinjaman aktif
+     * maupun pengajuan baru yang masih berjalan. Nasabah dengan dua pinjaman tidak
+     * dinonaktifkan ketika baru salah satunya yang lunas.
+     */
+    function nonaktifkanAnggotaBilaSemuaPinjamanLunas($db, $anggota_id) {
+        $stmt = $db->prepare("SELECT
+            (SELECT COUNT(*) FROM pinjaman WHERE anggota_id = ? AND status <> 'lunas') +
+            (SELECT COUNT(*) FROM pengajuan_pinjaman WHERE anggota_id = ? AND status IN ('menunggu','disetujui'))");
+        $stmt->execute([$anggota_id, $anggota_id]);
+        if ((int) $stmt->fetchColumn() > 0) {
+            return false;
+        }
+        $db->prepare("UPDATE anggota SET status = 'nonaktif' WHERE id = ?")->execute([$anggota_id]);
+        $db->prepare("UPDATE users u JOIN anggota a ON a.user_id = u.id
+                      SET u.status = 'nonaktif' WHERE a.id = ? AND u.role = 'anggota'")
+           ->execute([$anggota_id]);
+        return true;
+    }
+}
+
+if (!function_exists('aktifkanKembaliAnggota')) {
+    /** Aktifkan akun lama saat pengajuan baru berhasil dibuat. */
+    function aktifkanKembaliAnggota($db, $anggota_id) {
+        $db->prepare("UPDATE anggota SET status = 'aktif' WHERE id = ?")->execute([$anggota_id]);
+        $db->prepare("UPDATE users u JOIN anggota a ON a.user_id = u.id
+                      SET u.status = 'aktif' WHERE a.id = ? AND u.role = 'anggota'")
+           ->execute([$anggota_id]);
     }
 }
