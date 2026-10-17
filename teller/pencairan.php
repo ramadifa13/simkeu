@@ -806,7 +806,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Foto Nasabah Saat Menerima Uang <span class="text-danger">*</span></label>
                             <input type="file" name="foto_nasabah" id="foto_nasabah" class="form-control" required
-                                   accept="image/*" capture="environment">
+                                   accept="image/*">
                             <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB. Foto yang lebih besar akan dikompres otomatis.</small>
                             <img id="foto_nasabah_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau foto">
                         </div>
@@ -814,14 +814,14 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                             <div class="mb-3">
                                 <label class="form-label fw-semibold" id="label_foto_barang">Foto Barang Jaminan <span class="text-danger">*</span></label>
                                 <input type="file" name="foto_barang_jaminan" id="foto_barang_jaminan" class="form-control"
-                                       accept="image/*" capture="environment">
+                                       accept="image/*">
                                 <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB. Foto yang lebih besar akan dikompres otomatis.</small>
                                 <img id="foto_barang_jaminan_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau foto barang jaminan">
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Foto Nasabah dengan Barang Jaminan <span class="text-danger">*</span></label>
                                 <input type="file" name="foto_nasabah_barang" id="foto_nasabah_barang" class="form-control"
-                                       accept="image/*" capture="environment">
+                                       accept="image/*">
                                 <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB. Foto yang lebih besar akan dikompres otomatis.</small>
                                 <img id="foto_nasabah_barang_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau nasabah dengan barang jaminan">
                             </div>

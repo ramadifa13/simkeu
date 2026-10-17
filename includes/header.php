@@ -206,6 +206,7 @@ body {
 }
 </style>
 
+<script src="../assets/js/pilihan-foto.js?v=1" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Handle sidebar toggle for mobile
