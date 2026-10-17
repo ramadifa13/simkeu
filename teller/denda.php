@@ -17,7 +17,7 @@ if (!isTeller()) {
 $page_title = "Denda & Keterlambatan";
 
 // Denda otomatis (sekali sehari); denda manual tidak ditimpa
-perbaruiDendaOtomatis($db);
+perbaruiDendaOtomatis($db, true);
 
 // PERBAIKAN: Hapus semua fungsi pembayaran denda
 // Teller hanya bisa melihat, tidak bisa melakukan pembayaran denda

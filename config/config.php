@@ -7,6 +7,10 @@ if (session_status() == PHP_SESSION_NONE) {
 define('APP_NAME', 'Koperasi App');
 define('APP_VERSION', '1.0');
 
+// Seluruh jadwal angsuran dan denda mengikuti waktu operasional Indonesia Barat.
+// Hosting sering memakai UTC sehingga angsuran Sabtu baru dianggap telat beberapa jam kemudian.
+date_default_timezone_set('Asia/Jakarta');
+
 // Base URL dengan path yang benar
 $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
 $host = $_SERVER['HTTP_HOST'];
@@ -29,6 +33,7 @@ try {
     // panjang) - dan karena PDO dalam mode silent, gagalnya tidak terlihat. Samakan mode per koneksi.
     if ($db) {
         $db->exec("SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION'");
+        $db->exec("SET time_zone = '+07:00'");
     }
 } catch (Exception $e) {
     die("Database connection failed: " . $e->getMessage());

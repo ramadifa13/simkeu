@@ -24,7 +24,9 @@ if (!isAdmin() && !isTeller()) {
 $page_title = "Pembayaran Angsuran";
 
 // Denda otomatis (sekali sehari); denda yang diinput manual tidak ditimpa
-perbaruiDendaOtomatis($db);
+// Paksa hitung ulang saat halaman pembayaran dibuka agar perubahan jatuh tempo
+// langsung terlihat tanpa menunggu proses harian berikutnya.
+perbaruiDendaOtomatis($db, true);
 
 // Handle payment
 if ($_POST) {

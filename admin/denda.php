@@ -24,7 +24,7 @@ if (!isAdmin()) {
 $page_title = "Denda & Keterlambatan";
 
 // Denda otomatis (sekali sehari); denda manual tidak ditimpa
-perbaruiDendaOtomatis($db);
+perbaruiDendaOtomatis($db, true);
 
 // Handle fine update
 if ($_POST) {
