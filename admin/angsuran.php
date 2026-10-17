@@ -288,7 +288,9 @@ $kolom_hari = "COALESCE(
         (SELECT WEEKDAY(ah2.tanggal_jatuh_tempo) + 1 FROM angsuran ah2
           WHERE ah2.pinjaman_id = p.id ORDER BY ah2.tanggal_jatuh_tempo DESC LIMIT 1)
     ) AS hari_angsuran,";
-$query_pinjaman = "SELECT p.*, a.nama_lengkap, a.kode_anggota, jp.nama_jenis, $kolom_hari
+$kolom_tanggal_belum = "(SELECT GROUP_CONCAT(DISTINCT DATE(ah3.tanggal_jatuh_tempo) ORDER BY ah3.tanggal_jatuh_tempo)
+                           FROM angsuran ah3 WHERE ah3.pinjaman_id = p.id AND ah3.status <> 'lunas') AS tanggal_angsuran_belum,";
+$query_pinjaman = "SELECT p.*, a.nama_lengkap, a.kode_anggota, jp.nama_jenis, $kolom_hari $kolom_tanggal_belum
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) as total_angsuran,
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') as angsuran_lunas
                    FROM pinjaman p
@@ -339,19 +341,31 @@ if ($filter_pb !== '') {
         return $pj['n_pb'][$filter_pb] > 0;
     }));
 }
-// Filter hari angsuran (Senin - Minggu), digabung dengan filter pengajuan pembatalan
+// Filter hari memakai TANGGAL jatuh tempo aktual pada minggu berjalan, bukan sekadar
+// nama hari. Contoh: memilih Selasa hanya menampilkan angsuran yang benar-benar jatuh
+// tempo pada Selasa minggu ini; Selasa bulan depan tidak ikut muncul.
+$awal_minggu = new DateTimeImmutable('monday this week');
+$tanggal_per_hari = [];
+for ($nomor_hari = 1; $nomor_hari <= 7; $nomor_hari++) {
+    $tanggal_per_hari[$nomor_hari] = $awal_minggu->modify('+' . ($nomor_hari - 1) . ' days')->format('Y-m-d');
+}
 $jumlah_hari = array_fill(1, 7, 0);
 foreach ($pinjaman_list as $pj) {
-    if (!empty($pj['hari_angsuran'])) {
-        $jumlah_hari[(int) $pj['hari_angsuran']]++;
+    $tanggal_belum = empty($pj['tanggal_angsuran_belum']) ? [] : explode(',', $pj['tanggal_angsuran_belum']);
+    foreach ($tanggal_per_hari as $nomor_hari => $tanggal_filter) {
+        if (in_array($tanggal_filter, $tanggal_belum, true)) {
+            $jumlah_hari[$nomor_hari]++;
+        }
     }
 }
 $filter_hari = isset($_GET['hari']) ? (int) $_GET['hari'] : 0;
 if ($filter_hari < 1 || $filter_hari > 7) {
     $filter_hari = 0;
 } else {
-    $pinjaman_list = array_values(array_filter($pinjaman_list, function ($pj) use ($filter_hari) {
-        return (int) $pj['hari_angsuran'] === $filter_hari;
+    $tanggal_filter = $tanggal_per_hari[$filter_hari];
+    $pinjaman_list = array_values(array_filter($pinjaman_list, function ($pj) use ($tanggal_filter) {
+        $tanggal_belum = empty($pj['tanggal_angsuran_belum']) ? [] : explode(',', $pj['tanggal_angsuran_belum']);
+        return in_array($tanggal_filter, $tanggal_belum, true);
     }));
 }
 $qs_filter = ($filter_pb !== '' ? '&filter=' . $filter_pb : '') . ($filter_hari ? '&hari=' . $filter_hari : '');
@@ -594,7 +608,8 @@ function formatRupiah($angka) {
                                     <a href="angsuran.php<?php echo $qs_pb ? '?' . ltrim($qs_pb, '&') : ''; ?>" class="btn btn-sm <?php echo !$filter_hari ? 'btn-primary' : 'btn-outline-primary'; ?>">Semua</a>
                                     <?php foreach (daftarHariAngsuran() as $no => $nama_hari): ?>
                                     <a href="?hari=<?php echo $no . $qs_pb; ?>" class="btn btn-sm <?php echo $filter_hari === $no ? 'btn-primary' : 'btn-outline-primary'; ?>">
-                                        <?php echo $nama_hari; ?> <span class="badge bg-secondary"><?php echo $jumlah_hari[$no]; ?></span>
+                                        <?php echo $nama_hari; ?> <?php echo date('d/m', strtotime($tanggal_per_hari[$no])); ?>
+                                        <span class="badge bg-secondary"><?php echo $jumlah_hari[$no]; ?></span>
                                     </a>
                                     <?php endforeach; ?>
                                 </div>
@@ -603,7 +618,7 @@ function formatRupiah($angka) {
                                     <div class="text-center py-4">
                                         <i class="fas fa-info-circle fa-3x text-info mb-3"></i>
                                         <h5 class="text-muted">Tidak ada pinjaman</h5>
-                                        <p class="text-muted">Tidak ada pinjaman yang memiliki angsuran.</p>
+                                        <p class="text-muted"><?php echo $filter_hari ? 'Tidak ada angsuran yang jatuh tempo pada tanggal yang dipilih.' : 'Tidak ada pinjaman yang memiliki angsuran.'; ?></p>
                                     </div>
                                     <?php else: ?>
                                     <div class="list-group">
