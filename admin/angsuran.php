@@ -369,7 +369,13 @@ $query_stats = "SELECT
     COUNT(*) as total_pinjaman,
     COUNT(CASE WHEN status = 'aktif' THEN 1 END) as aktif,
     COUNT(CASE WHEN status = 'lunas' THEN 1 END) as lunas,
-    COUNT(CASE WHEN status = 'macet' THEN 1 END) as macet
+    COUNT(CASE WHEN status = 'macet' THEN 1 END) as macet,
+    (SELECT COUNT(DISTINCT a.pinjaman_id)
+       FROM angsuran a
+       JOIN pinjaman p2 ON p2.id = a.pinjaman_id
+      WHERE a.status <> 'lunas'
+        AND a.tanggal_jatuh_tempo < CURDATE()
+        AND p2.status <> 'lunas') as telat_bayar
     FROM pinjaman";
 $stmt_stats = $db->prepare($query_stats);
 $stmt_stats->execute();
@@ -471,7 +477,7 @@ function formatRupiah($angka) {
 
                 <!-- Statistics Cards -->
                 <div class="row mb-4">
-                    <div class="col-md-3">
+                    <div class="col-md">
                         <div class="card stat-card bg-primary text-white">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between">
@@ -486,7 +492,7 @@ function formatRupiah($angka) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md">
                         <div class="card stat-card bg-success text-white">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between">
@@ -501,7 +507,7 @@ function formatRupiah($angka) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md">
                         <div class="card stat-card bg-info text-white">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between">
@@ -516,7 +522,22 @@ function formatRupiah($angka) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md">
+                        <div class="card stat-card bg-warning text-dark">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h4><?php echo $stats['telat_bayar']; ?></h4>
+                                        <p>Telat Bayar</p>
+                                    </div>
+                                    <div class="align-self-center">
+                                        <i class="fas fa-clock fa-2x"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md">
                         <div class="card stat-card bg-danger text-white">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between">
