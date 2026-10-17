@@ -60,6 +60,12 @@ Aplikasi koperasi simpan pinjam (PHP + MySQL) dengan 3 level login: Admin, Telle
    ```bash
    mysql -u root koperasi_db < database/migrations/2026_10h_foto_pencairan_gadai.sql
    ```
+   Jika migrasi `10g` dan `10h` **keduanya belum pernah dijalankan**, keduanya dapat
+   digantikan dengan satu kali menjalankan file gabungan berikut:
+   ```bash
+   mysql -u root koperasi_db < database/migrations/2026_10gh_kode_dan_foto_gadai.sql
+   ```
+   Setelah memakai file gabungan, jangan jalankan `10g` dan `10h` lagi.
 4. Sesuaikan koneksi database di `config/database.php` bila user/password MySQL berbeda.
 5. Atur `php.ini` lalu restart Apache:
    ```ini
