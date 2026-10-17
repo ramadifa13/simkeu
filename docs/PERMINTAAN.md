@@ -161,3 +161,4 @@ Migrasi: `database/migrations/2026_10f_gadai_tenor_6_bulan.sql`.
 - Koreksi pembulatan cicilan terakhir diperbolehkan selama total dan nominal pembayaran sesuai tabel.
 - Untuk jenis gadai, Admin cukup mencentang opsi gadai: sistem otomatis membuat tenor 1–6 bulan dengan bunga dasar 15% dan mengaktifkan frekuensi mingguan, 2 mingguan, serta bulanan. Tenor/frekuensi dipilih saat Teller membuat pengajuan; Admin melihat pilihannya saat persetujuan.
 - Form Teller untuk gadai otomatis mengisi nominal dari Maksimal Pinjaman (tetap editable), menampilkan ketiga frekuensi, dan menyembunyikan Hari Angsuran. Jenis non-gadai tetap mewajibkan Hari Angsuran.
+- Form jaminan Teller menyediakan pilihan HP, sepeda motor, atau emas sebelum frekuensi. Masing-masing menampilkan field identitas khusus (HP: IMEI/kondisi; motor: nopol/rangka/mesin/BPKB; emas: berat/kadar/ciri/nota). Label frekuensi hanya Bulanan, Mingguan, dan 2 minggu sekali.

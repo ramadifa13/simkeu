@@ -96,15 +96,53 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
 
         $jaminan = null;
         if (!empty($jenis_info['memerlukan_jaminan'])) {
+            $kategori = trim($_POST['kategori_jaminan'] ?? '');
+            $wajib = function ($nama, $label) {
+                $nilai = trim($_POST[$nama] ?? '');
+                if ($nilai === '') throw new Exception("$label wajib diisi");
+                return $nilai;
+            };
+            if ($kategori === 'hp') {
+                $jenis = $wajib('hp_jenis', 'Jenis HP');
+                $merk = $wajib('hp_merk_tipe', 'Merk/tipe HP');
+                $warna = $wajib('hp_warna', 'Warna HP');
+                $imei = $wajib('hp_imei', 'IMEI');
+                $kelengkapan = $wajib('hp_kelengkapan', 'Kelengkapan HP');
+                $kondisi = $wajib('hp_kondisi', 'Kondisi HP');
+                $jenis_barang = 'HP - ' . $jenis;
+                $identitas_barang = 'IMEI: ' . $imei;
+                $deskripsi_barang = "Merk/tipe: $merk\nWarna: $warna\nKelengkapan: $kelengkapan\nKondisi: $kondisi";
+            } elseif ($kategori === 'sepeda_motor') {
+                $jenis = $wajib('motor_jenis_kendaraan', 'Jenis kendaraan');
+                $merk = $wajib('motor_merk_tipe', 'Merk/tipe kendaraan');
+                $tahun = $wajib('motor_tahun', 'Tahun kendaraan');
+                $nopol = $wajib('motor_nopol', 'Nomor polisi');
+                $rangka = $wajib('motor_no_rangka', 'Nomor rangka');
+                $mesin = $wajib('motor_no_mesin', 'Nomor mesin');
+                $warna = $wajib('motor_warna', 'Warna kendaraan');
+                $atas_nama = $wajib('motor_atas_nama_bpkb', 'Atas nama BPKB');
+                $no_bpkb = $wajib('motor_no_bpkb', 'Nomor BPKB');
+                $jenis_barang = 'Sepeda Motor - ' . $jenis;
+                $identitas_barang = "Nopol: $nopol; BPKB: $no_bpkb";
+                $deskripsi_barang = "Merk/tipe: $merk\nTahun: $tahun\nNo. rangka: $rangka\nNo. mesin: $mesin\nWarna: $warna\nAtas nama BPKB: $atas_nama";
+            } elseif ($kategori === 'emas') {
+                $jenis = $wajib('emas_jenis_barang', 'Jenis barang emas');
+                $berat = $wajib('emas_berat', 'Berat emas');
+                $kadar = $wajib('emas_kadar', 'Kadar emas');
+                $ciri = $wajib('emas_bentuk_ciri', 'Bentuk/ciri emas');
+                $surat = $wajib('emas_surat_nota', 'Surat/nota emas');
+                $jenis_barang = 'Emas - ' . $jenis;
+                $identitas_barang = 'Surat/nota: ' . $surat;
+                $deskripsi_barang = "Berat: $berat\nKadar: $kadar\nBentuk/ciri: $ciri";
+            } else {
+                throw new Exception("Pilih kategori jaminan: HP, sepeda motor, atau emas");
+            }
             $jaminan = [
-                'jenis_barang' => trim($_POST['jenis_barang'] ?? ''),
-                'identitas_barang' => trim($_POST['identitas_barang'] ?? ''),
-                'deskripsi_barang' => trim($_POST['deskripsi_barang'] ?? ''),
+                'jenis_barang' => $jenis_barang,
+                'identitas_barang' => $identitas_barang,
+                'deskripsi_barang' => $deskripsi_barang,
                 'nilai_taksiran' => parseRupiah($_POST['nilai_taksiran'] ?? ''),
             ];
-            if ($jaminan['jenis_barang'] === '' || $jaminan['identitas_barang'] === '' || $jaminan['deskripsi_barang'] === '') {
-                throw new Exception("Data barang jaminan wajib diisi lengkap untuk pinjaman gadai");
-            }
             if ($jaminan['nilai_taksiran'] === false || (float) $jaminan['nilai_taksiran'] <= 0) {
                 throw new Exception("Nilai taksiran jaminan harus berupa angka lebih dari 0");
             }
@@ -430,6 +468,33 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                         </div>
                                     </div>
 
+                                    <div id="jaminanFields" class="border rounded p-3 mb-3 bg-light" style="display:none">
+                                        <h6><i class="fas fa-box me-1"></i> Data Barang Jaminan / Gadai</h6>
+                                        <label class="form-label d-block">Pilih Jaminan *</label>
+                                        <div class="mb-3">
+                                            <div class="form-check form-check-inline"><input class="form-check-input kategori-jaminan" type="radio" name="kategori_jaminan" value="hp" id="jaminanHp"><label class="form-check-label" for="jaminanHp">HP</label></div>
+                                            <div class="form-check form-check-inline"><input class="form-check-input kategori-jaminan" type="radio" name="kategori_jaminan" value="sepeda_motor" id="jaminanMotor"><label class="form-check-label" for="jaminanMotor">Sepeda motor</label></div>
+                                            <div class="form-check form-check-inline"><input class="form-check-input kategori-jaminan" type="radio" name="kategori_jaminan" value="emas" id="jaminanEmas"><label class="form-check-label" for="jaminanEmas">Emas</label></div>
+                                        </div>
+                                        <div class="jaminan-detail" data-kategori="hp" style="display:none"><div class="row">
+                                            <div class="col-md-6 mb-2"><label>Jenis *</label><input class="form-control detail-required" name="hp_jenis"></div><div class="col-md-6 mb-2"><label>Merk/tipe HP *</label><input class="form-control detail-required" name="hp_merk_tipe"></div>
+                                            <div class="col-md-6 mb-2"><label>Warna *</label><input class="form-control detail-required" name="hp_warna"></div><div class="col-md-6 mb-2"><label>IMEI *</label><input class="form-control detail-required" name="hp_imei"></div>
+                                            <div class="col-md-6 mb-2"><label>Kelengkapan *</label><input class="form-control detail-required" name="hp_kelengkapan"></div><div class="col-md-6 mb-2"><label>Kondisi *</label><input class="form-control detail-required" name="hp_kondisi"></div>
+                                        </div></div>
+                                        <div class="jaminan-detail" data-kategori="sepeda_motor" style="display:none"><div class="row">
+                                            <div class="col-md-6 mb-2"><label>Jenis kendaraan *</label><input class="form-control detail-required" name="motor_jenis_kendaraan"></div><div class="col-md-6 mb-2"><label>Merk/tipe *</label><input class="form-control detail-required" name="motor_merk_tipe"></div>
+                                            <div class="col-md-4 mb-2"><label>Tahun *</label><input type="number" min="1900" max="<?php echo date('Y') + 1; ?>" class="form-control detail-required" name="motor_tahun"></div><div class="col-md-4 mb-2"><label>Nopol *</label><input class="form-control detail-required" name="motor_nopol"></div><div class="col-md-4 mb-2"><label>Warna *</label><input class="form-control detail-required" name="motor_warna"></div>
+                                            <div class="col-md-6 mb-2"><label>No. rangka *</label><input class="form-control detail-required" name="motor_no_rangka"></div><div class="col-md-6 mb-2"><label>No. mesin *</label><input class="form-control detail-required" name="motor_no_mesin"></div>
+                                            <div class="col-md-6 mb-2"><label>Atas nama BPKB *</label><input class="form-control detail-required" name="motor_atas_nama_bpkb"></div><div class="col-md-6 mb-2"><label>No. BPKB *</label><input class="form-control detail-required" name="motor_no_bpkb"></div>
+                                        </div></div>
+                                        <div class="jaminan-detail" data-kategori="emas" style="display:none"><div class="row">
+                                            <div class="col-md-6 mb-2"><label>Jenis barang *</label><input class="form-control detail-required" name="emas_jenis_barang"></div><div class="col-md-6 mb-2"><label>Berat *</label><input class="form-control detail-required" name="emas_berat" placeholder="Contoh: 10 gram"></div>
+                                            <div class="col-md-6 mb-2"><label>Kadar *</label><input class="form-control detail-required" name="emas_kadar" placeholder="Contoh: 22 karat"></div><div class="col-md-6 mb-2"><label>Bentuk/ciri *</label><input class="form-control detail-required" name="emas_bentuk_ciri"></div><div class="col-12 mb-2"><label>Surat/nota *</label><input class="form-control detail-required" name="emas_surat_nota"></div>
+                                        </div></div>
+                                        <div class="mt-2"><label>Nilai Taksiran (Rp) *</label><input type="number" name="nilai_taksiran" class="form-control jaminan-common-required" min="1" step="1"></div>
+                                        <small class="text-muted">Jumlah pinjaman tidak boleh melebihi nilai taksiran.</small>
+                                    </div>
+
                                     <div class="mb-3">
                                         <label class="form-label d-block">Frekuensi Angsuran *</label>
                                         <div class="form-check form-check-inline">
@@ -442,21 +507,10 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                         </div>
                                         <div class="form-check form-check-inline">
                                             <input class="form-check-input" type="radio" name="frekuensi" id="frekDuaMingguan" value="dua_mingguan" required>
-                                            <label class="form-check-label" for="frekDuaMingguan">2 minggu sekali / 1× bayar</label>
+                                            <label class="form-check-label" for="frekDuaMingguan">2 minggu sekali</label>
                                         </div>
                                     </div>
 
-                                    <div id="jaminanFields" class="border rounded p-3 mb-3 bg-light" style="display:none">
-                                        <h6><i class="fas fa-box me-1"></i> Data Barang Jaminan / Gadai</h6>
-                                        <div class="row">
-                                            <div class="col-md-6 mb-3"><label class="form-label">Jenis Barang *</label><input type="text" name="jenis_barang" class="form-control jaminan-required" maxlength="100" placeholder="Contoh: Sepeda motor"></div>
-                                            <div class="col-md-6 mb-3"><label class="form-label">No. Identitas Barang *</label><input type="text" name="identitas_barang" class="form-control jaminan-required" maxlength="100" placeholder="Nopol / IMEI / nomor seri"></div>
-                                        </div>
-                                        <div class="mb-3"><label class="form-label">Nilai Taksiran (Rp) *</label><input type="number" name="nilai_taksiran" class="form-control jaminan-required" min="1" step="1"></div>
-                                        <div><label class="form-label">Deskripsi & Kondisi Barang *</label><textarea name="deskripsi_barang" class="form-control jaminan-required" rows="2" maxlength="1000"></textarea></div>
-                                        <small class="text-muted">Jumlah pinjaman tidak boleh melebihi nilai taksiran.</small>
-                                    </div>
-                                    
                                     <div class="mb-3" id="hariAngsuranGroup">
                                         <label class="form-label">Hari Angsuran *</label>
                                         <select name="hari_angsuran" class="form-select" required>
@@ -743,7 +797,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             tenorSelect.innerHTML = '<option value="">-- Pilih Tenor --</option>';
             if (!selectedOption.value) {
                 document.getElementById('jaminanFields').style.display = 'none';
-                document.querySelectorAll('.jaminan-required').forEach(function (el) { el.required = false; });
+                document.querySelectorAll('.kategori-jaminan, .jaminan-common-required, .detail-required').forEach(function (el) { el.required = false; });
                 document.getElementById('hariAngsuranGroup').style.display = '';
                 document.getElementById('hariAngsuranGroup').querySelector('select').required = true;
                 updateCalculation();
@@ -775,7 +829,11 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
 
             const wajibJaminan = selectedOption.getAttribute('data-jaminan') === '1';
             document.getElementById('jaminanFields').style.display = wajibJaminan ? '' : 'none';
-            document.querySelectorAll('.jaminan-required').forEach(function (el) { el.required = wajibJaminan; });
+            document.querySelectorAll('.kategori-jaminan, .jaminan-common-required').forEach(function (el) { el.required = wajibJaminan; });
+            if (!wajibJaminan) {
+                document.querySelectorAll('.jaminan-detail').forEach(function (panel) { panel.style.display = 'none'; });
+                document.querySelectorAll('.detail-required').forEach(function (el) { el.required = false; });
+            }
             const hariGroup = document.getElementById('hariAngsuranGroup');
             const hariSelect = hariGroup.querySelector('select[name="hari_angsuran"]');
             hariGroup.style.display = wajibJaminan ? 'none' : '';
@@ -791,6 +849,19 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             }
 
             updateCalculation();
+        });
+
+        function aturKategoriJaminan() {
+            const dipilih = document.querySelector('input[name="kategori_jaminan"]:checked');
+            const kategori = dipilih ? dipilih.value : '';
+            document.querySelectorAll('.jaminan-detail').forEach(function (panel) {
+                const aktif = panel.getAttribute('data-kategori') === kategori;
+                panel.style.display = aktif ? '' : 'none';
+                panel.querySelectorAll('.detail-required').forEach(function (el) { el.required = aktif; });
+            });
+        }
+        document.querySelectorAll('.kategori-jaminan').forEach(function (radio) {
+            radio.addEventListener('change', aturKategoriJaminan);
         });
 
         // Update calculation when amount, tenor or frekuensi changes
