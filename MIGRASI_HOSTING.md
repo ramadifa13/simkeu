@@ -1,32 +1,13 @@
-# Urutan Migrasi Database Hosting
+# Migrasi Database Hosting
 
-Selalu buat backup database sebelum import. Setiap migrasi cukup dijalankan satu kali melalui phpMyAdmin pada database aplikasi yang sama.
+Selalu buat backup database sebelum melakukan perubahan.
 
-## A. Hosting yang sebelumnya sudah menjalankan migrasi sampai 10gh
+Setelah `git pull`, cukup import satu file melalui phpMyAdmin:
 
-Setelah `git pull`, cukup import:
+`database/migrations/MIGRASI_UNIVERSAL.sql`
 
-1. `database/migrations/UPDATE_HOSTING_TERBARU.sql`
+File universal dapat dipakai meskipun tidak diketahui migrasi lama mana yang sudah dijalankan. Struktur dan data referensi yang sudah ada akan dilewati sehingga tidak menimbulkan error duplikat.
 
-Mulai sekarang file ini menjadi satu-satunya file update lanjutan untuk hosting. File ini aman dijalankan ulang, termasuk jika migrasi `10i` sebelumnya sudah sempat diimport.
+Untuk instalasi benar-benar baru, import `simkeusi_koperasi_db.sql` terlebih dahulu. Sesudah itu import `MIGRASI_UNIVERSAL.sql`. File universal adalah peningkatan struktur, bukan pengganti database awal.
 
-## B. Instalasi baru dari database awal
-
-Import `simkeusi_koperasi_db.sql`, kemudian jalankan berurutan:
-
-1. `database/migrations/2026_10_revisi_koperasi.sql`
-2. `database/migrations/2026_10b_cara_bayar_angsuran.sql`
-3. `database/migrations/2026_10_revisi_tahap2.sql`
-4. `database/migrations/2026_10c_denda.sql`
-5. `database/migrations/2026_10_revisi_tahap3.sql`
-6. `database/migrations/2026_10d_input_mundur.sql`
-7. `database/migrations/2026_10e_hari_angsuran.sql`
-8. `database/migrations/2026_10f_gadai_tenor_6_bulan.sql`
-9. `database/migrations/2026_10gh_kode_dan_foto_gadai.sql`
-10. `database/migrations/UPDATE_HOSTING_TERBARU.sql`
-
-Jika memakai file gabungan `10gh`, jangan jalankan file `10g` dan `10h` secara terpisah.
-
-## Setelah update terbaru
-
-Login Admin, buka **Pengaturan → Surat Perjanjian & TTD Admin**, lalu lengkapi identitas Pihak Pertama, jabatan, template ringkas/lengkap, dan TTD Admin. Setelah disimpan, Teller dapat melakukan pencairan dan menghasilkan PDF perjanjian.
+Setelah migrasi selesai, login Admin dan buka **Pengaturan → Surat Perjanjian & TTD Admin**. Lengkapi identitas Pihak Pertama, jabatan, template surat, dan TTD Admin sebelum Teller melakukan pencairan.

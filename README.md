@@ -14,65 +14,19 @@ Aplikasi koperasi simpan pinjam (PHP + MySQL) dengan 3 level login: Admin, Telle
 
 1. Clone ke folder web server, misalnya `C:\xampp\htdocs\koperasi2`:
    ```bash
-   git clone https://github.com/ganova/koperasi.git koperasi2
+   git clone https://github.com/ramadifa13/simkeu.git simkeu
    ```
 2. Buat database `koperasi_db`, lalu import struktur & data awal:
    ```bash
    mysql -u root -e "CREATE DATABASE koperasi_db"
-   mysql -u root koperasi_db < koperasi_db.sql
+   mysql -u root koperasi_db < simkeusi_koperasi_db.sql
    ```
-3. Jalankan migrasi revisi **sekali saja**:
+3. Backup database, lalu jalankan **satu file migrasi universal**:
    ```bash
-   mysql -u root koperasi_db < database/migrations/2026_10_revisi_koperasi.sql
+   mysql -u root koperasi_db < database/migrations/MIGRASI_UNIVERSAL.sql
    ```
-   Untuk database yang sudah berisi data, **backup dulu** sebelum menjalankan migrasi.
-   Lalu jalankan migrasi tambahan (penanda pelunasan untuk Bukti Pembayaran Angsuran), juga **sekali saja**:
-   ```bash
-   mysql -u root koperasi_db < database/migrations/2026_10b_cara_bayar_angsuran.sql
-   ```
-   Terakhir, migrasi **revisi tahap 2** (pencairan oleh Teller + foto nasabah, tanggal lunas, profil teller), juga **sekali saja**:
-   ```bash
-   mysql -u root koperasi_db < database/migrations/2026_10_revisi_tahap2.sql
-   ```
-   Terakhir, migrasi **denda otomatis**, juga **sekali saja**:
-   ```bash
-   mysql -u root koperasi_db < database/migrations/2026_10c_denda.sql
-   ```
-   Dan migrasi **pengajuan pembatalan angsuran** (tahap 3), juga **sekali saja**:
-   ```bash
-   mysql -u root koperasi_db < database/migrations/2026_10_revisi_tahap3.sql
-   ```
-   Dan migrasi **input data lama / tanggal mundur**, juga **sekali saja**:
-   ```bash
-   mysql -u root koperasi_db < database/migrations/2026_10d_input_mundur.sql
-   ```
-   Dan migrasi **hari angsuran**, juga **sekali saja**:
-   ```bash
-   mysql -u root koperasi_db < database/migrations/2026_10e_hari_angsuran.sql
-   ```
-   Dan migrasi **gadai + tenor 6 bulan / 2 minggu sekali**, juga **sekali saja**:
-   ```bash
-   mysql -u root koperasi_db < database/migrations/2026_10f_gadai_tenor_6_bulan.sql
-   ```
-   Dan migrasi **batas satu pinjaman per kategori + kode anggota gadai AGTJ**, juga **sekali saja**:
-   ```bash
-   mysql -u root koperasi_db < database/migrations/2026_10g_batas_pinjaman_kode_gadai.sql
-   ```
-   Dan migrasi **foto pencairan gadai**, juga **sekali saja**:
-   ```bash
-   mysql -u root koperasi_db < database/migrations/2026_10h_foto_pencairan_gadai.sql
-   ```
-   Jika migrasi `10g` dan `10h` **keduanya belum pernah dijalankan**, keduanya dapat
-   digantikan dengan satu kali menjalankan file gabungan berikut:
-   ```bash
-   mysql -u root koperasi_db < database/migrations/2026_10gh_kode_dan_foto_gadai.sql
-   ```
-   Setelah memakai file gabungan, jangan jalankan `10g` dan `10h` lagi.
-   Jalankan satu file **update hosting terbaru** (surat perjanjian, TTD elektronik, dan lampiran PDF):
-   ```bash
-   mysql -u root koperasi_db < database/migrations/UPDATE_HOSTING_TERBARU.sql
-   ```
-   File ini aman dijalankan ulang dan akan dipakai untuk update berikutnya agar user hosting tidak perlu memilih banyak file.
+   File ini bisa dipakai pada database yang belum, sebagian, atau sudah pernah dimigrasi.
+   Struktur yang sudah tersedia akan dilewati sehingga tidak terjadi error duplikat.
    Setelah update, Admin wajib membuka **Pengaturan → Surat Perjanjian & TTD Admin**,
    memeriksa template, menggambar TTD Admin, lalu menyimpannya sebelum Teller mencairkan pinjaman.
 4. Sesuaikan koneksi database di `config/database.php` bila user/password MySQL berbeda.
@@ -90,7 +44,7 @@ Aplikasi koperasi simpan pinjam (PHP + MySQL) dengan 3 level login: Admin, Telle
 Berarti langkah 3 (file migrasi) belum dijalankan pada database yang dipakai. Tanpa migrasi,
 muncul error seperti `Undefined index: frekuensi_diizinkan` / `foto_kk` dan dokumen anggota
 tidak tersimpan. Jalankan migrasinya sekali (bisa juga lewat phpMyAdmin → database
-`koperasi_db` → tab **Import** → pilih `database/migrations/2026_10_revisi_koperasi.sql`).
+`koperasi_db` → tab **Import** → pilih `database/migrations/MIGRASI_UNIVERSAL.sql`).
 
 ## Setelah instalasi
 
