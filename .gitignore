@@ -1,0 +1,24 @@
+# Data pengguna dan berkas operasional (jangan unggah ke GitHub)
+/uploads/
+/assets/uploads/
+/backups/
+/*_db.sql
+
+# Log dan konfigurasi lokal
+error_log
+**/error_log
+.env
+.env.*
+!.env.example
+/config/database.local.php
+
+# Tool/editor/OS
+/.repo-inspect/
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+
+# Dependency lokal bila dibuat kemudian
+/vendor/
+/node_modules/
