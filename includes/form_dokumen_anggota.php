@@ -17,8 +17,9 @@ $dok_anggota = isset($dok_anggota) ? $dok_anggota : null;
         $lama = $dok_anggota && !empty($dok_anggota[$field]) ? urlDokumenAnggota($dok_anggota[$field]) : '';
     ?>
     <div class="col-md-4 mb-3">
-        <label class="form-label small"><?php echo $label; ?><?php echo ($wajib && $dok_prefix !== 'edit') ? ' *' : ''; ?></label>
+        <label class="form-label small label-dokumen" data-field="<?php echo $field; ?>" data-label="<?php echo htmlspecialchars($label); ?>"><?php echo $label; ?><?php echo ($wajib && $dok_prefix !== 'edit') ? ' *' : ''; ?></label>
         <input type="file" name="<?php echo $field; ?>" class="form-control form-control-sm input-dokumen"
+               data-field="<?php echo $field; ?>"
                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                data-label="<?php echo htmlspecialchars($label); ?>"
                data-wajib="<?php echo $wajib ? '1' : '0'; ?>"

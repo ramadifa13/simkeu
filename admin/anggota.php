@@ -7,13 +7,15 @@ cekPostMelebihiBatas();
 
 // Kode anggota berikutnya untuk form tambah
 $kode_otomatis = buatKodeAnggota($db);
+$kode_jaminan_otomatis = buatKodeAnggotaJaminan($db);
 
 // Handle form actions
 if ($_POST) {
     if (isset($_POST['add'])) {
         // Kode dibuat server (kiriman form diabaikan agar tidak bisa bentrok/diubah)
         kunciKodeAnggota($db); // dilepas otomatis saat skrip selesai (redirect di akhir proses)
-        $kode_anggota = buatKodeAnggota($db);
+        $kategori_anggota = ($_POST['kategori_anggota'] ?? 'biasa') === 'jaminan' ? 'jaminan' : 'biasa';
+        $kode_anggota = buatKodeAnggotaSesuaiKategori($db, $kategori_anggota);
         $nama_lengkap = trim($_POST['nama_lengkap']);
         $alamat = trim($_POST['alamat']);
         $telepon = trim($_POST['telepon']);
@@ -41,7 +43,7 @@ if ($_POST) {
                 $db->beginTransaction();
                 
                 // Validasi dokumen (finfo, maks. 10 MB) sebelum data disimpan
-                $dokumen = validasiDokumenAnggota();
+                $dokumen = validasiDokumenAnggota(null, $kategori_anggota === 'jaminan');
                 
                 // Check if kode anggota already exists
                 $check_query = "SELECT id FROM anggota WHERE kode_anggota = :kode_anggota";
@@ -979,6 +981,14 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Kategori Anggota <span class="text-danger">*</span></label>
+                            <select name="kategori_anggota" class="form-select kategori-anggota" required>
+                                <option value="biasa">Anggota Biasa (kode AGT)</option>
+                                <option value="jaminan">Anggota Jaminan/Gadai (kode AGTJ)</option>
+                            </select>
+                            <small class="text-muted">Akun login dibuat satu kali menggunakan kode saat pertama didaftarkan.</small>
+                        </div>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
@@ -1196,6 +1206,26 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <script>var DOKUMEN_LABEL = <?php echo json_encode(daftarDokumenAnggota()); ?>;</script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            var kategori = document.querySelector('#addModal .kategori-anggota');
+            var kodeInput = document.getElementById('add_kode');
+            var kodeBiasa = <?php echo json_encode($kode_otomatis); ?>;
+            var kodeJaminan = <?php echo json_encode($kode_jaminan_otomatis); ?>;
+            function sesuaikanKategoriAnggota() {
+                var jaminan = kategori && kategori.value === 'jaminan';
+                if (kodeInput) kodeInput.value = jaminan ? kodeJaminan : kodeBiasa;
+                document.querySelectorAll('#addModal .input-dokumen').forEach(function(input) {
+                    var wajib = !jaminan || input.dataset.field === 'foto_ktp';
+                    var kolom = input.closest('.col-md-4');
+                    if (kolom) kolom.style.display = (jaminan && input.dataset.field !== 'foto_ktp') ? 'none' : '';
+                    input.required = wajib;
+                    input.dataset.wajib = wajib ? '1' : '0';
+                    var label = kolom ? kolom.querySelector('.label-dokumen') : null;
+                    if (label) label.textContent = label.dataset.label + (wajib ? ' *' : ' (opsional)');
+                });
+            }
+            if (kategori) kategori.addEventListener('change', sesuaikanKategoriAnggota);
+            sesuaikanKategoriAnggota();
+
             // Edit Modal
             var editModal = document.getElementById('editModal');
             if (editModal) {

@@ -83,7 +83,10 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
                 " yang sedang diproses ($pengajuan_proses)");
         }
 
-        if ($kategori_gadai && empty($anggota_info['kode_anggota_jaminan'])) {
+        // Anggota yang sejak awal didaftarkan sebagai AGTJ memakai kode akun utamanya.
+        // Anggota AGT lama baru memperoleh kode tambahan AGTJ saat pertama mengajukan gadai.
+        if ($kategori_gadai && empty($anggota_info['kode_anggota_jaminan'])
+            && strpos((string) $anggota_info['kode_anggota'], 'AGTJ') !== 0) {
             $terkunci = (int) $db->query("SELECT GET_LOCK('kode_anggota_jaminan_koperasi', 10)")->fetchColumn();
             if ($terkunci !== 1) {
                 throw new Exception("Kode anggota gadai sedang dibuat oleh petugas lain. Silakan coba kembali");

@@ -43,15 +43,25 @@ if (!function_exists('buatKodeAnggota')) {
 if (!function_exists('buatKodeAnggotaJaminan')) {
     /** Kode nasabah gadai berikutnya: AGTJ001, AGTJ002, dan seterusnya. */
     function buatKodeAnggotaJaminan($db) {
-        $max = (int) $db->query("SELECT COALESCE(MAX(CAST(SUBSTRING(kode_anggota_jaminan, 5) AS UNSIGNED)), 0)
-                                 FROM anggota WHERE kode_anggota_jaminan REGEXP '^AGTJ[0-9]+$'")->fetchColumn();
-        $cek = $db->prepare("SELECT COUNT(*) FROM anggota WHERE kode_anggota_jaminan = ?");
+        $max = (int) $db->query("SELECT GREATEST(
+                    COALESCE(MAX(CASE WHEN kode_anggota REGEXP '^AGTJ[0-9]+$' THEN CAST(SUBSTRING(kode_anggota, 5) AS UNSIGNED) END), 0),
+                    COALESCE(MAX(CASE WHEN kode_anggota_jaminan REGEXP '^AGTJ[0-9]+$' THEN CAST(SUBSTRING(kode_anggota_jaminan, 5) AS UNSIGNED) END), 0)
+                ) FROM anggota")->fetchColumn();
+        $cek = $db->prepare("SELECT (SELECT COUNT(*) FROM anggota WHERE kode_anggota = :k1 OR kode_anggota_jaminan = :k2)
+                                  + (SELECT COUNT(*) FROM users WHERE username = :k3)");
         do {
             $max++;
             $kode = 'AGTJ' . str_pad($max, 3, '0', STR_PAD_LEFT);
-            $cek->execute([$kode]);
+            $cek->execute([':k1' => $kode, ':k2' => $kode, ':k3' => $kode]);
         } while ((int) $cek->fetchColumn() > 0);
         return $kode;
+    }
+}
+
+if (!function_exists('buatKodeAnggotaSesuaiKategori')) {
+    /** Kode akun utama sesuai kategori saat anggota pertama kali didaftarkan. */
+    function buatKodeAnggotaSesuaiKategori($db, $kategori) {
+        return $kategori === 'jaminan' ? buatKodeAnggotaJaminan($db) : buatKodeAnggota($db);
     }
 }
 
@@ -62,11 +72,13 @@ if (!function_exists('kunciKodeAnggota')) {
      */
     function kunciKodeAnggota($db) {
         $db->query("SELECT GET_LOCK('kode_anggota_koperasi', 10)")->fetchColumn();
+        $db->query("SELECT GET_LOCK('kode_anggota_jaminan_koperasi', 10)")->fetchColumn();
     }
 }
 
 if (!function_exists('lepasKodeAnggota')) {
     function lepasKodeAnggota($db) {
+        $db->query("SELECT RELEASE_LOCK('kode_anggota_jaminan_koperasi')")->fetchColumn();
         $db->query("SELECT RELEASE_LOCK('kode_anggota_koperasi')")->fetchColumn();
     }
 }

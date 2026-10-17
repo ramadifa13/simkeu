@@ -31,7 +31,10 @@ if (!function_exists('daftarDokumenAnggota')) {
 }
 
 if (!function_exists('dokumenWajib')) {
-    function dokumenWajib($field) {
+    function dokumenWajib($field, $khusus_jaminan = false) {
+        if ($khusus_jaminan) {
+            return $field === 'foto_ktp';
+        }
         return in_array($field, DOKUMEN_ANGGOTA_WAJIB, true);
     }
 }
@@ -83,7 +86,7 @@ if (!function_exists('validasiDokumenAnggota')) {
      * @return array field => ['tmp' => path, 'ext' => ekstensi] untuk file yang diunggah
      * @throws Exception bila ada file tidak valid
      */
-    function validasiDokumenAnggota($data_lama = null) {
+    function validasiDokumenAnggota($data_lama = null, $khusus_jaminan = false) {
         $mime_diizinkan = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
         $hasil = [];
 
@@ -92,7 +95,7 @@ if (!function_exists('validasiDokumenAnggota')) {
             $ada_file = $file && $file['error'] !== UPLOAD_ERR_NO_FILE;
 
             if (!$ada_file) {
-                if (dokumenWajib($field) && $data_lama === null) {
+                if (dokumenWajib($field, $khusus_jaminan) && $data_lama === null) {
                     throw new Exception("$label wajib diunggah");
                 }
                 continue;

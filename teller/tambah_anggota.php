@@ -10,6 +10,7 @@ if ($_SESSION['role'] !== 'teller') {
 
 // Kode anggota otomatis (nomor terbesar + 1, lihat includes/anggota_helper.php)
 $kode_otomatis = buatKodeAnggota($db);
+$kode_jaminan_otomatis = buatKodeAnggotaJaminan($db);
 
 // Upload melebihi post_max_size membuat $_POST kosong; tampilkan pesan yang jelas
 cekPostMelebihiBatas();
@@ -18,7 +19,8 @@ cekPostMelebihiBatas();
 if ($_POST) {
     if (isset($_POST['tambah_anggota'])) {
         kunciKodeAnggota($db); // cegah kode kembar bila Admin/Teller menambah bersamaan
-        $kode_anggota = buatKodeAnggota($db); // dibuat server, kiriman form diabaikan
+        $kategori_anggota = ($_POST['kategori_anggota'] ?? 'biasa') === 'jaminan' ? 'jaminan' : 'biasa';
+        $kode_anggota = buatKodeAnggotaSesuaiKategori($db, $kategori_anggota); // dibuat server, kiriman form diabaikan
         $nama_lengkap = $_POST['nama_lengkap'];
         $alamat = $_POST['alamat'] ?? '';
         $telepon = $_POST['telepon'] ?? '';
@@ -36,7 +38,7 @@ if ($_POST) {
             $db->beginTransaction();
 
             // Validasi dokumen (finfo, maks. 10 MB) sebelum data disimpan
-            $dokumen = validasiDokumenAnggota();
+            $dokumen = validasiDokumenAnggota(null, $kategori_anggota === 'jaminan');
 
             // No. KTP wajib & unik (sama dengan Admin)
             if (trim($ktp) === '') {
@@ -383,6 +385,14 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                             </div>
                             <div class="card-body">
                                 <form method="POST" enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <label class="form-label">Kategori Anggota *</label>
+                                        <select name="kategori_anggota" class="form-select kategori-anggota" required>
+                                            <option value="biasa">Anggota Biasa (kode AGT)</option>
+                                            <option value="jaminan">Anggota Jaminan/Gadai (kode AGTJ)</option>
+                                        </select>
+                                        <div class="form-text">Anggota jaminan hanya wajib mengunggah foto KTP dan tetap memperoleh satu akun login.</div>
+                                    </div>
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
@@ -583,10 +593,30 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <?php include __DIR__ . '/../includes/modal_dokumen.php'; ?>
     <script>
+        var kategori = document.querySelector('.kategori-anggota');
+        var kodeInput = document.querySelector('input[name="kode_anggota"]');
+        var kodeBiasa = <?php echo json_encode($kode_otomatis); ?>;
+        var kodeJaminan = <?php echo json_encode($kode_jaminan_otomatis); ?>;
+        function sesuaikanKategoriAnggota() {
+            var jaminan = kategori && kategori.value === 'jaminan';
+            if (kodeInput) kodeInput.value = jaminan ? kodeJaminan : kodeBiasa;
+            document.querySelectorAll('.input-dokumen').forEach(function(input) {
+                var wajib = !jaminan || input.dataset.field === 'foto_ktp';
+                var kolom = input.closest('.col-md-4');
+                if (kolom) kolom.style.display = (jaminan && input.dataset.field !== 'foto_ktp') ? 'none' : '';
+                input.required = wajib;
+                input.dataset.wajib = wajib ? '1' : '0';
+                var label = kolom ? kolom.querySelector('.label-dokumen') : null;
+                if (label) label.textContent = label.dataset.label + (wajib ? ' *' : ' (opsional)');
+            });
+        }
+        if (kategori) kategori.addEventListener('change', sesuaikanKategoriAnggota);
+        sesuaikanKategoriAnggota();
+
         function resetForm() {
             document.querySelector('form').reset();
             // Set kembali kode anggota yang otomatis
-            document.querySelector('input[name="kode_anggota"]').value = '<?php echo $kode_otomatis; ?>';
+            sesuaikanKategoriAnggota();
             // Set kembali tanggal hari ini
             document.querySelector('input[name="tanggal_daftar"]').value = '<?php echo date('Y-m-d'); ?>';
         }
