@@ -71,9 +71,10 @@ if (in_array($current_role, ['admin', 'teller'], true)) {
 }
 
 if (!function_exists('badgeNotifSidebar')) {
-    function badgeNotifSidebar($jumlah, $warna = 'danger', $judul = '') {
-        if ((int)$jumlah < 1) return '';
-        return '<span class="badge rounded-pill bg-' . htmlspecialchars($warna, ENT_QUOTES) . ' float-end" title="' .
+    function badgeNotifSidebar($key, $jumlah, $warna = 'danger', $judul = '') {
+        $sembunyi = (int)$jumlah < 1 ? 'display:none' : '';
+        return '<span data-notif-pinjaman="' . htmlspecialchars($key, ENT_QUOTES) . '" class="badge rounded-pill bg-' .
+            htmlspecialchars($warna, ENT_QUOTES) . ' float-end" style="' . $sembunyi . '" title="' .
             htmlspecialchars($judul, ENT_QUOTES) . '">' . (int)$jumlah . '</span>';
     }
 }
@@ -188,21 +189,21 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pengajuan.php' ? 'active text-white' : ''; ?>" 
                                href="pengajuan.php">
                                 <i class="fas fa-file-alt me-2"></i> Pengajuan
-                                <?php echo badgeNotifSidebar($notif_pinjaman['pengajuan'], 'warning text-dark', 'Pengajuan menunggu persetujuan'); ?>
+                                <?php echo badgeNotifSidebar('pengajuan', $notif_pinjaman['pengajuan'], 'warning text-dark', 'Pengajuan menunggu persetujuan'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'persetujuan.php' ? 'active text-white' : ''; ?>" 
                                href="persetujuan.php">
                                 <i class="fas fa-check-circle me-2"></i> Persetujuan
-                                <?php echo badgeNotifSidebar($notif_pinjaman['persetujuan'], 'danger', 'Perlu keputusan Admin'); ?>
+                                <?php echo badgeNotifSidebar('persetujuan', $notif_pinjaman['persetujuan'], 'danger', 'Perlu keputusan Admin'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pencairan.php' ? 'active text-white' : ''; ?>" 
                                href="pencairan.php">
                                 <i class="fas fa-money-bill-wave me-2"></i> Pencairan
-                                <?php echo badgeNotifSidebar($notif_pinjaman['pencairan'], 'info text-dark', 'Sudah disetujui dan belum dicairkan'); ?>
+                                <?php echo badgeNotifSidebar('pencairan', $notif_pinjaman['pencairan'], 'info text-dark', 'Sudah disetujui dan belum dicairkan'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -416,21 +417,21 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pengajuan.php' ? 'active text-white' : ''; ?>" 
                                href="pengajuan.php">
                                 <i class="fas fa-file-alt me-2"></i> Pengajuan
-                                <?php echo badgeNotifSidebar($notif_pinjaman['pengajuan'], 'warning text-dark', 'Pengajuan baru dari Teller'); ?>
+                                <?php echo badgeNotifSidebar('pengajuan', $notif_pinjaman['pengajuan'], 'warning text-dark', 'Pengajuan baru dari Teller'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'persetujuan.php' ? 'active text-white' : ''; ?>" 
                                href="persetujuan.php">
                                 <i class="fas fa-check-circle me-2"></i> Persetujuan
-                                <?php echo badgeNotifSidebar($notif_pinjaman['persetujuan'], 'danger', 'Pengajuan membutuhkan persetujuan Admin'); ?>
+                                <?php echo badgeNotifSidebar('persetujuan', $notif_pinjaman['persetujuan'], 'danger', 'Pengajuan membutuhkan persetujuan Admin'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pencairan.php' ? 'active text-white' : ''; ?>" 
                                href="pencairan.php">
                                 <i class="fas fa-money-bill-wave me-2"></i> Pencairan
-                                <?php echo badgeNotifSidebar($notif_pinjaman['pencairan'], 'info text-dark', 'Disetujui dan menunggu pencairan Teller'); ?>
+                                <?php echo badgeNotifSidebar('pencairan', $notif_pinjaman['pencairan'], 'info text-dark', 'Disetujui dan menunggu pencairan Teller'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -764,6 +765,13 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
 .btn-danger:hover {
     background-color: #c0392b;
 }
+
+@keyframes notifPulse {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.35); }
+    100% { transform: scale(1); }
+}
+.notif-pulse { animation: notifPulse .45s ease; }
 </style>
 
 <script>
@@ -792,5 +800,57 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Bootstrap akan handle collapse secara otomatis
     // Tidak perlu JavaScript tambahan
+
+    // Notifikasi alur pinjaman: polling ringan tiap 2 detik, berhenti saat tab tidak aktif.
+    let notifTimer = null;
+    let notifBusy = false;
+    let notifGagal = 0;
+    const notifUrl = '../api/notifikasi_pinjaman.php';
+
+    function jadwalkanNotif(ms) {
+        clearTimeout(notifTimer);
+        if (!document.hidden) notifTimer = setTimeout(ambilNotifPinjaman, ms);
+    }
+
+    function tampilkanNotif(data) {
+        ['pengajuan', 'persetujuan', 'pencairan'].forEach(function(key) {
+            document.querySelectorAll('[data-notif-pinjaman="' + key + '"]').forEach(function(el) {
+                const nilai = Number(data[key] || 0);
+                const lama = Number(el.textContent || 0);
+                el.textContent = nilai;
+                el.style.display = nilai > 0 ? '' : 'none';
+                if (nilai !== lama) {
+                    el.classList.remove('notif-pulse');
+                    void el.offsetWidth;
+                    el.classList.add('notif-pulse');
+                }
+            });
+        });
+    }
+
+    async function ambilNotifPinjaman() {
+        if (notifBusy || document.hidden) return;
+        notifBusy = true;
+        try {
+            const response = await fetch(notifUrl, {cache: 'no-store', credentials: 'same-origin'});
+            if (response.status === 401) { clearTimeout(notifTimer); return; }
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const data = await response.json();
+            if (data.ok) tampilkanNotif(data);
+            notifGagal = 0;
+        } catch (error) {
+            notifGagal++;
+        } finally {
+            notifBusy = false;
+            // Normal 2 detik; bila server bermasalah perlambat agar request tidak membebani hosting.
+            jadwalkanNotif(notifGagal ? Math.min(30000, 5000 * notifGagal) : 2000);
+        }
+    }
+
+    document.addEventListener('visibilitychange', function() {
+        clearTimeout(notifTimer);
+        if (!document.hidden) ambilNotifPinjaman();
+    });
+    ambilNotifPinjaman();
 });
 </script>
