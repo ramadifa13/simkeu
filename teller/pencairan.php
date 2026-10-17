@@ -656,7 +656,8 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
     <div class="modal fade" id="pencairanModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" enctype="multipart/form-data">
+                <form method="POST" enctype="multipart/form-data" id="formPencairan">
+                    <input type="hidden" name="proses_pencairan" value="1">
                     <div class="modal-header bg-primary text-white">
                         <h5 class="modal-title"><i class="fas fa-hand-holding-usd me-2"></i>Proses Pencairan</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -673,7 +674,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                             <label class="form-label fw-semibold">Foto Nasabah Saat Menerima Uang <span class="text-danger">*</span></label>
                             <input type="file" name="foto_nasabah" id="foto_nasabah" class="form-control" required
                                    accept="image/*" capture="environment">
-                            <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB. Di HP bisa langsung memotret.</small>
+                            <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB. Foto yang lebih besar akan dikompres otomatis.</small>
                             <img id="foto_nasabah_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau foto">
                         </div>
                         <div id="foto_gadai_fields" class="d-none">
@@ -681,14 +682,14 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                 <label class="form-label fw-semibold" id="label_foto_barang">Foto Barang Jaminan <span class="text-danger">*</span></label>
                                 <input type="file" name="foto_barang_jaminan" id="foto_barang_jaminan" class="form-control"
                                        accept="image/*" capture="environment">
-                                <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB.</small>
+                                <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB. Foto yang lebih besar akan dikompres otomatis.</small>
                                 <img id="foto_barang_jaminan_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau foto barang jaminan">
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Foto Nasabah dengan Barang Jaminan <span class="text-danger">*</span></label>
                                 <input type="file" name="foto_nasabah_barang" id="foto_nasabah_barang" class="form-control"
                                        accept="image/*" capture="environment">
-                                <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB.</small>
+                                <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB. Foto yang lebih besar akan dikompres otomatis.</small>
                                 <img id="foto_nasabah_barang_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau nasabah dengan barang jaminan">
                             </div>
                         </div>
@@ -711,7 +712,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="proses_pencairan" class="btn btn-primary">
+                        <button type="submit" id="btnCairkan" class="btn btn-primary">
                             <i class="fas fa-check-circle me-1"></i> Cairkan
                         </button>
                     </div>
@@ -781,6 +782,80 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                     img.classList.add('d-none');
                 }
             });
+        });
+
+        // PHP menolak berkas yang sudah melewati upload_max_filesize sebelum kode
+        // server berjalan. Karena itu foto besar dikompres dahulu di browser/HP.
+        var BATAS_FOTO = 5 * 1024 * 1024;
+        var TARGET_FOTO = Math.floor(4.8 * 1024 * 1024);
+
+        function canvasKeBlob(canvas, kualitas) {
+            return new Promise(function (resolve) {
+                canvas.toBlob(resolve, 'image/jpeg', kualitas);
+            });
+        }
+
+        async function kompresFoto(input) {
+            if (!input.files.length || input.files[0].size <= BATAS_FOTO) return;
+            var file = input.files[0];
+            var bitmap;
+            try {
+                bitmap = await createImageBitmap(file);
+            } catch (e) {
+                throw new Error('Foto "' + file.name + '" tidak dapat dikompres. Gunakan format JPG, PNG, atau WEBP.');
+            }
+
+            var skala = Math.min(1, 2560 / Math.max(bitmap.width, bitmap.height));
+            var canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(bitmap.width * skala));
+            canvas.height = Math.max(1, Math.round(bitmap.height * skala));
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            if (bitmap.close) bitmap.close();
+
+            var blob = null;
+            var kualitas = 0.88;
+            while (kualitas >= 0.45) {
+                blob = await canvasKeBlob(canvas, kualitas);
+                if (blob && blob.size <= TARGET_FOTO) break;
+                kualitas -= 0.08;
+            }
+            while (blob && blob.size > TARGET_FOTO && canvas.width > 800 && canvas.height > 800) {
+                var kecil = document.createElement('canvas');
+                kecil.width = Math.round(canvas.width * 0.8);
+                kecil.height = Math.round(canvas.height * 0.8);
+                kecil.getContext('2d').drawImage(canvas, 0, 0, kecil.width, kecil.height);
+                canvas = kecil;
+                blob = await canvasKeBlob(canvas, 0.7);
+            }
+            if (!blob || blob.size > BATAS_FOTO) {
+                throw new Error('Foto "' + file.name + '" masih melebihi 5 MB setelah dikompres.');
+            }
+
+            var nama = file.name.replace(/\.[^.]+$/, '') + '-kompres.jpg';
+            var hasil = new File([blob], nama, {type: 'image/jpeg', lastModified: Date.now()});
+            var transfer = new DataTransfer();
+            transfer.items.add(hasil);
+            input.files = transfer.files;
+        }
+
+        document.getElementById('formPencairan').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            var form = this;
+            var tombol = document.getElementById('btnCairkan');
+            tombol.disabled = true;
+            tombol.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Menyiapkan foto...';
+            try {
+                await kompresFoto(document.getElementById('foto_nasabah'));
+                await kompresFoto(document.getElementById('foto_barang_jaminan'));
+                await kompresFoto(document.getElementById('foto_nasabah_barang'));
+                tombol.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Mencairkan...';
+                form.submit();
+            } catch (e) {
+                alert(e.message);
+                tombol.disabled = false;
+                tombol.innerHTML = '<i class="fas fa-check-circle me-1"></i> Cairkan';
+            }
         });
     </script>
     <script>
