@@ -57,7 +57,7 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
 
         $stmt = $db->prepare("SELECT pp.*, jp.memerlukan_jaminan, jp.nama_jenis, j.id AS jaminan_id, j.jenis_barang,
                                      j.identitas_barang, j.deskripsi_barang, a.nama_lengkap, a.kode_anggota, a.kode_anggota_jaminan,
-                                     a.ktp, a.alamat, a.telepon
+                                     a.ktp, a.alamat, a.telepon, a.tempat_lahir, a.tanggal_lahir
                               FROM pengajuan_pinjaman pp
                               JOIN jenis_pinjaman jp ON jp.id = pp.jenis_pinjaman_id
                               JOIN anggota a ON a.id = pp.anggota_id
@@ -144,9 +144,15 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
 
         $nama_teller = $_SESSION['nama_lengkap'] ?? ($_SESSION['username'] ?? 'Teller');
         $hitung_surat = hitungDariPinjaman($pengajuan);
+        $stmtJadwal = $db->prepare("SELECT angsuran_ke,pokok,bunga,jumlah_angsuran,tanggal_jatuh_tempo FROM angsuran WHERE pinjaman_id=? ORDER BY angsuran_ke");
+        $stmtJadwal->execute([$pinjaman_id]);
+        $jadwal_surat = $stmtJadwal->fetchAll(PDO::FETCH_ASSOC);
+        $jatuh_tempo_akhir = $jadwal_surat ? end($jadwal_surat)['tanggal_jatuh_tempo'] : $tgl_cair;
         $snapshot = [
-            'koperasi'=>$koperasi, 'anggota'=>['nama'=>$pengajuan['nama_lengkap'],'kode'=>$adalah_gadai?($pengajuan['kode_anggota_jaminan'] ?: $pengajuan['kode_anggota']):$pengajuan['kode_anggota'],'nik'=>$pengajuan['ktp'],'alamat'=>$pengajuan['alamat'],'telepon'=>$pengajuan['telepon']],
-            'pinjaman'=>['id'=>$pinjaman_id,'jenis'=>$pengajuan['nama_jenis'],'jumlah'=>$hitung_surat['pokok'],'tenor'=>$hitung_surat['tenor'],'bunga'=>$hitung_surat['bunga_persen'],'total'=>$hitung_surat['total'],'angsuran'=>$hitung_surat['angsuran'],'frekuensi'=>$hitung_surat['frekuensi'],'tanggal_pencairan'=>$tgl_cair],
+            'koperasi'=>$koperasi, 'anggota'=>['nama'=>$pengajuan['nama_lengkap'],'kode'=>$adalah_gadai?($pengajuan['kode_anggota_jaminan'] ?: $pengajuan['kode_anggota']):$pengajuan['kode_anggota'],'nik'=>$pengajuan['ktp'],'alamat'=>$pengajuan['alamat'],'telepon'=>$pengajuan['telepon'],'tempat_lahir'=>$pengajuan['tempat_lahir'],'tanggal_lahir'=>$pengajuan['tanggal_lahir']],
+            'pihak_pertama'=>['nama'=>$aturan_surat['nama_pihak_pertama'] ?: $koperasi['nama'],'nik'=>$aturan_surat['nik_pihak_pertama'],'alamat'=>$aturan_surat['alamat_pihak_pertama'] ?: $koperasi['alamat'],'telepon'=>$aturan_surat['telepon_pihak_pertama'] ?: $koperasi['telepon']],
+            'pinjaman'=>['id'=>$pinjaman_id,'jenis'=>$pengajuan['nama_jenis'],'jumlah'=>$hitung_surat['pokok'],'tenor'=>$hitung_surat['tenor'],'bunga'=>$hitung_surat['bunga_persen'],'total'=>$hitung_surat['total'],'angsuran'=>$hitung_surat['angsuran'],'frekuensi'=>$hitung_surat['frekuensi'],'jumlah_cicilan'=>$hitung_surat['jumlah_cicilan'],'tanggal_pencairan'=>$tgl_cair,'jatuh_tempo'=>$jatuh_tempo_akhir,'tujuan'=>$pengajuan['tujuan_pinjaman'],'hari_angsuran'=>$pengajuan['hari_angsuran']],
+            'jadwal_angsuran'=>$jadwal_surat,
             'jaminan'=>['ada'=>$adalah_gadai,'jenis'=>$pengajuan['jenis_barang'] ?? null,'detail'=>trim(($pengajuan['identitas_barang'] ?? '').' '.($pengajuan['deskripsi_barang'] ?? ''))],
             'isi_perjanjian'=>$versi_perjanjian==='lengkap'?$aturan_surat['isi_lengkap']:$aturan_surat['isi_ringkas'],
             'penandatangan'=>['nasabah'=>$pengajuan['nama_lengkap'],'teller'=>$nama_teller,'admin'=>$nama_admin_ttd,'jabatan_admin'=>$aturan_surat['jabatan_admin'],'saksi_1'=>$nama_saksi_1,'saksi_2'=>$nama_saksi_2],

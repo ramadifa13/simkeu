@@ -12,16 +12,20 @@ if (!isAdmin()) {
 if ($_POST && isset($_POST['update_perjanjian'])) {
     try {
         $jabatan = trim($_POST['jabatan_admin'] ?? '');
+        $nama_pihak_pertama = trim($_POST['nama_pihak_pertama'] ?? '');
+        $nik_pihak_pertama = trim($_POST['nik_pihak_pertama'] ?? '');
+        $alamat_pihak_pertama = trim($_POST['alamat_pihak_pertama'] ?? '');
+        $telepon_pihak_pertama = trim($_POST['telepon_pihak_pertama'] ?? '');
         $versi = ($_POST['template_default'] ?? '') === 'lengkap' ? 'lengkap' : 'ringkas';
         $ringkas = trim($_POST['isi_ringkas'] ?? '');
         $lengkap = trim($_POST['isi_lengkap'] ?? '');
-        if ($jabatan === '' || $ringkas === '' || $lengkap === '') throw new Exception('Semua pengaturan surat wajib diisi');
+        if ($jabatan === '' || $nama_pihak_pertama === '' || $ringkas === '' || $lengkap === '') throw new Exception('Nama pihak pertama, jabatan, dan template surat wajib diisi');
         $lama = pengaturanPerjanjian($db);
         $ttd = trim($_POST['ttd_admin'] ?? '');
         if ($ttd === '') $ttd = (string) ($lama['ttd_admin'] ?? '');
         $ttd = validasiTtdDataUrl($ttd, 'Tanda tangan Admin');
-        $stmt = $db->prepare("UPDATE pengaturan_perjanjian SET jabatan_admin=?, template_default=?, isi_ringkas=?, isi_lengkap=?, ttd_admin=?, updated_by=? WHERE id=1");
-        $stmt->execute([$jabatan, $versi, $ringkas, $lengkap, $ttd, $_SESSION['user_id']]);
+        $stmt = $db->prepare("UPDATE pengaturan_perjanjian SET nama_pihak_pertama=?,nik_pihak_pertama=?,alamat_pihak_pertama=?,telepon_pihak_pertama=?,jabatan_admin=?, template_default=?, isi_ringkas=?, isi_lengkap=?, ttd_admin=?, updated_by=? WHERE id=1");
+        $stmt->execute([$nama_pihak_pertama,$nik_pihak_pertama,$alamat_pihak_pertama,$telepon_pihak_pertama,$jabatan, $versi, $ringkas, $lengkap, $ttd, $_SESSION['user_id']]);
         $_SESSION['success'] = 'Pengaturan surat perjanjian dan TTD Admin berhasil disimpan. Perubahan berlaku untuk pencairan berikutnya.';
     } catch (Exception $e) { $_SESSION['error'] = 'Gagal menyimpan pengaturan perjanjian: ' . $e->getMessage(); }
     header('Location: pengaturan.php'); exit();
@@ -393,6 +397,10 @@ function formatRupiah($angka) {
                                 <div class="alert alert-info">Pengaturan ini berlaku untuk surat baru. Surat yang sudah ditandatangani tetap memakai data saat transaksi.</div>
                                 <form method="POST" id="formPerjanjian">
                                     <div class="row">
+                                        <div class="col-md-6 mb-3"><label class="form-label">Nama Pihak Pertama *</label><input class="form-control" name="nama_pihak_pertama" required value="<?php echo htmlspecialchars($pengaturan_perjanjian['nama_pihak_pertama'] ?: $koperasi['nama']); ?>"></div>
+                                        <div class="col-md-6 mb-3"><label class="form-label">NIK Pihak Pertama</label><input class="form-control" name="nik_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['nik_pihak_pertama'] ?? ''); ?>"></div>
+                                        <div class="col-md-8 mb-3"><label class="form-label">Alamat Pihak Pertama</label><input class="form-control" name="alamat_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['alamat_pihak_pertama'] ?: $koperasi['alamat']); ?>"></div>
+                                        <div class="col-md-4 mb-3"><label class="form-label">No. HP Pihak Pertama</label><input class="form-control" name="telepon_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['telepon_pihak_pertama'] ?: $koperasi['telepon']); ?>"></div>
                                         <div class="col-md-6 mb-3"><label class="form-label">Jabatan penandatangan Admin</label><input class="form-control" name="jabatan_admin" required value="<?php echo htmlspecialchars($pengaturan_perjanjian['jabatan_admin']); ?>"></div>
                                         <div class="col-md-6 mb-3"><label class="form-label">Versi default</label><select class="form-select" name="template_default"><option value="ringkas" <?php echo $pengaturan_perjanjian['template_default']==='ringkas'?'selected':''; ?>>Ringkas</option><option value="lengkap" <?php echo $pengaturan_perjanjian['template_default']==='lengkap'?'selected':''; ?>>Lengkap</option></select></div>
                                     </div>

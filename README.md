@@ -1,5 +1,7 @@
 # Koperasi Simpan Pinjam Sejahtera
 
+Panduan urutan import untuk hosting tersedia di [MIGRASI_HOSTING.md](MIGRASI_HOSTING.md).
+
 Aplikasi koperasi simpan pinjam (PHP + MySQL) dengan 3 level login: Admin, Teller, Anggota.
 
 ## Kebutuhan

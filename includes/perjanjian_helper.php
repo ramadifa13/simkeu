@@ -44,7 +44,9 @@ function validasiTtdDataUrl($nilai, $label) {
 }
 
 function nomorPerjanjian($pinjaman) {
-    return 'SP-' . date('Ymd', strtotime($pinjaman['tanggal_pencairan'])) . '-' . str_pad($pinjaman['id'], 5, '0', STR_PAD_LEFT);
+    $roman = [1=>'I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+    $waktu = strtotime($pinjaman['tanggal_pencairan']);
+    return str_pad($pinjaman['id'], 3, '0', STR_PAD_LEFT) . '/SPHP/' . $roman[(int)date('n', $waktu)] . '/' . date('Y', $waktu);
 }
 
 function dataUrlKeFileSementara($dataUrl) {

@@ -1,6 +1,10 @@
 -- Pengaturan template dapat diedit Admin; arsip transaksi menyimpan snapshot sendiri.
 CREATE TABLE IF NOT EXISTS `pengaturan_perjanjian` (
   `id` INT NOT NULL DEFAULT 1,
+  `nama_pihak_pertama` VARCHAR(120) DEFAULT NULL,
+  `nik_pihak_pertama` VARCHAR(30) DEFAULT NULL,
+  `alamat_pihak_pertama` TEXT DEFAULT NULL,
+  `telepon_pihak_pertama` VARCHAR(30) DEFAULT NULL,
   `jabatan_admin` VARCHAR(100) NOT NULL DEFAULT 'Pengurus Koperasi',
   `template_default` ENUM('ringkas','lengkap') NOT NULL DEFAULT 'ringkas',
   `isi_ringkas` TEXT NOT NULL,
@@ -10,6 +14,13 @@ CREATE TABLE IF NOT EXISTS `pengaturan_perjanjian` (
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Baris ini menjaga migrasi tetap dapat dijalankan ulang jika tabel 10i sudah sempat dibuat.
+ALTER TABLE `pengaturan_perjanjian`
+  ADD COLUMN IF NOT EXISTS `nama_pihak_pertama` VARCHAR(120) DEFAULT NULL AFTER `id`,
+  ADD COLUMN IF NOT EXISTS `nik_pihak_pertama` VARCHAR(30) DEFAULT NULL AFTER `nama_pihak_pertama`,
+  ADD COLUMN IF NOT EXISTS `alamat_pihak_pertama` TEXT DEFAULT NULL AFTER `nik_pihak_pertama`,
+  ADD COLUMN IF NOT EXISTS `telepon_pihak_pertama` VARCHAR(30) DEFAULT NULL AFTER `alamat_pihak_pertama`;
 
 CREATE TABLE IF NOT EXISTS `perjanjian_pinjaman` (
   `id` INT NOT NULL AUTO_INCREMENT,
