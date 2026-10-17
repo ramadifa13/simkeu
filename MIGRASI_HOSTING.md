@@ -6,9 +6,9 @@ Selalu buat backup database sebelum import. Setiap migrasi cukup dijalankan satu
 
 Setelah `git pull`, cukup import:
 
-1. `database/migrations/2026_10i_perjanjian_ttd_elektronik.sql`
+1. `database/migrations/UPDATE_HOSTING_TERBARU.sql`
 
-File `10i` aman dijalankan ulang jika sebelumnya sudah sempat diimport, termasuk untuk menambahkan kolom identitas Pihak Pertama yang baru.
+Mulai sekarang file ini menjadi satu-satunya file update lanjutan untuk hosting. File ini aman dijalankan ulang, termasuk jika migrasi `10i` sebelumnya sudah sempat diimport.
 
 ## B. Instalasi baru dari database awal
 
@@ -23,10 +23,10 @@ Import `simkeusi_koperasi_db.sql`, kemudian jalankan berurutan:
 7. `database/migrations/2026_10e_hari_angsuran.sql`
 8. `database/migrations/2026_10f_gadai_tenor_6_bulan.sql`
 9. `database/migrations/2026_10gh_kode_dan_foto_gadai.sql`
-10. `database/migrations/2026_10i_perjanjian_ttd_elektronik.sql`
+10. `database/migrations/UPDATE_HOSTING_TERBARU.sql`
 
 Jika memakai file gabungan `10gh`, jangan jalankan file `10g` dan `10h` secara terpisah.
 
-## Setelah migrasi 10i
+## Setelah update terbaru
 
 Login Admin, buka **Pengaturan → Surat Perjanjian & TTD Admin**, lalu lengkapi identitas Pihak Pertama, jabatan, template ringkas/lengkap, dan TTD Admin. Setelah disimpan, Teller dapat melakukan pencairan dan menghasilkan PDF perjanjian.

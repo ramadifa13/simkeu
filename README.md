@@ -68,11 +68,12 @@ Aplikasi koperasi simpan pinjam (PHP + MySQL) dengan 3 level login: Admin, Telle
    mysql -u root koperasi_db < database/migrations/2026_10gh_kode_dan_foto_gadai.sql
    ```
    Setelah memakai file gabungan, jangan jalankan `10g` dan `10h` lagi.
-   Jalankan migrasi **surat perjanjian, TTD elektronik, dan lampiran PDF**, juga **sekali saja**:
+   Jalankan satu file **update hosting terbaru** (surat perjanjian, TTD elektronik, dan lampiran PDF):
    ```bash
-   mysql -u root koperasi_db < database/migrations/2026_10i_perjanjian_ttd_elektronik.sql
+   mysql -u root koperasi_db < database/migrations/UPDATE_HOSTING_TERBARU.sql
    ```
-   Setelah migrasi `10i`, Admin wajib membuka **Pengaturan → Surat Perjanjian & TTD Admin**,
+   File ini aman dijalankan ulang dan akan dipakai untuk update berikutnya agar user hosting tidak perlu memilih banyak file.
+   Setelah update, Admin wajib membuka **Pengaturan → Surat Perjanjian & TTD Admin**,
    memeriksa template, menggambar TTD Admin, lalu menyimpannya sebelum Teller mencairkan pinjaman.
 4. Sesuaikan koneksi database di `config/database.php` bila user/password MySQL berbeda.
 5. Atur `php.ini` lalu restart Apache:

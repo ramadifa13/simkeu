@@ -1,4 +1,6 @@
--- Pengaturan template dapat diedit Admin; arsip transaksi menyimpan snapshot sendiri.
+-- SATU FILE UPDATE UNTUK DATABASE HOSTING YANG SUDAH SAMPAI MIGRASI 10gh.
+-- File ini boleh dijalankan ulang dan akan menjadi file update tetap untuk revisi berikutnya.
+
 CREATE TABLE IF NOT EXISTS `pengaturan_perjanjian` (
   `id` INT NOT NULL DEFAULT 1,
   `nama_pihak_pertama` VARCHAR(120) DEFAULT NULL,
@@ -15,7 +17,6 @@ CREATE TABLE IF NOT EXISTS `pengaturan_perjanjian` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Baris ini menjaga migrasi tetap dapat dijalankan ulang jika tabel 10i sudah sempat dibuat.
 ALTER TABLE `pengaturan_perjanjian`
   ADD COLUMN IF NOT EXISTS `nama_pihak_pertama` VARCHAR(120) DEFAULT NULL AFTER `id`,
   ADD COLUMN IF NOT EXISTS `nik_pihak_pertama` VARCHAR(30) DEFAULT NULL AFTER `nama_pihak_pertama`,

@@ -56,6 +56,28 @@ try {
 $current_role = $_SESSION['role'];
 $current_page = basename($_SERVER['PHP_SELF']);
 
+// Badge alur pinjaman: diperbarui dari database setiap halaman dimuat.
+$notif_pinjaman = ['pengajuan' => 0, 'persetujuan' => 0, 'pencairan' => 0];
+if (in_array($current_role, ['admin', 'teller'], true)) {
+    try {
+        $notif_pinjaman['pengajuan'] = (int) $db->query("SELECT COUNT(*) FROM pengajuan_pinjaman WHERE status = 'menunggu'")->fetchColumn();
+        $notif_pinjaman['persetujuan'] = $notif_pinjaman['pengajuan'];
+        $notif_pinjaman['pencairan'] = (int) $db->query("SELECT COUNT(*) FROM pengajuan_pinjaman pp
+            WHERE pp.status = 'disetujui' AND NOT EXISTS
+            (SELECT 1 FROM pinjaman p WHERE p.pengajuan_id = pp.id)")->fetchColumn();
+    } catch (Exception $e) {
+        error_log('Gagal menghitung notifikasi sidebar pinjaman: ' . $e->getMessage());
+    }
+}
+
+if (!function_exists('badgeNotifSidebar')) {
+    function badgeNotifSidebar($jumlah, $warna = 'danger', $judul = '') {
+        if ((int)$jumlah < 1) return '';
+        return '<span class="badge rounded-pill bg-' . htmlspecialchars($warna, ENT_QUOTES) . ' float-end" title="' .
+            htmlspecialchars($judul, ENT_QUOTES) . '">' . (int)$jumlah . '</span>';
+    }
+}
+
 // Foto sidebar per level (fallback avatar inisial):
 //  - anggota: foto nasabah dari pencairan terbaru + status anggota (poin E)
 //  - teller : foto profil teller (poin F)
@@ -166,18 +188,21 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pengajuan.php' ? 'active text-white' : ''; ?>" 
                                href="pengajuan.php">
                                 <i class="fas fa-file-alt me-2"></i> Pengajuan
+                                <?php echo badgeNotifSidebar($notif_pinjaman['pengajuan'], 'warning text-dark', 'Pengajuan menunggu persetujuan'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'persetujuan.php' ? 'active text-white' : ''; ?>" 
                                href="persetujuan.php">
                                 <i class="fas fa-check-circle me-2"></i> Persetujuan
+                                <?php echo badgeNotifSidebar($notif_pinjaman['persetujuan'], 'danger', 'Perlu keputusan Admin'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pencairan.php' ? 'active text-white' : ''; ?>" 
                                href="pencairan.php">
                                 <i class="fas fa-money-bill-wave me-2"></i> Pencairan
+                                <?php echo badgeNotifSidebar($notif_pinjaman['pencairan'], 'info text-dark', 'Sudah disetujui dan belum dicairkan'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -391,18 +416,21 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pengajuan.php' ? 'active text-white' : ''; ?>" 
                                href="pengajuan.php">
                                 <i class="fas fa-file-alt me-2"></i> Pengajuan
+                                <?php echo badgeNotifSidebar($notif_pinjaman['pengajuan'], 'warning text-dark', 'Pengajuan baru dari Teller'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'persetujuan.php' ? 'active text-white' : ''; ?>" 
                                href="persetujuan.php">
                                 <i class="fas fa-check-circle me-2"></i> Persetujuan
+                                <?php echo badgeNotifSidebar($notif_pinjaman['persetujuan'], 'danger', 'Pengajuan membutuhkan persetujuan Admin'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pencairan.php' ? 'active text-white' : ''; ?>" 
                                href="pencairan.php">
                                 <i class="fas fa-money-bill-wave me-2"></i> Pencairan
+                                <?php echo badgeNotifSidebar($notif_pinjaman['pencairan'], 'info text-dark', 'Disetujui dan menunggu pencairan Teller'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
