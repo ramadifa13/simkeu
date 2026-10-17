@@ -296,7 +296,17 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             max-height: calc(100vh - 1rem);
             overflow: hidden;
         }
+        #pencairanModal .modal-content > form {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            height: 100%;
+            max-height: calc(100vh - 1rem);
+        }
         #pencairanModal .modal-body {
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: none;
             overflow-y: auto !important;
             overscroll-behavior: contain;
             -webkit-overflow-scrolling: touch;
