@@ -143,6 +143,17 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
     exit();
 }
 
+$filter_cari = trim(isset($_GET['q']) ? $_GET['q'] : '');
+$filter_tanggal_mulai = trim(isset($_GET['tanggal_mulai']) ? $_GET['tanggal_mulai'] : '');
+$filter_tanggal_selesai = trim(isset($_GET['tanggal_selesai']) ? $_GET['tanggal_selesai'] : '');
+if ($filter_tanggal_mulai !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $filter_tanggal_mulai)) $filter_tanggal_mulai = '';
+if ($filter_tanggal_selesai !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $filter_tanggal_selesai)) $filter_tanggal_selesai = '';
+if ($filter_tanggal_mulai !== '' && $filter_tanggal_selesai !== '' && $filter_tanggal_mulai > $filter_tanggal_selesai) {
+    $tmp_tanggal = $filter_tanggal_mulai;
+    $filter_tanggal_mulai = $filter_tanggal_selesai;
+    $filter_tanggal_selesai = $tmp_tanggal;
+}
+
 $query = "SELECT pp.*, a.nama_lengkap,
           CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
           jp.nama_jenis,
@@ -159,12 +170,27 @@ $query = "SELECT pp.*, a.nama_lengkap,
           LEFT JOIN jaminan_pinjaman j ON j.pengajuan_id = pp.id
           LEFT JOIN pinjaman p ON pp.id = p.pengajuan_id
           LEFT JOIN users uc ON p.dicairkan_oleh = uc.id
-          WHERE pp.status IN ('disetujui', 'dicairkan', 'develop')
-          OR (pp.status = '' AND pp.tanggal_persetujuan IS NOT NULL)
-          ORDER BY pp.tanggal_persetujuan DESC";
+          WHERE (pp.status IN ('disetujui', 'dicairkan', 'develop')
+          OR (pp.status = '' AND pp.tanggal_persetujuan IS NOT NULL))";
+$params_filter = [];
+if ($filter_cari !== '') {
+    $query .= " AND (a.nama_lengkap LIKE :cari OR a.kode_anggota LIKE :cari
+                OR COALESCE(a.kode_anggota_jaminan, '') LIKE :cari
+                OR pp.kode_pengajuan LIKE :cari OR COALESCE(p.kode_pinjaman, '') LIKE :cari)";
+    $params_filter[':cari'] = '%' . $filter_cari . '%';
+}
+if ($filter_tanggal_mulai !== '') {
+    $query .= " AND p.tanggal_pencairan >= :tanggal_mulai";
+    $params_filter[':tanggal_mulai'] = $filter_tanggal_mulai;
+}
+if ($filter_tanggal_selesai !== '') {
+    $query .= " AND p.tanggal_pencairan <= :tanggal_selesai";
+    $params_filter[':tanggal_selesai'] = $filter_tanggal_selesai;
+}
+$query .= " ORDER BY pp.tanggal_persetujuan DESC";
 
 $stmt = $db->prepare($query);
-$stmt->execute();
+$stmt->execute($params_filter);
 $pengajuan_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get statistics
@@ -313,6 +339,32 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body py-3">
+                        <form method="GET" class="row g-2 align-items-end">
+                            <div class="col-md-5">
+                                <label class="form-label">Cari Nama/Kode Anggota</label>
+                                <input type="search" name="q" class="form-control"
+                                       value="<?php echo htmlspecialchars($filter_cari); ?>"
+                                       placeholder="Nama, AGT/AGTJ, kode pengajuan/pinjaman">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Pencairan Mulai</label>
+                                <input type="date" name="tanggal_mulai" class="form-control" value="<?php echo htmlspecialchars($filter_tanggal_mulai); ?>">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Pencairan Sampai</label>
+                                <input type="date" name="tanggal_selesai" class="form-control" value="<?php echo htmlspecialchars($filter_tanggal_selesai); ?>">
+                            </div>
+                            <div class="col-md-3 d-flex gap-2">
+                                <button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-search me-1"></i>Filter</button>
+                                <a href="pencairan.php" class="btn btn-outline-secondary">Reset</a>
+                            </div>
+                        </form>
+                        <small class="text-muted">Filter tanggal hanya menampilkan data yang sudah memiliki tanggal pencairan.</small>
                     </div>
                 </div>
 
