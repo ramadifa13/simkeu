@@ -45,13 +45,18 @@ cekPostMelebihiBatas();
 if ($_POST && isset($_POST['proses_pencairan'])) {
     $id = (int) $_POST['id'];
     $foto_path = null;
+    $foto_barang_path = null;
+    $foto_nasabah_barang_path = null;
     $errmode = $db->getAttribute(PDO::ATTR_ERRMODE);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     try {
-        $foto = validasiFotoUpload('foto_nasabah', 'Foto nasabah', 10 * 1024 * 1024, true);
         $db->beginTransaction();
 
-        $stmt = $db->prepare("SELECT * FROM pengajuan_pinjaman WHERE id = ? AND status = 'disetujui' FOR UPDATE");
+        $stmt = $db->prepare("SELECT pp.*, jp.memerlukan_jaminan, j.id AS jaminan_id, j.jenis_barang
+                              FROM pengajuan_pinjaman pp
+                              JOIN jenis_pinjaman jp ON jp.id = pp.jenis_pinjaman_id
+                              LEFT JOIN jaminan_pinjaman j ON j.pengajuan_id = pp.id
+                              WHERE pp.id = ? AND pp.status = 'disetujui' FOR UPDATE");
         $stmt->execute([$id]);
         $pengajuan = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$pengajuan) {
@@ -62,6 +67,14 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         if ((int) $stmt->fetchColumn() > 0) {
             throw new Exception("Pengajuan ini sudah dicairkan");
         }
+
+        $adalah_gadai = !empty($pengajuan['memerlukan_jaminan']);
+        if ($adalah_gadai && empty($pengajuan['jaminan_id'])) {
+            throw new Exception("Data barang jaminan tidak ditemukan");
+        }
+        $foto = validasiFotoUpload('foto_nasabah', 'Foto nasabah saat menerima uang', 10 * 1024 * 1024, true);
+        $foto_barang = validasiFotoUpload('foto_barang_jaminan', 'Foto barang jaminan', 10 * 1024 * 1024, $adalah_gadai);
+        $foto_nasabah_barang = validasiFotoUpload('foto_nasabah_barang', 'Foto nasabah dengan barang jaminan', 10 * 1024 * 1024, $adalah_gadai);
 
         // Tanggal pencairan diisi Teller (boleh tanggal lampau untuk data lama, tidak boleh masa depan
         // dan tidak boleh sebelum tanggal pengajuan). Jatuh tempo dihitung dari tanggal ini.
@@ -89,12 +102,22 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         }
 
         $foto_path = simpanFotoUpload($foto, 'pencairan');
+        if ($adalah_gadai) {
+            $foto_barang_path = simpanFotoUpload($foto_barang, 'jaminan');
+            $foto_nasabah_barang_path = simpanFotoUpload($foto_nasabah_barang, 'jaminan');
+        }
         $pinjaman_id = buatPinjamanDanJadwal($db, $pengajuan, $tgl_cair, $tgl_cair);
         if (!$pinjaman_id) {
             throw new Exception("Pinjaman gagal dibuat");
         }
         $db->prepare("UPDATE pinjaman SET foto_pencairan = ?, dicairkan_oleh = ?, input_mundur = ? WHERE id = ?")
            ->execute([$foto_path, $_SESSION['user_id'], $mundur, $pinjaman_id]);
+        if ($adalah_gadai) {
+            $db->prepare("UPDATE jaminan_pinjaman
+                          SET foto_barang = ?, foto_nasabah_barang = ?
+                          WHERE id = ?")
+               ->execute([$foto_barang_path, $foto_nasabah_barang_path, $pengajuan['jaminan_id']]);
+        }
         tandaiCicilanDimuka($db, $pinjaman_id, $sudah_dibayar);
         $db->prepare("UPDATE pengajuan_pinjaman SET status = 'dicairkan' WHERE id = ?")->execute([$id]);
 
@@ -110,6 +133,8 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
             $db->rollBack();
         }
         hapusFotoUpload($foto_path);
+        hapusFotoUpload($foto_barang_path);
+        hapusFotoUpload($foto_nasabah_barang_path);
         $_SESSION['error'] = "Gagal memproses pencairan: " . htmlspecialchars($e->getMessage())
             . (migrasiRevisiBelumDijalankan($db) ? " (database belum di-update, jalankan file migrasi)" : "");
     }
@@ -121,7 +146,8 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
 $query = "SELECT pp.*, a.nama_lengkap,
           CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
           jp.nama_jenis,
-          jp.maksimal_pinjaman, u.nama_lengkap as admin_name,
+          jp.maksimal_pinjaman, jp.memerlukan_jaminan, u.nama_lengkap as admin_name,
+          j.jenis_barang, j.foto_barang, j.foto_nasabah_barang,
           p.id as pinjaman_id, p.kode_pinjaman, p.tanggal_pencairan, p.status as status_pinjaman,
           p.foto_pencairan, uc.nama_lengkap as teller_name,
           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status <> 'lunas') AS cicilan_belum,
@@ -130,6 +156,7 @@ $query = "SELECT pp.*, a.nama_lengkap,
           JOIN anggota a ON pp.anggota_id = a.id
           JOIN jenis_pinjaman jp ON pp.jenis_pinjaman_id = jp.id
           LEFT JOIN users u ON pp.admin_id = u.id
+          LEFT JOIN jaminan_pinjaman j ON j.pengajuan_id = pp.id
           LEFT JOIN pinjaman p ON pp.id = p.pengajuan_id
           LEFT JOIN users uc ON p.dicairkan_oleh = uc.id
           WHERE pp.status IN ('disetujui', 'dicairkan', 'develop')
@@ -419,6 +446,8 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                                     data-tgl-pengajuan="<?php echo date('Y-m-d', strtotime($pengajuan['tanggal_pengajuan'])); ?>"
                                                     data-cicilan="<?php echo (int) hitungDariPinjaman($pengajuan)['jumlah_cicilan']; ?>"
                                                     data-frekuensi="<?php echo htmlspecialchars(isset($pengajuan['frekuensi']) ? $pengajuan['frekuensi'] : 'bulanan'); ?>"
+                                                    data-gadai="<?php echo !empty($pengajuan['memerlukan_jaminan']) ? '1' : '0'; ?>"
+                                                    data-jenis-barang="<?php echo htmlspecialchars($pengajuan['jenis_barang'] ?: 'barang', ENT_QUOTES); ?>"
                                                     data-ringkas="<?php echo htmlspecialchars(labelTenorRow($pengajuan) . ' | ' . ringkasanAngsuran(hitungDariPinjaman($pengajuan))); ?>">
                                                 <i class="fas fa-hand-holding-usd me-1"></i>Proses Pencairan
                                             </button>
@@ -428,6 +457,20 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                                     onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($pengajuan['foto_pencairan']), ENT_QUOTES); ?>', 'Foto nasabah - <?php echo htmlspecialchars($pengajuan['nama_lengkap'], ENT_QUOTES); ?>')"
                                                     title="Foto nasabah saat pencairan">
                                                 <i class="fas fa-camera"></i>
+                                            </button>
+                                            <?php endif; ?>
+                                            <?php if (!empty($pengajuan['foto_barang'])): ?>
+                                            <button class="btn btn-sm btn-outline-warning btn-action" type="button"
+                                                    onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($pengajuan['foto_barang']), ENT_QUOTES); ?>', 'Foto <?php echo htmlspecialchars($pengajuan['jenis_barang'], ENT_QUOTES); ?>')"
+                                                    title="Foto barang jaminan">
+                                                <i class="fas fa-box"></i>
+                                            </button>
+                                            <?php endif; ?>
+                                            <?php if (!empty($pengajuan['foto_nasabah_barang'])): ?>
+                                            <button class="btn btn-sm btn-outline-warning btn-action" type="button"
+                                                    onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($pengajuan['foto_nasabah_barang']), ENT_QUOTES); ?>', 'Foto nasabah dengan barang jaminan')"
+                                                    title="Foto nasabah dengan barang jaminan">
+                                                <i class="fas fa-user-tag"></i>
                                             </button>
                                             <?php endif; ?>
                                             <?php if (!empty($pengajuan['pinjaman_id']) && (int) $pengajuan['total_cicilan'] > 0 && (int) $pengajuan['cicilan_belum'] === 0): ?>
@@ -627,11 +670,27 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                             <small id="pencairan_ringkas"></small>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Foto Nasabah (saat serah terima dana) <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">Foto Nasabah Saat Menerima Uang <span class="text-danger">*</span></label>
                             <input type="file" name="foto_nasabah" id="foto_nasabah" class="form-control" required
                                    accept="image/*" capture="environment">
                             <small class="text-muted">JPG/PNG/WEBP, maksimal 10 MB. Di HP bisa langsung memotret.</small>
                             <img id="foto_nasabah_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau foto">
+                        </div>
+                        <div id="foto_gadai_fields" class="d-none">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold" id="label_foto_barang">Foto Barang Jaminan <span class="text-danger">*</span></label>
+                                <input type="file" name="foto_barang_jaminan" id="foto_barang_jaminan" class="form-control"
+                                       accept="image/*" capture="environment">
+                                <small class="text-muted">JPG/PNG/WEBP, maksimal 10 MB.</small>
+                                <img id="foto_barang_jaminan_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau foto barang jaminan">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Foto Nasabah dengan Barang Jaminan <span class="text-danger">*</span></label>
+                                <input type="file" name="foto_nasabah_barang" id="foto_nasabah_barang" class="form-control"
+                                       accept="image/*" capture="environment">
+                                <small class="text-muted">JPG/PNG/WEBP, maksimal 10 MB.</small>
+                                <img id="foto_nasabah_barang_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau nasabah dengan barang jaminan">
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Tanggal Pencairan <span class="text-danger">*</span></label>
@@ -672,6 +731,16 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             document.getElementById('pencairan_kode').textContent = b.getAttribute('data-kode');
             document.getElementById('pencairan_jumlah').textContent = 'Rp ' + Number(b.getAttribute('data-jumlah')).toLocaleString('id-ID');
             document.getElementById('pencairan_ringkas').textContent = b.getAttribute('data-ringkas');
+            var gadai = b.getAttribute('data-gadai') === '1';
+            var fotoGadaiFields = document.getElementById('foto_gadai_fields');
+            var fotoBarang = document.getElementById('foto_barang_jaminan');
+            var fotoNasabahBarang = document.getElementById('foto_nasabah_barang');
+            fotoGadaiFields.classList.toggle('d-none', !gadai);
+            fotoBarang.required = gadai;
+            fotoNasabahBarang.required = gadai;
+            var jenisBarang = (b.getAttribute('data-jenis-barang') || 'barang').split(' - ')[0];
+            document.getElementById('label_foto_barang').innerHTML = 'Foto Barang Jaminan ' + jenisBarang +
+                ' <span class="text-danger">*</span>';
             var tgl = document.getElementById('tanggal_pencairan');
             tgl.min = b.getAttribute('data-tgl-pengajuan');
             tgl.value = tgl.max;
@@ -683,6 +752,10 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             tgl.dispatchEvent(new Event('change'));
             document.getElementById('foto_nasabah').value = '';
             document.getElementById('foto_nasabah_preview').classList.add('d-none');
+            ['foto_barang_jaminan', 'foto_nasabah_barang'].forEach(function (id) {
+                document.getElementById(id).value = '';
+                document.getElementById(id + '_preview').classList.add('d-none');
+            });
         });
         document.getElementById('tanggal_pencairan').addEventListener('change', function () {
             var mundur = this.value && this.value < this.max;
@@ -697,6 +770,17 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             } else {
                 img.classList.add('d-none');
             }
+        });
+        ['foto_barang_jaminan', 'foto_nasabah_barang'].forEach(function (id) {
+            document.getElementById(id).addEventListener('change', function () {
+                var img = document.getElementById(id + '_preview');
+                if (this.files.length) {
+                    img.src = URL.createObjectURL(this.files[0]);
+                    img.classList.remove('d-none');
+                } else {
+                    img.classList.add('d-none');
+                }
+            });
         });
     </script>
     <script>
