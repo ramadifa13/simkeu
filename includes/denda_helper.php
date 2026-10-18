@@ -3,7 +3,8 @@
  * Denda keterlambatan angsuran.
  *
  * Aturan (klien, Okt 2026):
- *  - Denda nominal tetap PER HARI menurut besar pinjaman (tabel denda_tarif):
+ *  - Dengan jaminan: Rp 5.000/hari per Rp 1 juta pinjaman (kelipatan juta penuh).
+ *  - Tanpa jaminan: denda nominal tetap PER HARI menurut tabel denda_tarif:
  *    Rp 1 jt = 1.500/hari, Rp 2 jt = 2.500/hari, Rp 3 jt = 3.500/hari.
  *  - Hari keterlambatan dihitung mulai hari SETELAH jatuh tempo, sampai jatuh tempo cicilan
  *    berikutnya (setelah itu cicilan berikutnya yang berjalan dendanya sendiri).
@@ -27,7 +28,12 @@ if (!function_exists('dendaDariParameter')) {
 }
 
 if (!function_exists('dendaPerHari')) {
-    function dendaPerHari($db, $jumlah_pinjaman) {
+    function dendaPerHari($db, $jumlah_pinjaman, $memerlukan_jaminan = false) {
+        if ($memerlukan_jaminan) {
+            // Pengajuan gadai hanya menerima kelipatan Rp 1 juta. Data lama di luar
+            // kelipatan mengikuti tingkat juta di bawahnya, minimal satu tingkat.
+            return max(1, floor((float) $jumlah_pinjaman / 1000000)) * 5000.0;
+        }
         static $tarif = null;
         if ($tarif === null) {
             $tarif = array();
@@ -58,7 +64,14 @@ if (!function_exists('hitungDendaAngsuran')) {
         $acuan = new DateTime($acuan ? $acuan : date('Y-m-d'));
         $jatuh_tempo = new DateTime($a['tanggal_jatuh_tempo']);
         $hari_telat = (int) $jatuh_tempo->diff($acuan)->format('%r%a');
-        $per_hari = dendaPerHari($db, $jumlah_pinjaman);
+        if (!array_key_exists('memerlukan_jaminan', $a)) {
+            $jenis = $db->prepare("SELECT jp.memerlukan_jaminan FROM pinjaman p
+                                  JOIN jenis_pinjaman jp ON jp.id = p.jenis_pinjaman_id
+                                  WHERE p.id = ?");
+            $jenis->execute(array($a['pinjaman_id']));
+            $a['memerlukan_jaminan'] = $jenis->fetchColumn();
+        }
+        $per_hari = dendaPerHari($db, $jumlah_pinjaman, !empty($a['memerlukan_jaminan']));
 
         $batas = null;
         $stmt = $db->prepare("SELECT MIN(tanggal_jatuh_tempo) FROM angsuran WHERE pinjaman_id = ? AND angsuran_ke > ?");
@@ -99,8 +112,9 @@ if (!function_exists('perbaruiDendaOtomatis')) {
         }
 
         $query = "SELECT a.id, a.pinjaman_id, a.angsuran_ke, a.tanggal_jatuh_tempo, a.denda, a.status,
-                                     a.keterlambatan_hari, p.jumlah_pinjaman
+                                     a.keterlambatan_hari, p.jumlah_pinjaman, jp.memerlukan_jaminan
                               FROM angsuran a JOIN pinjaman p ON a.pinjaman_id = p.id
+                              JOIN jenis_pinjaman jp ON jp.id = p.jenis_pinjaman_id
                               WHERE a.status IN ('belum_bayar', 'telat') AND a.denda_manual = 0
                                 AND a.tanggal_jatuh_tempo < ?";
         $params = array($hari_ini);
