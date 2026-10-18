@@ -21,7 +21,7 @@ if ($_POST && isset($_POST['update_perjanjian'])) {
         $ringkas = (string)$lama['isi_ringkas'];
         $lengkap = trim($_POST['isi_lengkap'] ?? '');
         if ($jabatan === '' || $nama_pihak_pertama === '' || $lengkap === '') throw new Exception('Nama pihak pertama, jabatan, dan template surat wajib diisi');
-        $ttd = trim($_POST['ttd_admin'] ?? '');
+        $ttd = bacaTtdRequest('ttd_admin', 'Tanda tangan Admin');
         if ($ttd === '') $ttd = (string) ($lama['ttd_admin'] ?? '');
         $ttd = validasiTtdDataUrl($ttd, 'Tanda tangan Admin');
         $stmt = $db->prepare("UPDATE pengaturan_perjanjian SET nama_pihak_pertama=?,nik_pihak_pertama=?,alamat_pihak_pertama=?,telepon_pihak_pertama=?,jabatan_admin=?, template_default=?, isi_ringkas=?, isi_lengkap=?, ttd_admin=?, updated_by=? WHERE id=1");
@@ -395,7 +395,7 @@ function formatRupiah($angka) {
                             <div class="card-header bg-primary text-white"><h6 class="mb-0"><i class="fas fa-file-signature me-2"></i>Surat Perjanjian & TTD Admin</h6></div>
                             <div class="card-body">
                                 <div class="alert alert-info">Pengaturan ini berlaku untuk surat baru. Surat yang sudah ditandatangani tetap memakai data saat transaksi.</div>
-                                <form method="POST" id="formPerjanjian">
+                                <form method="POST" enctype="multipart/form-data" id="formPerjanjian">
                                     <div class="row">
                                         <div class="col-md-6 mb-3"><label class="form-label">Nama Pihak Pertama *</label><input class="form-control" name="nama_pihak_pertama" required value="<?php echo htmlspecialchars($pengaturan_perjanjian['nama_pihak_pertama'] ?: $koperasi['nama']); ?>"></div>
                                         <div class="col-md-6 mb-3"><label class="form-label">NIK Pihak Pertama</label><input class="form-control" name="nik_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['nik_pihak_pertama'] ?? ''); ?>"></div>
@@ -469,7 +469,33 @@ function formatRupiah($angka) {
       c.addEventListener('pointermove',function(e){if(!drawing)return;var a=p(e);x.lineTo(a[0],a[1]);x.stroke()}); c.addEventListener('pointerup',function(){drawing=false});
       size(); var existing=<?php echo json_encode((string)($pengaturan_perjanjian['ttd_admin'] ?? '')); ?>;if(existing){var i=new Image;i.onload=function(){x.drawImage(i,0,0,c.clientWidth,180);dirty=true};i.src=existing}
       document.getElementById('hapusTtdAdmin').onclick=function(){x.clearRect(0,0,c.width,c.height);dirty=false;document.getElementById('ttd_admin').value=''};
-      document.getElementById('formPerjanjian').addEventListener('submit',function(e){if(dirty)document.getElementById('ttd_admin').value=c.toDataURL('image/png');if(!document.getElementById('ttd_admin').value&&!existing){e.preventDefault();alert('TTD Admin wajib dibuat.')}});
+      var saving=false;
+      document.getElementById('formPerjanjian').addEventListener('submit',async function(e){
+        e.preventDefault();
+        if(saving)return;
+        if(!dirty&&!existing){alert('TTD Admin wajib dibuat.');return;}
+        var form=this, button=form.querySelector('button[type="submit"]');
+        saving=true;button.disabled=true;
+        try {
+          var data=new FormData(form);
+          data.delete('ttd_admin');
+          data.set('update_perjanjian','1');
+          if(dirty){
+            var blob=await new Promise(function(resolve){c.toBlob(resolve,'image/png')});
+            if(!blob)throw new Error('Tanda tangan gagal dibuat. Silakan coba lagi.');
+            if(blob.size>2*1024*1024)throw new Error('Tanda tangan melebihi 2 MB.');
+            data.append('ttd_admin_file',blob,'ttd-admin.png');
+          }
+          var response=await fetch(form.action,{method:'POST',body:data,credentials:'same-origin'});
+          if(!response.ok)throw new Error(response.status===403
+            ?'Server menolak penyimpanan (403). Periksa log keamanan hosting pada waktu penyimpanan ini.'
+            :'Penyimpanan gagal (HTTP '+response.status+'). Silakan coba lagi.');
+          if(!response.redirected)throw new Error('Respons penyimpanan tidak sesuai. Periksa sesi login dan konfigurasi hosting.');
+          window.location.assign(response.url);
+        } catch(error) {
+          alert(error.message || 'Koneksi gagal. Silakan coba lagi.');
+        } finally {saving=false;button.disabled=false;}
+      });
     })();
     </script>
 </body>

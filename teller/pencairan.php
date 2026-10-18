@@ -86,10 +86,10 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         $nama_saksi_1 = trim($_POST['nama_saksi_1'] ?? '');
         $nama_saksi_2 = trim($_POST['nama_saksi_2'] ?? '');
         if ($nama_saksi_1 === '' || $nama_saksi_2 === '') throw new Exception('Nama kedua saksi wajib diisi');
-        $ttd_nasabah = validasiTtdDataUrl($_POST['ttd_nasabah'] ?? '', 'TTD nasabah');
-        $ttd_teller = validasiTtdDataUrl($_POST['ttd_teller'] ?? '', 'TTD Teller');
-        $ttd_saksi_1 = validasiTtdDataUrl($_POST['ttd_saksi_1'] ?? '', 'TTD saksi 1');
-        $ttd_saksi_2 = validasiTtdDataUrl($_POST['ttd_saksi_2'] ?? '', 'TTD saksi 2');
+        $ttd_nasabah = validasiTtdDataUrl(bacaTtdRequest('ttd_nasabah', 'TTD nasabah'), 'TTD nasabah');
+        $ttd_teller = validasiTtdDataUrl(bacaTtdRequest('ttd_teller', 'TTD Teller'), 'TTD Teller');
+        $ttd_saksi_1 = validasiTtdDataUrl(bacaTtdRequest('ttd_saksi_1', 'TTD saksi 1'), 'TTD saksi 1');
+        $ttd_saksi_2 = validasiTtdDataUrl(bacaTtdRequest('ttd_saksi_2', 'TTD saksi 2'), 'TTD saksi 2');
         $aturan_surat = pengaturanPerjanjian($db);
         $ttd_admin = validasiTtdDataUrl($aturan_surat['ttd_admin'] ?? '', 'TTD Admin pada menu Pengaturan');
         $stmtAdmin = $db->prepare("SELECT nama_lengkap FROM users WHERE id = ?");
@@ -288,20 +288,23 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             border-left: 4px solid #3498db;
         }
         #pencairanModal .modal-dialog {
-            height: calc(100vh - 1rem);
+            height: calc(var(--pencairan-viewport-height, 100vh) - 1rem);
             margin-top: .5rem;
             margin-bottom: .5rem;
         }
         #pencairanModal .modal-content {
-            max-height: calc(100vh - 1rem);
+            height: 100%;
+            max-height: 100%;
+            min-height: 0;
             overflow: hidden;
         }
         #pencairanModal .modal-content > form {
+            flex: 1 1 0;
             display: flex;
             flex-direction: column;
             min-height: 0;
             height: 100%;
-            max-height: calc(100vh - 1rem);
+            max-height: 100%;
         }
         #pencairanModal .modal-body {
             flex: 1 1 auto;
@@ -313,6 +316,16 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
         }
         #pencairanModal .modal-header,
         #pencairanModal .modal-footer { flex-shrink: 0; }
+        #pencairanModal .modal-footer {
+            padding-bottom: max(.75rem, env(safe-area-inset-bottom));
+            background: #fff;
+        }
+        /* Leave a touch-scroll gutter beside the drawing surfaces. */
+        #pencairanModal .signature-pad {
+            display: block;
+            width: calc(100% - 2rem) !important;
+            margin-inline: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -325,7 +338,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">
-                        <i class="fas fa-money-bill-wave me-2"></i>Status Pencairan Pinjaman
+                        <i class="fas fa-money-bill-wave me-2"></i>Status Pencairan Pinjaman <strong>test</strong>
                     </h1>
                     <div>
                         <a href="persetujuan.php" class="btn btn-primary">
@@ -867,6 +880,15 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
     <?php include __DIR__ . '/../includes/modal_dokumen.php'; ?>
     <script>
         var pencairanModal = document.getElementById('pencairanModal');
+        function updatePencairanViewport() {
+            var height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            pencairanModal.style.setProperty('--pencairan-viewport-height', height + 'px');
+        }
+        pencairanModal.addEventListener('show.bs.modal', updatePencairanViewport);
+        window.addEventListener('resize', updatePencairanViewport);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', updatePencairanViewport);
+        }
         pencairanModal.addEventListener('show.bs.modal', function (event) {
             var b = event.relatedTarget;
             document.getElementById('pencairan_id').value = b.getAttribute('data-id');
@@ -1000,6 +1022,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             event.preventDefault();
             var form = this;
             var tombol = document.getElementById('btnCairkan');
+            if (tombol.disabled) return;
             tombol.disabled = true;
             tombol.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Menyiapkan foto...';
             try {
@@ -1007,13 +1030,24 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                 await kompresFoto(document.getElementById('foto_barang_jaminan'));
                 await kompresFoto(document.getElementById('foto_nasabah_barang'));
                 await kompresFoto(document.getElementById('surat_tambahan'));
-                var ttdLengkap=true;
-                Object.keys(signaturePads).forEach(function(k){if(signaturePads[k].isDirty())document.getElementById('ttd_'+k).value=signaturePads[k].canvas.toDataURL('image/png');else ttdLengkap=false});
+                var ttdLengkap=Object.keys(signaturePads).every(function(k){return signaturePads[k].isDirty()});
                 if(!ttdLengkap) throw new Error('TTD nasabah, Teller, dan kedua saksi wajib dibuat langsung pada layar.');
+                var data = new FormData(form);
+                for (var key of Object.keys(signaturePads)) {
+                    data.delete('ttd_' + key);
+                    var blob = await new Promise(function(resolve){signaturePads[key].canvas.toBlob(resolve, 'image/png')});
+                    if (!blob || blob.size > 2 * 1024 * 1024) throw new Error('TTD gagal dibuat atau melebihi 2 MB.');
+                    data.append('ttd_' + key + '_file', blob, 'ttd-' + key + '.png');
+                }
                 tombol.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Mencairkan...';
-                form.submit();
+                var response = await fetch(form.action, {method: 'POST', body: data, credentials: 'same-origin'});
+                if (!response.ok) throw new Error(response.status === 403
+                    ? 'Server menolak pencairan (403). Periksa log keamanan hosting pada waktu transaksi ini. Jangan ulangi pencairan sebelum memeriksa status pengajuan.'
+                    : 'Respons server bermasalah (HTTP ' + response.status + '). Periksa status pengajuan sebelum mencoba lagi.');
+                if (!response.redirected) throw new Error('Respons pencairan tidak sesuai. Periksa status pengajuan dan sesi login sebelum mencoba lagi.');
+                window.location.assign(response.url);
             } catch (e) {
-                alert(e.message);
+                alert(e instanceof TypeError ? 'Koneksi terputus. Periksa status pengajuan sebelum mencoba pencairan lagi.' : e.message);
                 tombol.disabled = false;
                 tombol.innerHTML = '<i class="fas fa-check-circle me-1"></i> Cairkan';
             }

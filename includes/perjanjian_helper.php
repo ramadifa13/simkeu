@@ -43,6 +43,25 @@ function validasiTtdDataUrl($nilai, $label) {
     return $nilai;
 }
 
+function bacaTtdRequest($field, $label) {
+    $upload = $_FILES[$field . '_file'] ?? null;
+    if ($upload === null) return trim((string) ($_POST[$field] ?? ''));
+    if (!is_array($upload) || !isset($upload['error'], $upload['tmp_name'], $upload['size'])
+        || $upload['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($upload['tmp_name'])) {
+        throw new Exception("Unggah $label gagal. Silakan coba lagi.");
+    }
+    if ($upload['size'] < 100 || $upload['size'] > 2 * 1024 * 1024) {
+        throw new Exception("$label tidak valid atau melebihi 2 MB.");
+    }
+    $gambar = @getimagesize($upload['tmp_name']);
+    if (!$gambar || $gambar[2] !== IMAGETYPE_PNG) {
+        throw new Exception("$label harus berupa gambar PNG.");
+    }
+    $isi = file_get_contents($upload['tmp_name']);
+    if ($isi === false) throw new Exception("$label gagal dibaca.");
+    return validasiTtdDataUrl('data:image/png;base64,' . base64_encode($isi), $label);
+}
+
 function nomorPerjanjian($pinjaman) {
     $roman = [1=>'I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
     $waktu = strtotime($pinjaman['tanggal_pencairan']);
