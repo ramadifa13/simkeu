@@ -847,7 +847,15 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             document.getElementById('edit_tanggal_daftar').value = button.getAttribute('data-tanggal_daftar');
             
             isiPreviewDokumen('edit', JSON.parse(button.getAttribute('data-dokumen') || '{}'), DOKUMEN_LABEL);
-            editModal.querySelectorAll('.input-dokumen').forEach(function (i) { i.value = ''; });
+            var khususJaminan = (button.getAttribute('data-kode') || '').indexOf('AGTJ') === 0;
+            editModal.querySelectorAll('.input-dokumen').forEach(function (input) {
+                var sembunyikan = khususJaminan && input.dataset.field !== 'foto_ktp';
+                input.value = '';
+                input.required = false;
+                input.disabled = sembunyikan;
+                var kolom = input.closest('.col-md-4');
+                if (kolom) kolom.style.display = sembunyikan ? 'none' : '';
+            });
         });
 
         // Delete Modal (Hanya untuk Admin)

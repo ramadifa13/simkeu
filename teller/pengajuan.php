@@ -70,11 +70,17 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
                 " yang belum lunas ($pinjaman_aktif)");
         }
 
+        // Pengajuan tetap berstatus dicairkan setelah pinjamannya lunas.
+        // Riwayat tersebut tidak boleh menghalangi pengajuan berikutnya.
         $stmt_proses = $db->prepare("SELECT pp.kode_pengajuan
             FROM pengajuan_pinjaman pp
             JOIN jenis_pinjaman jp ON jp.id = pp.jenis_pinjaman_id
             WHERE pp.anggota_id = ? AND pp.status IN ('menunggu','disetujui','dicairkan')
               AND (CASE WHEN jp.memerlukan_jaminan = 1 THEN 1 ELSE 0 END) = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM pinjaman p_selesai
+                  WHERE p_selesai.pengajuan_id = pp.id AND p_selesai.status = 'lunas'
+              )
             LIMIT 1");
         $stmt_proses->execute([$anggota_id, $kategori_gadai]);
         $pengajuan_proses = $stmt_proses->fetchColumn();
