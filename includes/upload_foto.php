@@ -102,10 +102,20 @@ if (!function_exists('urlFoto')) {
 }
 
 if (!function_exists('fotoNasabahAnggota')) {
-    /** Path foto nasabah = foto pencairan terbaru milik anggota ('' bila belum ada / kolom belum dimigrasi). */
+    /** Foto pinjaman berjalan pertama; bila semuanya lunas, gunakan pencairan terakhir. */
     function fotoNasabahAnggota($db, $anggota_id) {
         if (!kolomAda($db, 'pinjaman', 'foto_pencairan')) {
             return '';
+        }
+        // Satu pinjaman berjalan memakai fotonya sendiri. Jika ada dua,
+        // pencairan kedua tidak mengganti foto dari pinjaman berjalan pertama.
+        $stmt = $db->prepare("SELECT foto_pencairan FROM pinjaman
+                              WHERE anggota_id = ? AND status <> 'lunas'
+                              ORDER BY tanggal_pencairan ASC, id ASC LIMIT 1");
+        $stmt->execute([$anggota_id]);
+        $berjalan = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($berjalan !== false) {
+            return (string) ($berjalan['foto_pencairan'] ?? '');
         }
         $stmt = $db->prepare("SELECT foto_pencairan FROM pinjaman
                               WHERE anggota_id = ? AND foto_pencairan IS NOT NULL AND foto_pencairan <> ''

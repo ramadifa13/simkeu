@@ -80,7 +80,7 @@ if (!function_exists('badgeNotifSidebar')) {
 }
 
 // Foto sidebar per level (fallback avatar inisial):
-//  - anggota: foto nasabah dari pencairan terbaru + status anggota (poin E)
+//  - anggota: foto pencairan sesuai pinjaman berjalan + status anggota
 //  - teller : foto profil teller (poin F)
 $sidebar_foto = '';
 $sidebar_status_anggota = '';
