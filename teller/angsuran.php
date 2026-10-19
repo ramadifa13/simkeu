@@ -824,6 +824,11 @@ function formatRupiah($angka) {
                                                         </button>
                                                         <?php endif; ?>
                                                     <?php endif; ?>
+                                                    <a class="btn btn-sm btn-outline-primary ms-1" target="_blank" rel="noopener"
+                                                       href="cetak_buku_angsuran.php?id=<?php echo (int) $angsuran['pinjaman_id']; ?>"
+                                                       title="Cetak Buku Angsuran">
+                                                        <i class="fas fa-book"></i> Cetak Buku Angsuran
+                                                    </a>
                                                 </td>
                                             </tr>
                                             <?php endforeach; ?>
