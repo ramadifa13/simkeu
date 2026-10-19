@@ -142,4 +142,29 @@ function getUserDashboardUrl() {
 
 // Auto-check authentication for protected pages
 // checkAuth();
+
+// Enforce permissions before a protected page can read or mutate application data.
+// CLI regression tests call the domain helpers directly and are intentionally separate.
+if (PHP_SAPI !== 'cli') {
+    $authScript=str_replace('\\','/',realpath($_SERVER['SCRIPT_FILENAME'] ?? '') ?: '');
+    $authRoot=str_replace('\\','/',realpath(__DIR__.'/..'));
+    $authArea=null;
+    foreach(['admin','teller','anggota','transaksi'] as $area) {
+        if(stripos($authScript,$authRoot.'/'.$area.'/')===0){$authArea=$area;break;}
+    }
+    if($authArea!==null) {
+        if(!isLoggedIn()) { header('Location: ../login.php');exit; }
+        $authAllowed=$authArea==='admin'?isAdmin():($authArea==='anggota'?isAnggota():(isAdmin()||isTeller()));
+        if(!$authAllowed){http_response_code(403);exit('Akses ditolak. Halaman ini tidak tersedia untuk peran Anda.');}
+        $authUser=$db->prepare('SELECT role,status FROM users WHERE id=?');$authUser->execute([$_SESSION['user_id']]);$authAccount=$authUser->fetch(PDO::FETCH_ASSOC);
+        if(!$authAccount || $authAccount['status']!=='aktif' || $authAccount['role']!==($_SESSION['role'] ?? '')) {
+            $_SESSION=[];session_regenerate_id(true);$_SESSION['error']='Sesi akun tidak aktif. Silakan masuk kembali.';
+            header('Location: ../login.php');exit;
+        }
+        if(($_SERVER['REQUEST_METHOD'] ?? 'GET')==='POST') {
+            try { layananValidasiToken(); }
+            catch(Exception $e) { http_response_code(403);exit('Formulir kedaluwarsa atau tidak valid. Muat ulang halaman sebelum mencoba kembali.'); }
+        }
+    }
+}
 ?>

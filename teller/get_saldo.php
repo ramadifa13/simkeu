@@ -1,4 +1,5 @@
 <?php
+require_once '../includes/auth.php';
 require_once '../config/config.php';
 
 // Start session jika belum started

@@ -76,7 +76,7 @@ $query = "SELECT
           CROSS JOIN jenis_simpanan j
           WHERE a.status = 'aktif'
           AND j.status = 'aktif'
-          AND j.kode_jenis != 'ANG'
+          AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')
           HAVING saldo != 0";
 
 $params = [

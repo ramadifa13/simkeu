@@ -29,9 +29,15 @@ function redirectBasedOnRole() {
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
-    $role = $_POST['role'] ?? 'admin';
+    $username = is_string($_POST['username'] ?? null)?trim($_POST['username']):'';
+    $password = is_string($_POST['password'] ?? null)?$_POST['password']:'';
+    $role = is_string($_POST['role'] ?? null)?$_POST['role']:'admin';
+    if(!in_array($role,['admin','teller','anggota'],true))$role='admin';
+    $loginToken=$_POST['login_csrf'] ?? '';
+    if(!is_string($loginToken) || empty($_SESSION['login_csrf']) || !hash_equals($_SESSION['login_csrf'],$loginToken)) {
+        $_SESSION['error']='Formulir login kedaluwarsa. Silakan coba kembali.';
+        header('Location: login.php?role='.$role);exit;
+    }
     
     // Validasi input
     if (empty($username) || empty($password)) {
@@ -57,6 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // Verify password dengan password_verify
             if (password_verify($password, $user['password'])) {
                 // Set session
+                session_regenerate_id(true);
+                unset($_SESSION['login_csrf'],$_SESSION['layanan_csrf']);
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['nama_lengkap'] = $user['nama_lengkap'];
@@ -72,12 +80,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 redirectBasedOnRole();
                 
             } else {
-                $_SESSION['error'] = "Password yang Anda masukkan salah!";
+                $_SESSION['error'] = "Username, password, atau peran tidak sesuai.";
                 header("Location: login.php?role=" . $role);
                 exit();
             }
         } else {
-            $_SESSION['error'] = "Username tidak ditemukan atau tidak memiliki akses sebagai " . ucfirst($role);
+            $_SESSION['error'] = "Username, password, atau peran tidak sesuai.";
             header("Location: login.php?role=" . $role);
             exit();
         }

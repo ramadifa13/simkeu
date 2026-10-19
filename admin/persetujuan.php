@@ -49,13 +49,13 @@ if ($_POST) {
         
         $query = "UPDATE pengajuan_pinjaman SET status = 'ditolak', 
                   catatan_admin = :catatan_admin, admin_id = :admin_id,
-                  tanggal_persetujuan = NOW() WHERE id = :id";
+                  tanggal_persetujuan = NOW() WHERE id = :id AND status = 'menunggu'";
         $stmt = $db->prepare($query);
         $stmt->bindParam(':id', $id);
         $stmt->bindParam(':catatan_admin', $catatan_admin);
         $stmt->bindParam(':admin_id', $_SESSION['user_id']);
         
-        if ($stmt->execute()) {
+        if ($stmt->execute() && $stmt->rowCount() === 1) {
             $_SESSION['success'] = "Pengajuan pinjaman berhasil ditolak";
         } else {
             $_SESSION['error'] = "Gagal menolak pengajuan";
@@ -65,11 +65,11 @@ if ($_POST) {
     if (isset($_POST['delete'])) {
         $id = $_POST['id'];
         
-        $query = "DELETE FROM pengajuan_pinjaman WHERE id = :id";
+        $query = "DELETE FROM pengajuan_pinjaman WHERE id = :id AND status IN ('menunggu','ditolak') AND NOT EXISTS (SELECT 1 FROM pinjaman WHERE pengajuan_id = pengajuan_pinjaman.id)";
         $stmt = $db->prepare($query);
         $stmt->bindParam(':id', $id);
         
-        if ($stmt->execute()) {
+        if ($stmt->execute() && $stmt->rowCount() === 1) {
             $_SESSION['success'] = "Pengajuan pinjaman berhasil dihapus";
         } else {
             $_SESSION['error'] = "Gagal menghapus pengajuan";
@@ -522,7 +522,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="approveModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title text-success">Setujui Pengajuan</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -559,7 +559,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="rejectModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title text-danger">Tolak Pengajuan</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -589,7 +589,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="deleteModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title text-danger">Hapus Pengajuan</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

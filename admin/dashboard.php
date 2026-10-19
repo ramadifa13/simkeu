@@ -62,7 +62,7 @@ try {
             COUNT(DISTINCT t.anggota_id) as jumlah_anggota
         FROM jenis_simpanan j
         LEFT JOIN transaksi t ON t.jenis_simpanan_id = j.id
-        WHERE j.status = 'aktif' AND j.kode_jenis != 'ANG'
+        WHERE j.status = 'aktif' AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')
         GROUP BY j.id, j.kode_jenis, j.nama_jenis
         ORDER BY j.id";
     $stmt_simpanan_per_jenis = $db->prepare($query_simpanan_per_jenis);
@@ -74,7 +74,7 @@ try {
             COALESCE(SUM(CASE WHEN t.jenis_transaksi = 'setoran' THEN t.jumlah ELSE -t.jumlah END), 0) as total
         FROM transaksi t
         JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
-        WHERE j.kode_jenis != 'ANG'";
+        WHERE j.kode_jenis NOT IN ('ANG','BONUS','SHU')";
     $stmt_total_simpanan = $db->prepare($query_total_simpanan);
     $stmt_total_simpanan->execute();
     $total_simpanan = $stmt_total_simpanan->fetch(PDO::FETCH_ASSOC)['total'];
@@ -351,7 +351,7 @@ try {
         JOIN anggota a ON t.anggota_id = a.id
         JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
         JOIN users u ON t.user_id = u.id
-        WHERE j.kode_jenis != 'ANG'
+        WHERE j.kode_jenis NOT IN ('ANG','BONUS','SHU')
         ORDER BY t.tanggal_transaksi DESC
         LIMIT 8";
     $stmt_transaksi_terbaru = $db->prepare($query_transaksi_terbaru);
@@ -400,7 +400,7 @@ try {
     
     // Ambil data jenis simpanan dari database (struktur saja)
     try {
-        $query_jenis = "SELECT kode_jenis, nama_jenis FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis != 'ANG'";
+        $query_jenis = "SELECT kode_jenis, nama_jenis FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU')";
         $stmt_jenis = $db->query($query_jenis);
         $jenis_list = $stmt_jenis->fetchAll(PDO::FETCH_ASSOC);
         
@@ -1243,6 +1243,7 @@ function formatRupiah($angka, $simple = false) {
                 <div class="text-end refresh-time">
                     <i class="fas fa-sync-alt me-1"></i> Auto refresh setiap 30 detik
                 </div>
+            <?php include __DIR__.'/../includes/layanan_dashboard.php'; ?>
             </main>
         </div>
     </div>

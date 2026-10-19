@@ -449,7 +449,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="setujuiModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title text-success">Setujui Pengajuan</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -488,7 +488,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="tolakModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title text-danger">Tolak Pengajuan</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

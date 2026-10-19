@@ -60,6 +60,14 @@ if (!function_exists('batalkanPembayaranAngsuran')) {
             if (!$a || $a['status'] !== 'lunas') {
                 throw new Exception("Angsuran tidak ditemukan atau belum dibayar");
             }
+            if (function_exists('layananSiap') && layananSiap($db)) {
+                $cek=$db->prepare('SELECT COUNT(*) FROM layanan_lelang WHERE pinjaman_id=?');$cek->execute([$a['pinjaman_id']]);
+                if($cek->fetchColumn())throw new Exception('Pinjaman dengan penjualan jaminan memerlukan rekonsiliasi menyeluruh; tidak dapat dibatalkan per cicilan.');
+                $cek=$db->prepare("SELECT COUNT(*) FROM layanan_pembayaran WHERE pinjaman_id=? AND jenis='pelunasan' AND dibatalkan_at IS NULL");$cek->execute([$a['pinjaman_id']]);
+                if ($cek->fetchColumn()) throw new Exception('Pelunasan dipercepat tidak dapat dibatalkan per cicilan. Gunakan rekonsiliasi pelunasan menyeluruh.');
+                $cek=$db->prepare("SELECT COUNT(*) FROM layanan_jaminan_kembali WHERE pinjaman_id=? AND status='diserahkan'");$cek->execute([$a['pinjaman_id']]);
+                if ($cek->fetchColumn()) throw new Exception('Jaminan sudah diserahkan. Koreksi memerlukan rekonsiliasi jaminan terlebih dahulu.');
+            }
 
             // ---- pembukuan: transaksi pembayaran terakhir untuk cicilan ini
             $ket = 'Pembayaran angsuran ke-' . $a['angsuran_ke'] . ' - ' . $a['kode_pinjaman'];
@@ -119,6 +127,10 @@ if (!function_exists('batalkanPembayaranAngsuran')) {
             }
             $db->prepare("UPDATE pinjaman SET $set WHERE id = ?")->execute([(float) $a['pokok'], $a['pinjaman_id']]);
             aktifkanKembaliAnggota($db, $a['anggota_id']);
+            if (function_exists('layananSiap') && layananSiap($db)) {
+                $db->prepare('UPDATE layanan_pembayaran SET dibatalkan_at=NOW() WHERE angsuran_id=? AND dibatalkan_at IS NULL')->execute([$angsuran_id]);
+                layananAudit($db,$a['pinjaman_id'],'batalkan_angsuran','Angsuran '.$angsuran_id.'; '.$alasan);
+            }
 
             // ---- Admin membatalkan langsung: pengajuan Teller yang masih menunggu ikut ditutup
             if ($tutup_pengajuan && tabelPengajuanPembatalanAda($db)) {
@@ -204,9 +216,12 @@ if (!function_exists('ajukanPembatalanAngsuran')) {
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         try {
             $db->beginTransaction();
-            $stmt = $db->prepare("SELECT status, tanggal_bayar FROM angsuran WHERE id = ? FOR UPDATE");
+            $stmt = $db->prepare("SELECT a.status, a.tanggal_bayar, p.status AS status_pinjaman FROM angsuran a JOIN pinjaman p ON p.id=a.pinjaman_id WHERE a.id = ? FOR UPDATE");
             $stmt->execute([$angsuran_id]);
             $ang = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($ang && $ang['status_pinjaman'] === 'lunas') {
+                throw new Exception('Histori pinjaman LUNAS terkunci untuk Teller. Hubungi Admin untuk koreksi.');
+            }
             if (!$ang || $ang['status'] !== 'lunas') {
                 throw new Exception("Angsuran ini belum dibayar, tidak ada pembayaran yang bisa dibatalkan");
             }

@@ -11,6 +11,7 @@ if ($_SESSION['role'] !== 'teller') {
 // Kode anggota otomatis (nomor terbesar + 1, lihat includes/anggota_helper.php)
 $kode_otomatis = buatKodeAnggota($db);
 $kode_jaminan_otomatis = buatKodeAnggotaJaminan($db);
+$ketua_shu_list = $db->query("SELECT id,kode_anggota,nama_lengkap FROM anggota WHERE kategori_shu='ketua_kelompok' ORDER BY nama_lengkap")->fetchAll(PDO::FETCH_ASSOC);
 
 // Upload melebihi post_max_size membuat $_POST kosong; tampilkan pesan yang jelas
 cekPostMelebihiBatas();
@@ -33,9 +34,12 @@ if ($_POST) {
         $rekening_bank = $_POST['rekening_bank'] ?? '';
         $tanggal_daftar = $_POST['tanggal_daftar'];
         $status = $_POST['status'];
+        $kategori_shu_input = $_POST['kategori_shu'] ?? 'anggota';
+        $ketua_kelompok_input = $_POST['ketua_kelompok_id'] ?? 0;
 
         try {
             $db->beginTransaction();
+            list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, 0, $kategori_shu_input, $ketua_kelompok_input);
 
             // Validasi dokumen (finfo, maks. 10 MB) sebelum data disimpan
             $dokumen = validasiDokumenAnggota(null, $kategori_anggota === 'jaminan');
@@ -65,8 +69,8 @@ if ($_POST) {
             $user_id = $db->lastInsertId();
 
             // Insert data anggota
-            $query = "INSERT INTO anggota (kode_anggota, nama_lengkap, alamat, telepon, email, tempat_lahir, tanggal_lahir, jenis_kelamin, pekerjaan, ktp, rekening_bank, tanggal_daftar, status, user_id) 
-                     VALUES (:kode_anggota, :nama_lengkap, :alamat, :telepon, :email, :tempat_lahir, :tanggal_lahir, :jenis_kelamin, :pekerjaan, :ktp, :rekening_bank, :tanggal_daftar, :status, :user_id)";
+            $query = "INSERT INTO anggota (kode_anggota, nama_lengkap, alamat, telepon, email, tempat_lahir, tanggal_lahir, jenis_kelamin, pekerjaan, ktp, rekening_bank, tanggal_daftar, kategori_shu, ketua_kelompok_id, status, user_id)
+                     VALUES (:kode_anggota, :nama_lengkap, :alamat, :telepon, :email, :tempat_lahir, :tanggal_lahir, :jenis_kelamin, :pekerjaan, :ktp, :rekening_bank, :tanggal_daftar, :kategori_shu, :ketua_kelompok_id, :status, :user_id)";
             $stmt = $db->prepare($query);
             $stmt->bindParam(':kode_anggota', $kode_anggota);
             $stmt->bindParam(':nama_lengkap', $nama_lengkap);
@@ -80,6 +84,8 @@ if ($_POST) {
             $stmt->bindParam(':ktp', $ktp);
             $stmt->bindParam(':rekening_bank', $rekening_bank);
             $stmt->bindParam(':tanggal_daftar', $tanggal_daftar);
+            $stmt->bindValue(':kategori_shu', $kategori_shu);
+            $stmt->bindValue(':ketua_kelompok_id', $ketua_kelompok_id, $ketua_kelompok_id === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
             $stmt->bindParam(':status', $status);
             $stmt->bindParam(':user_id', $user_id);
             
@@ -384,7 +390,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                 </h5>
                             </div>
                             <div class="card-body">
-                                <form method="POST" enctype="multipart/form-data">
+                                <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
                                     <div class="mb-3">
                                         <label class="form-label">Kategori Anggota *</label>
                                         <select name="kategori_anggota" class="form-select kategori-anggota" required>
@@ -485,6 +491,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                         </div>
                                     </div>
 
+                                    <div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label">Peran SHU *</label><select name="kategori_shu" id="kategori_shu" class="form-select" required><option value="anggota">Anggota (1%)</option><option value="ketua_kelompok">Ketua Kelompok (2%)</option></select></div><div class="col-md-6" id="ketua_shu_wrap"><label class="form-label">Ketua yang mengajak</label><select name="ketua_kelompok_id" id="ketua_kelompok_id" class="form-select"><option value="">Tidak ada</option><?php foreach($ketua_shu_list as $k): ?><option value="<?= (int)$k['id'] ?>"><?= htmlspecialchars($k['nama_lengkap'].' · '.$k['kode_anggota']) ?></option><?php endforeach; ?></select></div></div>
                                     <?php $dok_prefix = 'tambah'; $dok_anggota = null; include __DIR__ . '/../includes/form_dokumen_anggota.php'; ?>
 
                                     <div class="mb-3">
@@ -612,11 +619,15 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         }
         if (kategori) kategori.addEventListener('change', sesuaikanKategoriAnggota);
         sesuaikanKategoriAnggota();
+        var peranShu=document.getElementById('kategori_shu'),ketuaWrap=document.getElementById('ketua_shu_wrap'),ketuaShu=document.getElementById('ketua_kelompok_id');
+        function sesuaikanPeranShu(){var ketua=peranShu&&peranShu.value==='ketua_kelompok';if(ketuaWrap)ketuaWrap.style.display=ketua?'none':'';if(ketuaShu){ketuaShu.disabled=ketua;if(ketua)ketuaShu.value='';}}
+        if(peranShu)peranShu.addEventListener('change',sesuaikanPeranShu);sesuaikanPeranShu();
 
         function resetForm() {
             document.querySelector('form').reset();
             // Set kembali kode anggota yang otomatis
             sesuaikanKategoriAnggota();
+            sesuaikanPeranShu();
             // Set kembali tanggal hari ini
             document.querySelector('input[name="tanggal_daftar"]').value = '<?php echo date('Y-m-d'); ?>';
         }

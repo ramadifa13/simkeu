@@ -26,7 +26,7 @@ $query_simpanan = "SELECT s.*, js.nama_jenis, js.deskripsi, js.kode_jenis, js.mi
                    FROM simpanan s 
                    JOIN jenis_simpanan js ON s.jenis_simpanan_id = js.id 
                    WHERE s.anggota_id = :anggota_id 
-                     AND js.kode_jenis != 'ANG'
+                     AND js.kode_jenis NOT IN ('ANG','BONUS','SHU')
                      AND s.saldo > 0
                    ORDER BY js.id";
 $stmt_simpanan = $db->prepare($query_simpanan);
@@ -40,7 +40,7 @@ error_log("Jumlah simpanan ditemukan: " . count($simpanan_list));
 $query_total = "SELECT COALESCE(SUM(s.saldo), 0) as total_simpanan 
                 FROM simpanan s 
                 JOIN jenis_simpanan js ON s.jenis_simpanan_id = js.id 
-                WHERE s.anggota_id = :anggota_id AND js.kode_jenis != 'ANG'";
+                WHERE s.anggota_id = :anggota_id AND js.kode_jenis NOT IN ('ANG','BONUS','SHU')";
 $stmt_total = $db->prepare($query_total);
 $stmt_total->bindParam(':anggota_id', $anggota_data['id']);
 $stmt_total->execute();

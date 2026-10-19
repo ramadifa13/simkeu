@@ -343,7 +343,7 @@ $activities = $stmt_activities->fetchAll(PDO::FETCH_ASSOC);
                                         <h5 class="card-title">Informasi Profil</h5>
                                         <p class="text-muted">Perbarui informasi profil dan alamat email Anda.</p>
                                         
-                                        <form method="POST" enctype="multipart/form-data">
+                                        <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
                                             <div class="row">
                                                 <div class="col-md-6">
                                                     <div class="mb-3">
@@ -406,7 +406,7 @@ $activities = $stmt_activities->fetchAll(PDO::FETCH_ASSOC);
                                         <h5 class="card-title">Ubah Password</h5>
                                         <p class="text-muted">Pastikan password baru Anda kuat dan mudah diingat.</p>
                                         
-                                        <form method="POST" id="passwordForm">
+                                        <form method="POST" id="passwordForm"><?php echo layananToken(); ?>
                                             <div class="mb-3">
                                                 <label class="form-label">Password Lama *</label>
                                                 <input type="password" name="password_lama" class="form-control" required 

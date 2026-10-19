@@ -239,7 +239,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     data-status="<?php echo $teller['status']; ?>">
                                                 <i class="fas fa-edit"></i>
                                             </button>
-                                            <form method="POST" class="d-inline">
+                                            <form method="POST" class="d-inline"><?php echo layananToken(); ?>
                                                 <input type="hidden" name="id" value="<?php echo $teller['id']; ?>">
                                                 <button type="submit" name="reset_password" class="btn btn-sm btn-info" 
                                                         onclick="return confirm('Reset password ke 123456?')">
@@ -262,7 +262,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="addModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title">Tambah Teller Baru</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -304,7 +304,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="editModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title">Edit Data Teller</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

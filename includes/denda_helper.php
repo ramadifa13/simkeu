@@ -32,7 +32,11 @@ if (!function_exists('dendaPerHari')) {
         if ($memerlukan_jaminan) {
             // Pengajuan gadai hanya menerima kelipatan Rp 1 juta. Data lama di luar
             // kelipatan mengikuti tingkat juta di bawahnya, minimal satu tingkat.
-            return max(1, floor((float) $jumlah_pinjaman / 1000000)) * 5000.0;
+            $tarif_jaminan=5000.0;
+            if (function_exists('layananSiap') && layananSiap($db)) {
+                $tarif_jaminan=(float)$db->query('SELECT denda_jaminan_per_juta FROM layanan_pengaturan WHERE id=1')->fetchColumn();
+            }
+            return max(1, floor((float) $jumlah_pinjaman / 1000000)) * $tarif_jaminan;
         }
         static $tarif = null;
         if ($tarif === null) {
@@ -124,7 +128,7 @@ if (!function_exists('perbaruiDendaOtomatis')) {
         }
         $stmt = $db->prepare($query);
         $stmt->execute($params);
-        $update = $db->prepare("UPDATE angsuran SET denda = ?, keterlambatan_hari = ?, status = 'telat' WHERE id = ?");
+        $update = $db->prepare("UPDATE angsuran SET denda = ?, keterlambatan_hari = ?, status = 'telat' WHERE id = ? AND status IN ('belum_bayar','telat') AND denda_manual = 0");
         $diperbarui = 0;
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $a) {
             $d = hitungDendaAngsuran($db, $a, $a['jumlah_pinjaman'], $hari_ini);

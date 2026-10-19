@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/includes/brand.php';
 // PERBAIKAN: Cek session sudah dimulai atau belum
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -65,9 +66,11 @@ if (!empty($koperasi['logo'])) {
     }
 }
 
+if(empty($_SESSION['login_csrf'])) $_SESSION['login_csrf']=bin2hex(random_bytes(32));
 $error = '';
 $success = '';
 $selected_role = $_GET['role'] ?? 'admin';
+if (!in_array($selected_role,['admin','teller','anggota'],true)) $selected_role='admin';
 
 // Cek apakah ada error dari session (dari login_process.php)
 if (isset($_SESSION['error'])) {
@@ -493,20 +496,14 @@ if (isset($_SESSION['success'])) {
             font-size: 0.8rem;
         }
     </style>
-</head>
+<link rel="stylesheet" href="assets/css/public-ui.css?v=20261019-6">
+<script src="assets/js/brand.js?v=20261019-6" defer></script></head>
 <body class="role-<?php echo $selected_role; ?>">
+    <div class="login-layout"><aside class="login-intro"><a class="login-home" href="index.php"><i class="fas fa-hand-holding-usd" aria-hidden="true"></i> <?= htmlspecialchars($koperasi['nama']) ?></a><span class="login-eyebrow">LAYANAN KOPERASI</span><h1>Satu ruang kerja untuk melayani anggota.</h1><p>Kelola simpanan, pinjaman, dan pembayaran melalui akun sesuai peran Anda.</p><div class="login-intro-items"><span><i class="fas fa-users" aria-hidden="true"></i> Data anggota tersusun</span><span><i class="fas fa-receipt" aria-hidden="true"></i> Transaksi & bukti pembayaran</span><span><i class="fas fa-chart-line" aria-hidden="true"></i> Pemantauan tagihan</span></div><small>Akses hanya untuk pengguna yang terdaftar.</small></aside>
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
-                <div class="logo-container">
-                    <?php if (!empty($logo_path)): ?>
-                        <img src="<?php echo htmlspecialchars($logo_path); ?>" 
-                             alt="Logo <?php echo htmlspecialchars($koperasi['nama']); ?>"
-                             onerror="this.onerror=null; this.parentNode.innerHTML='<i class=\'fas fa-hand-holding-usd\'></i>';">
-                    <?php else: ?>
-                        <i class="fas fa-hand-holding-usd"></i>
-                    <?php endif; ?>
-                </div>
+                <div class="logo-container"><?= brandLogo($koperasi['logo'] ?? '') ?></div>
                 <div class="koperasi-name">
                     <?php echo htmlspecialchars($koperasi['nama']); ?>
                 </div>
@@ -515,25 +512,25 @@ if (isset($_SESSION['success'])) {
                 </div>
                 
                 <!-- Role Selector -->
-                <div class="role-selector">
-                    <div class="role-option admin <?php echo $selected_role == 'admin' ? 'active' : ''; ?>" 
+                <div class="role-selector" role="group" aria-label="Pilih peran akun">
+                    <button type="button" class="role-option admin <?php echo $selected_role == 'admin' ? 'active' : ''; ?>"
                          onclick="selectRole('admin')">
                         <i class="fas fa-crown"></i> 
                         <span class="d-none d-sm-inline">Admin</span>
                         <span class="d-sm-none">Admin</span>
-                    </div>
-                    <div class="role-option teller <?php echo $selected_role == 'teller' ? 'active' : ''; ?>" 
+                    </button>
+                    <button type="button" class="role-option teller <?php echo $selected_role == 'teller' ? 'active' : ''; ?>"
                          onclick="selectRole('teller')">
                         <i class="fas fa-user-tie"></i> 
                         <span class="d-none d-sm-inline">Teller</span>
                         <span class="d-sm-none">Teller</span>
-                    </div>
-                    <div class="role-option anggota <?php echo $selected_role == 'anggota' ? 'active' : ''; ?>" 
+                    </button>
+                    <button type="button" class="role-option anggota <?php echo $selected_role == 'anggota' ? 'active' : ''; ?>"
                          onclick="selectRole('anggota')">
                         <i class="fas fa-user"></i> 
                         <span class="d-none d-sm-inline">Anggota</span>
                         <span class="d-sm-none">Anggota</span>
-                    </div>
+                    </button>
                 </div>
             </div>
 
@@ -554,7 +551,7 @@ if (isset($_SESSION['success'])) {
                 </div>
                 <?php endif; ?>
                 
-                <form method="POST" action="login_process.php" id="loginForm">
+                <form method="POST" action="login_process.php" id="loginForm"><input type="hidden" name="login_csrf" value="<?php echo htmlspecialchars($_SESSION['login_csrf'],ENT_QUOTES); ?>">
                     <input type="hidden" name="role" id="selectedRole" value="<?php echo $selected_role; ?>">
                     
                     <div class="mb-3">
@@ -565,7 +562,7 @@ if (isset($_SESSION['success'])) {
                             <span class="input-group-text">
                                 <i class="fas fa-user"></i>
                             </span>
-                            <input type="text" class="form-control" id="username" name="username" 
+                            <input type="text" class="form-control" id="username" name="username" autocomplete="username"
                                    placeholder="Masukkan username" 
                                    value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>"
                                    required autofocus>
@@ -580,9 +577,9 @@ if (isset($_SESSION['success'])) {
                             <span class="input-group-text">
                                 <i class="fas fa-lock"></i>
                             </span>
-                            <input type="password" class="form-control" id="password" name="password" 
+                            <input type="password" class="form-control" id="password" name="password" autocomplete="current-password"
                                    placeholder="Masukkan password" required>
-                            <button type="button" class="password-toggle" onclick="togglePassword()" tabindex="-1">
+                            <button type="button" class="password-toggle" onclick="togglePassword()" aria-label="Tampilkan password" aria-pressed="false">
                                 <i class="fas fa-eye" id="passwordIcon"></i>
                             </button>
                         </div>
@@ -599,7 +596,7 @@ if (isset($_SESSION['success'])) {
                     Butuh bantuan? Hubungi administrator sistem
                     <br>
                     <small class="text-muted">
-                        <i class="fas fa-clock me-1"></i> Support 24/7
+                        <i class="fas fa-clock me-1"></i> Hubungi pengurus jika memerlukan bantuan
                     </small>
                 </div>
 
@@ -612,6 +609,7 @@ if (isset($_SESSION['success'])) {
         </div>
     </div>
 
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function selectRole(role) {
@@ -620,9 +618,9 @@ if (isset($_SESSION['success'])) {
             
             // Update active class
             document.querySelectorAll('.role-option').forEach(option => {
-                option.classList.remove('active');
+                option.classList.remove('active');option.setAttribute('aria-pressed','false');
             });
-            document.querySelector(`.role-option.${role}`).classList.add('active');
+            document.querySelector(`.role-option.${role}`).classList.add('active');document.querySelector(`.role-option.${role}`).setAttribute('aria-pressed','true');
             
             // Update login button text
             const roleNames = {
@@ -647,10 +645,14 @@ if (isset($_SESSION['success'])) {
             
             if (passwordInput.type === 'password') {
                 passwordInput.type = 'text';
+                document.querySelector('.password-toggle').setAttribute('aria-label','Sembunyikan password');
+                document.querySelector('.password-toggle').setAttribute('aria-pressed','true');
                 passwordIcon.classList.remove('fa-eye');
                 passwordIcon.classList.add('fa-eye-slash');
             } else {
                 passwordInput.type = 'password';
+                document.querySelector('.password-toggle').setAttribute('aria-label','Tampilkan password');
+                document.querySelector('.password-toggle').setAttribute('aria-pressed','false');
                 passwordIcon.classList.remove('fa-eye-slash');
                 passwordIcon.classList.add('fa-eye');
             }
@@ -659,6 +661,7 @@ if (isset($_SESSION['success'])) {
         // Set initial role text and style
         document.addEventListener('DOMContentLoaded', function() {
             const role = '<?php echo $selected_role; ?>';
+            selectRole(role);
             const roleNames = {
                 'admin': 'Admin',
                 'teller': 'Teller',
@@ -687,5 +690,6 @@ if (isset($_SESSION['success'])) {
             });
         });
     </script>
+
 </body>
 </html>

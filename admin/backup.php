@@ -66,10 +66,8 @@ function backupDatabase($db, $backup_path) {
                     foreach ($row as $value) {
                         if ($value === null) {
                             $values[] = "NULL";
-                        } elseif (is_numeric($value)) {
-                            $values[] = $value;
                         } else {
-                            $values[] = "'" . $db->quote($value) . "'";
+                            $values[] = $db->quote($value);
                         }
                     }
                     
@@ -82,7 +80,7 @@ function backupDatabase($db, $backup_path) {
                 }
             }
             
-            $output .= "\n" . str_repeat("-", 50) . "\n";
+            $output .= "\n-- " . str_repeat("-", 50) . "\n";
         }
         
         // Enable foreign key checks
@@ -132,11 +130,11 @@ if ($_POST && isset($_POST['backup_database'])) {
 }
 
 // Handle delete backup
-if ($_GET && isset($_GET['delete'])) {
-    $file = basename($_GET['delete']); // Prevent directory traversal
+if ($_POST && isset($_POST['delete'])) {
+    $file = basename((string)$_POST['delete']); // Prevent directory traversal
     $file_path = '../backups/' . $file;
     
-    if (file_exists($file_path) && is_file($file_path)) {
+    if (pathinfo($file_path, PATHINFO_EXTENSION) === 'sql' && is_file($file_path)) {
         if (unlink($file_path)) {
             $_SESSION['success'] = "Backup berhasil dihapus";
         } else {
@@ -155,7 +153,7 @@ if ($_GET && isset($_GET['download'])) {
     $file = basename($_GET['download']);
     $file_path = '../backups/' . $file;
     
-    if (file_exists($file_path) && is_file($file_path)) {
+    if (pathinfo($file_path, PATHINFO_EXTENSION) === 'sql' && is_file($file_path)) {
         header('Content-Description: File Transfer');
         header('Content-Type: application/sql');
         header('Content-Disposition: attachment; filename="' . $file . '"');
@@ -413,7 +411,7 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
                                     dan dapat digunakan untuk restore data jika diperlukan.
                                 </p>
                                 
-                                <form method="POST">
+                                <form method="POST"><?php echo layananToken(); ?>
                                     <div class="alert alert-info">
                                         <small>
                                             <i class="fas fa-info-circle me-2"></i>
@@ -460,12 +458,7 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
                                                            class="btn btn-sm btn-outline-primary" title="Download">
                                                             <i class="fas fa-download"></i>
                                                         </a>
-                                                        <a href="?delete=<?php echo urlencode($backup['name']); ?>" 
-                                                           class="btn btn-sm btn-outline-danger" 
-                                                           onclick="return confirmDelete('<?php echo htmlspecialchars($backup['name']); ?>')"
-                                                           title="Hapus">
-                                                            <i class="fas fa-trash"></i>
-                                                        </a>
+                                                        <form method="post" class="d-inline" onsubmit="return confirm('Hapus backup ini?')"><?= layananToken() ?><button class="btn btn-sm btn-danger" type="submit" name="delete" value="<?= htmlspecialchars($backup['name'], ENT_QUOTES, 'UTF-8') ?>" aria-label="Hapus backup"><i class="fas fa-trash"></i></button></form>
                                                     </td>
                                                 </tr>
                                                 <?php endforeach; ?>
@@ -500,7 +493,7 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
                                     <li>Pengaturan koperasi</li>
                                 </ul>
                                 
-                                <form method="POST" id="resetForm">
+                                <form method="POST" id="resetForm"><?php echo layananToken(); ?>
                                     <div class="alert alert-danger">
                                         <strong>PERINGATAN!</strong> Tindakan ini tidak dapat dibatalkan. 
                                         Pastikan Anda sudah membuat backup sebelum melanjutkan.

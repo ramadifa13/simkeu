@@ -11,6 +11,17 @@ if ($_POST && isset($_POST['proses_penarikan'])) {
     
     try {
         $db->beginTransaction();
+        if (!is_scalar($jumlah) || !preg_match('/^\d+(?:\.\d{1,2})?$/D', (string)$jumlah) || !is_finite((float)$jumlah) || (float)$jumlah <= 0 || (float)$jumlah > 999999999999) {
+            throw new Exception('Nominal harus berupa angka positif yang valid.');
+        }
+        $db->query('SELECT id FROM koperasi WHERE id=1 FOR UPDATE')->fetchColumn();
+        $lockMember=$db->prepare("SELECT id FROM anggota WHERE id=? AND status='aktif' FOR UPDATE");
+        $lockMember->execute([$anggota_id]);
+        if(!$lockMember->fetchColumn()) throw new Exception('Anggota tidak aktif atau tidak ditemukan.');
+        $validType=$db->prepare("SELECT id FROM jenis_simpanan WHERE id=? AND status='aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU')");
+        $validType->execute([$jenis_simpanan_id]);
+        if(!$validType->fetchColumn()) throw new Exception('Jenis simpanan tidak ditemukan.');
+
         
         // Check current balance
         $query_saldo = "SELECT saldo FROM simpanan WHERE anggota_id = :anggota_id AND jenis_simpanan_id = :jenis_simpanan_id";
@@ -93,7 +104,7 @@ $stmt_anggota = $db->prepare($query_anggota);
 $stmt_anggota->execute();
 $anggota_list = $stmt_anggota->fetchAll(PDO::FETCH_ASSOC);
 
-$query_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' ORDER BY nama_jenis";
+$query_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU') ORDER BY nama_jenis";
 $stmt_jenis = $db->prepare($query_jenis);
 $stmt_jenis->execute();
 $jenis_simpanan = $stmt_jenis->fetchAll(PDO::FETCH_ASSOC);
@@ -174,7 +185,7 @@ $recent_penarikan = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                                 </h5>
                             </div>
                             <div class="card-body">
-                                <form method="POST" id="formPenarikan">
+                                <form method="POST" id="formPenarikan"><?php echo layananToken(); ?>
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">

@@ -7,8 +7,7 @@ $logo_path = '';
 
 try {
     require_once '../config/database.php';
-    $database = new Database();
-    $db = $database->getConnection();
+    if (!isset($db) || !$db) { $database = new Database(); $db = $database->getConnection(); }
     
     $koperasi_query = "SELECT * FROM koperasi WHERE id = 1";
     $koperasi_stmt = $db->prepare($koperasi_query);
@@ -100,7 +99,7 @@ if ($current_role === 'anggota') {
 $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
 ?>
 <!-- Sidebar -->
-<div class="sidebar bg-dark" id="sidebarMenu">
+<div class="sidebar bg-dark" id="sidebarMenu" role="navigation" aria-label="Menu utama">
     <div class="p-3">
         <!-- Brand Logo -->
         <div class="text-center mb-4">
@@ -183,7 +182,7 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                     <i class="fas fa-hand-holding-usd me-2"></i> Peminjaman
                     <i class="fas fa-chevron-down float-end"></i>
                 </a>
-                <div class="collapse <?php echo in_array($current_page, ['pengajuan.php', 'persetujuan.php', 'pencairan.php', 'angsuran.php', 'denda.php', 'pelunasan.php']) ? 'show' : ''; ?>" id="menuPeminjaman">
+                <div class="collapse <?php echo in_array($current_page, ['pengajuan.php', 'persetujuan.php', 'pencairan.php', 'angsuran.php', 'denda.php', 'pelunasan.php', 'layanan.php']) ? 'show' : ''; ?>" id="menuPeminjaman">
                     <ul class="nav flex-column ms-3 mt-1">
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pengajuan.php' ? 'active text-white' : ''; ?>" 
@@ -224,13 +223,17 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'denda.php' ? 'active text-white' : ''; ?>" 
-                               href="denda.php">
+                            <a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'layanan.php' && in_array($_GET['tab'] ?? 'macet',['macet','pengaturan'],true)) ? 'active text-white' : ''; ?>"
+                               href="layanan.php?tab=macet">
+                                <i class="fas fa-exclamation-circle me-2"></i> Macet & Layanan
+                            </a>
+                        </li>
+                        <li class="nav-item"><a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'denda.php' || ($current_page === 'layanan.php' && ($_GET['tab'] ?? 'macet') === 'denda')) ? 'active text-white' : ''; ?>" href="denda.php">
                                 <i class="fas fa-exclamation-triangle me-2"></i> Denda
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pelunasan.php' ? 'active text-white' : ''; ?>" 
+                            <a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'pelunasan.php' || ($current_page === 'layanan.php' && ($_GET['tab'] ?? 'macet') === 'lunas')) ? 'active text-white' : ''; ?>"
                                href="pelunasan.php">
                                 <i class="fas fa-flag-checkered me-2"></i> Pelunasan
                             </a>
@@ -411,7 +414,7 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                     <i class="fas fa-hand-holding-usd me-2"></i> Pinjaman
                     <i class="fas fa-chevron-down float-end"></i>
                 </a>
-                <div class="collapse <?php echo in_array($current_page, ['pengajuan.php', 'persetujuan.php', 'pencairan.php', 'angsuran.php', 'denda.php', 'pelunasan.php']) ? 'show' : ''; ?>" id="menuPinjamanAdmin">
+                <div class="collapse <?php echo in_array($current_page, ['pengajuan.php', 'persetujuan.php', 'pencairan.php', 'angsuran.php', 'denda.php', 'pelunasan.php', 'layanan.php']) ? 'show' : ''; ?>" id="menuPinjamanAdmin">
                     <ul class="nav flex-column ms-3 mt-1">
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pengajuan.php' ? 'active text-white' : ''; ?>" 
@@ -444,13 +447,17 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'denda.php' ? 'active text-white' : ''; ?>" 
-                               href="denda.php">
+                            <a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'layanan.php' && in_array($_GET['tab'] ?? 'macet',['macet','pengaturan'],true)) ? 'active text-white' : ''; ?>"
+                               href="layanan.php?tab=macet">
+                                <i class="fas fa-exclamation-circle me-2"></i> Macet & Layanan
+                            </a>
+                        </li>
+                        <li class="nav-item"><a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'denda.php' || ($current_page === 'layanan.php' && ($_GET['tab'] ?? 'macet') === 'denda')) ? 'active text-white' : ''; ?>" href="denda.php">
                                 <i class="fas fa-exclamation-triangle me-2"></i> Denda
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pelunasan.php' ? 'active text-white' : ''; ?>" 
+                            <a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'pelunasan.php' || ($current_page === 'layanan.php' && ($_GET['tab'] ?? 'macet') === 'lunas')) ? 'active text-white' : ''; ?>"
                                href="pelunasan.php">
                                 <i class="fas fa-flag-checkered me-2"></i> Pelunasan
                             </a>
@@ -518,19 +525,19 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'shu.php' ? 'active text-white' : ''; ?>" 
                                href="shu.php">
-                                <i class="fas fa-calculator me-2"></i> Manajemen SHU
+                                <i class="fas fa-chart-line me-2"></i> Dashboard SHU
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'shu_anggota.php' ? 'active text-white' : ''; ?>" 
                                href="shu_anggota.php">
-                                <i class="fas fa-users me-2"></i> SHU Anggota
+                                <i class="fas fa-money-bill-wave me-2"></i> Pembayaran SHU
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'shu_laporan.php' ? 'active text-white' : ''; ?>" 
                                href="shu_laporan.php">
-                                <i class="fas fa-file-pdf me-2"></i> Laporan SHU
+                                <i class="fas fa-file-export me-2"></i> Laporan SHU
                             </a>
                         </li>
                     </ul>
@@ -624,183 +631,8 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
     </div>
 </div>
 
-<style>
-/* Sidebar styling */
-.sidebar {
-    position: fixed;
-    top: 56px;
-    left: 0;
-    width: 280px;
-    height: calc(100vh - 56px);
-    background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%) !important;
-    overflow-y: auto;
-    z-index: 1000;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-}
-
-/* Konten utama selalu bergeser selebar sidebar (sebelumnya memakai kolom persen sehingga
-   tertutup sidebar di laptop 1366px dan tablet; hanya aman di monitor lebar) */
-@media (min-width: 768px) {
-    main.col-md-9 {
-        margin-left: 280px !important;
-        width: calc(100% - 280px) !important;
-        max-width: none;
-        flex: 0 0 auto;
-    }
-}
-@media (min-width: 768px) and (max-width: 1199.98px) {
-    .sidebar { width: 230px; }
-    main.col-md-9 {
-        margin-left: 230px !important;
-        width: calc(100% - 230px) !important;
-    }
-}
-
-/* Mobile styles */
-@media (max-width: 767.98px) {
-    .sidebar {
-        left: -100%;
-        transition: left 0.3s ease;
-    }
-    
-    .sidebar.show {
-        left: 0;
-    }
-    
-    .sidebar-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.5);
-        z-index: 999;
-        display: none;
-    }
-    
-    .sidebar-overlay.show {
-        display: block;
-    }
-}
-
-.logo-container {
-    width: 70px;
-    height: 70px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto;
-    border: 3px solid rgba(255, 255, 255, 0.2);
-}
-
-.logo-container img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 50%;
-}
-
-.logo-container i {
-    font-size: 2rem;
-    color: white;
-}
-
-.nav-link {
-    border-radius: 5px;
-    padding: 10px 15px !important;
-    color: rgba(255,255,255,0.8) !important;
-    transition: all 0.3s;
-}
-
-.nav-link:hover {
-    background-color: rgba(255,255,255,0.1) !important;
-    color: white !important;
-}
-
-.nav-link.active {
-    background-color: #3498db !important;
-    color: white !important;
-}
-
-.nav-link.text-white-50 {
-    color: rgba(255,255,255,0.5) !important;
-    padding: 5px 15px !important;
-}
-
-.nav-link.text-white-50:hover {
-    color: white !important;
-    background-color: rgba(52, 152, 219, 0.3) !important;
-}
-
-.nav-link.text-white-50.active {
-    background-color: #3498db !important;
-    color: white !important;
-}
-
-.fa-chevron-down {
-    transition: transform 0.3s;
-}
-
-[aria-expanded="true"] .fa-chevron-down {
-    transform: rotate(180deg);
-}
-
-.collapse {
-    transition: all 0.3s ease;
-}
-
-.nav.flex-column.ms-3 {
-    border-left: 1px solid rgba(255,255,255,0.1);
-    margin-left: 15px !important;
-    padding-left: 5px;
-}
-
-.btn-danger {
-    background-color: rgba(231, 76, 60, 0.8);
-    border: none;
-}
-
-.btn-danger:hover {
-    background-color: #c0392b;
-}
-
-@keyframes notifPulse {
-    0% { transform: scale(1); }
-    45% { transform: scale(1.35); }
-    100% { transform: scale(1); }
-}
-.notif-pulse { animation: notifPulse .45s ease; }
-</style>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Mobile sidebar toggle
-    const navbarToggler = document.querySelector('.navbar-toggler');
-    const sidebar = document.querySelector('.sidebar');
-    
-    if (navbarToggler && sidebar) {
-        const overlay = document.createElement('div');
-        overlay.className = 'sidebar-overlay';
-        document.body.appendChild(overlay);
-        
-        navbarToggler.addEventListener('click', function() {
-            sidebar.classList.toggle('show');
-            overlay.classList.toggle('show');
-            document.body.style.overflow = sidebar.classList.contains('show') ? 'hidden' : '';
-        });
-        
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('show');
-            overlay.classList.remove('show');
-            document.body.style.overflow = '';
-        });
-    }
-    
-    // Bootstrap akan handle collapse secara otomatis
-    // Tidak perlu JavaScript tambahan
-
     // Notifikasi alur pinjaman: polling ringan tiap 2 detik, berhenti saat tab tidak aktif.
     let notifTimer = null;
     let notifBusy = false;

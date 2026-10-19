@@ -47,7 +47,7 @@ $stmt_anggota = $db->prepare($query_anggota);
 $stmt_anggota->execute();
 $anggota_list = $stmt_anggota->fetchAll(PDO::FETCH_ASSOC);
 
-$query_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis != 'ANG' ORDER BY id";
+$query_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU') ORDER BY id";
 $stmt_jenis = $db->prepare($query_jenis);
 $stmt_jenis->execute();
 $jenis_list = $stmt_jenis->fetchAll(PDO::FETCH_ASSOC);
@@ -74,7 +74,7 @@ $query = "SELECT
           CROSS JOIN jenis_simpanan j
           WHERE a.status = 'aktif'
           AND j.status = 'aktif'
-          AND j.kode_jenis != 'ANG'
+          AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')
           HAVING saldo != 0";
 
 $params = [
@@ -110,7 +110,7 @@ $query_summary = "SELECT
 FROM transaksi t
 JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
 WHERE DATE(t.tanggal_transaksi) BETWEEN :tanggal_awal AND :tanggal_akhir
-AND j.kode_jenis != 'ANG'
+AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')
 GROUP BY j.kode_jenis, j.nama_jenis
 HAVING total_saldo != 0
 ORDER BY j.kode_jenis";

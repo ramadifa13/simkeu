@@ -27,11 +27,14 @@ if ($_POST) {
         $ktp = $_POST['ktp'];
         $rekening_bank = $_POST['rekening_bank'];
         $tanggal_daftar = $_POST['tanggal_daftar'];
+        $kategori_shu_input = $_POST['kategori_shu'] ?? 'anggota';
+        $ketua_kelompok_input = $_POST['ketua_kelompok_id'] ?? 0;
         
         $foto_ktp = null; // diisi simpanDokumenAnggota()
         
         try {
             $db->beginTransaction();
+            list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, 0, $kategori_shu_input, $ketua_kelompok_input);
             
             // Validasi dokumen (finfo, maks. 10 MB) sebelum data disimpan
             $dokumen = validasiDokumenAnggota(null, $kategori_anggota === 'jaminan');
@@ -70,10 +73,10 @@ if ($_POST) {
             // Insert anggota data
             $query_anggota = "INSERT INTO anggota (kode_anggota, nama_lengkap, alamat, telepon, email, 
                             tempat_lahir, tanggal_lahir, jenis_kelamin, pekerjaan, ktp, foto_ktp, 
-                            rekening_bank, user_id, tanggal_daftar) 
+                            rekening_bank, user_id, tanggal_daftar, kategori_shu, ketua_kelompok_id)
                             VALUES (:kode_anggota, :nama_lengkap, :alamat, :telepon, :email, 
                             :tempat_lahir, :tanggal_lahir, :jenis_kelamin, :pekerjaan, :ktp, :foto_ktp, 
-                            :rekening_bank, :user_id, :tanggal_daftar)";
+                            :rekening_bank, :user_id, :tanggal_daftar, :kategori_shu, :ketua_kelompok_id)";
             $stmt_anggota = $db->prepare($query_anggota);
             $stmt_anggota->bindParam(':kode_anggota', $kode_anggota);
             $stmt_anggota->bindParam(':nama_lengkap', $nama_lengkap);
@@ -89,6 +92,8 @@ if ($_POST) {
             $stmt_anggota->bindParam(':rekening_bank', $rekening_bank);
             $stmt_anggota->bindParam(':user_id', $user_id);
             $stmt_anggota->bindParam(':tanggal_daftar', $tanggal_daftar);
+            $stmt_anggota->bindValue(':kategori_shu', $kategori_shu);
+            $stmt_anggota->bindValue(':ketua_kelompok_id', $ketua_kelompok_id, $ketua_kelompok_id === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
             $stmt_anggota->execute();
             
             $anggota_id = $db->lastInsertId();
@@ -135,9 +140,12 @@ if ($_POST) {
         $ktp = $_POST['ktp'];
         $rekening_bank = $_POST['rekening_bank'];
         $status = $_POST['status'];
+        $kategori_shu_input = $_POST['kategori_shu'] ?? 'anggota';
+        $ketua_kelompok_input = $_POST['ketua_kelompok_id'] ?? 0;
         
         try {
             $db->beginTransaction();
+            list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, $id, $kategori_shu_input, $ketua_kelompok_input);
             
             // Dokumen lama (untuk cek wajib & hapus file yang diganti)
             $stmt_dok = $db->prepare("SELECT foto_ktp, foto_kk, foto_ktp_pasangan FROM anggota WHERE id = ?");
@@ -162,7 +170,8 @@ if ($_POST) {
             $query = "UPDATE anggota SET nama_lengkap = :nama_lengkap,
                       alamat = :alamat, telepon = :telepon, tempat_lahir = :tempat_lahir,
                       tanggal_lahir = :tanggal_lahir, jenis_kelamin = :jenis_kelamin, pekerjaan = :pekerjaan,
-                      ktp = :ktp, rekening_bank = :rekening_bank, status = :status
+                      ktp = :ktp, rekening_bank = :rekening_bank, status = :status,
+                      kategori_shu = :kategori_shu, ketua_kelompok_id = :ketua_kelompok_id
                       WHERE id = :id";
             $stmt = $db->prepare($query);
             $stmt->bindParam(':id', $id);
@@ -176,6 +185,8 @@ if ($_POST) {
             $stmt->bindParam(':ktp', $ktp);
             $stmt->bindParam(':rekening_bank', $rekening_bank);
             $stmt->bindParam(':status', $status);
+            $stmt->bindValue(':kategori_shu', $kategori_shu);
+            $stmt->bindValue(':ketua_kelompok_id', $ketua_kelompok_id, $ketua_kelompok_id === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
             
             if ($stmt->execute()) {
                 // Update user data
@@ -261,6 +272,7 @@ foreach ($params as $key => $value) {
 }
 $stmt->execute();
 $anggota_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$ketua_shu_list = array_values(array_filter($anggota_list, function($a){ return ($a['kategori_shu'] ?? 'anggota') === 'ketua_kelompok'; }));
 
 // Get statistics
 $query_stats = "SELECT 
@@ -460,6 +472,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                         <th>#</th>
                                         <th>Kode</th>
                                         <th>Nama Lengkap</th>
+                                        <th>Peran SHU</th>
                                         <th>Telepon</th>
                                         <th>KTP</th>
                                         <th>Rekening</th>
@@ -471,7 +484,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                 <tbody>
                                     <?php if (empty($anggota_list)): ?>
                                     <tr>
-                                        <td colspan="9" class="text-center text-muted py-4">
+                                        <td colspan="10" class="text-center text-muted py-4">
                                             <i class="fas fa-users fa-3x mb-3"></i>
                                             <p>Tidak ada data anggota</p>
                                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
@@ -499,7 +512,8 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td><?php echo $anggota['telepon'] ?: '-'; ?></td>
+                                            <td><span class="badge <?= ($anggota['kategori_shu'] ?? 'anggota')==='ketua_kelompok'?'bg-primary':'bg-secondary' ?>"><?= ($anggota['kategori_shu'] ?? 'anggota')==='ketua_kelompok'?'Ketua Kelompok':'Anggota' ?></span></td>
+                                            <td><?php echo layananEscape($anggota['telepon'] ?: '-'); ?><br><?php echo tombolWhatsApp($anggota['telepon']); ?></td>
                                             <td>
                                                 <?php $dok_url = array_filter(array_map('urlDokumenAnggota', array_intersect_key($anggota, daftarDokumenAnggota()))); ?>
                                                 <?php if (!empty($dok_url)): ?>
@@ -546,10 +560,12 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                         data-rekening_bank="<?php echo $anggota['rekening_bank']; ?>"
                                                         data-status="<?php echo $anggota['status']; ?>"
                                                         data-tanggal_daftar="<?php echo $anggota['tanggal_daftar']; ?>"
+                                                        data-kategori_shu="<?= htmlspecialchars($anggota['kategori_shu'] ?? 'anggota') ?>"
+                                                        data-ketua_kelompok_id="<?= (int)($anggota['ketua_kelompok_id'] ?? 0) ?>"
                                                         title="Edit">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
-                                                <form method="POST" class="d-inline">
+                                                <form method="POST" class="d-inline"><?php echo layananToken(); ?>
                                                     <input type="hidden" name="id" value="<?php echo $anggota['id']; ?>">
                                                     <button type="submit" name="reset_password" class="btn btn-sm btn-info" 
                                                             onclick="return confirm('Reset password ke 123456?')" title="Reset Password">
@@ -582,7 +598,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="addModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <form method="POST" enctype="multipart/form-data">
+                <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title">Tambah Anggota Baru</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -646,6 +662,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="row">
                         </div>
+                        <div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label">Peran SHU *</label><select name="kategori_shu" class="form-select shu-role" required><option value="anggota">Anggota (1%)</option><option value="ketua_kelompok">Ketua Kelompok (2%)</option></select></div><div class="col-md-6 shu-leader-wrap"><label class="form-label">Ketua yang mengajak</label><select name="ketua_kelompok_id" class="form-select shu-leader"><option value="">Tidak ada</option><?php foreach($ketua_shu_list as $k): ?><option value="<?= (int)$k['id'] ?>"><?= htmlspecialchars($k['nama_lengkap'].' · '.$k['kode_anggota']) ?></option><?php endforeach; ?></select></div></div>
                         <?php $dok_prefix = 'add'; $dok_anggota = null; include __DIR__ . '/../includes/form_dokumen_anggota.php'; ?>
                         <div class="row">
                             <div class="col-md-6">
@@ -681,7 +698,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="editModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <form method="POST" enctype="multipart/form-data">
+                <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title">Edit Data Anggota</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -737,6 +754,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="row">
                         </div>
+                        <div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label">Peran SHU *</label><select name="kategori_shu" id="edit_kategori_shu" class="form-select shu-role" required><option value="anggota">Anggota (1%)</option><option value="ketua_kelompok">Ketua Kelompok (2%)</option></select></div><div class="col-md-6 shu-leader-wrap"><label class="form-label">Ketua yang mengajak</label><select name="ketua_kelompok_id" id="edit_ketua_kelompok_id" class="form-select shu-leader"><option value="">Tidak ada</option><?php foreach($ketua_shu_list as $k): ?><option value="<?= (int)$k['id'] ?>"><?= htmlspecialchars($k['nama_lengkap'].' · '.$k['kode_anggota']) ?></option><?php endforeach; ?></select></div></div>
                         <?php $dok_prefix = 'edit'; $dok_anggota = null; include __DIR__ . '/../includes/form_dokumen_anggota.php'; ?>
                         <div class="row">
                             <div class="col-md-6">
@@ -778,7 +796,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="deleteModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title text-danger">Konfirmasi Hapus</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -827,6 +845,8 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         }
         if (kategori) kategori.addEventListener('change', sesuaikanKategoriAnggota);
         sesuaikanKategoriAnggota();
+        function tampilkanKetua(form){var role=form.querySelector('.shu-role'),wrap=form.querySelector('.shu-leader-wrap'),leader=form.querySelector('.shu-leader'),ketua=role&&role.value==='ketua_kelompok';if(wrap)wrap.style.display=ketua?'none':'';if(leader){leader.disabled=ketua;if(ketua)leader.value='';}}
+        document.querySelectorAll('#addModal form,#editModal form').forEach(function(form){var role=form.querySelector('.shu-role');if(role)role.addEventListener('change',function(){tampilkanKetua(form);});tampilkanKetua(form);});
 
         // Edit Modal
         var editModal = document.getElementById('editModal');
@@ -845,6 +865,9 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             document.getElementById('edit_rekening_bank').value = button.getAttribute('data-rekening_bank');
             document.getElementById('edit_status').value = button.getAttribute('data-status');
             document.getElementById('edit_tanggal_daftar').value = button.getAttribute('data-tanggal_daftar');
+            document.getElementById('edit_kategori_shu').value = button.getAttribute('data-kategori_shu') || 'anggota';
+            document.getElementById('edit_ketua_kelompok_id').value = button.getAttribute('data-ketua_kelompok_id') || '';
+            tampilkanKetua(editModal.querySelector('form'));
             
             isiPreviewDokumen('edit', JSON.parse(button.getAttribute('data-dokumen') || '{}'), DOKUMEN_LABEL);
             var khususJaminan = (button.getAttribute('data-kode') || '').indexOf('AGTJ') === 0;

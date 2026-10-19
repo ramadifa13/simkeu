@@ -36,6 +36,11 @@ $hitung = hitungDariPinjaman($b);
 // Tanggal lunas: kolom tanggal_lunas bila ada, selain itu tanggal bayar cicilan terakhir
 $tanggal_lunas = !empty($b['tanggal_lunas']) ? $b['tanggal_lunas'] : $b['bayar_terakhir'];
 $total_dibayar = (float) $b['total_angsuran_dibayar'] + (float) $b['total_denda'];
+if (layananSiap($db)) {
+    $stmt_diskon=$db->prepare("SELECT l.diskon_persen, (SELECT COALESCE(SUM(bunga),0) FROM angsuran WHERE pinjaman_id=l.pinjaman_id AND cara_bayar='pelunasan') sisa_bunga FROM layanan_pelunasan l WHERE l.pinjaman_id=? AND l.status='selesai'");
+    $stmt_diskon->execute([$b['id']]);$diskon_lunas=$stmt_diskon->fetch(PDO::FETCH_ASSOC);
+    if ($diskon_lunas) $total_dibayar-=round($diskon_lunas['sisa_bunga']*$diskon_lunas['diskon_persen']/100,2);
+}
 $e = function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
 // Kolom tanda tangan: Admin (yang menyetujui pengajuan) dan Teller (yang mencairkan; cadangan: teller pencetak)
 $stmt_ttd = $db->prepare("SELECT ua.nama_lengkap AS admin_nama, ut.nama_lengkap AS teller_nama
@@ -119,6 +124,10 @@ $nama_teller = ($ttd && $ttd['teller_nama']) ? $ttd['teller_nama'] : (isTeller()
         </table>
 
         <div class="lunas">Pinjaman telah dinyatakan LUNAS</div>
+        <?php if (layananSiap($db)) {
+            $template=$db->query('SELECT surat_lunas FROM layanan_pengaturan WHERE id=1')->fetchColumn();
+            echo '<p>'.nl2br($e(strtr((string)$template,['{nama}'=>$b['nama_lengkap'],'{norek}'=>$b['kode_pinjaman'],'{tanggal}'=>$tanggal_lunas]))).'</p>';
+        } ?>
 
         <div class="ttd-section">
             <div class="ttd-box">

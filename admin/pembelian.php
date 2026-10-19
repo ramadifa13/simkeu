@@ -350,7 +350,7 @@ $total_waserda = array_sum(array_column($recent_transaksi, 'total_bayar'));
                         <i class="fas fa-cash-register me-2"></i>Form Transaksi Waserda
                     </div>
                     <div class="card-body">
-                        <form method="POST" id="formWaserda">
+                        <form method="POST" id="formWaserda"><?php echo layananToken(); ?>
                             <div class="row mb-3">
                                 <div class="col-md-6">
                                     <label class="form-label">Pilih Anggota <span class="text-danger">*</span></label>

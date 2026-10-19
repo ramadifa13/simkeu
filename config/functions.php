@@ -8,6 +8,8 @@ require_once __DIR__ . '/../includes/upload_foto.php';
 require_once __DIR__ . '/../includes/akun_helper.php';
 require_once __DIR__ . '/../includes/denda_helper.php';
 require_once __DIR__ . '/../includes/angsuran_helper.php';
+require_once __DIR__ . '/../includes/layanan_helper.php';
+require_once __DIR__ . '/../includes/layanan_lanjutan.php';
 require_once __DIR__ . '/../includes/perjanjian_helper.php';
 
 // TAMBAHKAN kondisi cek function untuk semua function

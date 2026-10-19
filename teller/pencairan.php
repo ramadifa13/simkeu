@@ -74,6 +74,7 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
             throw new Exception("Pengajuan ini sudah dicairkan");
         }
 
+        layananValidasiPrioritas($db,$pengajuan['anggota_id'],$pengajuan['jumlah_pinjaman'],$pengajuan['memerlukan_jaminan'],!empty($pengajuan['fasilitas_prioritas']));
         $adalah_gadai = !empty($pengajuan['memerlukan_jaminan']);
         if ($adalah_gadai && empty($pengajuan['jaminan_id'])) {
             throw new Exception("Data barang jaminan tidak ditemukan");
@@ -802,7 +803,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
     <div class="modal fade" id="pencairanModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
-                <form method="POST" enctype="multipart/form-data" id="formPencairan">
+                <form method="POST" enctype="multipart/form-data" id="formPencairan"><?php echo layananToken(); ?>
                     <input type="hidden" name="proses_pencairan" value="1">
                     <div class="modal-header bg-primary text-white">
                         <h5 class="modal-title"><i class="fas fa-hand-holding-usd me-2"></i>Proses Pencairan</h5>

@@ -11,6 +11,17 @@ if ($_POST && isset($_POST['proses_setoran'])) {
     
     try {
         $db->beginTransaction();
+        if (!is_scalar($jumlah) || !preg_match('/^\d+(?:\.\d{1,2})?$/D', (string)$jumlah) || !is_finite((float)$jumlah) || (float)$jumlah <= 0 || (float)$jumlah > 999999999999) {
+            throw new Exception('Nominal harus berupa angka positif yang valid.');
+        }
+        $db->query('SELECT id FROM koperasi WHERE id=1 FOR UPDATE')->fetchColumn();
+        $lockMember=$db->prepare("SELECT id FROM anggota WHERE id=? AND status='aktif' FOR UPDATE");
+        $lockMember->execute([$anggota_id]);
+        if(!$lockMember->fetchColumn()) throw new Exception('Anggota tidak aktif atau tidak ditemukan.');
+        $validType=$db->prepare("SELECT id FROM jenis_simpanan WHERE id=? AND status='aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU')");
+        $validType->execute([$jenis_simpanan_id]);
+        if(!$validType->fetchColumn()) throw new Exception('Jenis simpanan tidak ditemukan.');
+
         
         // Get jenis simpanan info for validation
         $query_jenis = "SELECT minimum, maksimum, kode_jenis FROM jenis_simpanan WHERE id = :jenis_id AND status = 'aktif'";
@@ -127,7 +138,7 @@ $stmt_anggota->execute();
 $anggota_list = $stmt_anggota->fetchAll(PDO::FETCH_ASSOC);
 
 // Ambil jenis simpanan kecuali yang berkode ANG (angsuran)
-$query_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis != 'ANG' ORDER BY nama_jenis";
+$query_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU') ORDER BY nama_jenis";
 $stmt_jenis = $db->prepare($query_jenis);
 $stmt_jenis->execute();
 $jenis_simpanan = $stmt_jenis->fetchAll(PDO::FETCH_ASSOC);
@@ -139,7 +150,7 @@ $query_recent = "SELECT t.*, a.nama_lengkap, j.nama_jenis, u.nama_lengkap as tel
                 JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
                 JOIN users u ON t.user_id = u.id
                 WHERE t.jenis_transaksi = 'setoran' 
-                AND j.kode_jenis != 'ANG'
+                AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')
                 ORDER BY t.tanggal_transaksi DESC 
                 LIMIT 10";
 $stmt_recent = $db->prepare($query_recent);
@@ -215,7 +226,7 @@ $recent_setoran = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                                 </h5>
                             </div>
                             <div class="card-body">
-                                <form method="POST" id="formSetoran">
+                                <form method="POST" id="formSetoran"><?php echo layananToken(); ?>
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">

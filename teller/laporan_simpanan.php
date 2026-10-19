@@ -38,7 +38,7 @@ if (isset($_GET['export_excel']) && $_GET['export_excel'] == 1) {
 // ============================================
 // AMBIL DATA JENIS SIMPANAN DARI DATABASE
 // ============================================
-$query_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis != 'ANG' ORDER BY id";
+$query_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU') ORDER BY id";
 $stmt_jenis = $db->prepare($query_jenis);
 $stmt_jenis->execute();
 $jenis_simpanan = $stmt_jenis->fetchAll(PDO::FETCH_ASSOC);
@@ -52,7 +52,7 @@ $query_total = "SELECT
     COALESCE(SUM(CASE WHEN t.jenis_transaksi = 'penarikan' THEN t.jumlah ELSE 0 END), 0) as total_penarikan
     FROM transaksi t
     JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
-    WHERE DATE(t.tanggal_transaksi) BETWEEN :start_date AND :end_date AND j.kode_jenis != 'ANG'";
+    WHERE DATE(t.tanggal_transaksi) BETWEEN :start_date AND :end_date AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')";
 $stmt_total = $db->prepare($query_total);
 $stmt_total->bindParam(':start_date', $start_date);
 $stmt_total->bindParam(':end_date', $end_date);
@@ -75,7 +75,7 @@ $query_saldo = "SELECT
     COALESCE(SUM(s.saldo), 0) as saldo_akhir
     FROM jenis_simpanan j
     LEFT JOIN simpanan s ON j.id = s.jenis_simpanan_id
-    WHERE j.status = 'aktif' AND j.kode_jenis != 'ANG'
+    WHERE j.status = 'aktif' AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')
     GROUP BY j.id, j.kode_jenis
     ORDER BY j.id";
 $stmt_saldo = $db->prepare($query_saldo);
@@ -102,7 +102,7 @@ $query_transactions = "SELECT t.*,
                       JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
                       JOIN users u ON t.user_id = u.id
                       WHERE DATE(t.tanggal_transaksi) BETWEEN :start_date AND :end_date 
-                          AND j.kode_jenis != 'ANG'
+                          AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')
                       ORDER BY t.tanggal_transaksi DESC";
 $stmt_transactions = $db->prepare($query_transactions);
 $stmt_transactions->bindParam(':start_date', $start_date);

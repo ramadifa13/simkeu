@@ -134,7 +134,7 @@ $db->exec("CREATE TABLE IF NOT EXISTS settings (
                                 </h5>
                             </div>
                             <div class="card-body">
-                                <form method="POST">
+                                <form method="POST"><?php echo layananToken(); ?>
                                     <table class="table table-striped">
                                         <thead>
                                             <tr>
@@ -175,7 +175,7 @@ $db->exec("CREATE TABLE IF NOT EXISTS settings (
                                 </h5>
                             </div>
                             <div class="card-body">
-                                <form method="POST" id="formTarifDenda">
+                                <form method="POST" id="formTarifDenda"><?php echo layananToken(); ?>
                                     <table class="table table-sm align-middle mb-2">
                                         <thead>
                                             <tr><th>Jumlah Pinjaman (Rp)</th><th>Denda per Hari (Rp)</th><th></th></tr>

@@ -18,7 +18,7 @@ $filter_jenis = $_GET['jenis_simpanan'] ?? '';
 $query_tanggal = "SELECT MIN(DATE(tanggal_transaksi)) as earliest, MAX(DATE(tanggal_transaksi)) as latest
                   FROM transaksi t
                   JOIN jenis_simpanan js ON t.jenis_simpanan_id = js.id
-                  WHERE t.anggota_id = :anggota_id AND js.kode_jenis != 'ANG'";
+                  WHERE t.anggota_id = :anggota_id AND js.kode_jenis NOT IN ('ANG','BONUS','SHU')";
 $stmt_tanggal = $db->prepare($query_tanggal);
 $stmt_tanggal->bindParam(':anggota_id', $anggota_data['id']);
 $stmt_tanggal->execute();
@@ -28,7 +28,7 @@ $earliest_date = $tanggal_range['earliest'] ?? date('Y-m-d');
 $latest_date = $tanggal_range['latest'] ?? date('Y-m-d');
 
 // Get all jenis simpanan aktif (untuk referensi)
-$query_all_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis != 'ANG' ORDER BY id";
+$query_all_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU') ORDER BY id";
 $stmt_all_jenis = $db->prepare($query_all_jenis);
 $stmt_all_jenis->execute();
 $all_jenis = $stmt_all_jenis->fetchAll(PDO::FETCH_ASSOC);
@@ -37,7 +37,7 @@ $all_jenis = $stmt_all_jenis->fetchAll(PDO::FETCH_ASSOC);
 $query_saldo_saat_ini = "SELECT js.id, js.kode_jenis, js.nama_jenis, COALESCE(s.saldo, 0) as saldo
                          FROM jenis_simpanan js
                          LEFT JOIN simpanan s ON s.jenis_simpanan_id = js.id AND s.anggota_id = :anggota_id
-                         WHERE js.status = 'aktif' AND js.kode_jenis != 'ANG'
+                         WHERE js.status = 'aktif' AND js.kode_jenis NOT IN ('ANG','BONUS','SHU')
                          ORDER BY js.id";
 $stmt_saldo = $db->prepare($query_saldo_saat_ini);
 $stmt_saldo->bindParam(':anggota_id', $anggota_data['id']);
@@ -58,7 +58,7 @@ $query = "SELECT t.*, js.nama_jenis, js.kode_jenis
           FROM transaksi t 
           JOIN jenis_simpanan js ON t.jenis_simpanan_id = js.id 
           WHERE t.anggota_id = :anggota_id 
-            AND js.kode_jenis != 'ANG'";
+            AND js.kode_jenis NOT IN ('ANG','BONUS','SHU')";
 
 if (!empty($filter_jenis)) {
     $query .= " AND t.jenis_simpanan_id = :jenis_simpanan";
@@ -81,12 +81,12 @@ $query_jenis = "SELECT DISTINCT js.id, js.nama_jenis, js.kode_jenis
                 FROM transaksi t 
                 JOIN jenis_simpanan js ON t.jenis_simpanan_id = js.id 
                 WHERE t.anggota_id = :anggota_id 
-                  AND js.kode_jenis != 'ANG'
+                  AND js.kode_jenis NOT IN ('ANG','BONUS','SHU')
                 UNION
                 SELECT js.id, js.nama_jenis, js.kode_jenis
                 FROM simpanan s
                 JOIN jenis_simpanan js ON s.jenis_simpanan_id = js.id
-                WHERE s.anggota_id = :anggota_id2 AND js.kode_jenis != 'ANG' AND s.saldo > 0
+                WHERE s.anggota_id = :anggota_id2 AND js.kode_jenis NOT IN ('ANG','BONUS','SHU') AND s.saldo > 0
                 ORDER BY nama_jenis";
 $stmt_jenis = $db->prepare($query_jenis);
 $stmt_jenis->bindParam(':anggota_id', $anggota_data['id']);

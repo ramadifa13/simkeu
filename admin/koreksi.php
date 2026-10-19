@@ -13,7 +13,7 @@ if ($_POST) {
             $db->beginTransaction();
             
             // Get original transaction data
-            $query_transaksi = "SELECT * FROM transaksi WHERE id = :id";
+            $query_transaksi = "SELECT * FROM transaksi WHERE id = :id FOR UPDATE";
             $stmt_transaksi = $db->prepare($query_transaksi);
             $stmt_transaksi->bindParam(':id', $transaksi_id);
             $stmt_transaksi->execute();
@@ -23,6 +23,9 @@ if ($_POST) {
                 throw new Exception("Transaksi tidak ditemukan");
             }
             
+            $journal=$db->prepare('SELECT kode_jenis FROM jenis_simpanan WHERE id=?');
+            $journal->execute([$transaksi['jenis_simpanan_id']]);
+            if($journal->fetchColumn()==='SHU') throw new Exception('Jurnal SHU terkunci. Gunakan Koreksi pada riwayat pembayaran SHU agar hak anggota dan jurnal pembalik tetap sesuai.');
             $selisih = $jumlah_baru - $transaksi['jumlah'];
             
             // Update transaction
@@ -83,6 +86,7 @@ $query_transaksi = "SELECT t.*, a.nama_lengkap, j.nama_jenis, u.nama_lengkap as 
                    JOIN anggota a ON t.anggota_id = a.id 
                    JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
                    JOIN users u ON t.user_id = u.id
+                   WHERE j.kode_jenis <> 'SHU'
                    ORDER BY t.tanggal_transaksi DESC 
                    LIMIT 50";
 $stmt_transaksi = $db->prepare($query_transaksi);
@@ -212,7 +216,7 @@ $db->exec("CREATE TABLE IF NOT EXISTS log_koreksi (
     <div class="modal fade" id="koreksiModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title">Koreksi Transaksi</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

@@ -10,8 +10,6 @@ if ($_SESSION['role'] !== 'teller') {
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proses_setoran'])) {
-    // Debug: log POST data
-    error_log("POST data: " . print_r($_POST, true));
     
     $anggota_id = $_POST['anggota_id'] ?? '';
     $jenis_simpanan_id = $_POST['jenis_simpanan_id'] ?? '';
@@ -28,6 +26,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proses_setoran'])) {
     
     try {
         $db->beginTransaction();
+        if (!is_scalar($jumlah) || !preg_match('/^\d+(?:\.\d{1,2})?$/D', (string)$jumlah) || !is_finite((float)$jumlah) || (float)$jumlah <= 0 || (float)$jumlah > 999999999999) {
+            throw new Exception('Nominal harus berupa angka positif yang valid.');
+        }
+        $db->query('SELECT id FROM koperasi WHERE id=1 FOR UPDATE')->fetchColumn();
+        $lockMember=$db->prepare("SELECT id FROM anggota WHERE id=? AND status='aktif' FOR UPDATE");
+        $lockMember->execute([$anggota_id]);
+        if(!$lockMember->fetchColumn()) throw new Exception('Anggota tidak aktif atau tidak ditemukan.');
+        $validType=$db->prepare("SELECT id FROM jenis_simpanan WHERE id=? AND status='aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU')");
+        $validType->execute([$jenis_simpanan_id]);
+        if(!$validType->fetchColumn()) throw new Exception('Jenis simpanan tidak ditemukan.');
+
         
         // Get jenis simpanan info for validation
         $query_jenis = "SELECT nama_jenis, minimum, maksimum, kode_jenis FROM jenis_simpanan WHERE id = :jenis_id AND status = 'aktif'";
@@ -163,7 +172,7 @@ $stmt_anggota->execute();
 $anggota_list = $stmt_anggota->fetchAll(PDO::FETCH_ASSOC);
 
 // Ambil jenis simpanan kecuali yang berkode ANG (angsuran)
-$query_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis != 'ANG' ORDER BY 
+$query_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU') ORDER BY
                 CASE 
                     WHEN kode_jenis = 'POKOK' THEN 1
                     WHEN kode_jenis = 'WAJIB' THEN 2
@@ -181,7 +190,7 @@ $query_recent = "SELECT t.*, a.nama_lengkap, j.nama_jenis, j.kode_jenis, u.nama_
                 JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
                 JOIN users u ON t.user_id = u.id
                 WHERE t.jenis_transaksi = 'setoran' 
-                AND j.kode_jenis != 'ANG'
+                AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')
                 ORDER BY t.tanggal_transaksi DESC 
                 LIMIT 10";
 $stmt_recent = $db->prepare($query_recent);
@@ -291,7 +300,7 @@ function formatRupiah($angka) {
                                 <small class="text-white-50">Setoran untuk simpanan pokok, wajib, sukarela, dll.</small>
                             </div>
                             <div class="card-body">
-                                <form method="POST" id="formSetoran">
+                                <form method="POST" id="formSetoran"><?php echo layananToken(); ?>
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">

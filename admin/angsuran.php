@@ -30,6 +30,7 @@ perbaruiDendaOtomatis($db, true);
 
 // Handle payment
 if ($_POST) {
+    try { layananValidasiToken(); } catch (Exception $e) { $_SESSION['error']=$e->getMessage();header('Location: angsuran.php');exit; }
     // Koreksi langsung (HANYA Admin; fungsi memeriksa peran di server)
     if (isset($_POST['batalkan_bayar'])) {
         try {
@@ -80,6 +81,7 @@ if ($_POST) {
     }
 
     if (isset($_POST['bayar'])) {
+        $bukti_path = null;
         $id = $_POST['id'];
         // Denda: kosong = otomatis (tarif per hari x hari terlambat); diisi = manual
         $denda_input = isset($_POST['denda']) ? trim($_POST['denda']) : '';
@@ -88,13 +90,24 @@ if ($_POST) {
         $user_id = $_SESSION['user_id'];
         
         try {
+            layananValidasiToken();
+            if (!layananSiap($db)) throw new Exception('Jalankan migrasi layanan terlebih dahulu.');
+            $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $foto = validasiFotoUpload('bukti', 'Bukti pembayaran', 5 * 1024 * 1024, true);
+            $metode = $_POST['metode'] ?? '';
+            if (!in_array($metode, ['cash','transfer'], true)) throw new Exception('Metode pembayaran tidak valid.');
             $db->beginTransaction();
+            $pid = $db->prepare('SELECT pinjaman_id FROM angsuran WHERE id=?');
+            $pid->execute([(int)$id]);
+            $pinjaman_kunci = layananPinjaman($db, $pid->fetchColumn());
+            layananSegarkanDenda($db,$pinjaman_kunci);
+            if ($pinjaman_kunci['status'] === 'lunas') throw new Exception('Histori pinjaman lunas terkunci.');
             
             // Get data angsuran lengkap sebelum diupdate
             $query_angsuran = "SELECT a.*, p.anggota_id, p.kode_pinjaman, p.jumlah_pinjaman, p.sisa_pokok 
                               FROM angsuran a
                               JOIN pinjaman p ON a.pinjaman_id = p.id
-                              WHERE a.id = :id";
+                              WHERE a.id = :id FOR UPDATE";
             $stmt_angsuran = $db->prepare($query_angsuran);
             $stmt_angsuran->bindParam(':id', $id);
             $stmt_angsuran->execute();
@@ -102,6 +115,11 @@ if ($_POST) {
             
             if (!$angsuran_data) {
                 throw new Exception("Data angsuran tidak ditemukan");
+            }
+            if ($pinjaman_kunci['memerlukan_jaminan']) {
+                $sisa_cicilan = $db->prepare("SELECT COUNT(*) FROM angsuran WHERE pinjaman_id=? AND status<>'lunas'");
+                $sisa_cicilan->execute([$angsuran_data['pinjaman_id']]);
+                if ((int)$sisa_cicilan->fetchColumn()===1 && empty($_POST['cek_fisik'])) throw new Exception('Pelunasan terakhir: wajib verifikasi fisik jaminan.');
             }
             if ($angsuran_data['status'] === 'lunas') {
                 throw new Exception("Angsuran ini sudah dibayar");
@@ -116,6 +134,7 @@ if ($_POST) {
             } else {
                 throw new Exception("Denda harus berupa angka 0 atau lebih");
             }
+            $denda = !empty($angsuran_data['denda_manual']) ? (float)$angsuran_data['denda'] : $denda_auto['denda'];
             $denda_manual = abs($denda - $denda_auto['denda']) > 0.5 ? 1 : 0;
             
             // Update angsuran
@@ -130,8 +149,8 @@ if ($_POST) {
             }
             
             // Update sisa pokok di pinjaman
-            $sisa_pokok_baru = $angsuran_data['sisa_pokok'] - $angsuran_data['pokok'];
-            $status_pinjaman = ($sisa_pokok_baru <= 0) ? 'lunas' : 'aktif';
+            $sisa_pokok_baru = max(0, $angsuran_data['sisa_pokok'] - $angsuran_data['pokok']);
+            $status_pinjaman = 'aktif'; // Status lunas hanya setelah seluruh jadwal selesai.
             
             $query_update_pinjaman = "UPDATE pinjaman SET 
                                       sisa_pokok = :sisa_pokok,
@@ -147,7 +166,11 @@ if ($_POST) {
             tandaiLunasBilaSelesai($db, $angsuran_data['pinjaman_id']);
             
             // Hitung total pembayaran
-            $total_bayar = $angsuran_data['jumlah_angsuran'] + $denda;
+            $dibayar_denda = $db->prepare('SELECT COALESCE(SUM(jumlah),0) FROM layanan_bayar_denda WHERE angsuran_id=?');
+            $dibayar_denda->execute([$id]);
+            $total_bayar = $angsuran_data['jumlah_angsuran'] + max(0, $denda - (float)$dibayar_denda->fetchColumn());
+            $kredit_lelang = layananPakaiKredit($db,$angsuran_data['pinjaman_id'],$id,$total_bayar);
+            $total_bayar -= $kredit_lelang;
             
             // ============================================
             // CEK APAKAH JENIS SIMPANAN 'ANG' SUDAH ADA
@@ -174,7 +197,7 @@ if ($_POST) {
             // TAMBAHKAN KE TABEL TRANSAKSI (PAKAI ID YANG BENAR)
             // ============================================
             // Generate kode transaksi
-            $kode_transaksi = 'ANG-' . date('Ymd') . '-' . str_pad(mt_rand(1, 999), 3, '0', STR_PAD_LEFT);
+            $kode_transaksi = 'ANG-' . date('Ymd') . '-' . str_pad(random_int(100000, 999999), 3, '0', STR_PAD_LEFT);
             
             // Insert ke tabel transaksi - GUNAKAN JENIS_SIMPANAN_ID YANG BENAR
             $query_transaksi = "INSERT INTO transaksi 
@@ -200,7 +223,8 @@ if ($_POST) {
             // TAMBAHKAN KE TABEL KAS (WAJIB!)
             // ============================================
             // Get saldo kas terakhir
-            $query_saldo_kas = "SELECT saldo_sesudah FROM kas ORDER BY id DESC LIMIT 1";
+            $db->query('SELECT id FROM koperasi WHERE id=1 FOR UPDATE')->fetchColumn();
+            $query_saldo_kas = "SELECT saldo_sesudah FROM kas ORDER BY id DESC LIMIT 1 FOR UPDATE";
             $stmt_saldo_kas = $db->prepare($query_saldo_kas);
             $stmt_saldo_kas->execute();
             $saldo_kas = $stmt_saldo_kas->fetch(PDO::FETCH_ASSOC);
@@ -251,11 +275,15 @@ if ($_POST) {
                 $stmt_insert_simpanan->execute();
             }
             
+            $bukti_path = layananSimpanFoto($foto, 'pembayaran');
+            $db->prepare("INSERT INTO layanan_pembayaran (angsuran_id,pinjaman_id,user_id,jenis,jumlah,metode,bukti) VALUES (?,?,?,'angsuran',?,?,?)")->execute([$id,$angsuran_data['pinjaman_id'],$user_id,$total_bayar,$metode,$bukti_path]);
+            layananAudit($db,$angsuran_data['pinjaman_id'],'bayar_angsuran','Angsuran '.$id.'; Rp '.$total_bayar.'; '.$metode);
             $db->commit();
             $_SESSION['success'] = "Pembayaran angsuran ke-" . $angsuran_data['angsuran_ke'] . " berhasil dicatat. Kas bertambah " . formatRupiah($total_bayar);
             
         } catch (Exception $e) {
-            $db->rollBack();
+            if ($db->inTransaction()) $db->rollBack();
+            if ($bukti_path) hapusFotoUpload($bukti_path);
             $_SESSION['error'] = "Gagal mencatat pembayaran: " . $e->getMessage();
         }
         
@@ -290,13 +318,13 @@ $kolom_hari = "COALESCE(
     ) AS hari_angsuran,";
 $kolom_tanggal_belum = "(SELECT GROUP_CONCAT(DISTINCT DATE(ah3.tanggal_jatuh_tempo) ORDER BY ah3.tanggal_jatuh_tempo)
                            FROM angsuran ah3 WHERE ah3.pinjaman_id = p.id AND ah3.status <> 'lunas') AS tanggal_angsuran_belum,";
-$query_pinjaman = "SELECT p.*, a.nama_lengkap, a.kode_anggota, jp.nama_jenis, $kolom_hari $kolom_tanggal_belum
+$query_pinjaman = "SELECT p.*, a.nama_lengkap, a.kode_anggota, a.ktp, jp.nama_jenis, $kolom_hari $kolom_tanggal_belum
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) as total_angsuran,
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') as angsuran_lunas
                    FROM pinjaman p
                    JOIN anggota a ON p.anggota_id = a.id
                    JOIN jenis_pinjaman jp ON p.jenis_pinjaman_id = jp.id
-                   WHERE p.status IN ('aktif', 'lunas') 
+                   WHERE p.status IN ('aktif', 'lunas', 'macet')
                    AND EXISTS (SELECT 1 FROM angsuran WHERE pinjaman_id = p.id)
                    ORDER BY p.tanggal_pencairan DESC";
 
@@ -377,7 +405,9 @@ $angsuran_list = [];
 $pembatalan = [];
 $jumlah_menunggu = jumlahPengajuanPembatalan($db);
 if (isset($_GET['pinjaman_id'])) {
-    $query_angsuran = "SELECT a.*, p.kode_pinjaman, p.jumlah_pinjaman
+    $kolom_denda_dibayar = layananSiap($db) ? '(SELECT COALESCE(SUM(b.jumlah),0) FROM layanan_bayar_denda b WHERE b.angsuran_id=a.id)' : '0';
+    $query_angsuran = "SELECT a.*, p.kode_pinjaman, p.jumlah_pinjaman,
+                              $kolom_denda_dibayar AS denda_dibayar
                        FROM angsuran a
                        JOIN pinjaman p ON a.pinjaman_id = p.id
                        WHERE a.pinjaman_id = :pinjaman_id
@@ -433,7 +463,7 @@ function formatRupiah($angka) {
             padding: 0.5rem 0.75rem;
         }
         .loan-list {
-            max-height: 500px;
+            max-height: none;
             overflow-y: auto;
         }
         .debug-info {
@@ -581,7 +611,7 @@ function formatRupiah($angka) {
 
                 <div class="row">
                     <!-- Loan List -->
-                    <div class="col-md-6">
+                    <div class="col-12 mb-4">
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h5 class="card-title mb-0">
@@ -613,6 +643,7 @@ function formatRupiah($angka) {
                                     </a>
                                     <?php endforeach; ?>
                                 </div>
+                                <label for="cariPinjaman" class="form-label">Cari nasabah (NIK / nama / kode)</label><input id="cariPinjaman" type="search" class="form-control mb-3" placeholder="Ketik NIK atau nama nasabah">
                                 <div class="loan-list">
                                     <?php if (empty($pinjaman_list)): ?>
                                     <div class="text-center py-4">
@@ -625,8 +656,8 @@ function formatRupiah($angka) {
                                         <?php foreach ($pinjaman_list as $pinjaman): 
                                             $progress = $pinjaman['total_angsuran'] > 0 ? ($pinjaman['angsuran_lunas'] / $pinjaman['total_angsuran'] * 100) : 0;
                                         ?>
-                                        <a href="?pinjaman_id=<?php echo $pinjaman['id'] . $qs_filter; ?>" 
-                                           class="list-group-item list-group-item-action <?php echo isset($_GET['pinjaman_id']) && $_GET['pinjaman_id'] == $pinjaman['id'] ? 'active' : ''; ?>">
+                                        <a href="?pinjaman_id=<?php echo $pinjaman['id'] . $qs_filter; ?>#daftar-angsuran"
+                                           data-nik="<?php echo layananEscape($pinjaman['ktp']); ?>" class="list-group-item list-group-item-action <?php echo isset($_GET['pinjaman_id']) && $_GET['pinjaman_id'] == $pinjaman['id'] ? 'active' : ''; ?>">
                                             <div class="d-flex w-100 justify-content-between">
                                                 <h6 class="mb-1"><?php echo $pinjaman['kode_pinjaman']; ?></h6>
                                                 <div>
@@ -678,7 +709,8 @@ function formatRupiah($angka) {
                     </div>
 
                     <!-- Installments List -->
-                    <div class="col-md-6">
+                    <span id="daftar-angsuran"></span>
+                    <div class="col-12 mb-4">
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h5 class="card-title mb-0">
@@ -697,7 +729,7 @@ function formatRupiah($angka) {
                                 <div class="text-center py-5">
                                     <i class="fas fa-hand-pointer fa-3x text-primary mb-3"></i>
                                     <h5 class="text-muted">Pilih pinjaman</h5>
-                                    <p class="text-muted">Pilih pinjaman dari daftar di sebelah kiri untuk melihat angsurannya.</p>
+                                    <p class="text-muted">Pilih pinjaman dari daftar di atas untuk melihat angsurannya.</p>
                                 </div>
                                 <?php elseif (empty($angsuran_list)): ?>
                                 <div class="text-center py-5">
@@ -771,7 +803,7 @@ function formatRupiah($angka) {
                                                                 data-id="<?php echo $angsuran['id']; ?>"
                                                                 data-angsuran_ke="<?php echo $angsuran['angsuran_ke']; ?>"
                                                                 data-total="<?php echo $angsuran['jumlah_angsuran']; ?>"
-                                                                data-denda="<?php echo $d_nilai; ?>"
+                                                                data-denda="<?php echo $d_nilai; ?>" data-lelang="<?php echo layananSiap($db)?layananKreditLelang($db,$angsuran['pinjaman_id']):0; ?>" data-kredit="<?php echo (float)$angsuran['denda_dibayar']; ?>"
                                                                 data-denda_info="<?php echo htmlspecialchars($d_info); ?>"
                                                                 title="Bayar">
                                                             <i class="fas fa-money-bill"></i> Bayar
@@ -846,16 +878,19 @@ function formatRupiah($angka) {
 
     <!-- Bayar Modal -->
     <div class="modal fade" id="bayarModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-fullscreen">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST" enctype="multipart/form-data">
                     <div class="modal-header">
                         <h5 class="modal-title text-success">Pembayaran Angsuran</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <?php echo layananToken(); ?>
                         <input type="hidden" name="id" id="bayar_id">
-                        <p>Angsuran ke-<span id="bayar_angsuran_ke"></span></p>
+                        <label class="form-label">Metode pembayaran</label><select name="metode" class="form-select mb-3" required><option value="cash">Cash</option><option value="transfer">Transfer</option></select>
+                        <label class="form-label">Foto bukti pembayaran (wajib)</label><input type="file" name="bukti" accept="image/jpeg,image/png,image/webp" class="form-control mb-3" required>
+                        <p>Angsuran ke-<span id="bayar_angsuran_ke"></span></p><label class="d-block mb-3"><input type="checkbox" name="cek_fisik" value="1"> Fisik jaminan sudah diperiksa (wajib untuk cicilan terakhir pinjaman dengan jaminan)</label>
                         
                         <div class="mb-3">
                             <label class="form-label">Total yang harus dibayar:</label>
@@ -863,10 +898,10 @@ function formatRupiah($angka) {
                         </div>
                         
                         <div class="mb-3">
-                            <label for="bayar_denda" class="form-label">Denda (otomatis, bisa diubah manual)</label>
-                            <input type="number" class="form-control" id="bayar_denda" name="denda" value="0" min="0" step="1">
+                            <label for="bayar_denda" class="form-label">Denda (sesuai ketetapan sistem / Admin)</label>
+                            <input type="number" class="form-control" id="bayar_denda" name="denda" readonly value="0" min="0" step="1">
                             <div class="form-text" id="bayar_denda_info"></div>
-                            <div class="form-text">Ubah angkanya untuk denda manual; kosongkan untuk memakai hitungan otomatis. Denda ditambahkan ke total pembayaran dan masuk ke kas.</div>
+                            <div class="form-text">Teller mengikuti denda yang ditetapkan sistem atau disetujui Admin. Denda ditambahkan ke total pembayaran dan masuk ke kas.</div>
                         </div>
                         
                         <div class="alert alert-info">
@@ -896,7 +931,7 @@ function formatRupiah($angka) {
     <div class="modal fade" id="batalModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title text-danger">Batalkan Pembayaran</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -930,7 +965,7 @@ function formatRupiah($angka) {
     <div class="modal fade" id="putusModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title" id="putus_judul"></h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -966,7 +1001,7 @@ function formatRupiah($angka) {
     <div class="modal fade" id="ajukanModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title text-warning">Ajukan Pembatalan</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -1055,7 +1090,11 @@ function formatRupiah($angka) {
             document.getElementById('bayar_id').value = button.getAttribute('data-id');
             document.getElementById('bayar_angsuran_ke').textContent = button.getAttribute('data-angsuran_ke');
             
-            var total = Number(button.getAttribute('data-total'));
+            var kredit = Number(button.getAttribute('data-kredit') || 0);
+            var lelang=Number(button.getAttribute('data-lelang') || 0); bayarModal.dataset.lelang=lelang;
+            var total = Number(button.getAttribute('data-total')) + Math.max(0,Number(button.getAttribute('data-denda') || 0)-kredit); total=Math.max(0,total-lelang);
+            bayarModal.dataset.pokokBunga = Number(button.getAttribute('data-total'));
+            bayarModal.dataset.kredit = kredit;
             document.getElementById('bayar_total').value = 'Rp ' + total.toLocaleString('id-ID');
             
             var denda = Number(button.getAttribute('data-denda'));
@@ -1063,15 +1102,18 @@ function formatRupiah($angka) {
             document.getElementById('bayar_denda_info').textContent = button.getAttribute('data-denda_info') || '';
         });
 
+        document.getElementById('bayar_denda').addEventListener('input', function(){var total=Number(bayarModal.dataset.pokokBunga)+Math.max(0,Number(this.value)-Number(bayarModal.dataset.kredit));total=Math.max(0,total-Number(bayarModal.dataset.lelang||0));document.getElementById('bayar_total').value='Rp '+total.toLocaleString('id-ID');});
         // Toggle debug info dengan Ctrl+D
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey && e.key === 'd') {
                 e.preventDefault();
                 var debugInfo = document.querySelector('.debug-info');
+                if (!debugInfo) return;
                 debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
             }
         });
     </script>
 <?php if (isTeller()) { tandaiKeputusanPembatalanDilihat($db, $_SESSION['user_id']); } ?>
+<script>document.getElementById("cariPinjaman").addEventListener("input",function(){const q=this.value.toLocaleLowerCase("id");document.querySelectorAll(".loan-list .list-group-item-action").forEach(function(a){a.hidden=!(a.textContent+" "+a.dataset.nik).toLocaleLowerCase("id").includes(q);});});</script>
 </body>
 </html>

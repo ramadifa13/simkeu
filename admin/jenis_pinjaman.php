@@ -435,7 +435,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="addModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <form method="POST" class="form-jenis-pinjaman">
+                <form method="POST" class="form-jenis-pinjaman"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title">
                             <i class="fas fa-plus-circle text-primary me-2"></i>Tambah Jenis Pinjaman
@@ -481,7 +481,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="editModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <form method="POST" class="form-jenis-pinjaman">
+                <form method="POST" class="form-jenis-pinjaman"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title">
                             <i class="fas fa-edit text-warning me-2"></i>Edit Jenis Pinjaman
@@ -537,7 +537,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" id="deleteForm">
+                <form method="POST" id="deleteForm"><?php echo layananToken(); ?>
                     <div class="modal-body">
                         <input type="hidden" name="id" id="delete_id">
                         <input type="hidden" name="delete" value="1">

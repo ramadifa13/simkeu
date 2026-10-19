@@ -136,7 +136,7 @@ if ($_POST && isset($_POST['ganti_password'])) {
                                 </h6>
                             </div>
                             <div class="card-body p-3">
-                                <form method="POST" id="passwordForm">
+                                <form method="POST" id="passwordForm"><?php echo layananToken(); ?>
                                     <div class="mb-3">
                                         <label class="form-label small">Password Lama</label>
                                         <div class="input-group input-group-sm">

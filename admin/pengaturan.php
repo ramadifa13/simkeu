@@ -201,7 +201,7 @@ $stats_query = "SELECT
     (SELECT COUNT(*) FROM pinjaman WHERE status = 'aktif') as total_pinjaman_aktif,
     (SELECT COALESCE(SUM(saldo), 0) FROM simpanan s 
      JOIN jenis_simpanan j ON s.jenis_simpanan_id = j.id 
-     WHERE j.kode_jenis != 'ANG') as total_simpanan,
+     WHERE j.kode_jenis NOT IN ('ANG','BONUS','SHU')) as total_simpanan,
     (SELECT COALESCE(SUM(sisa_pokok), 0) FROM pinjaman WHERE status = 'aktif') as total_pinjaman_berjalan";
 $stats_stmt = $db->prepare($stats_query);
 $stats_stmt->execute();
@@ -312,7 +312,7 @@ function formatRupiah($angka) {
                                 <h6 class="mb-0"><i class="fas fa-key me-2"></i>Ubah Password</h6>
                             </div>
                             <div class="card-body">
-                                <form method="POST">
+                                <form method="POST"><?php echo layananToken(); ?>
                                     <div class="mb-3">
                                         <label class="form-label">Password Saat Ini</label>
                                         <input type="password" name="current_password" class="form-control" required>
@@ -344,7 +344,7 @@ function formatRupiah($angka) {
                                 <h6 class="mb-0"><i class="fas fa-building me-2"></i>Profil Koperasi</h6>
                             </div>
                             <div class="card-body">
-                                <form method="POST">
+                                <form method="POST"><?php echo layananToken(); ?>
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
@@ -395,7 +395,7 @@ function formatRupiah($angka) {
                             <div class="card-header bg-primary text-white"><h6 class="mb-0"><i class="fas fa-file-signature me-2"></i>Surat Perjanjian & TTD Admin</h6></div>
                             <div class="card-body">
                                 <div class="alert alert-info">Pengaturan ini berlaku untuk surat baru. Surat yang sudah ditandatangani tetap memakai data saat transaksi.</div>
-                                <form method="POST" enctype="multipart/form-data" id="formPerjanjian">
+                                <form method="POST" enctype="multipart/form-data" id="formPerjanjian"><?php echo layananToken(); ?>
                                     <div class="row">
                                         <div class="col-md-6 mb-3"><label class="form-label">Nama Pihak Pertama *</label><input class="form-control" name="nama_pihak_pertama" required value="<?php echo htmlspecialchars($pengaturan_perjanjian['nama_pihak_pertama'] ?: $koperasi['nama']); ?>"></div>
                                         <div class="col-md-6 mb-3"><label class="form-label">NIK Pihak Pertama</label><input class="form-control" name="nik_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['nik_pihak_pertama'] ?? ''); ?>"></div>
@@ -437,7 +437,7 @@ function formatRupiah($angka) {
                                         <?php endif; ?>
                                     </div>
                                     <div class="col-md-8">
-                                        <form method="POST" enctype="multipart/form-data">
+                                        <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
                                             <div class="mb-3">
                                                 <label class="form-label">Upload Logo Baru</label>
                                                 <input type="file" name="logo" class="form-control" accept="image/*" required>

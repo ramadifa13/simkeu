@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <?php endif; ?>
 
                                 <!-- Change Password Form -->
-                                <form method="POST" id="changePasswordForm">
+                                <form method="POST" id="changePasswordForm"><?php echo layananToken(); ?>
                                     <div class="row">
                                         <div class="col-md-6">
                                             <!-- Current Password -->

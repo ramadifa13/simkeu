@@ -21,7 +21,7 @@ $anggota_id_db = $anggota_data['id'];
 $query_total_simpanan = "SELECT COALESCE(SUM(s.saldo), 0) as total_simpanan 
                          FROM simpanan s 
                          JOIN jenis_simpanan j ON s.jenis_simpanan_id = j.id
-                         WHERE s.anggota_id = :anggota_id AND j.kode_jenis != 'ANG'";
+                         WHERE s.anggota_id = :anggota_id AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')";
 $stmt_simpanan = $db->prepare($query_total_simpanan);
 $stmt_simpanan->bindParam(':anggota_id', $anggota_id_db);
 $stmt_simpanan->execute();
@@ -82,7 +82,7 @@ $query_jenis_simpanan = "SELECT j.nama_jenis, j.kode_jenis, s.saldo
                          JOIN jenis_simpanan j ON s.jenis_simpanan_id = j.id 
                          WHERE s.anggota_id = :anggota_id 
                            AND s.saldo > 0 
-                           AND j.kode_jenis != 'ANG'
+                           AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')
                          ORDER BY j.id";
 $stmt_jenis = $db->prepare($query_jenis_simpanan);
 $stmt_jenis->bindParam(':anggota_id', $anggota_id_db);
@@ -94,7 +94,7 @@ $query_transaksi = "SELECT t.*, js.nama_jenis, js.kode_jenis
                     FROM transaksi t 
                     JOIN jenis_simpanan js ON t.jenis_simpanan_id = js.id 
                     WHERE t.anggota_id = :anggota_id 
-                      AND js.kode_jenis != 'ANG'
+                      AND js.kode_jenis NOT IN ('ANG','BONUS','SHU')
                     ORDER BY t.tanggal_transaksi DESC 
                     LIMIT 10";
 $stmt_transaksi = $db->prepare($query_transaksi);

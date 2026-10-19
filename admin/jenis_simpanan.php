@@ -4,6 +4,14 @@ require_once '../config/config.php';
 
 // Handle form actions
 if ($_POST) {
+    $reserved=['ANG','BONUS','SHU'];
+    $existing=$db->prepare('SELECT kode_jenis FROM jenis_simpanan WHERE id=?');
+    $existing->execute([(int)($_POST['id'] ?? 0)]);
+    if(in_array($existing->fetchColumn(),$reserved,true) || in_array(strtoupper(trim($_POST['kode_jenis'] ?? '')),$reserved,true)) {
+        $_SESSION['error']='Jenis jurnal ANG, BONUS, dan SHU dikelola sistem dan tidak dapat diubah melalui master simpanan.';
+        header('Location: jenis_simpanan.php');exit;
+    }
+
     if (isset($_POST['add'])) {
         $kode_jenis = $_POST['kode_jenis'];
         $nama_jenis = $_POST['nama_jenis'];
@@ -346,7 +354,7 @@ foreach ($jenis_simpanan as $jenis) {
                                                     <?php echo ucfirst($jenis['status']); ?>
                                                 </span>
                                             </td>
-                                            <td class="table-actions">
+                                            <td class="table-actions"><?php if(in_array($jenis['kode_jenis'],['ANG','BONUS','SHU'],true)): ?><span class="text-muted small">Dikelola sistem</span><?php else: ?>
                                                 <button class="btn btn-sm btn-warning me-1" data-bs-toggle="modal" 
                                                         data-bs-target="#editModal" 
                                                         data-id="<?php echo $jenis['id']; ?>"
@@ -365,7 +373,7 @@ foreach ($jenis_simpanan as $jenis) {
                                                         title="Hapus">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
-                                            </td>
+                                            <?php endif; ?></td>
                                         </tr>
                                         <?php endforeach; ?>
                                     <?php endif; ?>
@@ -382,7 +390,7 @@ foreach ($jenis_simpanan as $jenis) {
     <div class="modal fade" id="addModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title">
                             <i class="fas fa-plus-circle text-primary me-2"></i>Tambah Jenis Simpanan
@@ -443,7 +451,7 @@ foreach ($jenis_simpanan as $jenis) {
     <div class="modal fade" id="editModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
                         <h5 class="modal-title">
                             <i class="fas fa-edit text-warning me-2"></i>Edit Jenis Simpanan
@@ -511,7 +519,7 @@ foreach ($jenis_simpanan as $jenis) {
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" id="deleteForm">
+                <form method="POST" id="deleteForm"><?php echo layananToken(); ?>
                     <div class="modal-body">
                         <input type="hidden" name="id" id="delete_id">
                         <input type="hidden" name="delete" value="1">

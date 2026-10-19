@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/shu_pinjaman_helper.php';
 /**
  * Helper perhitungan pinjaman & jadwal angsuran.
  *
@@ -292,13 +293,14 @@ if (!function_exists('buatPinjamanDanJadwal')) {
         $stmt = $db->prepare("INSERT INTO pinjaman
             (pengajuan_id, kode_pinjaman, anggota_id, jenis_pinjaman_id, jumlah_pinjaman, sisa_pokok,
              tenor, bunga, skema_bunga, frekuensi, jumlah_cicilan, total_pinjaman, angsuran_per_bulan,
-             tanggal_pencairan, jatuh_tempo, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'aktif')");
+             tanggal_pencairan, jatuh_tempo, kategori_shu, ketua_kelompok_id, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'aktif')");
         $stmt->execute([
             $pengajuan['id'], $kode_pinjaman, $pengajuan['anggota_id'], $pengajuan['jenis_pinjaman_id'],
             $hitung['pokok'], $hitung['pokok'], $hitung['tenor'], $hitung['bunga_persen'],
             $hitung['skema'], $hitung['frekuensi'], $n, $hitung['total'], $hitung['angsuran'],
             $tanggal_pencairan, $jatuh_tempo_akhir,
+            shuKategoriAnggota($pengajuan['kategori_shu'] ?? 'anggota'), $pengajuan['ketua_kelompok_id'] ?: null,
         ]);
         $pinjaman_id = $db->lastInsertId();
 
@@ -423,6 +425,7 @@ if (!function_exists('tandaiLunasBilaSelesai')) {
         $stmt_pinjaman->execute([$pinjaman_id]);
         $anggota_id = (int) $stmt_pinjaman->fetchColumn();
         $db->prepare("UPDATE pinjaman SET $set WHERE id = ?")->execute([$pinjaman_id]);
+        shuCatatHakPinjaman($db, $pinjaman_id);
         if ($anggota_id > 0) {
             nonaktifkanAnggotaBilaSemuaPinjamanLunas($db, $anggota_id);
         }

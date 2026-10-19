@@ -21,7 +21,7 @@ $query_transaksi = "SELECT t.*, js.nama_jenis, js.kode_jenis
                     FROM transaksi t 
                     JOIN jenis_simpanan js ON t.jenis_simpanan_id = js.id 
                     WHERE t.anggota_id = :anggota_id 
-                      AND js.kode_jenis != 'ANG'";
+                      AND js.kode_jenis NOT IN ('ANG','BONUS','SHU')";
 
 if (!empty($start_date) && !empty($end_date)) {
     $query_transaksi .= " AND DATE(t.tanggal_transaksi) BETWEEN :start_date AND :end_date";
@@ -47,7 +47,7 @@ $stmt_transaksi->execute();
 $transaksi_list = $stmt_transaksi->fetchAll(PDO::FETCH_ASSOC);
 
 // Get all jenis simpanan for filter
-$query_all_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis != 'ANG' ORDER BY nama_jenis";
+$query_all_jenis = "SELECT * FROM jenis_simpanan WHERE status = 'aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU') ORDER BY nama_jenis";
 $stmt_all_jenis = $db->prepare($query_all_jenis);
 $stmt_all_jenis->execute();
 $all_jenis = $stmt_all_jenis->fetchAll(PDO::FETCH_ASSOC);
@@ -56,7 +56,7 @@ $all_jenis = $stmt_all_jenis->fetchAll(PDO::FETCH_ASSOC);
 $query_saldo = "SELECT js.id, js.kode_jenis, js.nama_jenis, COALESCE(s.saldo, 0) as saldo
                 FROM jenis_simpanan js
                 LEFT JOIN simpanan s ON s.jenis_simpanan_id = js.id AND s.anggota_id = :anggota_id
-                WHERE js.status = 'aktif' AND js.kode_jenis != 'ANG'
+                WHERE js.status = 'aktif' AND js.kode_jenis NOT IN ('ANG','BONUS','SHU')
                 ORDER BY js.id";
 $stmt_saldo = $db->prepare($query_saldo);
 $stmt_saldo->bindParam(':anggota_id', $anggota_data['id']);

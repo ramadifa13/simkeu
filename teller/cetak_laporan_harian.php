@@ -55,7 +55,7 @@ $query_summary = "SELECT
     COUNT(CASE WHEN t.jenis_transaksi = 'penarikan' THEN 1 END) as jumlah_penarikan
     FROM transaksi t
     JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
-    WHERE DATE(t.tanggal_transaksi) = :tanggal AND j.kode_jenis != 'ANG'";
+    WHERE DATE(t.tanggal_transaksi) = :tanggal AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')";
 $stmt_summary = $db->prepare($query_summary);
 $stmt_summary->bindParam(':tanggal', $selected_date);
 $stmt_summary->execute();
@@ -117,7 +117,7 @@ $query_transactions = "SELECT t.*,
                       JOIN anggota a ON t.anggota_id = a.id 
                       JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
                       JOIN users u ON t.user_id = u.id
-                      WHERE DATE(t.tanggal_transaksi) = :tanggal AND j.kode_jenis != 'ANG'
+                      WHERE DATE(t.tanggal_transaksi) = :tanggal AND j.kode_jenis NOT IN ('ANG','BONUS','SHU')
                       ORDER BY t.tanggal_transaksi DESC";
 $stmt_transactions = $db->prepare($query_transactions);
 $stmt_transactions->bindParam(':tanggal', $selected_date);

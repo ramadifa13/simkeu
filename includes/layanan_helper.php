@@ -1,0 +1,126 @@
+<?php
+// Aturan layanan pinjaman dipakai bersama oleh Admin dan Teller.
+function layananEscape($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); }
+
+function nomorWhatsApp($nomor) {
+    $nomor = preg_replace('/[^0-9]/', '', (string) $nomor);
+    if (substr($nomor, 0, 1) === '0') $nomor = '62' . substr($nomor, 1);
+    elseif (substr($nomor, 0, 1) === '8') $nomor = '62' . $nomor;
+    return preg_match('/^[1-9][0-9]{7,14}$/D', $nomor) ? $nomor : '';
+}
+function tombolWhatsApp($nomor, $pesan = '', $label = 'WhatsApp') {
+    $nomor = nomorWhatsApp($nomor);
+    if (!$nomor) return '';
+    return '<a class="btn btn-sm btn-outline-success mt-1" target="_blank" rel="noopener noreferrer" href="https://wa.me/' . $nomor . '?text=' . rawurlencode($pesan) . '"><i class="fab fa-whatsapp"></i> ' . layananEscape($label) . '</a>';
+}
+function statusKolektibilitas($hari) {
+    $hari = max(0, (int) $hari);
+    if ($hari <= 3) return ['Lancar', '#198754'];
+    if ($hari < 7) return ['Terlambat', '#997404'];
+    if ($hari < 30) return ['Macet Ringan', '#c65d00'];
+    if ($hari <= 90) return ['Macet Berat', '#dc3545'];
+    return ['Gagal Bayar', '#212529'];
+}
+function layananToken() {
+    if (empty($_SESSION['layanan_csrf'])) $_SESSION['layanan_csrf'] = bin2hex(random_bytes(32));
+    return '<input type="hidden" name="csrf" value="' . layananEscape($_SESSION['layanan_csrf']) . '">';
+}
+function layananValidasiToken() {
+    $token=$_POST['csrf'] ?? '';
+    if (!is_string($token) || empty($_SESSION['layanan_csrf']) || !hash_equals($_SESSION['layanan_csrf'], $token)) {
+        throw new Exception('Sesi formulir tidak valid. Muat ulang halaman.');
+    }
+}
+function layananSiap($db) {
+    static $cache=[];$key=spl_object_hash($db);
+    if (!array_key_exists($key,$cache)) $cache[$key]=kolomAda($db,'layanan_audit','aksi')
+        && kolomAda($db,'layanan_pembayaran','dibatalkan_at')
+        && kolomAda($db,'layanan_bayar_denda','denda_akhir')
+        && kolomAda($db,'layanan_pengaturan','denda_jaminan_per_juta')
+        && kolomAda($db,'layanan_pengaturan','bonus_persen')
+        && kolomAda($db,'layanan_lelang','kredit')
+        && kolomAda($db,'layanan_pembayaran','bunga_diskon')
+        && kolomAda($db,'layanan_pengajuan_hapus_denda','aktif');
+    return $cache[$key];
+}
+function layananSimpanFoto($foto, $folder) {
+    if (!in_array($folder,['pembayaran','jaminan_kembali'],true)) throw new Exception('Folder bukti tidak valid.');
+    $dir=__DIR__.'/../uploads/'.$folder;
+    if (!is_dir($dir) && !mkdir($dir,0755,true)) throw new Exception('Folder bukti tidak dapat dibuat.');
+    // Bukti dibaca melalui kwitansi yang memeriksa sesi, bukan URL gambar publik.
+    if (file_put_contents($dir.'/.htaccess',"Options -Indexes\nRequire all denied\n")===false) throw new Exception('Proteksi folder bukti gagal dibuat.');
+    return simpanFotoUpload($foto,$folder);
+}
+function layananPrioritasLayak($db,$anggota) {
+    $s=$db->prepare("SELECT p.id, (SELECT COUNT(*) FROM angsuran a WHERE a.pinjaman_id=p.id AND (a.status<>'lunas' OR a.tanggal_bayar IS NULL OR DATE(a.tanggal_bayar)>a.tanggal_jatuh_tempo)) telat FROM pinjaman p WHERE p.anggota_id=? AND p.status='lunas' AND EXISTS(SELECT 1 FROM angsuran ax WHERE ax.pinjaman_id=p.id) ORDER BY p.tanggal_lunas DESC,p.id DESC LIMIT 2");
+    $s->execute([$anggota]);$rows=$s->fetchAll(PDO::FETCH_ASSOC);
+    return count($rows)===2 && !(int)$rows[0]['telat'] && !(int)$rows[1]['telat'];
+}
+function layananAudit($db, $pinjaman, $aksi, $detail) {
+    $db->prepare('INSERT INTO layanan_audit (pinjaman_id,user_id,aksi,detail) VALUES (?,?,?,?)')
+        ->execute([$pinjaman, $_SESSION['user_id'], $aksi, $detail]);
+}
+function layananAdmin() {
+    if (!isAdmin()) throw new Exception('Tindakan ini hanya untuk Admin.');
+}
+function layananNominal($value, $bolehNol = false) {
+    if (!is_scalar($value) || !preg_match('/^\d{1,12}(\.\d{1,2})?$/D', (string) $value) || (!$bolehNol && (float) $value <= 0)) {
+        throw new Exception('Nominal tidak valid. Gunakan angka positif tanpa pemisah ribuan.');
+    }
+    return round((float) $value, 2);
+}
+function layananPinjaman($db, $id) {
+    $stmt = $db->prepare('SELECT p.*, jp.memerlukan_jaminan FROM pinjaman p JOIN jenis_pinjaman jp ON jp.id=p.jenis_pinjaman_id WHERE p.id=? FOR UPDATE');
+    $stmt->execute([(int) $id]);
+    $p = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$p) throw new Exception('Pinjaman tidak ditemukan.');
+    return $p;
+}
+function layananSisa($db, $id, $diskon = 0) {
+    $stmt = $db->prepare("SELECT COALESCE(SUM(pokok),0) pokok, COALESCE(SUM(bunga),0) bunga, COALESCE(SUM(denda),0) denda, COUNT(*) jumlah FROM angsuran WHERE pinjaman_id=? AND status<>'lunas'");
+    $stmt->execute([$id]);
+    $s = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt = $db->prepare("SELECT COALESCE(SUM(b.jumlah),0) FROM layanan_bayar_denda b JOIN angsuran a ON a.id=b.angsuran_id WHERE a.pinjaman_id=? AND a.status<>'lunas'");
+    $stmt->execute([$id]);
+    $s['denda_dibayar'] = (float) $stmt->fetchColumn();
+    $s['diskon_bunga'] = round((float) $s['bunga'] * max(0, min(100, (float) $diskon)) / 100, 2);
+    $s['kredit_lelang']=layananKreditLelang($db,$id);
+    $s['sebelum_kredit']=round($s['pokok']+$s['bunga']-$s['diskon_bunga']+max(0,$s['denda']-$s['denda_dibayar']),2);
+    $s['kredit_terpakai']=min($s['kredit_lelang'],$s['sebelum_kredit']);
+    $s['total'] = max(0,round($s['sebelum_kredit']-$s['kredit_terpakai'],2));
+    return $s;
+}
+// Kas dan transaksi selalu dicatat dalam transaksi DB milik pemanggil.
+function layananCatatKas($db, $p, $jumlah, $keterangan) {
+    $stmt = $db->query("SELECT id FROM jenis_simpanan WHERE kode_jenis='ANG'");
+    $jenis = $stmt->fetchColumn();
+    if (!$jenis) {
+        $db->exec("INSERT INTO jenis_simpanan (kode_jenis,nama_jenis,deskripsi,status) VALUES ('ANG','Pembayaran Angsuran','Pembayaran pinjaman','aktif')");
+        $jenis = $db->lastInsertId();
+    }
+    // Mutex transaksi kas, termasuk ketika tabel kas belum mempunyai baris.
+    $db->query('SELECT id FROM koperasi WHERE id=1 FOR UPDATE')->fetchColumn();
+    $saldo = (float) $db->query('SELECT saldo_sesudah FROM kas ORDER BY id DESC LIMIT 1 FOR UPDATE')->fetchColumn();
+    $kode = 'LYN-' . bin2hex(random_bytes(8));
+    $db->prepare("INSERT INTO transaksi (kode_transaksi,anggota_id,jenis_simpanan_id,jenis_transaksi,jumlah,saldo_sebelum,saldo_sesudah,keterangan,user_id,tanggal_transaksi) VALUES (?,?,?,'setoran',?,0,?,?,?,NOW())")
+        ->execute([$kode,$p['anggota_id'],$jenis,$jumlah,$jumlah,$keterangan,$_SESSION['user_id']]);
+    $id = $db->lastInsertId();
+    $db->prepare("INSERT INTO kas (transaksi_id,jenis,jumlah,saldo_sebelum,saldo_sesudah,keterangan,tanggal) VALUES (?,'masuk',?,?,?,?,NOW())")
+        ->execute([$id,$jumlah,$saldo,$saldo+$jumlah,$keterangan]);
+    $stmt=$db->prepare('SELECT id FROM simpanan WHERE anggota_id=? AND jenis_simpanan_id=? FOR UPDATE');
+    $stmt->execute([$p['anggota_id'],$jenis]);$sid=$stmt->fetchColumn();
+    if ($sid) $db->prepare('UPDATE simpanan SET saldo=saldo+? WHERE id=?')->execute([$jumlah,$sid]);
+    else $db->prepare('INSERT INTO simpanan (anggota_id,jenis_simpanan_id,saldo) VALUES (?,?,?)')->execute([$p['anggota_id'],$jenis,$jumlah]);
+    return $id;
+}
+function layananDaftar($db) {
+    return $db->query("SELECT p.*, ag.nama_lengkap,ag.kode_anggota,ag.ktp,ag.telepon,jp.memerlukan_jaminan,
+        (SELECT COALESCE(SUM(ax.jumlah_angsuran),0) FROM angsuran ax WHERE ax.pinjaman_id=p.id) total_balik,
+        COALESCE(s.sisa,0) sisa_tagihan, COALESCE(s.denda,0) sisa_denda, COALESCE(s.jumlah,0) sisa_cicilan,
+        s.jatuh_tempo, s.terakhir, GREATEST(0,COALESCE(DATEDIFF(CURDATE(),s.jatuh_tempo),0)) hari_telat,
+        j.nilai_taksiran,j.status_jaminan,ro.pinjaman_id AS repeat_selesai
+        FROM pinjaman p JOIN anggota ag ON ag.id=p.anggota_id JOIN jenis_pinjaman jp ON jp.id=p.jenis_pinjaman_id
+        LEFT JOIN (SELECT pinjaman_id, SUM(jumlah_angsuran+denda) sisa,SUM(jumlah_angsuran) total_balik,SUM(denda) denda,COUNT(*) jumlah,
+        MIN(tanggal_jatuh_tempo) jatuh_tempo,MAX(tanggal_jatuh_tempo) terakhir FROM angsuran WHERE status<>'lunas' GROUP BY pinjaman_id) s ON s.pinjaman_id=p.id
+        LEFT JOIN layanan_repeat_order ro ON ro.pinjaman_id=p.id LEFT JOIN jaminan_pinjaman j ON j.pinjaman_id=p.id ORDER BY hari_telat DESC,p.id DESC")->fetchAll(PDO::FETCH_ASSOC);
+}

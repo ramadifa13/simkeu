@@ -46,6 +46,19 @@ if ($pelunasan) {
     $ket_angsuran = 'Pelunasan (cicilan ke-' . $pl['dari'] . ' s.d. ' . $pl['sampai'] . ' dari ' . $b['total_cicilan'] . ')';
 }
 $total_bayar = $jumlah_angsuran + $denda;
+// Pembayaran denda terpisah / diskon pelunasan tidak boleh ditagih dua kali
+// atau menghasilkan kwitansi lebih besar daripada uang yang diterima.
+if (layananSiap($db)) {
+    if ($pelunasan) {
+        $snap = $db->prepare("SELECT jumlah FROM layanan_pembayaran WHERE pinjaman_id=? AND jenis='pelunasan' AND dibatalkan_at IS NULL ORDER BY id DESC LIMIT 1");
+        $snap->execute([$b['pinjaman_id']]);
+    } else {
+        $snap = $db->prepare("SELECT jumlah FROM layanan_pembayaran WHERE angsuran_id=? AND jenis='angsuran' AND dibatalkan_at IS NULL ORDER BY id DESC LIMIT 1");
+        $snap->execute([$b['id']]);
+    }
+    $terima = $snap->fetchColumn();
+    if ($terima !== false) $total_bayar = (float) $terima;
+}
 if (!$pelunasan) {
     if ($b['status_pinjaman'] === 'lunas' && (int) $b['angsuran_ke'] === (int) $b['total_cicilan']) {
         $ket_angsuran = 'Lunas (cicilan ke-' . $b['angsuran_ke'] . ' dari ' . $b['total_cicilan'] . ')';

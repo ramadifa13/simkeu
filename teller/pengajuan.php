@@ -30,8 +30,12 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
     $frekuensi = isset($_POST['frekuensi']) ? $_POST['frekuensi'] : '';
     $tujuan_pinjaman = $_POST['tujuan_pinjaman'];
     $user_id = $_SESSION['user_id'];
+    $kategori_shu_input = $_POST['kategori_shu'] ?? 'anggota';
+    $ketua_kelompok_input = $_POST['ketua_kelompok_id'] ?? 0;
 
     try {
+        layananValidasiToken();
+        $db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
         $db->beginTransaction();
 
         // Get jenis pinjaman info for validation
@@ -54,6 +58,7 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
         if (!$anggota_info) {
             throw new Exception("Anggota tidak valid");
         }
+        list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, $anggota_id, $kategori_shu_input, $ketua_kelompok_input);
 
         // Satu anggota maksimal satu pinjaman belum lunas untuk setiap kategori:
         // satu tanpa jaminan dan satu gadai boleh berjalan bersamaan.
@@ -119,6 +124,8 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
             throw new Exception("Jumlah pinjaman harus berupa angka rupiah penuh lebih dari 0");
         }
 
+        $fasilitas_prioritas=empty($_POST['fasilitas_prioritas'])?0:1;
+        layananValidasiPrioritas($db,$anggota_id,$jumlah_pinjaman,$kategori_gadai,$fasilitas_prioritas);
         // Validate maksimal pinjaman
         if ($jumlah_pinjaman > $jenis_info['maksimal_pinjaman']) {
             throw new Exception("Jumlah pinjaman melebihi batas maksimal. Maksimal: " . formatRupiah($jenis_info['maksimal_pinjaman']));
@@ -235,10 +242,13 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
 
         // Insert pengajuan (skema flat)
         $query = "INSERT INTO pengajuan_pinjaman (kode_pengajuan, anggota_id, jenis_pinjaman_id,
-                  jumlah_pinjaman, tenor, bunga, skema_bunga, frekuensi, tujuan_pinjaman, user_id, tanggal_pengajuan, hari_angsuran)
+                  jumlah_pinjaman, tenor, bunga, skema_bunga, frekuensi, tujuan_pinjaman, user_id, tanggal_pengajuan, hari_angsuran, fasilitas_prioritas, kategori_shu, ketua_kelompok_id)
                   VALUES (:kode_pengajuan, :anggota_id, :jenis_pinjaman_id,
-                  :jumlah_pinjaman, :tenor, :bunga, 'flat', :frekuensi, :tujuan_pinjaman, :user_id, :tanggal_pengajuan, :hari_angsuran)";
+                  :jumlah_pinjaman, :tenor, :bunga, 'flat', :frekuensi, :tujuan_pinjaman, :user_id, :tanggal_pengajuan, :hari_angsuran, :fasilitas_prioritas, :kategori_shu, :ketua_kelompok_id)";
         $stmt = $db->prepare($query);
+        $stmt->bindValue(':fasilitas_prioritas',$fasilitas_prioritas,PDO::PARAM_INT);
+        $stmt->bindValue(':kategori_shu',$kategori_shu);
+        $stmt->bindValue(':ketua_kelompok_id',$ketua_kelompok_id,$ketua_kelompok_id===null?PDO::PARAM_NULL:PDO::PARAM_INT);
         $stmt->bindParam(':tanggal_pengajuan', $waktu_ajuan);
         $stmt->bindValue(':hari_angsuran', $hari_angsuran, $hari_angsuran === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
         $stmt->bindParam(':kode_pengajuan', $kode_pengajuan);
@@ -280,6 +290,7 @@ $query_anggota = "SELECT * FROM anggota ORDER BY status = 'aktif' DESC, nama_len
 $stmt_anggota = $db->prepare($query_anggota);
 $stmt_anggota->execute();
 $anggota_list = $stmt_anggota->fetchAll(PDO::FETCH_ASSOC);
+$ketua_kelompok_list = array_values(array_filter($anggota_list, function($a){ return ($a['kategori_shu'] ?? 'anggota') === 'ketua_kelompok'; }));
 
 $query_jenis = "SELECT * FROM jenis_pinjaman WHERE status = 'aktif' ORDER BY nama_jenis";
 $stmt_jenis = $db->prepare($query_jenis);
@@ -481,13 +492,15 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                 </h5>
                             </div>
                             <div class="card-body form-card">
-                                <form method="POST" id="formPengajuan">
+                                <form method="POST" id="formPengajuan"><?php echo layananToken(); ?><label class="d-block mb-3"><input type="checkbox" name="fasilitas_prioritas" value="1"> Gunakan fasilitas anggota prioritas (tanpa jaminan, maksimal Rp 1 juta; wajib persetujuan prioritas Admin)</label>
                                     <div class="mb-3">
                                         <label class="form-label">Pilih Anggota *</label>
                                         <select name="anggota_id" class="form-select" required id="anggotaSelect">
                                             <option value="">-- Pilih Anggota --</option>
                                             <?php foreach ($anggota_list as $anggota): ?>
-                                            <option value="<?php echo $anggota['id']; ?>">
+                                            <option value="<?php echo $anggota['id']; ?>"
+                                                    data-kategori-shu="<?= htmlspecialchars($anggota['kategori_shu'] ?? 'anggota') ?>"
+                                                    data-ketua-id="<?= (int)($anggota['ketua_kelompok_id'] ?? 0) ?>">
                                                 <?php echo $anggota['kode_anggota'] . ' - ' . $anggota['nama_lengkap']; ?><?php echo $anggota['status'] !== 'aktif' ? ' (Nonaktif - akan diaktifkan saat pengajuan)' : ''; ?>
                                             </option>
                                             <?php endforeach; ?>
@@ -510,6 +523,25 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                             </option>
                                             <?php endforeach; ?>
                                         </select>
+                                    </div>
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Peran SHU pada pengajuan *</label>
+                                            <select name="kategori_shu" id="kategori_shu_pengajuan" class="form-select" required>
+                                                <option value="anggota">Anggota (SHU 1% saat lunas)</option>
+                                                <option value="ketua_kelompok">Ketua Kelompok (SHU 2% saat lunas)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6" id="ketua_kelompok_wrap">
+                                            <label class="form-label">Ketua yang mengajak</label>
+                                            <select name="ketua_kelompok_id" id="ketua_kelompok_id" class="form-select">
+                                                <option value="">Tidak ada</option>
+                                                <?php foreach($ketua_kelompok_list as $ketua): ?>
+                                                <option value="<?= (int)$ketua['id'] ?>"><?= htmlspecialchars($ketua['nama_lengkap'].' · '.$ketua['kode_anggota']) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <small class="text-muted">Ketua mendapat Rp2.500 per Rp1 juta jika seluruh pembayaran anggota tepat waktu.</small>
+                                        </div>
                                     </div>
                                     
                                     <div class="row">
@@ -847,6 +879,24 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             const opt = document.getElementById('jenisPinjamanSelect').selectedOptions[0];
             return opt && opt.value ? JSON.parse(opt.getAttribute('data-tarif') || '{}') : {};
         }
+
+        function sesuaikanPeranShu(ambilProfil) {
+            const anggota = document.getElementById('anggotaSelect');
+            const opt = anggota && anggota.selectedOptions[0];
+            const kategori = document.getElementById('kategori_shu_pengajuan');
+            const ketua = document.getElementById('ketua_kelompok_id');
+            if (ambilProfil && opt && opt.value) {
+                kategori.value = opt.getAttribute('data-kategori-shu') || 'anggota';
+                ketua.value = opt.getAttribute('data-ketua-id') || '';
+            }
+            const sebagaiKetua = kategori.value === 'ketua_kelompok';
+            document.getElementById('ketua_kelompok_wrap').style.display = sebagaiKetua ? 'none' : '';
+            ketua.disabled = sebagaiKetua;
+            if (sebagaiKetua) ketua.value = '';
+        }
+        document.getElementById('anggotaSelect').addEventListener('change', function(){ sesuaikanPeranShu(true); });
+        document.getElementById('kategori_shu_pengajuan').addEventListener('change', function(){ sesuaikanPeranShu(false); });
+        sesuaikanPeranShu(true);
 
         function getFrekuensiTerpilih() {
             const r = document.querySelector('input[name="frekuensi"]:checked');
