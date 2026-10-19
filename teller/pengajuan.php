@@ -1,8 +1,5 @@
 <?php
-// Start session jika belum
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../config/bootstrap.php';
 
 // Include config dan auth dengan path yang benar
 require_once '../config/config.php';
@@ -332,12 +329,6 @@ $stmt_pengajuan = $db->prepare($query_pengajuan);
 $stmt_pengajuan->bindParam(':user_id', $_SESSION['user_id']);
 $stmt_pengajuan->execute();
 $pengajuan_list = $stmt_pengajuan->fetchAll(PDO::FETCH_ASSOC);
-
-// Debug: Check if data is retrieved
-error_log("Pengajuan found: " . count($pengajuan_list));
-if (count($pengajuan_list) > 0) {
-    error_log("First pengajuan: " . print_r($pengajuan_list[0], true));
-}
 
 // Get statistics untuk teller
 $query_stats = "SELECT 

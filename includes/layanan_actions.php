@@ -46,6 +46,9 @@ function prosesLayanan($db, $aksi, $id, &$files) {
         if (!$stmt->rowCount()) throw new Exception('Jaminan tidak tersedia untuk dieksekusi.');
         $catatan='Keputusan eksekusi jaminan (hasil penjualan belum mengurangi hutang): '.$catatan;
     } elseif ($aksi === 'bayar_denda') {
+        if (!isAdmin() && (isset($_POST['diskon']) || isset($_POST['tarif']) || isset($_POST['denda_akhir']))) {
+            throw new Exception('Tarif, diskon, dan penghapusan denda hanya untuk Admin.');
+        }
         if ($p['status']==='lunas') throw new Exception('Pinjaman lunas terkunci.');
         $stmt=$db->prepare("SELECT * FROM angsuran WHERE id=? AND pinjaman_id=? AND status<>'lunas' FOR UPDATE");$stmt->execute([(int)$_POST['angsuran_id'],$id]);$a=$stmt->fetch(PDO::FETCH_ASSOC);
         if (!$a) throw new Exception('Angsuran tidak ditemukan atau sudah lunas.');
@@ -59,7 +62,8 @@ function prosesLayanan($db, $aksi, $id, &$files) {
         $path=layananSimpanFoto($foto,'pembayaran');$files[]=$path;
         $tid=layananCatatKas($db,$p,$jumlah,'Pembayaran denda angsuran ke-'.$a['angsuran_ke'].' - '.$p['kode_pinjaman']);
         $db->prepare('INSERT INTO layanan_bayar_denda (angsuran_id,pinjaman_id,user_id,jumlah,metode,bukti,transaksi_id,hari_telat,tarif,denda_awal,denda_akhir) VALUES (?,?,?,?,?,?,?,?,?,?,?)')->execute([$a['id'],$id,$uid,$jumlah,$metode,$path,$tid,$d['hari_telat'],$d['per_hari'],$d['denda'],$denda]);
-        $catatan='Denda angsuran '.$a['id'].'; Rp '.$jumlah.'; '.$metode;
+        $nasabah=$db->prepare('SELECT nama_lengkap FROM anggota WHERE id=?');$nasabah->execute([$p['anggota_id']]);
+        $catatan='Input pembayaran denda Rp '.$jumlah.' untuk '.$nasabah->fetchColumn().'; angsuran '.$a['id'].'; '.$metode;
     } elseif ($aksi === 'diskon_denda') {
         layananAdmin();
         if ($p['status']==='lunas' || strlen($catatan)<5) throw new Exception('Isi alasan diskon pada pinjaman yang belum lunas.');
@@ -88,16 +92,23 @@ function prosesLayanan($db, $aksi, $id, &$files) {
         $stmt=$db->prepare("UPDATE layanan_pelunasan SET status=?,diskon_persen=?,admin_id=?,diputuskan_at=NOW(),catatan=? WHERE pinjaman_id=? AND status='menunggu'");
         $stmt->execute([$aksi==='approve_lunas'?'disetujui':'ditolak',$diskon,$uid,$catatan,$id]);
         if (!$stmt->rowCount()) throw new Exception('Tidak ada pengajuan yang menunggu.');
-    } elseif ($aksi === 'proses_lunas') {
+    } elseif ($aksi === 'proses_lunas' || $aksi === 'pelunasan_langsung') {
         if ($p['status']==='lunas') throw new Exception('Pelunasan sudah diproses.');
         $stmt=$db->prepare("SELECT * FROM layanan_pelunasan WHERE pinjaman_id=? AND status='disetujui' FOR UPDATE");$stmt->execute([$id]);$approval=$stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$approval) throw new Exception('Pelunasan dipercepat wajib disetujui Admin terlebih dahulu.');
+        if ($aksi==='pelunasan_langsung') {
+            // Pelunasan biasa tidak memberikan diskon; keputusan Admin yang sudah ada tetap berlaku.
+            if (!$approval) $approval=['diskon_persen'=>0,'admin_id'=>null];
+        } elseif (!$approval) throw new Exception('Pelunasan dipercepat wajib disetujui Admin terlebih dahulu.');
         $s=layananSisa($db,$id,$approval['diskon_persen']);
         $jumlah=layananNominal($_POST['jumlah'] ?? '',true);
         if (abs($jumlah-$s['total'])>0.001 || !$s['jumlah']) throw new Exception('Nominal harus sama dengan sisa tagihan terbaru setelah diskon Admin.');
+        if ($s['denda']-$s['denda_dibayar']>0.005) throw new Exception('Bayar sisa denda melalui menu Denda terlebih dahulu. Foto bukti pembayaran denda wajib dicatat.');
         $metode=$_POST['metode'] ?? '';if (!in_array($metode,['cash','transfer'],true)) throw new Exception('Metode tidak valid.');
-        if ($p['memerlukan_jaminan'] && empty($_POST['cek_fisik'])) throw new Exception('Verifikasi fisik jaminan wajib dilakukan.');
-        $foto=validasiFotoUpload('bukti','Bukti pelunasan',5*1024*1024,true);$path=layananSimpanFoto($foto,'pembayaran');$files[]=$path;
+        if ($aksi!=='pelunasan_langsung' && $p['memerlukan_jaminan'] && empty($_POST['cek_fisik'])) throw new Exception('Verifikasi fisik jaminan wajib dilakukan.');
+        $path='';
+        if ($aksi!=='pelunasan_langsung') {
+            $foto=validasiFotoUpload('bukti','Bukti pelunasan',5*1024*1024,true);$path=layananSimpanFoto($foto,'pembayaran');$files[]=$path;
+        }
         if($jumlah>0)layananCatatKas($db,$p,$jumlah,'Pelunasan dipercepat - '.$p['kode_pinjaman'].'; diskon bunga '.$s['diskon_bunga']);
         if($s['kredit_lelang']>0) {
             $first=$db->prepare("SELECT id FROM angsuran WHERE pinjaman_id=? AND status<>'lunas' ORDER BY angsuran_ke LIMIT 1");$first->execute([$id]);
@@ -105,7 +116,7 @@ function prosesLayanan($db, $aksi, $id, &$files) {
             $db->prepare('UPDATE layanan_lelang SET kelebihan=kelebihan+kredit,kredit=0 WHERE pinjaman_id=?')->execute([$id]);
         }
         $db->prepare("UPDATE angsuran SET status='lunas',tanggal_bayar=CURDATE(),cara_bayar='pelunasan' WHERE pinjaman_id=? AND status<>'lunas'")->execute([$id]);
-        $db->prepare('INSERT INTO pelunasan_dini (pinjaman_id,jumlah_pelunasan,keterangan,user_id) VALUES (?,?,?,?)')->execute([$id,$jumlah,'Disetujui Admin '.$approval['admin_id'].'; diskon bunga '.$s['diskon_bunga'],$uid]);
+        $db->prepare('INSERT INTO pelunasan_dini (pinjaman_id,jumlah_pelunasan,keterangan,user_id) VALUES (?,?,?,?)')->execute([$id,$jumlah,($approval['admin_id']?'Disetujui Admin '.$approval['admin_id']:'Pelunasan tanpa diskon').'; diskon bunga '.$s['diskon_bunga'],$uid]);
         $db->prepare("INSERT INTO layanan_pembayaran (pinjaman_id,user_id,jenis,jumlah,metode,bukti,bunga_diskon) VALUES (?,?,'pelunasan',?,?,?,?)")->execute([$id,$uid,$jumlah,$metode,$path,$s['diskon_bunga']]);
         $db->prepare("UPDATE layanan_pelunasan SET status='selesai' WHERE pinjaman_id=?")->execute([$id]);
         tandaiLunasBilaSelesai($db,$id);

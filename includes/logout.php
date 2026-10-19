@@ -1,6 +1,2 @@
 <?php
-session_start();
-session_destroy();
-header('Location: login.php');
-exit();
-?>
+require_once dirname(__DIR__) . '/logout.php';

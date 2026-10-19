@@ -1,11 +1,5 @@
 <?php
-// Start session jika belum
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
-
-// Include config dan auth dengan path yang benar
-require_once '../config/config.php';
+require_once __DIR__ . '/../config/bootstrap.php';
 require_once '../includes/auth.php';
 
 // Load TCPDF

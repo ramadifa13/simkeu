@@ -65,6 +65,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     const account=document.querySelector('.ui-account');
     if(account){document.addEventListener('click',e=>{if(!account.contains(e.target))account.open=false;});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&account.open){account.open=false;account.querySelector('summary').focus();}});}
+    const notifications=document.querySelector('.ui-notifications');
+    if(notifications){document.addEventListener('click',e=>{if(!notifications.contains(e.target))notifications.open=false;});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&notifications.open){notifications.open=false;notifications.querySelector('summary').focus();}});}
     const main=document.querySelector('main');
     if(main){main.id=main.id || 'konten-utama';main.setAttribute('tabindex','-1');document.querySelector('.ui-skip')?.setAttribute('href','#'+main.id);}
     document.querySelectorAll('main .row').forEach(row=>{if(Array.from(row.children).some(col=>Array.from(col.children).some(card=>card.classList.contains('stat-card')))){row.classList.add('ui-stat-grid');row.dataset.count=row.children.length;}});
@@ -146,6 +148,44 @@ document.addEventListener('DOMContentLoaded', function () {
         const match=names.find(([cls])=>icon?.classList.contains(cls));
         const label=button.title || match?.[1];if(label){button.setAttribute('aria-label',label);button.title=label;}
     });
-    // Keep touch scrolling inside a dialog and limit tall forms to the viewport.
+    // VisualViewport follows the space left by mobile browser bars and keyboards.
+    const viewport = window.visualViewport;
+    let modalViewportFrame = 0;
+    function updateModalViewport() {
+        cancelAnimationFrame(modalViewportFrame);
+        modalViewportFrame = requestAnimationFrame(function () {
+            const height = viewport ? viewport.height : window.innerHeight;
+            const top = viewport ? viewport.offsetTop : 0;
+            document.body.style.setProperty('--ui-modal-height', height + 'px');
+            document.body.style.setProperty('--ui-modal-top', top + 'px');
+            document.body.classList.toggle('ui-modal-short', height <= 360);
+            const focused = document.activeElement;
+            if (focused && focused.matches('input,select,textarea') && focused.closest('.modal.show')) {
+                focused.scrollIntoView({block:'nearest', inline:'nearest'});
+            }
+        });
+    }
+    window.addEventListener('resize', updateModalViewport);
+    if (viewport) {
+        viewport.addEventListener('resize', updateModalViewport);
+        viewport.addEventListener('scroll', updateModalViewport);
+    }
+    document.addEventListener('shown.bs.modal', updateModalViewport);
+    updateModalViewport();
     document.querySelectorAll('.modal-dialog:not(.modal-fullscreen)').forEach(el=>el.classList.add('modal-dialog-scrollable'));
+    // Ulangi scroll anchor setelah panel dinamis selesai mengubah tinggi halaman.
+    function scrollToCurrentHash() {
+        if (!location.hash) return;
+        let target;
+        try { target=document.querySelector(location.hash); } catch (_) { return; }
+        if (target) target.scrollIntoView({block:'start',behavior:'auto'});
+    }
+    if (location.hash) {
+        history.scrollRestoration='manual';
+        requestAnimationFrame(scrollToCurrentHash);
+        setTimeout(scrollToCurrentHash,120);
+        setTimeout(scrollToCurrentHash,500);
+    }
+    window.addEventListener('pageshow',scrollToCurrentHash);
+    window.addEventListener('hashchange',scrollToCurrentHash);
 });

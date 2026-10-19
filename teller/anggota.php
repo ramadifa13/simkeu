@@ -27,8 +27,7 @@ if ($_POST) {
         $ktp = $_POST['ktp'];
         $rekening_bank = $_POST['rekening_bank'];
         $tanggal_daftar = $_POST['tanggal_daftar'];
-        $kategori_shu_input = $_POST['kategori_shu'] ?? 'anggota';
-        $ketua_kelompok_input = $_POST['ketua_kelompok_id'] ?? 0;
+        list($kategori_shu_input,$ketua_kelompok_input)=shuProfilUntukKode($kode_anggota,$_POST['kategori_shu'] ?? 'anggota',$_POST['ketua_kelompok_id'] ?? 0);
         
         $foto_ktp = null; // diisi simpanDokumenAnggota()
         
@@ -140,8 +139,7 @@ if ($_POST) {
         $ktp = $_POST['ktp'];
         $rekening_bank = $_POST['rekening_bank'];
         $status = $_POST['status'];
-        $kategori_shu_input = $_POST['kategori_shu'] ?? 'anggota';
-        $ketua_kelompok_input = $_POST['ketua_kelompok_id'] ?? 0;
+        list($kategori_shu_input,$ketua_kelompok_input)=shuProfilUntukKode($kode_anggota,$_POST['kategori_shu'] ?? 'anggota',$_POST['ketua_kelompok_id'] ?? 0);
         
         try {
             $db->beginTransaction();
@@ -512,7 +510,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td><span class="badge <?= ($anggota['kategori_shu'] ?? 'anggota')==='ketua_kelompok'?'bg-primary':'bg-secondary' ?>"><?= ($anggota['kategori_shu'] ?? 'anggota')==='ketua_kelompok'?'Ketua Kelompok':'Anggota' ?></span></td>
+                                            <td><?php if(strpos($anggota['kode_anggota'],'AGTJ')===0): ?><span class="text-muted">Tidak berlaku</span><?php else: ?><span class="badge <?= ($anggota['kategori_shu'] ?? 'anggota')==='ketua_kelompok'?'bg-primary':'bg-secondary' ?>"><?= ($anggota['kategori_shu'] ?? 'anggota')==='ketua_kelompok'?'Ketua Kelompok':'Anggota' ?></span><?php endif; ?></td>
                                             <td><?php echo layananEscape($anggota['telepon'] ?: '-'); ?><br><?php echo tombolWhatsApp($anggota['telepon']); ?></td>
                                             <td>
                                                 <?php $dok_url = array_filter(array_map('urlDokumenAnggota', array_intersect_key($anggota, daftarDokumenAnggota()))); ?>
@@ -842,10 +840,12 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 var label = kolom ? kolom.querySelector('.label-dokumen') : null;
                 if (label) label.textContent = label.dataset.label + (wajib ? ' *' : ' (opsional)');
             });
+            var addForm=document.querySelector('#addModal form');
+            if(addForm)tampilkanKetua(addForm);
         }
         if (kategori) kategori.addEventListener('change', sesuaikanKategoriAnggota);
         sesuaikanKategoriAnggota();
-        function tampilkanKetua(form){var role=form.querySelector('.shu-role'),wrap=form.querySelector('.shu-leader-wrap'),leader=form.querySelector('.shu-leader'),ketua=role&&role.value==='ketua_kelompok';if(wrap)wrap.style.display=ketua?'none':'';if(leader){leader.disabled=ketua;if(ketua)leader.value='';}}
+        function tampilkanKetua(form){var role=form.querySelector('.shu-role'),wrap=form.querySelector('.shu-leader-wrap'),leader=form.querySelector('.shu-leader'),code=form.querySelector('[name="kode_anggota"]'),khususJaminan=code&&code.value.indexOf('AGTJ')===0,ketua=role&&role.value==='ketua_kelompok',roleWrap=role&&role.closest('.col-md-6');if(roleWrap)roleWrap.style.display=khususJaminan?'none':'';if(role){role.disabled=khususJaminan;if(khususJaminan)role.value='anggota';}if(khususJaminan)ketua=false;if(wrap)wrap.style.display=(ketua||khususJaminan)?'none':'';if(leader){leader.disabled=ketua||khususJaminan;if(ketua||khususJaminan)leader.value='';}}
         document.querySelectorAll('#addModal form,#editModal form').forEach(function(form){var role=form.querySelector('.shu-role');if(role)role.addEventListener('change',function(){tampilkanKetua(form);});tampilkanKetua(form);});
 
         // Edit Modal

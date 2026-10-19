@@ -1,9 +1,6 @@
 <?php
+require_once __DIR__ . '/config/bootstrap.php';
 require_once __DIR__.'/includes/brand.php';
-// PERBAIKAN: Cek session sudah dimulai atau belum
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
 
 // PERBAIKAN: Include config dan auth yang benar
 require_once 'config/config.php';

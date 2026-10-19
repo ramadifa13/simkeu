@@ -4,9 +4,6 @@ checkAnggota();
 
 $anggota_id = $_SESSION['user_id'];
 
-// Debug: cek session
-error_log("Anggota ID dari session: " . $anggota_id);
-
 // Get anggota data
 $query_anggota = "SELECT a.* FROM anggota a WHERE a.user_id = :user_id";
 $stmt_anggota = $db->prepare($query_anggota);
@@ -19,7 +16,6 @@ if ($stmt_anggota->rowCount() == 0) {
 }
 
 $anggota_data = $stmt_anggota->fetch(PDO::FETCH_ASSOC);
-error_log("Data anggota ditemukan: id = " . $anggota_data['id']);
 
 // Get filter parameters
 $filter_pinjaman = $_GET['pinjaman_id'] ?? '';
@@ -59,8 +55,6 @@ foreach ($pinjaman_list as $pinjaman_row) {
         $pinjaman_tanpa_jaminan[] = $pinjaman_row;
     }
 }
-
-error_log("Jumlah pinjaman ditemukan: " . count($pinjaman_list));
 
 // Get riwayat angsuran
 $query_angsuran = "SELECT a.*, p.kode_pinjaman, p.jumlah_pinjaman, jp.nama_jenis as jenis_pinjaman,

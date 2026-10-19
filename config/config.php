@@ -1,8 +1,5 @@
 <?php
-// Cek apakah session sudah started
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/bootstrap.php';
 
 define('APP_NAME', 'Koperasi App');
 define('APP_VERSION', '1.0');

@@ -12,6 +12,12 @@ function shuKategoriAnggota($value) {
     return $value === 'ketua_kelompok' ? 'ketua_kelompok' : 'anggota';
 }
 
+/** Kode AGTJ tidak memiliki peran SHU dan tidak boleh memilih ketua pengajak. */
+function shuProfilUntukKode($kodeAnggota, $kategori, $ketuaId) {
+    if (strpos((string)$kodeAnggota, 'AGTJ') === 0) return ['anggota', null];
+    return [shuKategoriAnggota($kategori), (int)$ketuaId ?: null];
+}
+
 function shuValidasiProfil($db, $anggotaId, $kategori, $ketuaId) {
     $anggotaId = (int)$anggotaId;
     $kategori = shuKategoriAnggota($kategori);
@@ -34,10 +40,10 @@ function shuPinjamanLancar($db, $pinjamanId) {
 
 function shuCatatHakPinjaman($db, $pinjamanId) {
     if (!shuPinjamanSiap($db)) return;
-    $s = $db->prepare("SELECT p.*,jp.memerlukan_jaminan FROM pinjaman p JOIN jenis_pinjaman jp ON jp.id=p.jenis_pinjaman_id WHERE p.id=? FOR UPDATE");
+    $s = $db->prepare("SELECT p.*,jp.memerlukan_jaminan,a.kode_anggota FROM pinjaman p JOIN jenis_pinjaman jp ON jp.id=p.jenis_pinjaman_id JOIN anggota a ON a.id=p.anggota_id WHERE p.id=? FOR UPDATE");
     $s->execute([(int)$pinjamanId]);
     $p = $s->fetch(PDO::FETCH_ASSOC);
-    if (!$p || $p['status'] !== 'lunas' || !empty($p['memerlukan_jaminan'])) return;
+    if (!$p || $p['status'] !== 'lunas' || !empty($p['memerlukan_jaminan']) || strpos($p['kode_anggota'],'AGTJ')===0) return;
 
     $kategori = shuKategoriAnggota($p['kategori_shu'] ?? 'anggota');
     $persen = $kategori === 'ketua_kelompok' ? 2.0 : 1.0;
@@ -69,7 +75,7 @@ function shuCatatHakPinjaman($db, $pinjamanId) {
 
 function shuSinkronkanHakLama($db) {
     if (!shuPinjamanSiap($db)) return 0;
-    $ids = $db->query("SELECT p.id FROM pinjaman p JOIN jenis_pinjaman jp ON jp.id=p.jenis_pinjaman_id WHERE p.status='lunas' AND jp.memerlukan_jaminan=0 ORDER BY p.id")->fetchAll(PDO::FETCH_COLUMN);
+    $ids = $db->query("SELECT p.id FROM pinjaman p JOIN jenis_pinjaman jp ON jp.id=p.jenis_pinjaman_id JOIN anggota a ON a.id=p.anggota_id WHERE p.status='lunas' AND jp.memerlukan_jaminan=0 AND a.kode_anggota NOT LIKE 'AGTJ%' ORDER BY p.id")->fetchAll(PDO::FETCH_COLUMN);
     foreach ($ids as $id) shuCatatHakPinjaman($db, $id);
     return count($ids);
 }

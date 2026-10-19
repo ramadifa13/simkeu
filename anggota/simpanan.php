@@ -4,9 +4,6 @@ checkAnggota();
 
 $anggota_id = $_SESSION['user_id'];
 
-// Debug: cek session
-error_log("Anggota ID dari session: " . $anggota_id);
-
 // Get anggota data
 $query_anggota = "SELECT a.* FROM anggota a WHERE a.user_id = :user_id";
 $stmt_anggota = $db->prepare($query_anggota);
@@ -19,7 +16,6 @@ if ($stmt_anggota->rowCount() == 0) {
 }
 
 $anggota_data = $stmt_anggota->fetch(PDO::FETCH_ASSOC);
-error_log("Data anggota ditemukan: id = " . $anggota_data['id']);
 
 // Get simpanan data (HANYA SIMPANAN REAL, EXCLUDE ANG)
 $query_simpanan = "SELECT s.*, js.nama_jenis, js.deskripsi, js.kode_jenis, js.minimum, js.maksimum, js.bagi_hasil
@@ -33,8 +29,6 @@ $stmt_simpanan = $db->prepare($query_simpanan);
 $stmt_simpanan->bindParam(':anggota_id', $anggota_data['id']);
 $stmt_simpanan->execute();
 $simpanan_list = $stmt_simpanan->fetchAll(PDO::FETCH_ASSOC);
-
-error_log("Jumlah simpanan ditemukan: " . count($simpanan_list));
 
 // Get total simpanan (HANYA SIMPANAN REAL, EXCLUDE ANG)
 $query_total = "SELECT COALESCE(SUM(s.saldo), 0) as total_simpanan 

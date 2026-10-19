@@ -55,29 +55,6 @@ try {
 $current_role = $_SESSION['role'];
 $current_page = basename($_SERVER['PHP_SELF']);
 
-// Badge alur pinjaman: diperbarui dari database setiap halaman dimuat.
-$notif_pinjaman = ['pengajuan' => 0, 'persetujuan' => 0, 'pencairan' => 0];
-if (in_array($current_role, ['admin', 'teller'], true)) {
-    try {
-        $notif_pinjaman['pengajuan'] = (int) $db->query("SELECT COUNT(*) FROM pengajuan_pinjaman WHERE status = 'menunggu'")->fetchColumn();
-        $notif_pinjaman['persetujuan'] = $notif_pinjaman['pengajuan'];
-        $notif_pinjaman['pencairan'] = (int) $db->query("SELECT COUNT(*) FROM pengajuan_pinjaman pp
-            WHERE pp.status = 'disetujui' AND NOT EXISTS
-            (SELECT 1 FROM pinjaman p WHERE p.pengajuan_id = pp.id)")->fetchColumn();
-    } catch (Exception $e) {
-        error_log('Gagal menghitung notifikasi sidebar pinjaman: ' . $e->getMessage());
-    }
-}
-
-if (!function_exists('badgeNotifSidebar')) {
-    function badgeNotifSidebar($key, $jumlah, $warna = 'danger', $judul = '') {
-        $sembunyi = (int)$jumlah < 1 ? 'display:none' : '';
-        return '<span data-notif-pinjaman="' . htmlspecialchars($key, ENT_QUOTES) . '" class="badge rounded-pill bg-' .
-            htmlspecialchars($warna, ENT_QUOTES) . ' float-end" style="' . $sembunyi . '" title="' .
-            htmlspecialchars($judul, ENT_QUOTES) . '">' . (int)$jumlah . '</span>';
-    }
-}
-
 // Foto sidebar per level (fallback avatar inisial):
 //  - anggota: foto pencairan sesuai pinjaman berjalan + status anggota
 //  - teller : foto profil teller (poin F)
@@ -188,52 +165,40 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pengajuan.php' ? 'active text-white' : ''; ?>" 
                                href="pengajuan.php">
                                 <i class="fas fa-file-alt me-2"></i> Pengajuan
-                                <?php echo badgeNotifSidebar('pengajuan', $notif_pinjaman['pengajuan'], 'warning text-dark', 'Pengajuan menunggu persetujuan'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'persetujuan.php' ? 'active text-white' : ''; ?>" 
                                href="persetujuan.php">
                                 <i class="fas fa-check-circle me-2"></i> Persetujuan
-                                <?php echo badgeNotifSidebar('persetujuan', $notif_pinjaman['persetujuan'], 'danger', 'Perlu keputusan Admin'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pencairan.php' ? 'active text-white' : ''; ?>" 
                                href="pencairan.php">
                                 <i class="fas fa-money-bill-wave me-2"></i> Pencairan
-                                <?php echo badgeNotifSidebar('pencairan', $notif_pinjaman['pencairan'], 'info text-dark', 'Sudah disetujui dan belum dicairkan'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'angsuran.php' ? 'active text-white' : ''; ?>" 
                                href="angsuran.php">
                                 <i class="fas fa-calendar-check me-2"></i> Angsuran
-                                <?php $n_pembatalan = jumlahPengajuanPembatalan($db); ?>
-                                <?php $kp = isTeller() ? jumlahKeputusanPembatalanTeller($db, $_SESSION['user_id']) : array('disetujui' => 0, 'ditolak' => 0); ?>
-                                <?php if (isTeller()): ?>
-                                    <span class="ms-1 text-nowrap">
-                                        <span class="badge bg-warning text-dark" style="<?php echo $n_pembatalan ? '' : 'opacity:.35'; ?>" title="Pengajuan pembatalan menunggu keputusan Admin"><?php echo $n_pembatalan; ?></span>
-                                        <span class="badge bg-success" style="<?php echo $kp['disetujui'] ? '' : 'opacity:.35'; ?>" title="Pengajuan pembatalan disetujui Admin"><?php echo $kp['disetujui']; ?></span>
-                                        <span class="badge bg-danger" style="<?php echo $kp['ditolak'] ? '' : 'opacity:.35'; ?>" title="Pengajuan pembatalan ditolak Admin"><?php echo $kp['ditolak']; ?></span>
-                                    </span>
-                                <?php elseif ($n_pembatalan > 0): ?>
-                                    <span class="badge bg-warning text-dark ms-1" title="Pengajuan pembatalan menunggu keputusan Admin"><?php echo $n_pembatalan; ?></span>
-                                <?php endif; ?>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'layanan.php' && in_array($_GET['tab'] ?? 'macet',['macet','pengaturan'],true)) ? 'active text-white' : ''; ?>"
+                            <a class="nav-link sidebar-dev-link text-white-50 py-1 <?php echo ($current_page === 'layanan.php' && in_array($_GET['tab'] ?? 'macet',['macet','pengaturan'],true)) ? 'active text-white' : ''; ?>"
                                href="layanan.php?tab=macet">
-                                <i class="fas fa-exclamation-circle me-2"></i> Macet & Layanan
+                                <i class="fas fa-exclamation-circle"></i><span class="sidebar-dev-title">Macet &amp; Layanan</span>
+                                <span class="badge bg-warning text-dark sidebar-dev-badge" title="Fitur masih dalam pengembangan">Dalam Pengembangan</span>
                             </a>
                         </li>
-                        <li class="nav-item"><a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'denda.php' || ($current_page === 'layanan.php' && ($_GET['tab'] ?? 'macet') === 'denda')) ? 'active text-white' : ''; ?>" href="denda.php">
-                                <i class="fas fa-exclamation-triangle me-2"></i> Denda
+                        <li class="nav-item"><a class="nav-link sidebar-dev-link text-white-50 py-1 <?php echo ($current_page === 'denda.php' || ($current_page === 'layanan.php' && ($_GET['tab'] ?? 'macet') === 'denda')) ? 'active text-white' : ''; ?>" href="denda.php">
+                                <i class="fas fa-exclamation-triangle"></i><span class="sidebar-dev-title">Denda</span>
+                                <span class="badge bg-warning text-dark sidebar-dev-badge" title="Fitur masih dalam pengembangan">Dalam Pengembangan</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'pelunasan.php' || ($current_page === 'layanan.php' && ($_GET['tab'] ?? 'macet') === 'lunas')) ? 'active text-white' : ''; ?>"
+                            <a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'pelunasan.php') ? 'active text-white' : ''; ?>"
                                href="pelunasan.php">
                                 <i class="fas fa-flag-checkered me-2"></i> Pelunasan
                             </a>
@@ -278,8 +243,10 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                     <i class="fas fa-chart-bar me-2"></i> Laporan
                     <i class="fas fa-chevron-down float-end"></i>
                 </a>
-                <div class="collapse <?php echo in_array($current_page, ['laporan_harian.php', 'laporan_simpanan.php']) ? 'show' : ''; ?>" id="menuLaporanTeller">
+                <div class="collapse <?php echo in_array($current_page, ['laporan_harian.php', 'laporan_simpanan.php', 'laporan_lunas.php', 'laporan_denda.php']) ? 'show' : ''; ?>" id="menuLaporanTeller">
                     <ul class="nav flex-column ms-3 mt-1">
+                        <li class="nav-item"><a class="nav-link text-white-50 py-1 <?= $current_page==='laporan_lunas.php'?'active text-white':'' ?>" href="laporan_lunas.php"><i class="fas fa-check-circle me-2"></i>Laporan Lunas</a></li>
+                        <li class="nav-item"><a class="nav-link text-white-50 py-1 <?= $current_page==='laporan_denda.php'?'active text-white':'' ?>" href="laporan_denda.php"><i class="fas fa-clock me-2"></i>Laporan Denda</a></li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'laporan_harian.php' ? 'active text-white' : ''; ?>" 
                                href="laporan_harian.php">
@@ -333,6 +300,53 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                 </a>
             </li>
             
+            <!-- Laporan Admin -->
+            <li class="nav-item mb-1">
+                <a class="nav-link text-white"
+                   data-bs-toggle="collapse"
+                   href="#menuLaporanAdmin"
+                   role="button">
+                    <i class="fas fa-chart-bar me-2"></i> Laporan
+                    <i class="fas fa-chevron-down float-end"></i>
+                </a>
+                <div class="collapse <?php echo in_array($current_page, ['laporan_simpanan.php', 'laporan_transaksi.php', 'laporan_kas.php', 'laporan_pinjaman.php', 'laporan_angsuran.php', 'laporan_lunas.php', 'laporan_denda.php']) ? 'show' : ''; ?>" id="menuLaporanAdmin">
+                    <ul class="nav flex-column ms-3 mt-1">
+                        <li class="nav-item"><a class="nav-link text-white-50 py-1 <?= $current_page==='laporan_lunas.php'?'active text-white':'' ?>" href="laporan_lunas.php"><i class="fas fa-check-circle me-2"></i>Laporan Lunas</a></li>
+                        <li class="nav-item"><a class="nav-link text-white-50 py-1 <?= $current_page==='laporan_denda.php'?'active text-white':'' ?>" href="laporan_denda.php"><i class="fas fa-clock me-2"></i>Laporan Denda</a></li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'laporan_simpanan.php' ? 'active text-white' : ''; ?>"
+                               href="laporan_simpanan.php">
+                                <i class="fas fa-piggy-bank me-2"></i> Simpanan
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'laporan_pinjaman.php' ? 'active text-white' : ''; ?>"
+                               href="laporan_pinjaman.php">
+                                <i class="fas fa-hand-holding-usd me-2"></i> Pinjaman
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'laporan_angsuran.php' ? 'active text-white' : ''; ?>"
+                               href="laporan_angsuran.php">
+                                <i class="fas fa-calendar-check me-2"></i> Angsuran
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'laporan_transaksi.php' ? 'active text-white' : ''; ?>"
+                               href="laporan_transaksi.php">
+                                <i class="fas fa-exchange-alt me-2"></i> Transaksi
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'laporan_kas.php' ? 'active text-white' : ''; ?>"
+                               href="laporan_kas.php">
+                                <i class="fas fa-wallet me-2"></i> Kas
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+
             <!-- Data Master -->
             <li class="nav-item mb-1">
                 <a class="nav-link text-white" 
@@ -420,91 +434,42 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pengajuan.php' ? 'active text-white' : ''; ?>" 
                                href="pengajuan.php">
                                 <i class="fas fa-file-alt me-2"></i> Pengajuan
-                                <?php echo badgeNotifSidebar('pengajuan', $notif_pinjaman['pengajuan'], 'warning text-dark', 'Pengajuan baru dari Teller'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'persetujuan.php' ? 'active text-white' : ''; ?>" 
                                href="persetujuan.php">
                                 <i class="fas fa-check-circle me-2"></i> Persetujuan
-                                <?php echo badgeNotifSidebar('persetujuan', $notif_pinjaman['persetujuan'], 'danger', 'Pengajuan membutuhkan persetujuan Admin'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pencairan.php' ? 'active text-white' : ''; ?>" 
                                href="pencairan.php">
                                 <i class="fas fa-money-bill-wave me-2"></i> Pencairan
-                                <?php echo badgeNotifSidebar('pencairan', $notif_pinjaman['pencairan'], 'info text-dark', 'Disetujui dan menunggu pencairan Teller'); ?>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'angsuran.php' ? 'active text-white' : ''; ?>" 
                                href="angsuran.php">
                                 <i class="fas fa-calendar-check me-2"></i> Angsuran
-                                <?php if (($n_pembatalan = jumlahPengajuanPembatalan($db)) > 0): ?>
-                                    <span class="badge bg-warning text-dark ms-1" title="Pengajuan pembatalan menunggu keputusan"><?php echo $n_pembatalan; ?></span>
-                                <?php endif; ?>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'layanan.php' && in_array($_GET['tab'] ?? 'macet',['macet','pengaturan'],true)) ? 'active text-white' : ''; ?>"
+                            <a class="nav-link sidebar-dev-link text-white-50 py-1 <?php echo ($current_page === 'layanan.php' && in_array($_GET['tab'] ?? 'macet',['macet','pengaturan'],true)) ? 'active text-white' : ''; ?>"
                                href="layanan.php?tab=macet">
-                                <i class="fas fa-exclamation-circle me-2"></i> Macet & Layanan
+                                <i class="fas fa-exclamation-circle"></i><span class="sidebar-dev-title">Macet &amp; Layanan</span>
+                                <span class="badge bg-warning text-dark sidebar-dev-badge" title="Fitur masih dalam pengembangan">Dalam Pengembangan</span>
                             </a>
                         </li>
-                        <li class="nav-item"><a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'denda.php' || ($current_page === 'layanan.php' && ($_GET['tab'] ?? 'macet') === 'denda')) ? 'active text-white' : ''; ?>" href="denda.php">
-                                <i class="fas fa-exclamation-triangle me-2"></i> Denda
+                        <li class="nav-item"><a class="nav-link sidebar-dev-link text-white-50 py-1 <?php echo ($current_page === 'denda.php' || ($current_page === 'layanan.php' && ($_GET['tab'] ?? 'macet') === 'denda')) ? 'active text-white' : ''; ?>" href="denda.php">
+                                <i class="fas fa-exclamation-triangle"></i><span class="sidebar-dev-title">Denda</span>
+                                <span class="badge bg-warning text-dark sidebar-dev-badge" title="Fitur masih dalam pengembangan">Dalam Pengembangan</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'pelunasan.php' || ($current_page === 'layanan.php' && ($_GET['tab'] ?? 'macet') === 'lunas')) ? 'active text-white' : ''; ?>"
+                            <a class="nav-link text-white-50 py-1 <?php echo ($current_page === 'pelunasan.php') ? 'active text-white' : ''; ?>"
                                href="pelunasan.php">
                                 <i class="fas fa-flag-checkered me-2"></i> Pelunasan
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </li>
-            
-            <!-- Laporan Admin -->
-            <li class="nav-item mb-1">
-                <a class="nav-link text-white" 
-                   data-bs-toggle="collapse" 
-                   href="#menuLaporanAdmin" 
-                   role="button">
-                    <i class="fas fa-chart-bar me-2"></i> Laporan
-                    <i class="fas fa-chevron-down float-end"></i>
-                </a>
-                <div class="collapse <?php echo in_array($current_page, ['laporan_simpanan.php', 'laporan_transaksi.php', 'laporan_kas.php', 'laporan_pinjaman.php', 'laporan_angsuran.php']) ? 'show' : ''; ?>" id="menuLaporanAdmin">
-                    <ul class="nav flex-column ms-3 mt-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'laporan_simpanan.php' ? 'active text-white' : ''; ?>" 
-                               href="laporan_simpanan.php">
-                                <i class="fas fa-piggy-bank me-2"></i> Simpanan
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'laporan_pinjaman.php' ? 'active text-white' : ''; ?>" 
-                               href="laporan_pinjaman.php">
-                                <i class="fas fa-hand-holding-usd me-2"></i> Pinjaman
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'laporan_angsuran.php' ? 'active text-white' : ''; ?>" 
-                               href="laporan_angsuran.php">
-                                <i class="fas fa-calendar-check me-2"></i> Angsuran
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'laporan_transaksi.php' ? 'active text-white' : ''; ?>" 
-                               href="laporan_transaksi.php">
-                                <i class="fas fa-exchange-alt me-2"></i> Transaksi
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'laporan_kas.php' ? 'active text-white' : ''; ?>" 
-                               href="laporan_kas.php">
-                                <i class="fas fa-wallet me-2"></i> Kas
                             </a>
                         </li>
                     </ul>
@@ -645,18 +610,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function tampilkanNotif(data) {
-        ['pengajuan', 'persetujuan', 'pencairan'].forEach(function(key) {
+        ['pengajuan', 'persetujuan', 'pencairan', 'pembatalan', 'hapus_denda', 'pelunasan_dini', 'jaminan_kembali', 'prioritas', 'laporan_macet', 'pembayaran_denda', 'pelunasan_disetujui', 'jaminan_disetujui', 'jatuh_tempo', 'terlambat', 'denda_tertunggak', 'anggota_pengajuan', 'anggota_pencairan', 'anggota_jatuh_tempo', 'anggota_terlambat', 'anggota_denda', 'anggota_jaminan', 'layanan', 'total'].forEach(function(key) {
             document.querySelectorAll('[data-notif-pinjaman="' + key + '"]').forEach(function(el) {
                 const nilai = Number(data[key] || 0);
                 const lama = Number(el.textContent || 0);
                 el.textContent = nilai;
                 el.style.display = nilai > 0 ? '' : 'none';
+                if(key==='total') document.querySelector('.ui-notifications summary')?.setAttribute('aria-label', 'Buka ' + nilai + ' notifikasi');
                 if (nilai !== lama) {
                     el.classList.remove('notif-pulse');
                     void el.offsetWidth;
                     el.classList.add('notif-pulse');
                 }
             });
+        });
+        document.querySelectorAll('[data-notif-row]').forEach(function(row) {
+            row.style.display = Number(data[row.dataset.notifRow] || 0) > 0 ? '' : 'none';
+        });
+        const total = Number(data.total || 0);
+        document.querySelector('.ui-notifications')?.classList.toggle('has-notifications', total > 0);
+        document.querySelectorAll('[data-notif-summary]').forEach(function(el) {
+            el.textContent = total + ' perlu ditindaklanjuti';
+        });
+        document.querySelectorAll('.ui-notification-empty').forEach(function(el) {
+            el.hidden = total > 0;
         });
     }
 

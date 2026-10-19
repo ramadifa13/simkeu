@@ -42,10 +42,12 @@ try {
     $_SESSION=['role'=>'teller','user_id'=>$teller];$_POST=['jumlah'=>'1','metode'=>'cash'];
     ditolakLayanan(function()use($db,$id,&$files){prosesLayanan($db,'proses_lunas',$id,$files);},'Nominal harus sama');
     $_POST=['jumlah'=>(string)$s['total'],'metode'=>'cash','cek_fisik'=>1];
-    ditolakLayanan(function()use($db,$id,&$files){prosesLayanan($db,'proses_lunas',$id,$files);},'Bukti pelunasan wajib');
+    ditolakLayanan(function()use($db,$id,&$files){prosesLayanan($db,'proses_lunas',$id,$files);},'Bayar sisa denda');
     $a=$db->query("SELECT id FROM angsuran WHERE pinjaman_id=".(int)$id." AND status<>'lunas' LIMIT 1")->fetchColumn();
     $_POST=['angsuran_id'=>$a,'jumlah'=>'50001','metode'=>'cash'];ditolakLayanan(function()use($db,$id,&$files){prosesLayanan($db,'bayar_denda',$id,$files);},'melebihi sisa denda');
     $_POST=['angsuran_id'=>$a,'jumlah'=>'1000','metode'=>'cash'];ditolakLayanan(function()use($db,$id,&$files){prosesLayanan($db,'bayar_denda',$id,$files);},'Bukti pembayaran denda wajib');
+    $_POST=['angsuran_id'=>$a,'jumlah'=>'1000','metode'=>'cash','diskon'=>'100'];
+    ditolakLayanan(function()use($db,$id,&$files){prosesLayanan($db,'bayar_denda',$id,$files);},'hanya untuk Admin');
     // Ledger denda: bayar terpisah harus mengurangi sisa tagihan sekali saja.
     $p=layananPinjaman($db,$id);$tid=layananCatatKas($db,$p,1000,'TEST DENDA');
     $db->prepare("INSERT INTO layanan_bayar_denda (angsuran_id,pinjaman_id,user_id,jumlah,metode,bukti,transaksi_id) VALUES (?,?,?,1000,'cash','test.jpg',?)")->execute([$a,$id,$teller,$tid]);
@@ -53,6 +55,32 @@ try {
     $_SESSION=['role'=>'admin','user_id'=>$admin];$_POST=['angsuran_id'=>$a,'jumlah'=>'0','catatan'=>'Pemutihan penuh'];ditolakLayanan(function()use($db,$id,&$files){prosesLayanan($db,'diskon_denda',$id,$files);},'antara jumlah yang sudah dibayar');
     $_POST=['tanggal'=>date('Y-m-d',strtotime('+7 days')),'catatan'=>'Perpanjangan disetujui'];prosesLayanan($db,'reschedule',$id,$files);
     checkLayanan(abs(layananSisa($db,$id,10)['total']-$sesudah['total'])<0.01,'Reschedule tidak menghapus denda terutang');
+    // Pelunasan langsung memakai tampilan lama tanpa menghilangkan pencatatan kas.
+    $db->exec('SAVEPOINT uji_pelunasan_langsung');
+    $db->prepare('DELETE FROM layanan_pelunasan WHERE pinjaman_id=?')->execute([$id]);
+    $_SESSION=['role'=>'teller','user_id'=>$teller];
+    $_POST=['jumlah'=>'1','metode'=>'cash'];
+    ditolakLayanan(function()use($db,$id,&$files){prosesLayanan($db,'pelunasan_langsung',$id,$files);},'Nominal harus sama');
+    $tagihan=layananSisa($db,$id);
+    $_POST=['jumlah'=>(string)$tagihan['total'],'metode'=>'cash'];
+    ditolakLayanan(function()use($db,$id,&$files){prosesLayanan($db,'pelunasan_langsung',$id,$files);},'Bayar sisa denda');
+    // Fixture denda telah dibayar terpisah sebelum pelunasan pokok/bunga.
+    $fineRows=$db->prepare("SELECT a.id,a.denda-COALESCE((SELECT SUM(b.jumlah) FROM layanan_bayar_denda b WHERE b.angsuran_id=a.id),0) sisa FROM angsuran a WHERE a.pinjaman_id=? AND a.status<>'lunas'");$fineRows->execute([$id]);
+    foreach($fineRows->fetchAll(PDO::FETCH_ASSOC) as $fineRow)if($fineRow['sisa']>0){
+        $fineTid=layananCatatKas($db,layananPinjaman($db,$id),$fineRow['sisa'],'TEST BAYAR DENDA SEBELUM PELUNASAN');
+        $db->prepare("INSERT INTO layanan_bayar_denda (angsuran_id,pinjaman_id,user_id,jumlah,metode,bukti,transaksi_id) VALUES (?,?,?,?,'cash','test.jpg',?)")->execute([$fineRow['id'],$id,$teller,$fineRow['sisa'],$fineTid]);
+    }
+    $tagihan=layananSisa($db,$id);
+    $saldoAwal=(float)$db->query('SELECT saldo_sesudah FROM kas ORDER BY id DESC LIMIT 1')->fetchColumn();
+    $_POST=['jumlah'=>(string)$tagihan['total'],'metode'=>'cash'];
+    prosesLayanan($db,'pelunasan_langsung',$id,$files);
+    $status=$db->prepare('SELECT status FROM pinjaman WHERE id=?');$status->execute([$id]);
+    checkLayanan($status->fetchColumn()==='lunas','Pelunasan langsung menandai pinjaman lunas');
+    $saldoAkhir=(float)$db->query('SELECT saldo_sesudah FROM kas ORDER BY id DESC LIMIT 1')->fetchColumn();
+    checkLayanan(abs($saldoAkhir-$saldoAwal-$tagihan['total'])<0.01,'Pelunasan langsung mencatat kas sesuai sisa setelah denda terpisah');
+    $bukti=$db->prepare("SELECT COUNT(*) FROM layanan_pembayaran WHERE pinjaman_id=? AND jenis='pelunasan' AND user_id=?");$bukti->execute([$id,$teller]);
+    checkLayanan($bukti->fetchColumn()>0,'Pelunasan langsung menyimpan jejak pembayaran teller');
+    $db->exec('ROLLBACK TO SAVEPOINT uji_pelunasan_langsung');
     $db->prepare("UPDATE pinjaman SET status='lunas' WHERE id=?")->execute([$id]);
     $_SESSION=['role'=>'teller','user_id'=>$teller];$_POST=['angsuran_id'=>$a,'jumlah'=>'1000','metode'=>'cash'];ditolakLayanan(function()use($db,$id,&$files){prosesLayanan($db,'bayar_denda',$id,$files);},'terkunci');
     $db->rollBack();echo "Semua $count pemeriksaan lulus; perubahan di-rollback.\n";

@@ -27,8 +27,7 @@ if ($_POST) {
         $ktp = trim($_POST['ktp']);
         $rekening_bank = trim($_POST['rekening_bank']);
         $tanggal_daftar = $_POST['tanggal_daftar'];
-        $kategori_shu_input = $_POST['kategori_shu'] ?? 'anggota';
-        $ketua_kelompok_input = $_POST['ketua_kelompok_id'] ?? 0;
+        list($kategori_shu_input,$ketua_kelompok_input)=shuProfilUntukKode($kode_anggota,$_POST['kategori_shu'] ?? 'anggota',$_POST['ketua_kelompok_id'] ?? 0);
         
         // Validasi input
         $errors = [];
@@ -179,8 +178,7 @@ if ($_POST) {
         $ktp = trim($_POST['ktp']);
         $rekening_bank = trim($_POST['rekening_bank']);
         $status = $_POST['status'];
-        $kategori_shu_input = $_POST['kategori_shu'] ?? 'anggota';
-        $ketua_kelompok_input = $_POST['ketua_kelompok_id'] ?? 0;
+        list($kategori_shu_input,$ketua_kelompok_input)=shuProfilUntukKode($kode_anggota,$_POST['kategori_shu'] ?? 'anggota',$_POST['ketua_kelompok_id'] ?? 0);
         
         // Validasi
         $errors = [];
@@ -902,7 +900,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td><span class="badge <?= ($anggota['kategori_shu'] ?? 'anggota')==='ketua_kelompok'?'bg-primary':'bg-secondary' ?>"><?= ($anggota['kategori_shu'] ?? 'anggota')==='ketua_kelompok'?'Ketua Kelompok':'Anggota' ?></span></td>
+                                            <td><?php if(strpos($anggota['kode_anggota'],'AGTJ')===0): ?><span class="text-muted">Tidak berlaku</span><?php else: ?><span class="badge <?= ($anggota['kategori_shu'] ?? 'anggota')==='ketua_kelompok'?'bg-primary':'bg-secondary' ?>"><?= ($anggota['kategori_shu'] ?? 'anggota')==='ketua_kelompok'?'Ketua Kelompok':'Anggota' ?></span><?php endif; ?></td>
                                             <td class="d-none d-sm-table-cell"><?php echo layananEscape($anggota['telepon'] ?: '-'); ?><br><?php echo tombolWhatsApp($anggota['telepon']); ?></td>
                                             <td class="mobile-hide">
                                                 <?php $dok_url = array_filter(array_map('urlDokumenAnggota', array_intersect_key($anggota, daftarDokumenAnggota()))); ?>
@@ -1055,7 +1053,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         <div class="row">
                         </div>
                         <div class="row g-3 mb-3">
-                            <div class="col-md-6"><label class="form-label">Peran SHU *</label><select name="kategori_shu" id="add_kategori_shu" class="form-select shu-role" required><option value="anggota">Anggota (1%)</option><option value="ketua_kelompok">Ketua Kelompok (2%)</option></select></div>
+                            <div class="col-md-6 shu-role-wrap"><label class="form-label">Peran SHU *</label><select name="kategori_shu" id="add_kategori_shu" class="form-select shu-role" required><option value="anggota">Anggota (1%)</option><option value="ketua_kelompok">Ketua Kelompok (2%)</option></select></div>
                             <div class="col-md-6 shu-leader-wrap"><label class="form-label">Ketua yang mengajak</label><select name="ketua_kelompok_id" class="form-select shu-leader"><option value="">Tidak ada</option><?php foreach($ketua_shu_list as $k): ?><option value="<?= (int)$k['id'] ?>"><?= htmlspecialchars($k['nama_lengkap'].' · '.$k['kode_anggota']) ?></option><?php endforeach; ?></select></div>
                         </div>
                         <?php $dok_prefix = 'add'; $dok_anggota = null; include __DIR__ . '/../includes/form_dokumen_anggota.php'; ?>
@@ -1152,7 +1150,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         <div class="row">
                         </div>
                         <div class="row g-3 mb-3">
-                            <div class="col-md-6"><label class="form-label">Peran SHU *</label><select name="kategori_shu" id="edit_kategori_shu" class="form-select shu-role" required><option value="anggota">Anggota (1%)</option><option value="ketua_kelompok">Ketua Kelompok (2%)</option></select></div>
+                            <div class="col-md-6 shu-role-wrap"><label class="form-label">Peran SHU *</label><select name="kategori_shu" id="edit_kategori_shu" class="form-select shu-role" required><option value="anggota">Anggota (1%)</option><option value="ketua_kelompok">Ketua Kelompok (2%)</option></select></div>
                             <div class="col-md-6 shu-leader-wrap"><label class="form-label">Ketua yang mengajak</label><select name="ketua_kelompok_id" id="edit_ketua_kelompok_id" class="form-select shu-leader"><option value="">Tidak ada</option><?php foreach($ketua_shu_list as $k): ?><option value="<?= (int)$k['id'] ?>"><?= htmlspecialchars($k['nama_lengkap'].' · '.$k['kode_anggota']) ?></option><?php endforeach; ?></select></div>
                         </div>
                         <?php $dok_prefix = 'edit'; $dok_anggota = null; include __DIR__ . '/../includes/form_dokumen_anggota.php'; ?>
@@ -1245,15 +1243,24 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                     var label = kolom ? kolom.querySelector('.label-dokumen') : null;
                     if (label) label.textContent = label.dataset.label + (wajib ? ' *' : ' (opsional)');
                 });
+                var addForm=document.querySelector('#addModal form');
+                if(addForm)tampilkanKetua(addForm);
             }
             if (kategori) kategori.addEventListener('change', sesuaikanKategoriAnggota);
             sesuaikanKategoriAnggota();
 
             function tampilkanKetua(form) {
                 var role=form.querySelector('.shu-role'), wrap=form.querySelector('.shu-leader-wrap'), leader=form.querySelector('.shu-leader');
+                var code=form.querySelector('[name="kode_anggota"]');
+                var khususJaminan=code && code.value.indexOf('AGTJ')===0;
                 var ketua=role && role.value==='ketua_kelompok';
+                var roleWrap=role && role.closest('.col-md-6');
+                if(roleWrap)roleWrap.style.display=khususJaminan?'none':'';
+                if(role){role.disabled=khususJaminan;if(khususJaminan)role.value='anggota';}
+                if(khususJaminan)ketua=false;
                 if(wrap) wrap.style.display=ketua?'none':'';
-                if(leader){leader.disabled=ketua;if(ketua)leader.value='';}
+                if(wrap && khususJaminan)wrap.style.display='none';
+                if(leader){leader.disabled=ketua||khususJaminan;if(ketua||khususJaminan)leader.value='';}
             }
             document.querySelectorAll('#addModal form,#editModal form').forEach(function(form){var role=form.querySelector('.shu-role');if(role)role.addEventListener('change',function(){tampilkanKetua(form);});tampilkanKetua(form);});
 

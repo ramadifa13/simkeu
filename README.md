@@ -76,3 +76,16 @@ Foto nasabah juga menjadi foto profil anggota dan foto di sidebar anggota.
 - Rumus bunga & angsuran ada di satu tempat: `includes/pinjaman_helper.php` (PHP) dan `assets/js/pinjaman.js` (preview form).
 - Pinjaman sebelum migrasi tetap memakai skema bunga lama (`skema_bunga = 'tahunan'`); pinjaman baru memakai bunga flat per tenor.
 - Dokumen anggota (KTP, KK, KTP suami/istri) **wajib** dan disimpan di `uploads/anggota/{id_anggota}/`. Daftar dokumen wajib diatur di `DOKUMEN_ANGGOTA_WAJIB` (`includes/dokumen_anggota.php`).
+# Pengingat WhatsApp H-1 jatuh tempo
+
+Proses otomatis tersedia di `cron/wa_jatuh_tempo.php` dan memakai WhatsApp Cloud API. Buat template WhatsApp bernama `pengingat_angsuran_h1` dengan lima parameter body berurutan: nama, angsuran ke, tanggal jatuh tempo, nominal, dan kode pinjaman.
+
+Salin `.env.example` menjadi `.env`, kemudian isi kredensial database dan WhatsApp. File `.env` dibaca otomatis oleh aplikasi serta sudah dikecualikan dari Git agar token tidak ikut terunggah.
+
+Atur environment hosting: `WA_PHONE_NUMBER_ID`, `WA_ACCESS_TOKEN`, dan `WA_GRAPH_VERSION` sesuai versi aktif pada akun Meta, serta opsional `WA_TEMPLATE_NAME` dan `WA_TEMPLATE_LANG` (default `id`). Jalankan Cron Job sekali sehari, misalnya pukul 08:00 WIB:
+
+```sh
+0 8 * * * /usr/local/bin/php /home/USER/public_html/cron/wa_jatuh_tempo.php
+```
+
+Jika hosting hanya menyediakan URL cron, atur `CRON_SECRET` lalu panggil `/cron/wa_jatuh_tempo.php?token=SECRET`. Log pada `wa_pengingat_log` mencegah pesan H-1 yang sama terkirim dua kali dan menyimpan kegagalan untuk dicoba kembali.

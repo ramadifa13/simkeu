@@ -16,6 +16,23 @@
  * terkecil memakai tarif terkecil).
  */
 
+// Hak perubahan nominal diperiksa di server, termasuk ketika Teller membuka URL Admin.
+function dendaUntukPembayaran($input, $otomatis, $tersimpan, $manual, $bolehUbah) {
+    if (!is_scalar($input)) throw new Exception('Denda harus berupa angka 0 atau lebih.');
+    $input=trim((string)$input);
+    $ketetapan=$manual?(float)$tersimpan:(float)$otomatis;
+    if (!$bolehUbah) {
+        if ($input!=='' && (!is_numeric($input) || !is_finite((float)$input) || abs((float)$input-$ketetapan)>0.005)) {
+            throw new Exception('Teller tidak dapat mengubah denda. Diskon atau pemutihan harus diputuskan Admin.');
+        }
+        return ['denda'=>$ketetapan,'manual'=>$manual?1:0];
+    }
+    if ($input==='') return ['denda'=>(float)$otomatis,'manual'=>0];
+    if (!preg_match('/^\d{1,12}(\.\d{1,2})?$/D',$input)) throw new Exception('Denda harus berupa angka 0 atau lebih.');
+    $nilai=round((float)$input,2);
+    return ['denda'=>$nilai,'manual'=>abs($nilai-$otomatis)>0.005?1:0];
+}
+
 if (!function_exists('dendaDariParameter')) {
     /** Fungsi murni: denda = tarif per hari x hari yang dihitung (maksimal $batas_hari bila ada). */
     function dendaDariParameter($per_hari, $hari_telat, $batas_hari = null) {

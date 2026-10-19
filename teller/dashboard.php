@@ -253,12 +253,14 @@ try {
         JOIN pinjaman p ON a.pinjaman_id = p.id
         JOIN anggota ang ON p.anggota_id = ang.id
         WHERE a.status IN ('belum_bayar', 'telat')
-        AND a.tanggal_jatuh_tempo BETWEEN :current_date AND DATE_ADD(:current_date, INTERVAL 7 DAY)
+        AND a.tanggal_jatuh_tempo BETWEEN :current_date_start AND DATE_ADD(:current_date_end, INTERVAL 7 DAY)
         ORDER BY a.tanggal_jatuh_tempo ASC
         LIMIT 8";
     $stmt_jatuh_tempo = $db->prepare($query_jatuh_tempo);
-    $stmt_jatuh_tempo->bindParam(':current_date', $current_date);
-    $stmt_jatuh_tempo->execute();
+    $stmt_jatuh_tempo->execute([
+        ':current_date_start' => $current_date,
+        ':current_date_end' => $current_date,
+    ]);
     $jatuh_tempo = $stmt_jatuh_tempo->fetchAll(PDO::FETCH_ASSOC);
 
     // ============================================

@@ -1,11 +1,5 @@
 <?php
-// Start session jika belum
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
-
-// Include config dan auth dengan path yang benar
-require_once '../config/config.php';
+require_once __DIR__ . '/../config/bootstrap.php';
 require_once '../includes/auth.php';
 
 // Check if user is logged in
@@ -125,11 +119,6 @@ function formatRupiah($angka) {
     return 'Rp ' . number_format($angka, 0, ',', '.');
 }
 
-// Debug: Check data
-error_log("Pinjaman found: " . count($pinjaman));
-if (count($pinjaman) > 0) {
-    error_log("Sample data: " . print_r($pinjaman[0], true));
-}
 ?>
 <!DOCTYPE html>
 <html lang="id">

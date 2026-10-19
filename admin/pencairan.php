@@ -1,8 +1,5 @@
 <?php
-// Start session jika belum
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../config/bootstrap.php';
 
 // Include config dan auth dengan path yang benar
 require_once '../config/config.php';

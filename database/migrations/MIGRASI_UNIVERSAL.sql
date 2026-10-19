@@ -187,6 +187,13 @@ CREATE TABLE IF NOT EXISTS layanan_pengaturan (
  pemutihan TINYINT NOT NULL DEFAULT 1,
  wa_denda TEXT NOT NULL, wa_lunas TEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS wa_pengingat_log (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, angsuran_id INT NOT NULL, tanggal_jadwal DATE NOT NULL,
+ nomor VARCHAR(20) NOT NULL, status VARCHAR(20) NOT NULL, message_id VARCHAR(150) NULL,
+ error_message VARCHAR(500) NULL, percobaan INT NOT NULL DEFAULT 1,
+ sent_at DATETIME NULL, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY uniq_wa_angsuran_tanggal (angsuran_id,tanggal_jadwal)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 INSERT IGNORE INTO layanan_pengaturan (id,wa_denda,wa_lunas) VALUES
  (1,'Yth {nama}, Anda telat {hari} hari, denda Rp {denda}. Mohon segera dibayar.',
  'Yth {nama}, Selamat pinjaman {norek} LUNAS. Silakan hubungi kantor untuk pengambilan jaminan.');

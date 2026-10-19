@@ -1,8 +1,5 @@
 <?php
-// Pastikan session sudah started
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../config/bootstrap.php';
 
 /**
  * PERBAIKAN: Deteksi path config.php yang benar berdasarkan lokasi file
