@@ -123,13 +123,23 @@ function prosesLayanan($db, $aksi, $id, &$files) {
         $catatan='Pelunasan Rp '.$jumlah.'; diskon bunga '.$s['diskon_bunga'];
     } elseif ($aksi === 'ajukan_jaminan') {
         if ($p['status']!=='lunas' || !$p['memerlukan_jaminan']) throw new Exception('Hanya untuk pinjaman lunas dengan jaminan.');
+        if (strlen($catatan) < 5) throw new Exception('Alasan pengembalian minimal 5 karakter.');
         $stmt=$db->prepare("SELECT COUNT(*) FROM jaminan_pinjaman WHERE pinjaman_id=? AND status_jaminan='dititipkan' AND foto_barang IS NOT NULL AND foto_barang<>''");$stmt->execute([$id]);
         if (!$stmt->fetchColumn()) throw new Exception('Jaminan harus tersedia dan memiliki foto saat diterima.');
-        $db->prepare('INSERT INTO layanan_jaminan_kembali (pinjaman_id,user_id) VALUES (?,?)')->execute([$id,$uid]);
-    } elseif ($aksi === 'approve_jaminan') {
+        $fotoJaminan=validasiFotoUpload('bukti_jaminan','Foto bukti jaminan',5*1024*1024,true);
+        $fotoLunas=validasiFotoUpload('bukti_lunas','Kuitansi/surat bukti lunas',5*1024*1024,true);
+        $pathJaminan=layananSimpanFoto($fotoJaminan,'jaminan_kembali');$files[]=$pathJaminan;
+        $pathLunas=layananSimpanFoto($fotoLunas,'jaminan_kembali');$files[]=$pathLunas;
+        $existing=$db->prepare('SELECT id FROM layanan_jaminan_kembali WHERE pinjaman_id=?');$existing->execute([$id]);
+        if($existing->fetchColumn()) $db->prepare("UPDATE layanan_jaminan_kembali SET user_id=?,status='menunggu',admin_id=NULL,alasan=?,bukti_jaminan=?,bukti_lunas=?,catatan_admin=NULL,diperiksa_at=NULL WHERE pinjaman_id=?")->execute([$uid,$catatan,$pathJaminan,$pathLunas,$id]);
+        else $db->prepare('INSERT INTO layanan_jaminan_kembali (pinjaman_id,user_id,alasan,bukti_jaminan,bukti_lunas) VALUES (?,?,?,?,?)')->execute([$id,$uid,$catatan,$pathJaminan,$pathLunas]);
+    } elseif ($aksi === 'cek_jaminan' || $aksi === 'approve_jaminan' || $aksi === 'tolak_jaminan') {
         layananAdmin();
         if ($p['status']!=='lunas') throw new Exception('Pinjaman belum lunas.');
-        $s=$db->prepare("UPDATE layanan_jaminan_kembali SET status='disetujui',admin_id=? WHERE pinjaman_id=? AND status='menunggu'");$s->execute([$uid,$id]);
+        if (strlen($catatan)<5) throw new Exception('Keterangan Admin minimal 5 karakter.');
+        $status=$aksi==='cek_jaminan'?'pengecekan':($aksi==='tolak_jaminan'?'ditolak':'disetujui');
+        $from=$aksi==='approve_jaminan'?"('menunggu','pengecekan')":"('menunggu','pengecekan')";
+        $s=$db->prepare("UPDATE layanan_jaminan_kembali SET status=?,admin_id=?,catatan_admin=?,diperiksa_at=NOW() WHERE pinjaman_id=? AND status IN $from");$s->execute([$status,$uid,$catatan,$id]);
         if(!$s->rowCount())throw new Exception('Pengembalian tidak ditemukan atau sudah diproses.');
     } elseif ($aksi === 'serahkan_jaminan') {
         if ($p['status']!=='lunas' || empty($_POST['cek_fisik'])) throw new Exception('Pinjaman harus lunas dan fisik jaminan harus diperiksa.');
@@ -146,11 +156,16 @@ function prosesLayanan($db, $aksi, $id, &$files) {
         if (!$stmt->rowCount()) throw new Exception('Jaminan sudah diserahkan atau dieksekusi.');
     } elseif ($aksi === 'prioritas') {
         if ($p['status']!=='lunas') throw new Exception('Pengajuan prioritas hanya untuk nasabah lunas.');
-        $db->prepare('INSERT INTO layanan_prioritas (pinjaman_id,anggota_id,user_id) VALUES (?,?,?)')->execute([$id,$p['anggota_id'],$uid]);
-    } elseif ($aksi === 'approve_prioritas') {
+        if (strlen($catatan)<5) throw new Exception('Keterangan pengajuan minimal 5 karakter.');
+        $existing=$db->prepare('SELECT id FROM layanan_prioritas WHERE pinjaman_id=?');$existing->execute([$id]);
+        if($existing->fetchColumn()) $db->prepare("UPDATE layanan_prioritas SET anggota_id=?,user_id=?,status='menunggu',admin_id=NULL,catatan=?,koreksi=NULL,koreksi_admin_id=NULL,koreksi_at=NULL WHERE pinjaman_id=?")->execute([$p['anggota_id'],$uid,$catatan,$id]);
+        else $db->prepare('INSERT INTO layanan_prioritas (pinjaman_id,anggota_id,user_id,catatan) VALUES (?,?,?,?)')->execute([$id,$p['anggota_id'],$uid,$catatan]);
+    } elseif (in_array($aksi,['koreksi_prioritas','approve_prioritas','tolak_prioritas'],true)) {
         layananAdmin();
-        if (!layananPrioritasLayak($db,$p['anggota_id'])) throw new Exception('Prioritas memerlukan dua pinjaman lunas terakhir tanpa keterlambatan.');
-        $s=$db->prepare("UPDATE layanan_prioritas SET status='disetujui',admin_id=? WHERE pinjaman_id=? AND status='menunggu'");$s->execute([$uid,$id]);
+        if ($aksi==='approve_prioritas' && !layananPrioritasLayak($db,$p['anggota_id'])) throw new Exception('Prioritas memerlukan dua pinjaman lunas terakhir tanpa keterlambatan.');
+        if ($aksi!=='approve_prioritas' && strlen($catatan)<5) throw new Exception('Keterangan Admin minimal 5 karakter.');
+        $status=$aksi==='koreksi_prioritas'?'pengecekan':($aksi==='tolak_prioritas'?'ditolak':'disetujui');
+        $s=$db->prepare("UPDATE layanan_prioritas SET status=?,admin_id=?,koreksi=?,koreksi_admin_id=?,koreksi_at=NOW() WHERE pinjaman_id=? AND status IN ('menunggu','pengecekan')");$s->execute([$status,$uid,$catatan,$uid,$id]);
         if(!$s->rowCount())throw new Exception('Pengajuan prioritas tidak ditemukan atau sudah diproses.');
     } else throw new Exception('Tindakan tidak dikenal.');
     layananAudit($db,$id,$aksi,$catatan);

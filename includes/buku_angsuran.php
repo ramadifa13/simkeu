@@ -5,8 +5,8 @@ if (!$id || $id < 1) {
     http_response_code(400);
     exit('ID pinjaman tidak valid.');
 }
-$stmt = $db->prepare('SELECT p.*, a.nama_lengkap, a.kode_anggota, a.alamat
-    FROM pinjaman p JOIN anggota a ON a.id = p.anggota_id WHERE p.id = ?');
+$stmt = $db->prepare('SELECT p.*, jp.memerlukan_jaminan, a.nama_lengkap, a.kode_anggota, a.alamat
+    FROM pinjaman p JOIN anggota a ON a.id = p.anggota_id JOIN jenis_pinjaman jp ON jp.id=p.jenis_pinjaman_id WHERE p.id = ?');
 $stmt->execute([$id]);
 $p = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$p) {
@@ -24,6 +24,7 @@ $koperasi = $db->query('SELECT * FROM koperasi WHERE id = 1')->fetch(PDO::FETCH_
 $e = function ($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); };
 $uang = function ($value) { return 'Rp ' . number_format($value, 0, ',', '.'); };
 $frekuensi = $p['frekuensi'] ?? 'bulanan';
+$tampilkanMinggu = !empty($p['memerlukan_jaminan']) && $frekuensi === 'mingguan';
 $label = ['mingguan' => 'Mingguan', 'dua_mingguan' => 'Dua Mingguan', 'bulanan' => 'Bulanan'][$frekuensi] ?? 'Bulanan';
 $hari = [1 => 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 $hari_jadwal = [];
@@ -78,19 +79,19 @@ tr { break-inside: avoid; }
 <tr><td>Hari Angsuran</td><td>: <?= $e(implode(', ', array_keys($hari_jadwal))) ?></td></tr>
 </table>
 <table class="jadwal">
-<colgroup><col style="width: 6%"><col style="width: 14%"><col style="width: 4%"><col style="width: 16%"><col style="width: 14%"><col style="width: 16%"><col style="width: 18%"><col style="width: 12%"></colgroup>
-<thead><tr><th rowspan="2">Ke</th><th rowspan="2">Tanggal</th><th rowspan="2">K</th><th colspan="3">Angsuran <?= $e($label) ?></th><th colspan="2">Saldo</th></tr><tr><th>Modal Kerja</th><th>Margin</th><th>Jumlah</th><th>Modal Kerja</th><th>Ttd</th></tr></thead>
+<colgroup><col style="width: 6%"><col style="width: 14%"><col style="width: 4%"><?php if($tampilkanMinggu): ?><col style="width: 10%"><?php endif; ?><col style="width: 16%"><col style="width: 14%"><col style="width: 16%"><col style="width: 18%"><col style="width: 12%"></colgroup>
+<thead><tr><th rowspan="2">Ke</th><th rowspan="2">Tanggal</th><th rowspan="2">K</th><?php if($tampilkanMinggu): ?><th rowspan="2">Minggu</th><?php endif; ?><th colspan="3">Angsuran <?= $e($label) ?></th><th colspan="2">Saldo</th></tr><tr><th>Modal Kerja</th><th>Margin</th><th>Jumlah</th><th>Modal Kerja</th><th>Ttd</th></tr></thead>
 <tbody>
-<tr><td colspan="6">Saldo awal</td><td class="angka"><?= $uang($saldo) ?></td><td></td></tr>
+<tr><td colspan="<?= $tampilkanMinggu ? 7 : 6 ?>">Saldo awal</td><td class="angka"><?= $uang($saldo) ?></td><td></td></tr>
 <?php foreach ($jadwal as $row):
     $saldo -= (float) $row['pokok'];
     $total_pokok += (float) $row['pokok'];
     $total_margin += (float) $row['bunga'];
     $total_angsuran += (float) $row['jumlah_angsuran'];
 ?>
-<tr><td class="tengah"><?= (int) $row['angsuran_ke'] ?></td><td class="tengah"><?= date('d/m/Y', strtotime($row['tanggal_jatuh_tempo'])) ?></td><td></td><td class="angka"><?= $uang($row['pokok']) ?></td><td class="angka"><?= $uang($row['bunga']) ?></td><td class="angka"><?= $uang($row['jumlah_angsuran']) ?></td><td class="angka"><?= $uang(abs($saldo) < 0.005 ? 0 : $saldo) ?></td><td style="min-width: 12mm"></td></tr>
+<tr><td class="tengah"><?= (int) $row['angsuran_ke'] ?></td><td class="tengah"><?= date('d/m/Y', strtotime($row['tanggal_jatuh_tempo'])) ?></td><td></td><?php if($tampilkanMinggu): ?><td class="tengah">Minggu <?= (int)$row['angsuran_ke'] ?></td><?php endif; ?><td class="angka"><?= $uang($row['pokok']) ?></td><td class="angka"><?= $uang($row['bunga']) ?></td><td class="angka"><?= $uang($row['jumlah_angsuran']) ?></td><td class="angka"><?= $uang(abs($saldo) < 0.005 ? 0 : $saldo) ?></td><td style="min-width: 12mm"></td></tr>
 <?php endforeach; ?>
-<tr><th colspan="3">Jumlah</th><th class="angka"><?= $uang($total_pokok) ?></th><th class="angka"><?= $uang($total_margin) ?></th><th class="angka"><?= $uang($total_angsuran) ?></th><td colspan="2"></td></tr>
+<tr><th colspan="<?= $tampilkanMinggu ? 4 : 3 ?>">Jumlah</th><th class="angka"><?= $uang($total_pokok) ?></th><th class="angka"><?= $uang($total_margin) ?></th><th class="angka"><?= $uang($total_angsuran) ?></th><td colspan="2"></td></tr>
 </tbody></table>
 <div class="catatan">K = Kode / keterangan. Kolom K dan tanda tangan diisi saat pembayaran.<br>Tanggal libur: ____________________<br>Jadwal ini mengikuti data pinjaman. Denda keterlambatan mengikuti ketentuan koperasi.</div>
 </main>

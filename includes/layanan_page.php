@@ -4,6 +4,53 @@ require_once __DIR__.'/auth.php';
 require_once __DIR__.'/layanan_actions.php';
 if (!isLoggedIn()) { header('Location: ../login.php'); exit; }
 if (!isAdmin() && !isTeller()) { http_response_code(403); exit('Akses ditolak.'); }
+
+function layananStatusBadge($status) {
+    $status = strtolower(trim((string)$status));
+    $map = [
+        'disetujui' => ['Disetujui', 'success'],
+        'diserahkan' => ['Diserahkan', 'success'],
+        'menunggu' => ['Menunggu persetujuan admin', 'warning'],
+        'pengecekan' => ['Dalam pengecekan', 'warning'],
+        'koreksi' => ['Dalam koreksi', 'warning'],
+        'koreksi_prioritas' => ['Dalam koreksi', 'warning'],
+        'ditolak' => ['Ditolak', 'danger'],
+    ];
+    return $map[$status] ?? [ucfirst($status ?: 'Tidak diketahui'), 'secondary'];
+}
+
+function layananStatusBadgeHtml($status) {
+    [$label, $warna] = layananStatusBadge($status);
+    return '<span class="badge bg-' . $warna . ($warna === 'warning' ? ' text-dark' : '') . '">' . layananEscape($label) . '</span>';
+}
+
+?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.badge').forEach(function (badge) {
+        var status = badge.textContent.trim().toLowerCase();
+        if (status === 'ditolak') {
+            badge.classList.remove('bg-warning', 'text-dark');
+            badge.classList.add('bg-danger');
+        } else if (status === 'disetujui' || status === 'diserahkan') {
+            badge.classList.remove('bg-warning', 'text-dark');
+            badge.classList.add('bg-success');
+        } else if (status === 'pengecekan' || status === 'koreksi') {
+            badge.classList.remove('bg-success', 'bg-danger');
+            badge.classList.add('bg-warning', 'text-dark');
+        }
+    });
+    document.querySelectorAll('p').forEach(function (label) {
+        if (!label.textContent.trim().toLowerCase().startsWith('prioritas:')) return;
+        var badge = label.querySelector('.badge');
+        var detail = label.nextElementSibling;
+        if (badge && detail && badge.textContent.trim().toLowerCase() === 'disetujui') {
+            detail.style.display = 'none';
+        }
+    });
+});
+</script>
+<?php
 $tab=$_GET['tab'] ?? 'macet';
 if (!in_array($tab,['macet','denda','lunas','pengaturan'],true)) $tab='macet';
 if ($tab==='pengaturan' && !isAdmin()) { http_response_code(403); exit('Khusus Admin.'); }
@@ -109,12 +156,16 @@ if (isset($_GET['export']) && $siap) {
 }
 function layananForm($aksi,$id,$judul,$fields='',$warna='primary') {
     $expandable=$aksi!=='simpan_pengaturan';
+    if ($aksi==='approve_jaminan') {
+        $fields .= '<label class="form-label">Keterangan Admin</label><textarea name="catatan" class="form-control" minlength="5" maxlength="2000" required></textarea>';
+    }
     if($expandable)echo '<details class="service-action"><summary>'.layananEscape($judul).'</summary>';
     echo '<form method="post" enctype="multipart/form-data" class="service-action-form border rounded p-3 mb-3">'.layananToken().'<input type="hidden" name="aksi" value="'.layananEscape($aksi).'"><input type="hidden" name="pinjaman_id" value="'.(int)$id.'"><h6 class="'.($expandable?'visually-hidden':'').'">'.layananEscape($judul).'</h6>'.$fields.'<button class="btn btn-'.$warna.' mt-2">'.layananEscape($judul).'</button></form>';
     if($expandable)echo '</details>';
 }
 $catatanField='<label class="form-label">Catatan / alasan</label><textarea name="catatan" class="form-control" minlength="5" maxlength="2000" required></textarea>';
 $buktiField='<label class="form-label">Foto bukti (wajib, maks. 5 MB)</label><input type="file" name="bukti" class="form-control mb-2" accept="image/jpeg,image/png,image/webp" required>';
+$buktiJaminanField='<label class="form-label">Foto bukti jaminan</label><input type="file" name="bukti_jaminan" class="form-control mb-2" accept="image/jpeg,image/png,image/webp" required><label class="form-label">Kuitansi / surat bukti lunas</label><input type="file" name="bukti_lunas" class="form-control mb-2" accept="image/jpeg,image/png,image/webp" required>';
 $metodeField='<label class="form-label">Metode</label><select name="metode" class="form-select mb-2"><option value="cash">Cash</option><option value="transfer">Transfer</option></select>';
 ?>
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Layanan Pinjaman</title>
@@ -145,12 +196,15 @@ $metodeField='<label class="form-label">Metode</label><select name="metode" clas
 <?php endif; ?>
 <?php if($tab==='denda') include __DIR__.'/denda_report_panel.php'; ?>
 <?php if($tab==='lunas'): ?>
-<div class="table-responsive"><table class="table"><thead><tr><th>Nama</th><th>Tgl Lunas</th><th>Tipe</th><th>Total Pinjam</th><th>Bunga Didapat</th><th>Jaminan</th><th>Teller Pelunasan</th><th>Aksi</th></tr></thead><tbody>
+<div class="table-responsive"><table class="table"><thead><tr><th>Nama</th><th>Tgl Lunas</th><th>Tipe</th><th>Total Pinjam</th><th>Bunga Didapat</th><th>Jaminan</th><th>Teller Pelunasan</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
 <?php foreach($list as $r):
 $stmt=$db->prepare("SELECT COALESCE(SUM(bunga),0) FROM angsuran WHERE pinjaman_id=? AND status='lunas'");$stmt->execute([$r['id']]);$bunga=(float)$stmt->fetchColumn();
 $stmt=$db->prepare("SELECT diskon_persen,(SELECT COALESCE(SUM(bunga),0) FROM angsuran WHERE pinjaman_id=? AND cara_bayar='pelunasan') bunga FROM layanan_pelunasan WHERE pinjaman_id=? AND status='selesai'");$stmt->execute([$r['id'],$r['id']]);$pl=$stmt->fetch(PDO::FETCH_ASSOC);if($pl)$bunga-=round($pl['bunga']*$pl['diskon_persen']/100,2);
-$stmt=$db->prepare("SELECT u.nama_lengkap FROM layanan_pembayaran b JOIN users u ON u.id=b.user_id WHERE b.pinjaman_id=? AND b.dibatalkan_at IS NULL ORDER BY b.id DESC LIMIT 1");$stmt->execute([$r['id']]);$tellerLunas=$stmt->fetchColumn(); ?>
-<tr><td><?= layananEscape($r['nama_lengkap']) ?></td><td><?= layananEscape($r['tanggal_lunas']) ?></td><td><?= $pl?'Dipercepat':'Normal' ?></td><td><?= formatRupiah($r['jumlah_pinjaman']) ?></td><td><?= formatRupiah($bunga) ?></td><td><?= layananEscape($r['status_jaminan'] ?: 'Tanpa jaminan') ?></td><td><?= layananEscape($tellerLunas ?: 'Data lama') ?></td><td><a href="cetak_bukti_pelunasan.php?id=<?= (int)$r['id'] ?>" target="_blank" rel="noopener">Surat Lunas</a> · <a href="?tab=lunas&id=<?= (int)$r['id'] ?>#detail">Detail / BAST</a></td></tr><?php endforeach; ?></tbody></table></div>
+$stmt=$db->prepare("SELECT u.nama_lengkap FROM layanan_pembayaran b JOIN users u ON u.id=b.user_id WHERE b.pinjaman_id=? AND b.dibatalkan_at IS NULL ORDER BY b.id DESC LIMIT 1");$stmt->execute([$r['id']]);$tellerLunas=$stmt->fetchColumn();
+$stmt=$db->prepare("SELECT status FROM layanan_jaminan_kembali WHERE pinjaman_id=? UNION ALL SELECT status FROM layanan_prioritas WHERE pinjaman_id=?");$stmt->execute([$r['id'],$r['id']]);$statusLayanan=$stmt->fetchAll(PDO::FETCH_COLUMN);
+$statusLayanan=array_values(array_unique(array_filter($statusLayanan)));
+$statusAktual='';foreach(['ditolak','menunggu','pengecekan','koreksi_prioritas','disetujui','diserahkan'] as $statusCari){if(in_array($statusCari,$statusLayanan,true)){$statusAktual=$statusCari;break;}} ?>
+<tr><td><?= layananEscape($r['nama_lengkap']) ?></td><td><?= layananEscape($r['tanggal_lunas']) ?></td><td><?= $pl?'Dipercepat':'Normal' ?></td><td><?= formatRupiah($r['jumlah_pinjaman']) ?></td><td><?= formatRupiah($bunga) ?></td><td><?= layananEscape($r['status_jaminan'] ?: 'Tanpa jaminan') ?></td><td><?= layananEscape($tellerLunas ?: 'Data lama') ?></td><td><?= $statusAktual ? layananStatusBadgeHtml($statusAktual) : '<span class="badge bg-secondary">Tidak ada pengajuan</span>' ?></td><td><a href="cetak_bukti_pelunasan.php?id=<?= (int)$r['id'] ?>" target="_blank" rel="noopener">Surat Lunas</a> · <a href="?tab=lunas&id=<?= (int)$r['id'] ?>#detail">Detail / BAST</a></td></tr><?php endforeach; ?></tbody></table></div>
 
 <?php endif; ?>
 </div></section>
@@ -198,10 +252,11 @@ $dendaRingkasan='<label>Nama nasabah</label><input class="form-control mb-2" rea
 <?php endif;endif; ?>
 <?php else: ?>
 <a class="btn btn-success my-2" target="_blank" rel="noopener" href="cetak_bukti_pelunasan.php?id=<?= $id ?>">Cetak Surat Lunas</a>
-<?php $stmt=$db->prepare('SELECT * FROM layanan_prioritas WHERE pinjaman_id=?');$stmt->execute([$id]);$prioritas=$stmt->fetch(PDO::FETCH_ASSOC);if(!$prioritas): layananForm('prioritas',$id,'Ajukan Anggota Prioritas');else: ?><p>Prioritas: <?= layananEscape($prioritas['status']) ?></p><?php if(isAdmin() && $prioritas['status']==='menunggu') layananForm('approve_prioritas',$id,'Approve Anggota Prioritas');endif; ?>
+<?php $stmt=$db->prepare('SELECT * FROM layanan_prioritas WHERE pinjaman_id=?');$stmt->execute([$id]);$prioritas=$stmt->fetch(PDO::FETCH_ASSOC);if(!$prioritas || $prioritas['status']==='ditolak'): layananForm('prioritas',$id,'Ajukan Anggota Prioritas',$catatanField);else: ?><p>Prioritas: <span class="badge bg-<?= $prioritas['status']==='disetujui'?'success':'warning' ?>"><?= layananEscape(ucfirst($prioritas['status'])) ?></span></p><p class="small text-muted">Pengajuan: <?= layananEscape($prioritas['catatan'] ?? '') ?><br>Koreksi Admin: <?= layananEscape($prioritas['koreksi'] ?? 'Belum ada') ?></p><?php if(isAdmin() && in_array($prioritas['status'],['menunggu','pengecekan'],true)): ?><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Angsuran</th><th>Jatuh tempo</th><th>Status</th><th>Telat</th><th>Tanggal bayar</th></tr></thead><tbody><?php $rh=$db->prepare("SELECT angsuran_ke,tanggal_jatuh_tempo,status,tanggal_bayar,GREATEST(0,DATEDIFF(COALESCE(tanggal_bayar,CURDATE()),tanggal_jatuh_tempo)) hari_telat FROM angsuran WHERE pinjaman_id=? ORDER BY angsuran_ke");$rh->execute([$id]);foreach($rh->fetchAll(PDO::FETCH_ASSOC) as $rr): ?><tr><td><?= (int)$rr['angsuran_ke'] ?></td><td><?= layananEscape($rr['tanggal_jatuh_tempo']) ?></td><td><?= layananEscape($rr['status']) ?></td><td><span class="badge bg-<?= (int)$rr['hari_telat']===0?'success':((int)$rr['hari_telat']<=3?'warning':'danger') ?>"><?= (int)$rr['hari_telat'] ?> hari<?= (int)$rr['hari_telat']===0?' · Lancar':((int)$rr['hari_telat']<=3?' · Telat ringan':' · Macet') ?></span></td><td><?= layananEscape($rr['tanggal_bayar'] ?: '-') ?></td></tr><?php endforeach; ?></tbody></table></div><?php layananForm('koreksi_prioritas',$id,'Koreksi Anggota Prioritas',$catatanField,'warning'); layananForm('approve_prioritas',$id,'Approve Anggota Prioritas','<p class="small">Persetujuan final akan mengaktifkan fasilitas tanpa keterangan tambahan.</p>','success'); layananForm('tolak_prioritas',$id,'Tolak Anggota Prioritas',$catatanField,'danger'); endif; ?>
+<?php endif; ?>
 <?php if($p['memerlukan_jaminan']): $stmt=$db->prepare('SELECT * FROM layanan_jaminan_kembali WHERE pinjaman_id=?');$stmt->execute([$id]);$kembali=$stmt->fetch(PDO::FETCH_ASSOC); ?>
-<?php if(!$kembali): layananForm('ajukan_jaminan',$id,'Ajukan Pengembalian Jaminan');else: ?><p>Pengembalian jaminan: <strong><?= layananEscape($kembali['status']) ?></strong></p>
-<?php if(isAdmin() && $kembali['status']==='menunggu') layananForm('approve_jaminan',$id,'Approve Pengembalian Jaminan'); ?>
+<?php if(!$kembali || $kembali['status']==='ditolak'): layananForm('ajukan_jaminan',$id,'Ajukan Pengembalian Jaminan',$buktiJaminanField.$catatanField);else: ?><p>Pengembalian jaminan: <span class="badge bg-<?= $kembali['status']==='diserahkan'?'success':'warning' ?>"><?= layananEscape(ucfirst($kembali['status'])) ?></span></p><p class="small">Alasan Teller: <?= layananEscape($kembali['alasan'] ?? '') ?><br>Keterangan Admin: <?= layananEscape($kembali['catatan_admin'] ?? 'Belum ada') ?></p>
+<?php if(isAdmin() && in_array($kembali['status'],['menunggu','pengecekan'],true)): layananForm('cek_jaminan',$id,'Pengecekan Jaminan',$catatanField,'warning'); layananForm('approve_jaminan',$id,'Approve Pengembalian Jaminan','<p class="small">Pastikan foto, kuitansi, dan barang sesuai sebelum approve.</p>','success'); layananForm('tolak_jaminan',$id,'Tolak Pengembalian Jaminan',$catatanField,'danger'); endif; ?>
 <?php if($kembali['status']==='disetujui') layananForm('serahkan_jaminan',$id,'Serahkan Jaminan',$buktiField.'<label class="d-block my-2"><input type="checkbox" name="cek_fisik" required> Jaminan sudah diserahkan kembali dan diperiksa bersama nasabah</label><p>Tanda tangan nasabah</p><canvas class="signature" width="500" height="180"></canvas><input type="hidden" name="ttd"><button type="button" class="clear-sign btn btn-sm btn-outline-secondary d-block">Hapus tanda tangan</button>','success'); ?>
 <?php if($kembali['status']==='diserahkan'): ?><a class="btn btn-outline-primary" href="kwitansi_layanan.php?jenis=bast&id=<?= (int)$kembali['id'] ?>" target="_blank" rel="noopener">Cetak BAST</a><?php endif;endif;endif; ?>
 <?php endif; ?>

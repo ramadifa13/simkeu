@@ -171,11 +171,22 @@ CREATE TABLE IF NOT EXISTS layanan_jaminan_kembali (
  foto VARCHAR(255) NULL, ttd MEDIUMTEXT NULL, diserahkan_at DATETIME NULL,
  UNIQUE KEY uniq_kembali_pinjaman(pinjaman_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ALTER TABLE layanan_jaminan_kembali
+ ADD COLUMN IF NOT EXISTS alasan TEXT NULL,
+ ADD COLUMN IF NOT EXISTS bukti_jaminan VARCHAR(255) NULL,
+ ADD COLUMN IF NOT EXISTS bukti_lunas VARCHAR(255) NULL,
+ ADD COLUMN IF NOT EXISTS catatan_admin TEXT NULL,
+ ADD COLUMN IF NOT EXISTS diperiksa_at DATETIME NULL;
 CREATE TABLE IF NOT EXISTS layanan_prioritas (
  id INT AUTO_INCREMENT PRIMARY KEY, pinjaman_id INT NOT NULL, anggota_id INT NOT NULL, user_id INT NOT NULL,
  status VARCHAR(20) NOT NULL DEFAULT 'menunggu', admin_id INT NULL,
  UNIQUE KEY uniq_prioritas_pinjaman(pinjaman_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ALTER TABLE layanan_prioritas
+ ADD COLUMN IF NOT EXISTS catatan TEXT NULL,
+ ADD COLUMN IF NOT EXISTS koreksi TEXT NULL,
+ ADD COLUMN IF NOT EXISTS koreksi_admin_id INT NULL,
+ ADD COLUMN IF NOT EXISTS koreksi_at DATETIME NULL;
 CREATE TABLE IF NOT EXISTS layanan_pembayaran (
  id INT AUTO_INCREMENT PRIMARY KEY, angsuran_id INT NULL, pinjaman_id INT NOT NULL, user_id INT NOT NULL,
  jenis VARCHAR(20) NOT NULL, jumlah DECIMAL(15,2) NOT NULL, metode VARCHAR(10) NOT NULL,

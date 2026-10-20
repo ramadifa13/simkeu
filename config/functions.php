@@ -30,7 +30,8 @@ if (!function_exists('base_redirect')) {
 
 if (!function_exists('sanitize')) {
     function sanitize($data) {
-        return htmlspecialchars(strip_tags(trim($data)));
+        if (!is_scalar($data)) return '';
+        return htmlspecialchars(strip_tags(trim((string)$data)), ENT_QUOTES, 'UTF-8');
     }
 }
 
@@ -49,8 +50,8 @@ if (!function_exists('formatDateIndonesian')) {
             '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
         ];
         
-        $date_parts = explode('-', $date);
-        if (count($date_parts) === 3) {
+        $date_parts = explode('-', (string)$date);
+        if (count($date_parts) === 3 && isset($months[$date_parts[1]]) && checkdate((int)$date_parts[1], (int)$date_parts[2], (int)$date_parts[0])) {
             return $date_parts[2] . ' ' . $months[$date_parts[1]] . ' ' . $date_parts[0];
         }
         return $date;

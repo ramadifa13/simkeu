@@ -483,7 +483,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                 </h5>
                             </div>
                             <div class="card-body form-card">
-                                <form method="POST" id="formPengajuan"><?php echo layananToken(); ?><label class="d-block mb-3"><input type="checkbox" name="fasilitas_prioritas" value="1"> Gunakan fasilitas anggota prioritas (tanpa jaminan, maksimal Rp 1 juta; wajib persetujuan prioritas Admin)</label>
+                                <form method="POST" id="formPengajuan"><?php echo layananToken(); ?><input type="hidden" name="ajukan_pinjaman" value="1"><label class="d-block mb-3"><input type="checkbox" name="fasilitas_prioritas" value="1"> Gunakan fasilitas anggota prioritas (tanpa jaminan, maksimal Rp 1 juta; wajib persetujuan prioritas Admin)</label>
                                     <div class="mb-3">
                                         <label class="form-label">Pilih Anggota *</label>
                                         <select name="anggota_id" class="form-select" required id="anggotaSelect">
@@ -649,7 +649,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                     </div>
                                     
                                     <div class="d-grid gap-2">
-                                        <button type="submit" name="ajukan_pinjaman" class="btn btn-primary btn-lg">
+                                        <button type="submit" class="btn btn-primary btn-lg">
                                             <i class="fas fa-paper-plane me-2"></i> Ajukan Pinjaman
                                         </button>
                                     </div>

@@ -19,6 +19,8 @@ if (!defined('SIMKEU_BOOTSTRAPPED')) {
         ini_set('session.use_strict_mode', '1');
         ini_set('session.cookie_httponly', '1');
         ini_set('session.cookie_samesite', 'Lax');
+        // Jangan kirim cookie sesi melalui koneksi HTTP ketika aplikasi berjalan di HTTPS.
+        ini_set('session.cookie_secure', (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? '1' : '0');
         session_start();
     }
 }

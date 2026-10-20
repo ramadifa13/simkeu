@@ -8,14 +8,16 @@ define('APP_VERSION', '1.0');
 // Hosting sering memakai UTC sehingga angsuran Sabtu baru dianggap telat beberapa jam kemudian.
 date_default_timezone_set('Asia/Jakarta');
 
-// Base URL dengan path yang benar
-$protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
-$host = $_SERVER['HTTP_HOST'];
-$script_dir = dirname($_SERVER['SCRIPT_NAME']);
-
-// Pastikan path berakhir dengan slash
-$base_path = $script_dir === '/' ? '/' : $script_dir . '/';
-$base_url = $protocol . "://" . $host . $base_path;
+// Gunakan APP_URL bila disediakan. HTTP_HOST tidak boleh dipercaya sebagai URL
+// aplikasi karena dapat dipengaruhi Host header dari request.
+$configuredUrl = trim((string)(getenv('APP_URL') ?: ''));
+if ($configuredUrl !== '') {
+    $base_url = rtrim($configuredUrl, '/') . '/';
+} else {
+    $scriptDir = dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/'));
+    $basePath = $scriptDir === DIRECTORY_SEPARATOR || $scriptDir === '.' ? '/' : str_replace('\\', '/', rtrim($scriptDir, '/\\')) . '/';
+    $base_url = $basePath;
+}
 
 define('BASE_URL', $base_url);
 
@@ -33,7 +35,9 @@ try {
         $db->exec("SET time_zone = '+07:00'");
     }
 } catch (Exception $e) {
-    die("Database connection failed: " . $e->getMessage());
+    error_log('Database connection failed: ' . $e->getMessage());
+    http_response_code(503);
+    die('Layanan sedang tidak tersedia. Silakan coba lagi beberapa saat lagi.');
 }
 
 // Functions - TAMBAHKAN kondisi cek function
