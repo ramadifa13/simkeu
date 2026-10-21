@@ -44,8 +44,9 @@ if (!empty($filter_status)) {
 }
 
 if (!empty($filter_search)) {
-    $query .= " AND (a.kode_anggota LIKE :search OR a.nama_lengkap LIKE :search OR a.telepon LIKE :search OR a.ktp LIKE :search)";
-    $params[':search'] = "%$filter_search%";
+    $query .= " AND (a.kode_anggota LIKE :search_kode OR a.nama_lengkap LIKE :search_nama OR a.telepon LIKE :search_telepon OR a.ktp LIKE :search_ktp)";
+    $nilai_search = "%$filter_search%";
+    $params += [':search_kode'=>$nilai_search, ':search_nama'=>$nilai_search, ':search_telepon'=>$nilai_search, ':search_ktp'=>$nilai_search];
 }
 
 $query .= " ORDER BY a.created_at DESC";

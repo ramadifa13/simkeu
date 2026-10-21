@@ -83,9 +83,10 @@ $query = "SELECT pp.*, a.nama_lengkap,
           AND pp.id NOT IN (SELECT pengajuan_id FROM pinjaman WHERE pengajuan_id IS NOT NULL)";
 $params_siap = [];
 if ($filter_cari !== '') {
-    $query .= " AND (a.nama_lengkap LIKE :cari OR a.kode_anggota LIKE :cari
-                OR COALESCE(a.kode_anggota_jaminan, '') LIKE :cari OR pp.kode_pengajuan LIKE :cari)";
-    $params_siap[':cari'] = '%' . $filter_cari . '%';
+    $query .= " AND (a.nama_lengkap LIKE :siap_nama OR a.kode_anggota LIKE :siap_kode
+                OR COALESCE(a.kode_anggota_jaminan, '') LIKE :siap_jaminan OR pp.kode_pengajuan LIKE :siap_pengajuan)";
+    $nilai_cari = '%' . $filter_cari . '%';
+    $params_siap = [':siap_nama'=>$nilai_cari, ':siap_kode'=>$nilai_cari, ':siap_jaminan'=>$nilai_cari, ':siap_pengajuan'=>$nilai_cari];
 }
 $query .= " ORDER BY pp.tanggal_persetujuan DESC";
 $stmt = $db->prepare($query);
@@ -106,9 +107,10 @@ $query_dicairkan = "SELECT p.*, a.nama_lengkap,
                    WHERE 1=1";
 $params_dicairkan = [];
 if ($filter_cari !== '') {
-    $query_dicairkan .= " AND (a.nama_lengkap LIKE :cari OR a.kode_anggota LIKE :cari
-                          OR COALESCE(a.kode_anggota_jaminan, '') LIKE :cari OR p.kode_pinjaman LIKE :cari)";
-    $params_dicairkan[':cari'] = '%' . $filter_cari . '%';
+    $query_dicairkan .= " AND (a.nama_lengkap LIKE :cair_nama OR a.kode_anggota LIKE :cair_kode
+                          OR COALESCE(a.kode_anggota_jaminan, '') LIKE :cair_jaminan OR p.kode_pinjaman LIKE :cair_pinjaman)";
+    $nilai_cari = '%' . $filter_cari . '%';
+    $params_dicairkan = [':cair_nama'=>$nilai_cari, ':cair_kode'=>$nilai_cari, ':cair_jaminan'=>$nilai_cari, ':cair_pinjaman'=>$nilai_cari];
 }
 if ($filter_tanggal_mulai !== '') {
     $query_dicairkan .= " AND p.tanggal_pencairan >= :tanggal_mulai";
