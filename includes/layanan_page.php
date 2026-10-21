@@ -15,6 +15,9 @@ function layananStatusBadge($status) {
         'koreksi' => ['Dalam koreksi', 'warning'],
         'koreksi_prioritas' => ['Dalam koreksi', 'warning'],
         'ditolak' => ['Ditolak', 'danger'],
+        'jaminan_belum_diambil' => ['Jaminan belum diambil', 'warning'],
+        'jaminan_siap_diambil' => ['Siap diambil', 'info'],
+        'jaminan_dikembalikan' => ['Jaminan sudah dikembalikan', 'success'],
     ];
     return $map[$status] ?? [ucfirst($status ?: 'Tidak diketahui'), 'secondary'];
 }
@@ -203,7 +206,7 @@ $stmt=$db->prepare("SELECT diskon_persen,(SELECT COALESCE(SUM(bunga),0) FROM ang
 $stmt=$db->prepare("SELECT u.nama_lengkap FROM layanan_pembayaran b JOIN users u ON u.id=b.user_id WHERE b.pinjaman_id=? AND b.dibatalkan_at IS NULL ORDER BY b.id DESC LIMIT 1");$stmt->execute([$r['id']]);$tellerLunas=$stmt->fetchColumn();
 $stmt=$db->prepare("SELECT status FROM layanan_jaminan_kembali WHERE pinjaman_id=? UNION ALL SELECT status FROM layanan_prioritas WHERE pinjaman_id=?");$stmt->execute([$r['id'],$r['id']]);$statusLayanan=$stmt->fetchAll(PDO::FETCH_COLUMN);
 $statusLayanan=array_values(array_unique(array_filter($statusLayanan)));
-$statusAktual='';foreach(['ditolak','menunggu','pengecekan','koreksi_prioritas','disetujui','diserahkan'] as $statusCari){if(in_array($statusCari,$statusLayanan,true)){$statusAktual=$statusCari;break;}} ?>
+$statusAktual='';foreach(['ditolak','menunggu','pengecekan','koreksi_prioritas','disetujui','diserahkan'] as $statusCari){if(in_array($statusCari,$statusLayanan,true)){$statusAktual=$statusCari;break;}} if(!$statusAktual && !empty($r['memerlukan_jaminan']) && ($r['status_jaminan']??'')==='dititipkan') $statusAktual='jaminan_belum_diambil'; if($statusAktual==='disetujui' && ($r['status_jaminan']??'')==='dititipkan') $statusAktual='jaminan_siap_diambil'; if(($r['status_jaminan']??'')==='dikembalikan') $statusAktual='jaminan_dikembalikan'; ?>
 <tr><td><?= layananEscape($r['nama_lengkap']) ?></td><td><?= layananEscape($r['tanggal_lunas']) ?></td><td><?= $pl?'Dipercepat':'Normal' ?></td><td><?= formatRupiah($r['jumlah_pinjaman']) ?></td><td><?= formatRupiah($bunga) ?></td><td><?= layananEscape($r['status_jaminan'] ?: 'Tanpa jaminan') ?></td><td><?= layananEscape($tellerLunas ?: 'Data lama') ?></td><td><?= $statusAktual ? layananStatusBadgeHtml($statusAktual) : '<span class="badge bg-secondary">Tidak ada pengajuan</span>' ?></td><td><a href="cetak_bukti_pelunasan.php?id=<?= (int)$r['id'] ?>" target="_blank" rel="noopener">Surat Lunas</a> · <a href="?tab=lunas&id=<?= (int)$r['id'] ?>#detail">Detail / BAST</a></td></tr><?php endforeach; ?></tbody></table></div>
 
 <?php endif; ?>
@@ -256,7 +259,8 @@ $dendaRingkasan='<label>Nama nasabah</label><input class="form-control mb-2" rea
 <?php endif; ?>
 <?php if($p['memerlukan_jaminan']): $stmt=$db->prepare('SELECT * FROM layanan_jaminan_kembali WHERE pinjaman_id=?');$stmt->execute([$id]);$kembali=$stmt->fetch(PDO::FETCH_ASSOC); ?>
 <?php if(!$kembali || $kembali['status']==='ditolak'): layananForm('ajukan_jaminan',$id,'Ajukan Pengembalian Jaminan',$buktiJaminanField.$catatanField);else: ?><p>Pengembalian jaminan: <span class="badge bg-<?= $kembali['status']==='diserahkan'?'success':'warning' ?>"><?= layananEscape(ucfirst($kembali['status'])) ?></span></p><p class="small">Alasan Teller: <?= layananEscape($kembali['alasan'] ?? '') ?><br>Keterangan Admin: <?= layananEscape($kembali['catatan_admin'] ?? 'Belum ada') ?></p>
-<?php if(isAdmin() && in_array($kembali['status'],['menunggu','pengecekan'],true)): layananForm('cek_jaminan',$id,'Pengecekan Jaminan',$catatanField,'warning'); layananForm('approve_jaminan',$id,'Approve Pengembalian Jaminan','<p class="small">Pastikan foto, kuitansi, dan barang sesuai sebelum approve.</p>','success'); layananForm('tolak_jaminan',$id,'Tolak Pengembalian Jaminan',$catatanField,'danger'); endif; ?>
+<?php if(isAdmin() && $kembali['status']==='menunggu'): layananForm('cek_jaminan',$id,'Pengecekan Jaminan','<p class="small">Periksa foto barang, kuitansi, dan keterangan dari Teller terlebih dahulu.</p>'.$catatanField,'warning'); endif; ?>
+<?php if(isAdmin() && $kembali['status']==='pengecekan'): layananForm('approve_jaminan',$id,'Approve Pengembalian Jaminan','<p class="small">Pengecekan selesai. Pilih approve atau tolak dan sertakan keterangan keputusan.</p>'.$catatanField,'success'); layananForm('tolak_jaminan',$id,'Tolak Pengembalian Jaminan',$catatanField,'danger'); endif; ?>
 <?php if($kembali['status']==='disetujui') layananForm('serahkan_jaminan',$id,'Serahkan Jaminan',$buktiField.'<label class="d-block my-2"><input type="checkbox" name="cek_fisik" required> Jaminan sudah diserahkan kembali dan diperiksa bersama nasabah</label><div class="signature-field"><div class="signature-field-head"><div><span class="signature-field-title">Tanda tangan nasabah</span><small class="signature-field-help">Gunakan mouse atau layar sentuh untuk menandatangani.</small></div><span class="signature-status"><i class="fas fa-pen-nib"></i> Belum diisi</span></div><div class="signature-canvas-wrap"><canvas class="signature" width="500" height="180"></canvas></div><input type="hidden" name="ttd"><div class="signature-field-foot"><span class="signature-field-note">Pastikan tanda tangan terlihat jelas sebelum dikirim.</span><button type="button" class="clear-sign signature-clear btn btn-sm btn-outline-danger"><i class="fas fa-eraser me-1"></i>Hapus</button></div></div>','success'); ?>
 <?php if($kembali['status']==='diserahkan'): ?><a class="btn btn-outline-primary" href="kwitansi_layanan.php?jenis=bast&id=<?= (int)$kembali['id'] ?>" target="_blank" rel="noopener">Cetak BAST</a><?php endif;endif;endif; ?>
 <?php endif; ?>

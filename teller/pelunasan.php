@@ -63,7 +63,7 @@ if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filter_mulai)) { $filter_where[] = 'DAT
 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filter_sampai)) { $filter_where[] = 'DATE(p.tanggal_pencairan) <= :sampai'; $filter_params[':sampai'] = $filter_sampai; }
 
 // Get active loans that can be settled early
-$query = "SELECT p.*, a.nama_lengkap, a.kode_anggota, jp.nama_jenis, jp.memerlukan_jaminan,
+$query = "SELECT p.*, a.nama_lengkap, a.telepon, a.kode_anggota, jp.nama_jenis, jp.memerlukan_jaminan,
                  (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status IN ('belum_bayar','telat')) as sisa_angsuran,
                  (SELECT SUM(jumlah_angsuran + denda) FROM angsuran WHERE pinjaman_id = p.id AND status IN ('belum_bayar','telat')) as total_sisa_bayar
           FROM pinjaman p
@@ -289,6 +289,8 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     data-bs-target="#detailModal"
                                                     data-kode="<?php echo $pinjaman['kode_pinjaman']; ?>"
                                                     data-nama="<?php echo $pinjaman['nama_lengkap']; ?>"
+                                                    data-telepon="<?php echo htmlspecialchars($pinjaman['telepon'] ?? '', ENT_QUOTES); ?>"
+                                                    data-gadai="<?php echo !empty($pinjaman['memerlukan_jaminan']) ? '1' : '0'; ?>"
                                                     data-kode_anggota="<?php echo $pinjaman['kode_anggota']; ?>"
                                                     data-jenis="<?php echo $pinjaman['nama_jenis']; ?>"
                                                     data-jumlah_pinjaman="<?php echo $pinjaman['jumlah_pinjaman']; ?>"
@@ -447,6 +449,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         </div>
                     </div>
                     <div class="modal-footer">
+                        <a href="#" id="waPelunasan" class="btn btn-outline-success d-none" target="_blank" rel="noopener"><i class="fab fa-whatsapp me-1"></i>Cek WhatsApp</a>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
                         <button type="submit" name="lunaskan" class="btn btn-success">Konfirmasi Pelunasan</button>
                     </div>
@@ -487,6 +490,13 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             document.getElementById('lunaskan_sisa_pokok').textContent = 'Rp ' + Number(button.getAttribute('data-sisa_pokok')).toLocaleString('id-ID');
             document.getElementById('lunaskan_total_sisa_bayar').textContent = 'Rp ' + totalSisaBayar.toLocaleString('id-ID');
             document.getElementById('lunaskan_jumlah').value = totalSisaBayar;
+            var wa = document.getElementById('waPelunasan');
+            var telepon = (button.getAttribute('data-telepon') || '').replace(/[^0-9]/g, '');
+            if (wa && button.getAttribute('data-gadai') === '1' && telepon) {
+                if (telepon.indexOf('0') === 0) telepon = '62' + telepon.substring(1);
+                wa.href = 'https://wa.me/' + telepon + '?text=' + encodeURIComponent('Halo ' + button.getAttribute('data-nama') + ', proses pelunasan pinjaman ' + button.getAttribute('data-kode') + ' sedang diproses.');
+                wa.classList.remove('d-none');
+            } else if (wa) { wa.classList.add('d-none'); wa.removeAttribute('href'); }
         });
     </script>
 </body>

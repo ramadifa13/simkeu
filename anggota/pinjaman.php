@@ -139,7 +139,9 @@ function tabelAngsuranAnggota($rows, $pesan_kosong) {
         $kelas = $a['status'] == 'lunas' ? 'success' : ($a['status'] == 'telat' ? 'danger' : 'warning');
         echo '<tr>';
         echo '<td>' . $no++ . '</td>';
-        echo '<td><code>' . htmlspecialchars($a['kode_pinjaman']) . '</code></td>';
+        $labelJenis = !empty($a['memerlukan_jaminan']) ? 'AGTJ · Gadai' : 'AGT · Tanpa jaminan';
+        $warnaJenis = !empty($a['memerlukan_jaminan']) ? 'warning text-dark' : 'light text-secondary';
+        echo '<td><code>' . htmlspecialchars($a['kode_pinjaman']) . '</code><br><span class="badge rounded-pill bg-' . $warnaJenis . '">' . $labelJenis . '</span></td>';
         echo '<td class="text-center">' . (int) $a['angsuran_ke'] . '</td>';
         echo '<td>' . date('d/m/Y', strtotime($a['tanggal_jatuh_tempo'])) . '</td>';
         echo '<td class="text-end">' . formatRupiah($a['pokok']) . '</td>';
@@ -478,6 +480,7 @@ unset($daftar_lunas);
                                                         <div>
                                                             <h6 class="mb-1">
                                                                 <?php echo $pinjaman['kode_pinjaman']; ?>
+                                                                <span class="badge rounded-pill bg-<?php echo !empty($pinjaman['memerlukan_jaminan']) ? 'warning text-dark' : 'light text-secondary'; ?> ms-1"><?php echo !empty($pinjaman['memerlukan_jaminan']) ? 'AGTJ · Gadai' : 'AGT · Tanpa jaminan'; ?></span>
                                                                 <span class="badge bg-<?php echo $status_class; ?> ms-2">
                                                                     <?php echo ucfirst($pinjaman['status']); ?>
                                                                 </span>

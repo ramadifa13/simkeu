@@ -105,7 +105,7 @@ if ($_POST) {
             } else {
                 throw new Exception("Gagal menambahkan anggota");
             }
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             if ($db->inTransaction()) {
                 $db->rollBack();
             }

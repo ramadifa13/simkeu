@@ -116,7 +116,11 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
         $hasil['layanan']+=$hasil['pembayaran_denda'];
         // Persetujuan adalah tampilan dari pengajuan yang sama, jadi jangan dihitung dua kali.
         $hasil['total']=$hasil['persetujuan']+$hasil['pembatalan']+$hasil['layanan'];
-        $hasil['detail'] = ['persetujuan'=>(int)$db->query("SELECT id FROM pengajuan_pinjaman WHERE status='menunggu' ORDER BY id DESC LIMIT 1")->fetchColumn()];
+        $hasil['detail'] = [
+            'persetujuan'=>(int)$db->query("SELECT id FROM pengajuan_pinjaman WHERE status='menunggu' ORDER BY id DESC LIMIT 1")->fetchColumn(),
+            'pembatalan'=>(int)$db->query("SELECT x.pinjaman_id FROM pengajuan_pembatalan_angsuran pb JOIN angsuran x ON x.id=pb.angsuran_id WHERE pb.status='menunggu' ORDER BY pb.id DESC LIMIT 1")->fetchColumn(),
+            'pembayaran_denda'=>(int)$db->query("SELECT pinjaman_id FROM layanan_bayar_denda WHERE approved_by IS NULL ORDER BY id DESC LIMIT 1")->fetchColumn(),
+        ];
         foreach (['hapus_denda'=>'layanan_pengajuan_hapus_denda','pelunasan_dini'=>'layanan_pelunasan','jaminan_kembali'=>'layanan_jaminan_kembali','prioritas'=>'layanan_prioritas','laporan_macet'=>'layanan_laporan_macet'] as $key=>$table) {
             $hasil['detail'][$key]=(int)$db->query("SELECT pinjaman_id FROM $table WHERE status='menunggu' ORDER BY id DESC LIMIT 1")->fetchColumn();
         }

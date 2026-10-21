@@ -62,11 +62,12 @@ $params = [];
 
 // Add date filter (optional)
 if (!empty($start_date) && !empty($end_date)) {
-    $query .= " AND (a.tanggal_jatuh_tempo BETWEEN :start_date AND :end_date 
-                OR a.tanggal_bayar BETWEEN :start_date AND :end_date
-                OR a.tanggal_jatuh_tempo IS NOT NULL)";
-    $params[':start_date'] = $start_date;
-    $params[':end_date'] = $end_date;
+    $query .= " AND (a.tanggal_jatuh_tempo BETWEEN :tanggal_mulai AND :tanggal_selesai
+                OR a.tanggal_bayar BETWEEN :bayar_mulai AND :bayar_selesai)";
+    $params[':tanggal_mulai'] = $start_date;
+    $params[':tanggal_selesai'] = $end_date;
+    $params[':bayar_mulai'] = $start_date;
+    $params[':bayar_selesai'] = $end_date;
 }
 
 // Add status filter

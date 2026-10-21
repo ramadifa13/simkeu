@@ -315,7 +315,7 @@ $kolom_hari = "COALESCE(
     ) AS hari_angsuran,";
 $kolom_tanggal_belum = "(SELECT GROUP_CONCAT(DISTINCT DATE(ah3.tanggal_jatuh_tempo) ORDER BY ah3.tanggal_jatuh_tempo)
                            FROM angsuran ah3 WHERE ah3.pinjaman_id = p.id AND ah3.status <> 'lunas') AS tanggal_angsuran_belum,";
-$query_pinjaman = "SELECT p.*, a.nama_lengkap, a.kode_anggota, a.ktp, jp.nama_jenis, $kolom_hari $kolom_tanggal_belum
+$query_pinjaman = "SELECT p.*, a.nama_lengkap, a.kode_anggota, a.ktp, jp.nama_jenis, jp.memerlukan_jaminan, $kolom_hari $kolom_tanggal_belum
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) as total_angsuran,
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') as angsuran_lunas
                    FROM pinjaman p
@@ -617,7 +617,7 @@ function formatRupiah($angka) {
                                 <small class="text-muted"><?php echo count($pinjaman_list); ?> pinjaman</small>
                             </div>
                             <div class="card-body">
-                                <div class="mb-3 d-flex flex-wrap gap-1">
+                                <div class="mb-3 ui-loan-filters d-flex flex-wrap gap-2">
                                     <?php
                                     $chips = isAdmin()
                                         ? array('menunggu' => array('Pengajuan Pembatalan', 'warning'))
@@ -630,7 +630,7 @@ function formatRupiah($angka) {
                                     </a>
                                     <?php endforeach; ?>
                                 </div>
-                                <div class="mb-3 d-flex flex-wrap gap-1 align-items-center">
+                                <div class="mb-3 ui-loan-days d-flex flex-wrap gap-2 align-items-center">
                                     <small class="text-muted me-1">Hari angsuran:</small>
                                     <a href="angsuran.php<?php echo $qs_pb ? '?' . ltrim($qs_pb, '&') : ''; ?>" class="btn btn-sm <?php echo !$filter_hari ? 'btn-primary' : 'btn-outline-primary'; ?>">Semua</a>
                                     <?php foreach (daftarHariAngsuran() as $no => $nama_hari): ?>
@@ -640,7 +640,7 @@ function formatRupiah($angka) {
                                     </a>
                                     <?php endforeach; ?>
                                 </div>
-                                <label for="cariPinjaman" class="form-label">Cari nasabah (NIK / nama / kode)</label><input id="cariPinjaman" type="search" class="form-control mb-3" placeholder="Ketik NIK atau nama nasabah">
+                                <div class="ui-loan-search mb-3"><label for="cariPinjaman" class="form-label"><i class="fas fa-search me-1"></i>Cari nasabah <span>(NIK, nama, atau kode)</span></label><div class="ui-search-control"><i class="fas fa-search" aria-hidden="true"></i><input id="cariPinjaman" type="search" class="form-control" placeholder="Ketik NIK, nama, atau kode anggota"><button type="button" class="ui-search-clear" id="clearCariPinjaman" aria-label="Hapus pencarian" hidden><i class="fas fa-times"></i></button></div></div>
                                 <div class="loan-list">
                                     <?php if (empty($pinjaman_list)): ?>
                                     <div class="text-center py-4">
@@ -649,7 +649,7 @@ function formatRupiah($angka) {
                                         <p class="text-muted"><?php echo $filter_hari ? 'Tidak ada angsuran yang jatuh tempo pada tanggal yang dipilih.' : 'Tidak ada pinjaman yang memiliki angsuran.'; ?></p>
                                     </div>
                                     <?php else: ?>
-                                    <div class="list-group">
+                                    <div class="list-group ui-loan-list">
                                         <?php foreach ($pinjaman_list as $pinjaman): 
                                             $progress = $pinjaman['total_angsuran'] > 0 ? ($pinjaman['angsuran_lunas'] / $pinjaman['total_angsuran'] * 100) : 0;
                                         ?>
@@ -675,25 +675,26 @@ function formatRupiah($angka) {
                                                     </small>
                                                 </div>
                                             </div>
-                                            <p class="mb-1"><?php echo $pinjaman['nama_lengkap']; ?></p>
+                                            <p class="mb-1 ui-loan-member"><strong><?php echo htmlspecialchars($pinjaman['nama_lengkap'], ENT_QUOTES, 'UTF-8'); ?></strong> <small>(<?php echo htmlspecialchars($pinjaman['kode_anggota'], ENT_QUOTES, 'UTF-8'); ?>)</small> <span class="badge rounded-pill bg-<?php echo !empty($pinjaman['memerlukan_jaminan']) ? 'warning text-dark' : 'light text-secondary'; ?>"><?php echo !empty($pinjaman['memerlukan_jaminan']) ? 'AGTJ · Gadai' : 'AGT · Tanpa jaminan'; ?></span></p>
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <small class="<?php echo isset($_GET['pinjaman_id']) && $_GET['pinjaman_id'] == $pinjaman['id'] ? 'text-light' : 'text-muted'; ?>">
                                                     <?php echo formatRupiah($pinjaman['jumlah_pinjaman']); ?> | 
                                                     Sisa: <?php echo formatRupiah($pinjaman['sisa_pokok']); ?>
                                                 </small>
                                                 <small class="<?php echo isset($_GET['pinjaman_id']) && $_GET['pinjaman_id'] == $pinjaman['id'] ? 'text-light' : 'text-muted'; ?>">
-                                                    <?php echo $pinjaman['angsuran_lunas']; ?>/<?php echo $pinjaman['total_angsuran']; ?>
+                                                    <?php echo $pinjaman['angsuran_lunas']; ?> dari <?php echo $pinjaman['total_angsuran']; ?> selesai
                                                 </small>
                                             </div>
                                             <div class="progress">
                                                 <div class="progress-bar bg-success" style="width: <?php echo $progress; ?>%"></div>
                                             </div>
+                                            <?php if ($pinjaman['status'] !== 'lunas'): ?><span class="ui-loan-open"><i class="fas fa-arrow-right"></i> Lihat angsuran</span><?php endif; ?>
                                         </a>
                                         <?php if ($pinjaman['total_angsuran'] > 0 && $pinjaman['angsuran_lunas'] == $pinjaman['total_angsuran']): ?>
-                                        <div class="list-group-item py-1 text-end bg-light">
+                                        <div class="list-group-item ui-loan-action py-2 text-end">
                                             <a class="btn btn-sm btn-success" target="_blank" rel="noopener"
                                                href="cetak_bukti_pelunasan.php?id=<?php echo (int) $pinjaman['id']; ?>">
-                                                <i class="fas fa-print me-1"></i>Cetak Bukti Pelunasan
+                                                <i class="fas fa-receipt me-1"></i>Bukti Pelunasan
                                             </a>
                                         </div>
                                         <?php endif; ?>
@@ -1117,6 +1118,6 @@ function formatRupiah($angka) {
         });
     </script>
 <?php if (isTeller()) { tandaiKeputusanPembatalanDilihat($db, $_SESSION['user_id']); } ?>
-<script>document.getElementById("cariPinjaman").addEventListener("input",function(){const q=this.value.toLocaleLowerCase("id");document.querySelectorAll(".loan-list .list-group-item-action").forEach(function(a){a.hidden=!(a.textContent+" "+a.dataset.nik).toLocaleLowerCase("id").includes(q);});});</script>
+<script>const cariPinjaman=document.getElementById("cariPinjaman"),clearCariPinjaman=document.getElementById("clearCariPinjaman");cariPinjaman.addEventListener("input",function(){const q=this.value.toLocaleLowerCase("id");clearCariPinjaman.hidden=!q;document.querySelectorAll(".loan-list .list-group-item-action").forEach(function(a){a.hidden=!(a.textContent+" "+a.dataset.nik).toLocaleLowerCase("id").includes(q);});});clearCariPinjaman.addEventListener("click",function(){cariPinjaman.value="";cariPinjaman.dispatchEvent(new Event("input"));cariPinjaman.focus();});</script>
 </body>
 </html>
