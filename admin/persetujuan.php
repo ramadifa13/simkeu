@@ -83,9 +83,9 @@ $filter_tanggal_mulai = $_GET['tanggal_mulai'] ?? '';
 $filter_tanggal_selesai = $_GET['tanggal_selesai'] ?? '';
 
 // Build query with filters
-$query = "SELECT pp.*, a.nama_lengkap,
+$query = "SELECT pp.*, a.nama_lengkap, a.foto_ktp, a.foto_kk, a.foto_ktp_pasangan,
           CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
-          jp.nama_jenis,
+          jp.nama_jenis, jp.memerlukan_jaminan,
           (SELECT COUNT(*) FROM pinjaman pj WHERE pj.pengajuan_id = pp.id) AS sudah_cair,
           jp.maksimal_pinjaman, u.nama_lengkap as admin_name
           FROM pengajuan_pinjaman pp
@@ -157,6 +157,9 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             border-radius: 10px;
             padding: 1.5rem;
         }
+        .document-card { height: 100%; border: 1px solid #dee2e6; border-radius: .5rem; padding: .75rem; background: #f8f9fa; }
+        .document-card img { width: 100%; height: 160px; object-fit: contain; background: #fff; border: 1px solid #dee2e6; border-radius: .375rem; }
+        .document-empty { height: 160px; display: flex; align-items: center; justify-content: center; text-align: center; color: #842029; background: #f8d7da; border-radius: .375rem; }
     </style>
 </head>
 <body>
@@ -374,6 +377,13 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                             <small class="text-muted"><?php echo date('H:i', strtotime($pengajuan['tanggal_pengajuan'])); ?></small>
                                         </td>
                                         <td class="table-actions">
+                                            <?php
+                                            $dokumen_detail = [
+                                                'foto_ktp' => urlDokumenAnggota($pengajuan['foto_ktp']),
+                                                'foto_kk' => urlDokumenAnggota($pengajuan['foto_kk']),
+                                                'foto_ktp_pasangan' => urlDokumenAnggota($pengajuan['foto_ktp_pasangan']),
+                                            ];
+                                            ?>
                                             <!-- View Details Button -->
                                             <button class="btn btn-sm btn-info" data-bs-toggle="modal" 
                                                     data-bs-target="#detailModal" 
@@ -388,6 +398,8 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     data-status="<?php echo $pengajuan['status']; ?>"
                                                     data-tanggal="<?php echo date('d/m/Y H:i', strtotime($pengajuan['tanggal_pengajuan'])); ?>"
                                                     data-catatan="<?php echo $pengajuan['catatan_admin']; ?>"
+                                                    data-jaminan="<?php echo !empty($pengajuan['memerlukan_jaminan']) ? '1' : '0'; ?>"
+                                                    data-dokumen="<?php echo htmlspecialchars(json_encode($dokumen_detail), ENT_QUOTES, 'UTF-8'); ?>"
                                                     title="Detail">
                                                 <i class="fas fa-eye"></i>
                                             </button>
@@ -509,6 +521,14 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                 <div id="detail_catatan" class="p-2 bg-light rounded"></div>
                             </div>
                         </div>
+                    </div>
+                    <div class="border-top pt-3 mt-1">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label fw-bold mb-0">Kelengkapan Dokumen Anggota</label>
+                            <span id="detail_dokumen_status" class="badge bg-secondary">Memeriksa</span>
+                        </div>
+                        <div id="detail_dokumen_info" class="small text-muted mb-3"></div>
+                        <div id="detail_dokumen" class="row g-3"></div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -641,6 +661,52 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             document.getElementById('detail_tujuan').textContent = button.getAttribute('data-tujuan') || '-';
             document.getElementById('detail_tanggal').textContent = button.getAttribute('data-tanggal');
             document.getElementById('detail_catatan').textContent = button.getAttribute('data-catatan') || '-';
+
+            var denganJaminan = button.getAttribute('data-jaminan') === '1';
+            var dokumen = {};
+            try { dokumen = JSON.parse(button.getAttribute('data-dokumen') || '{}'); } catch (e) { dokumen = {}; }
+            var daftar = denganJaminan
+                ? [['foto_ktp', 'Foto KTP']]
+                : [['foto_ktp', 'Foto KTP'], ['foto_kk', 'Foto Kartu Keluarga (KK)'], ['foto_ktp_pasangan', 'Foto KTP Suami/Istri']];
+            var wadah = document.getElementById('detail_dokumen');
+            wadah.replaceChildren();
+            var lengkap = true;
+            daftar.forEach(function (item) {
+                var url = dokumen[item[0]] || '';
+                if (!url) lengkap = false;
+                var kolom = document.createElement('div');
+                kolom.className = 'col-md-' + (daftar.length === 1 ? '12' : '4');
+                var kartu = document.createElement('div');
+                kartu.className = 'document-card';
+                var judul = document.createElement('div');
+                judul.className = 'fw-semibold mb-2';
+                judul.textContent = item[1];
+                kartu.appendChild(judul);
+                if (url) {
+                    var tautan = document.createElement('a');
+                    tautan.href = url;
+                    tautan.target = '_blank';
+                    tautan.rel = 'noopener noreferrer';
+                    var gambar = document.createElement('img');
+                    gambar.src = url;
+                    gambar.alt = item[1];
+                    tautan.appendChild(gambar);
+                    kartu.appendChild(tautan);
+                } else {
+                    var kosong = document.createElement('div');
+                    kosong.className = 'document-empty';
+                    kosong.textContent = item[1] + ' belum tersedia';
+                    kartu.appendChild(kosong);
+                }
+                kolom.appendChild(kartu);
+                wadah.appendChild(kolom);
+            });
+            document.getElementById('detail_dokumen_info').textContent = denganJaminan
+                ? 'Pinjaman dengan jaminan: dokumen wajib berupa KTP.'
+                : 'Pinjaman tanpa jaminan: dokumen wajib berupa KTP, KK, dan KTP suami/istri.';
+            var statusDokumen = document.getElementById('detail_dokumen_status');
+            statusDokumen.className = 'badge bg-' + (lengkap ? 'success' : 'danger');
+            statusDokumen.textContent = lengkap ? 'Dokumen lengkap' : 'Dokumen belum lengkap';
         });
 
         // Approve Modal

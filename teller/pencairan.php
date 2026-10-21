@@ -222,10 +222,15 @@ $query = "SELECT pp.*, a.nama_lengkap,
           OR (pp.status = '' AND pp.tanggal_persetujuan IS NOT NULL))";
 $params_filter = [];
 if ($filter_cari !== '') {
-    $query .= " AND (a.nama_lengkap LIKE :cari OR a.kode_anggota LIKE :cari
-                OR COALESCE(a.kode_anggota_jaminan, '') LIKE :cari
-                OR pp.kode_pengajuan LIKE :cari OR COALESCE(p.kode_pinjaman, '') LIKE :cari)";
-    $params_filter[':cari'] = '%' . $filter_cari . '%';
+    $query .= " AND (a.nama_lengkap LIKE :cari_nama OR a.kode_anggota LIKE :cari_kode
+                OR COALESCE(a.kode_anggota_jaminan, '') LIKE :cari_kode_jaminan
+                OR pp.kode_pengajuan LIKE :cari_pengajuan OR COALESCE(p.kode_pinjaman, '') LIKE :cari_pinjaman)";
+    $nilai_cari = '%' . $filter_cari . '%';
+    $params_filter[':cari_nama'] = $nilai_cari;
+    $params_filter[':cari_kode'] = $nilai_cari;
+    $params_filter[':cari_kode_jaminan'] = $nilai_cari;
+    $params_filter[':cari_pengajuan'] = $nilai_cari;
+    $params_filter[':cari_pinjaman'] = $nilai_cari;
 }
 if ($filter_tanggal_mulai !== '') {
     $query .= " AND p.tanggal_pencairan >= :tanggal_mulai";
@@ -590,6 +595,11 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                                     data-ringkas="<?php echo htmlspecialchars(labelTenorRow($pengajuan) . ' | ' . ringkasanAngsuran(hitungDariPinjaman($pengajuan))); ?>">
                                                 <i class="fas fa-hand-holding-usd me-1"></i>Proses Pencairan
                                             </button>
+                                            <a class="btn btn-sm btn-outline-primary btn-action" target="_blank" rel="noopener"
+                                               href="cetak_draft_perjanjian.php?id=<?php echo (int)$pengajuan['id']; ?>"
+                                               title="Cetak surat perjanjian sebelum pencairan">
+                                                <i class="fas fa-file-contract me-1"></i>Perjanjian
+                                            </a>
                                             <?php endif; ?>
                                             <?php if (!empty($pengajuan['foto_pencairan'])): ?>
                                             <button class="btn btn-sm btn-outline-secondary btn-action" type="button"

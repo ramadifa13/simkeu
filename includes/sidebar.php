@@ -216,18 +216,12 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                     <i class="fas fa-users me-2"></i> Data Anggota
                     <i class="fas fa-chevron-down float-end"></i>
                 </a>
-                <div class="collapse <?php echo in_array($current_page, ['anggota.php', 'tambah_anggota.php']) ? 'show' : ''; ?>" id="menuAnggota">
+                <div class="collapse <?php echo $current_page === 'anggota.php' ? 'show' : ''; ?>" id="menuAnggota">
                     <ul class="nav flex-column ms-3 mt-1">
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'anggota.php' ? 'active text-white' : ''; ?>" 
                                href="anggota.php">
                                 <i class="fas fa-list me-2"></i> Daftar
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'tambah_anggota.php' ? 'active text-white' : ''; ?>" 
-                               href="tambah_anggota.php">
-                                <i class="fas fa-user-plus me-2"></i> Tambah
                             </a>
                         </li>
                     </ul>

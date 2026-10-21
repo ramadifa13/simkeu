@@ -11,7 +11,8 @@ $kode_jaminan_otomatis = buatKodeAnggotaJaminan($db);
 
 // Handle form actions
 if ($_POST) {
-    if (isset($_POST['add'])) {
+    if (($_POST['aksi'] ?? '') === 'add') {
+        $tambah_berhasil = false;
         // Kode dibuat server (kiriman form diabaikan); dikunci sampai selesai simpan agar tidak kembar
         kunciKodeAnggota($db);
         $kategori_anggota = ($_POST['kategori_anggota'] ?? 'biasa') === 'jaminan' ? 'jaminan' : 'biasa';
@@ -32,6 +33,7 @@ if ($_POST) {
         $foto_ktp = null; // diisi simpanDokumenAnggota()
         
         try {
+            layananValidasiToken();
             $db->beginTransaction();
             list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, 0, $kategori_shu_input, $ketua_kelompok_input);
             
@@ -116,11 +118,18 @@ if ($_POST) {
             
             $db->commit();
             $_SESSION['success'] = "Anggota berhasil ditambahkan. Password default: 123456";
-        } catch (Exception $e) {
-            $db->rollBack();
+            $tambah_berhasil = true;
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
             $_SESSION['error'] = "Gagal menambahkan anggota: " . $e->getMessage();
         }
         lepasKodeAnggota($db);
+        if ($tambah_berhasil) {
+            header('Location: anggota.php');
+            exit();
+        }
     }
     
     if (isset($_POST['edit'])) {
@@ -281,6 +290,8 @@ $query_stats = "SELECT
 $stmt_stats = $db->prepare($query_stats);
 $stmt_stats->execute();
 $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
+$buka_modal_tambah = isset($_GET['tambah'])
+    || ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['aksi'] ?? '') === 'add');
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -597,6 +608,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
+                    <input type="hidden" name="aksi" value="add">
                     <div class="modal-header">
                         <h5 class="modal-title">Tambah Anggota Baru</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -893,7 +905,10 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
 
         // Auto-generate kode anggota
         document.addEventListener('DOMContentLoaded', function() {
-            // You can add auto-generation logic here if needed
+            <?php if ($buka_modal_tambah): ?>
+            var addModal = document.getElementById('addModal');
+            if (addModal) bootstrap.Modal.getOrCreateInstance(addModal).show();
+            <?php endif; ?>
         });
     </script>
 </body>

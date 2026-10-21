@@ -46,6 +46,13 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
             throw new Exception("Jenis pinjaman tidak valid atau tidak aktif");
         }
         $kategori_gadai = !empty($jenis_info['memerlukan_jaminan']) ? 1 : 0;
+        // Hak SHU mengikuti jenis pinjaman, bukan awalan kode anggota:
+        // pinjaman gadai tidak mendapat SHU, sedangkan pinjaman tanpa jaminan
+        // tetap dapat memilih peran SHU/ketua termasuk untuk anggota AGTJ.
+        if ($kategori_gadai) {
+            $kategori_shu_input = 'anggota';
+            $ketua_kelompok_input = 0;
+        }
 
         // Kunci baris anggota agar dua pengajuan bersamaan tidak lolos validasi.
         $stmt_anggota_kunci = $db->prepare("SELECT id, kode_anggota, kode_anggota_jaminan, status
@@ -877,16 +884,19 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             const kategori = document.getElementById('kategori_shu_pengajuan');
             const ketua = document.getElementById('ketua_kelompok_id');
             const shuWrap = document.getElementById('shuPengajuanWrap');
-            const isAgtj = opt && (/^AGTJ/i.test(opt.getAttribute('data-kode-utama') || '') || /^AGTJ/i.test(opt.getAttribute('data-kode-jaminan') || ''));
+            const jenis = document.getElementById('jenisPinjamanSelect');
+            const jenisOpt = jenis && jenis.selectedOptions[0];
+            const gadai = !!(jenisOpt && jenisOpt.value && jenisOpt.getAttribute('data-jaminan') === '1');
             if (ambilProfil && opt && opt.value) {
                 kategori.value = opt.getAttribute('data-kategori-shu') || 'anggota';
                 ketua.value = opt.getAttribute('data-ketua-id') || '';
             }
-            if (shuWrap) shuWrap.style.display = isAgtj ? 'none' : '';
-            if (isAgtj) { kategori.value = 'anggota'; ketua.value = ''; }
-            const sebagaiKetua = !isAgtj && kategori.value === 'ketua_kelompok';
+            if (shuWrap) shuWrap.style.display = gadai ? 'none' : '';
+            if (gadai) { kategori.value = 'anggota'; ketua.value = ''; }
+            kategori.disabled = gadai;
+            const sebagaiKetua = !gadai && kategori.value === 'ketua_kelompok';
             document.getElementById('ketua_kelompok_wrap').style.display = sebagaiKetua ? 'none' : '';
-            ketua.disabled = sebagaiKetua;
+            ketua.disabled = gadai || sebagaiKetua;
             if (sebagaiKetua) ketua.value = '';
         }
         document.getElementById('anggotaSelect').addEventListener('change', function(){ sesuaikanPeranShu(true); });
@@ -910,6 +920,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 document.querySelectorAll('.kategori-jaminan, .jaminan-common-required, .detail-required').forEach(function (el) { el.required = false; });
                 document.getElementById('hariAngsuranGroup').style.display = '';
                 document.getElementById('hariAngsuranGroup').querySelector('select').required = true;
+                sesuaikanPeranShu(true);
                 updateCalculation();
                 return;
             }
@@ -954,6 +965,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             if (wajibJaminan) {
                 hariSelect.value = '';
             }
+            sesuaikanPeranShu(true);
 
             updateCalculation();
         });
