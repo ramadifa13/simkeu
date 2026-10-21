@@ -157,6 +157,33 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('button[data-bs-toggle="modal"],a[data-bs-toggle="modal"]').forEach(function(button){
         if(!button.textContent.trim()&&!button.hasAttribute('aria-label'))button.setAttribute('aria-label',button.title || 'Buka detail');
     });
+    // Semua thumbnail/pratinjau dokumen memakai penampil gambar yang sama.
+    // Delegasi event membuat preview hasil pemilihan file yang muncul belakangan ikut aktif.
+    const previewSelector='.document-preview-image,.thumb-dokumen,img.img-thumbnail,img[id*="preview" i],img[id^="fotoJaminan"],img[data-image-preview],#modalDokumenGambar';
+    let imageViewer=null,imageViewerImg=null,imageViewerTitle=null,imageScale=1,imageX=0,imageY=0,imageDragging=false,imageStartX=0,imageStartY=0,imageOriginX=0,imageOriginY=0,imageLastFocus=null;
+    function applyImageTransform(){if(imageViewerImg)imageViewerImg.style.transform='translate('+imageX+'px,'+imageY+'px) scale('+imageScale+')';if(imageViewer)imageViewer.querySelector('[data-viewer-zoom]').textContent=Math.round(imageScale*100)+'%';}
+    function setImageScale(next){imageScale=Math.min(5,Math.max(.5,next));if(imageScale<=1){imageX=0;imageY=0;}applyImageTransform();}
+    function closeImageViewer(){if(!imageViewer||imageViewer.hidden)return;imageViewer.hidden=true;document.body.classList.remove('ui-image-viewer-open');imageViewerImg.removeAttribute('src');if(imageLastFocus&&document.contains(imageLastFocus))imageLastFocus.focus();}
+    function ensureImageViewer(){
+        if(imageViewer)return;
+        imageViewer=document.createElement('div');imageViewer.className='ui-image-viewer';imageViewer.hidden=true;imageViewer.setAttribute('role','dialog');imageViewer.setAttribute('aria-modal','true');imageViewer.setAttribute('aria-labelledby','uiImageViewerTitle');
+        imageViewer.innerHTML='<div class="ui-image-viewer-head"><strong id="uiImageViewerTitle">Pratinjau gambar</strong><div class="ui-image-viewer-actions"><button type="button" data-viewer-action="out" aria-label="Perkecil gambar" title="Perkecil">&minus;</button><span data-viewer-zoom>100%</span><button type="button" data-viewer-action="in" aria-label="Perbesar gambar" title="Perbesar">+</button><button type="button" data-viewer-action="reset" aria-label="Ukuran semula" title="Ukuran semula">100%</button><button type="button" data-viewer-action="close" aria-label="Tutup pratinjau" title="Tutup">&times;</button></div></div><div class="ui-image-viewer-stage"><img alt=""></div><small class="ui-image-viewer-help">Klik dua kali atau gunakan roda mouse untuk zoom. Geser gambar saat diperbesar.</small>';
+        document.body.appendChild(imageViewer);imageViewerImg=imageViewer.querySelector('img');imageViewerTitle=imageViewer.querySelector('strong');
+        imageViewer.addEventListener('click',function(e){const action=e.target.closest('[data-viewer-action]')?.dataset.viewerAction;if(action==='close')closeImageViewer();else if(action==='in')setImageScale(imageScale+.25);else if(action==='out')setImageScale(imageScale-.25);else if(action==='reset'){imageScale=1;imageX=0;imageY=0;applyImageTransform();}else if(e.target===imageViewer)closeImageViewer();});
+        imageViewerImg.addEventListener('dblclick',function(){setImageScale(imageScale===1?2:1);});
+        imageViewer.querySelector('.ui-image-viewer-stage').addEventListener('wheel',function(e){e.preventDefault();setImageScale(imageScale+(e.deltaY<0?.25:-.25));},{passive:false});
+        imageViewerImg.addEventListener('pointerdown',function(e){if(imageScale<=1)return;imageDragging=true;imageStartX=e.clientX;imageStartY=e.clientY;imageOriginX=imageX;imageOriginY=imageY;imageViewerImg.setPointerCapture(e.pointerId);imageViewerImg.classList.add('is-dragging');});
+        imageViewerImg.addEventListener('pointermove',function(e){if(!imageDragging)return;imageX=imageOriginX+e.clientX-imageStartX;imageY=imageOriginY+e.clientY-imageStartY;applyImageTransform();});
+        imageViewerImg.addEventListener('pointerup',function(){imageDragging=false;imageViewerImg.classList.remove('is-dragging');});
+    }
+    function openImageViewer(img){
+        if(!img.currentSrc&&!img.src)return;ensureImageViewer();imageLastFocus=img;imageScale=1;imageX=0;imageY=0;
+        imageViewerImg.src=img.currentSrc||img.src;imageViewerImg.alt=img.alt||'Pratinjau gambar';imageViewerTitle.textContent=img.alt||img.title||'Pratinjau gambar';applyImageTransform();imageViewer.hidden=false;document.body.classList.add('ui-image-viewer-open');imageViewer.querySelector('[data-viewer-action="close"]').focus();
+    }
+    document.addEventListener('click',function(e){const img=e.target.closest&&e.target.closest(previewSelector);if(!img||img.classList.contains('d-none')||!img.src)return;e.preventDefault();e.stopImmediatePropagation();openImageViewer(img);},true);
+    document.addEventListener('keydown',function(e){if(!imageViewer||imageViewer.hidden)return;if(e.key==='Escape'){e.preventDefault();closeImageViewer();}else if(e.key==='+'||e.key==='='){e.preventDefault();setImageScale(imageScale+.25);}else if(e.key==='-'){e.preventDefault();setImageScale(imageScale-.25);}else if(e.key==='0'){e.preventDefault();setImageScale(1);}});
+    document.querySelectorAll(previewSelector).forEach(function(img){img.tabIndex=img.tabIndex>=0?img.tabIndex:0;img.setAttribute('role','button');img.setAttribute('aria-label','Perbesar '+(img.alt||'gambar'));});
+    document.addEventListener('keydown',function(e){if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches(previewSelector)){e.preventDefault();openImageViewer(e.target);}});
     // Icon actions need an understandable name outside the visual icon font.
     document.querySelectorAll('main button,main a.btn').forEach(button=>{
         if(button.textContent.trim() || button.hasAttribute('aria-label'))return;

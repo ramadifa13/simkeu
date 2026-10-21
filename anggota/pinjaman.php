@@ -23,6 +23,11 @@ $filter_status = $_GET['status'] ?? '';
 
 // Get pinjaman dengan perhitungan sisa yang benar (termasuk bunga)
 $query_pinjaman = "SELECT p.*, jp.nama_jenis, jp.memerlukan_jaminan,
+                          jk.status_jaminan,
+                          lk.status AS status_pengembalian_jaminan,
+                          lk.alasan AS alasan_pengembalian_jaminan,
+                          lk.catatan_admin AS catatan_admin_pengembalian,
+                          lk.diperiksa_at AS tanggal_status_pengembalian,
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') as angsuran_lunas,
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) as total_angsuran,
                           (SELECT COALESCE(SUM(pokok), 0) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') as total_pokok_dibayar,
@@ -30,7 +35,9 @@ $query_pinjaman = "SELECT p.*, jp.nama_jenis, jp.memerlukan_jaminan,
                           (SELECT COALESCE(SUM(denda), 0) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') as total_denda_dibayar,
                           (SELECT COALESCE(SUM(bunga), 0) FROM angsuran WHERE pinjaman_id = p.id AND status != 'lunas') as sisa_bunga
                    FROM pinjaman p 
-                   JOIN jenis_pinjaman jp ON p.jenis_pinjaman_id = jp.id 
+                   JOIN jenis_pinjaman jp ON p.jenis_pinjaman_id = jp.id
+                   LEFT JOIN jaminan_pinjaman jk ON jk.pinjaman_id = p.id
+                   LEFT JOIN layanan_jaminan_kembali lk ON lk.pinjaman_id = p.id
                    WHERE p.anggota_id = :anggota_id 
                    ORDER BY p.tanggal_pencairan DESC";
 $stmt_pinjaman = $db->prepare($query_pinjaman);
@@ -465,6 +472,18 @@ unset($daftar_lunas);
                                     <div class="row">
                                         <?php foreach ($kelompok['data'] as $pinjaman):
                                             $status_class = $pinjaman['status'] == 'aktif' ? 'success' : ($pinjaman['status'] == 'lunas' ? 'secondary' : 'danger');
+                                            $status_pengembalian = strtolower((string) ($pinjaman['status_pengembalian_jaminan'] ?? ''));
+                                            $label_pengembalian = [
+                                                'menunggu' => 'Menunggu pemeriksaan Admin',
+                                                'pengecekan' => 'Sedang diperiksa Admin',
+                                                'disetujui' => 'Disetujui, jaminan siap diambil',
+                                                'ditolak' => 'Ditolak',
+                                                'diserahkan' => 'Jaminan sudah dikembalikan'
+                                            ][$status_pengembalian] ?? '';
+                                            $warna_pengembalian = [
+                                                'menunggu' => 'warning text-dark', 'pengecekan' => 'info text-dark',
+                                                'disetujui' => 'primary', 'ditolak' => 'danger', 'diserahkan' => 'success'
+                                            ][$status_pengembalian] ?? 'secondary';
                                             $pokok_dibayar = $pinjaman['total_pokok_dibayar'];
                                             
                                             $sisa_pokok_tampil = max(0, $pinjaman['sisa_pokok']);
@@ -526,6 +545,20 @@ unset($daftar_lunas);
                                                             <div class="fw-bold text-danger small"><?php echo formatRupiah($total_tagihan); ?></div>
                                                         </div>
                                                     </div>
+
+                                                    <?php if (!empty($pinjaman['memerlukan_jaminan'])): ?>
+                                                    <div class="alert alert-<?php echo strpos($warna_pengembalian, 'danger') !== false ? 'danger' : (strpos($warna_pengembalian, 'success') !== false ? 'success' : (strpos($warna_pengembalian, 'primary') !== false ? 'primary' : 'warning')); ?> py-2 px-3 mt-3 mb-0 small">
+                                                        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                                                            <strong><i class="fas fa-box-open me-1"></i> Pengembalian barang</strong>
+                                                            <?php if ($label_pengembalian): ?><span class="badge bg-<?php echo $warna_pengembalian; ?>"><?php echo htmlspecialchars($label_pengembalian); ?></span><?php else: ?><span class="badge bg-secondary">Belum diajukan</span><?php endif; ?>
+                                                        </div>
+                                                        <?php if ($status_pengembalian === 'ditolak'): ?>
+                                                            <div class="mt-2"><strong>Keterangan penolakan:</strong> <?php echo htmlspecialchars(trim((string) $pinjaman['catatan_admin_pengembalian']) ?: 'Tidak ada keterangan dari Admin.'); ?></div>
+                                                        <?php elseif ($status_pengembalian && !empty($pinjaman['catatan_admin_pengembalian'])): ?>
+                                                            <div class="mt-2"><strong>Keterangan Admin:</strong> <?php echo htmlspecialchars($pinjaman['catatan_admin_pengembalian']); ?></div>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <?php endif; ?>
                                                     
                                                     <?php if ($pinjaman['status'] == 'aktif'): ?>
                                                     <div class="mt-2">
@@ -723,6 +756,16 @@ unset($daftar_lunas);
             var sisa_pokok = Number(pinjaman.sisa_pokok) > 0 ? Number(pinjaman.sisa_pokok) : 0;
             var sisa_bunga = Number(pinjaman.sisa_bunga) || 0;
             var total_tagihan = sisa_pokok + sisa_bunga;
+            var status_pengembalian = pinjaman.status_pengembalian_jaminan || '';
+            var label_pengembalian = {
+                menunggu: 'Menunggu pemeriksaan Admin',
+                pengecekan: 'Sedang diperiksa Admin',
+                disetujui: 'Disetujui, jaminan siap diambil',
+                ditolak: 'Ditolak',
+                diserahkan: 'Jaminan sudah dikembalikan'
+            }[status_pengembalian] || 'Belum diajukan';
+            var warna_pengembalian = {menunggu:'warning text-dark',pengecekan:'info text-dark',disetujui:'primary',ditolak:'danger',diserahkan:'success'}[status_pengembalian] || 'secondary';
+            var catatan_pengembalian = escapeHtml(pinjaman.catatan_admin_pengembalian || '');
             
             var status_badge = '';
             if (pinjaman.status == 'aktif') {
@@ -864,6 +907,11 @@ unset($daftar_lunas);
                         </table>
                     </div>
                 </div>
+                ${Number(pinjaman.memerlukan_jaminan) ? `
+                <div class="alert ${status_pengembalian === 'ditolak' ? 'alert-danger' : (status_pengembalian === 'diserahkan' ? 'alert-success' : 'alert-info')} mt-3 mb-0">
+                    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap"><strong><i class="fas fa-box-open me-1"></i>Status pengembalian barang</strong><span class="badge bg-${warna_pengembalian}">${label_pengembalian}</span></div>
+                    ${status_pengembalian === 'ditolak' ? `<div class="mt-2"><strong>Keterangan penolakan:</strong> ${catatan_pengembalian || 'Tidak ada keterangan dari Admin.'}</div>` : (catatan_pengembalian ? `<div class="mt-2"><strong>Keterangan Admin:</strong> ${catatan_pengembalian}</div>` : '')}
+                </div>` : ''}
             `;
             
             document.getElementById('detailPinjamanContent').innerHTML = content;
@@ -877,6 +925,11 @@ unset($daftar_lunas);
                 return 'Rp 0';
             }
             return 'Rp ' + angka.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        }
+        function escapeHtml(value) {
+            return String(value).replace(/[&<>"']/g, function (char) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char];
+            });
         }
     </script>
 </body>

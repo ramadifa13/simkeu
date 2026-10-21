@@ -108,12 +108,13 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
             'anggota_jatuh_tempo'=>"SELECT COUNT(*) FROM angsuran a JOIN pinjaman p ON p.id=a.pinjaman_id WHERE p.anggota_id=? AND p.status='aktif' AND a.status<>'lunas' AND a.tanggal_jatuh_tempo BETWEEN CURDATE() AND DATE_ADD(CURDATE(),INTERVAL 7 DAY)",
             'anggota_terlambat'=>"SELECT COUNT(*) FROM angsuran a JOIN pinjaman p ON p.id=a.pinjaman_id WHERE p.anggota_id=? AND p.status='aktif' AND a.status<>'lunas' AND a.tanggal_jatuh_tempo<CURDATE()",
             'anggota_denda'=>"SELECT COUNT(*) FROM angsuran a JOIN pinjaman p ON p.id=a.pinjaman_id WHERE p.anggota_id=? AND a.status<>'lunas' AND a.denda>COALESCE((SELECT SUM(b.jumlah) FROM layanan_bayar_denda b WHERE b.angsuran_id=a.id),0)",
-            'anggota_jaminan'=>"SELECT COUNT(*) FROM layanan_jaminan_kembali k JOIN pinjaman p ON p.id=k.pinjaman_id WHERE p.anggota_id=? AND k.status='disetujui'",
+            'anggota_jaminan'=>"SELECT COUNT(*) FROM layanan_jaminan_kembali k JOIN pinjaman p ON p.id=k.pinjaman_id WHERE p.anggota_id=? AND k.status IN ('menunggu','pengecekan','disetujui','ditolak','diserahkan')",
         ];
         foreach($queries as $key=>$sql){$stmt=$db->prepare($sql);$stmt->execute([$anggotaId]);$hasil[$key]=(int)$stmt->fetchColumn();}
         $hasil['detail'] = [
             'anggota_pengajuan' => (int)$db->query("SELECT id FROM pengajuan_pinjaman WHERE anggota_id=".(int)$anggotaId." AND status='menunggu' ORDER BY id DESC LIMIT 1")->fetchColumn(),
             'anggota_pencairan' => (int)$db->query("SELECT pp.id FROM pengajuan_pinjaman pp WHERE pp.anggota_id=".(int)$anggotaId." AND pp.status='disetujui' AND NOT EXISTS(SELECT 1 FROM pinjaman p WHERE p.pengajuan_id=pp.id) ORDER BY pp.id DESC LIMIT 1")->fetchColumn(),
+            'anggota_jaminan' => (int)$db->query("SELECT k.pinjaman_id FROM layanan_jaminan_kembali k JOIN pinjaman p ON p.id=k.pinjaman_id WHERE p.anggota_id=".(int)$anggotaId." AND k.status IN ('menunggu','pengecekan','disetujui','ditolak','diserahkan') ORDER BY COALESCE(k.diperiksa_at,k.created_at) DESC,k.id DESC LIMIT 1")->fetchColumn(),
         ];
         $hasil['total']=array_sum(array_intersect_key($hasil,$queries));
         return $hasil;

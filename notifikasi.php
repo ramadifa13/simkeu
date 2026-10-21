@@ -44,7 +44,7 @@ $routes = [
 $destination = $routes[$role][$target] ?? ($role . '/dashboard.php');
 if ($detailId > 0) {
     $param = 'id';
-    if ($target === 'pembatalan' || in_array($target, ['jatuh_tempo','terlambat','denda_tertunggak','pembayaran_denda'], true)) $param = 'pinjaman_id';
+    if ($target === 'pembatalan' || in_array($target, ['jatuh_tempo','terlambat','denda_tertunggak','pembayaran_denda','anggota_jaminan'], true)) $param = 'pinjaman_id';
     if ($target === 'pencairan') $param = 'pengajuan_id';
     $destination .= (strpos($destination, '?') === false ? '?' : '&') . $param . '=' . $detailId;
 }

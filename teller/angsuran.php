@@ -153,7 +153,7 @@ if ($_POST) {
             $stmt_update->execute([':sisa_pokok' => $sisa_pokok_baru, ':status' => $status_pinjaman, ':pinjaman_id' => (int) $angsuran_data['pinjaman_id']]);
 
             // Semua cicilan lunas -> pinjaman lunas + catat tanggal lunas
-            tandaiLunasBilaSelesai($db, $angsuran_data['pinjaman_id']);
+            $pinjaman_selesai = tandaiLunasBilaSelesai($db, $angsuran_data['pinjaman_id']);
             
             // Hitung total pembayaran
             $dibayar_denda = $db->prepare('SELECT COALESCE(SUM(jumlah),0) FROM layanan_bayar_denda WHERE angsuran_id=?');
@@ -253,6 +253,7 @@ if ($_POST) {
             $_SESSION['success'] = "Pembayaran angsuran ke-" . $angsuran_data['angsuran_ke'] . " berhasil dicatat. Kas bertambah " . formatRupiah($total_bayar);
             
         } catch (Throwable $e) {
+            $pinjaman_selesai = false;
             if ($db->inTransaction()) $db->rollBack();
             if ($bukti_path) hapusFotoUpload($bukti_path);
             error_log('Gagal mencatat pembayaran angsuran: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
@@ -260,7 +261,7 @@ if ($_POST) {
         }
         
         // Redirect untuk menghindari resubmission
-        header("Location: angsuran.php" . (isset($_GET['pinjaman_id']) ? "?pinjaman_id=" . $_GET['pinjaman_id'] : ""));
+        header("Location: angsuran.php" . (empty($pinjaman_selesai) && isset($_GET['pinjaman_id']) ? "?pinjaman_id=" . (int) $_GET['pinjaman_id'] : ""));
         exit();
     }
 }
@@ -296,8 +297,8 @@ $query_pinjaman = "SELECT p.*, a.nama_lengkap, a.kode_anggota, a.ktp, jp.nama_je
                    FROM pinjaman p
                    JOIN anggota a ON p.anggota_id = a.id
                    JOIN jenis_pinjaman jp ON p.jenis_pinjaman_id = jp.id
-                   WHERE p.status IN ('aktif', 'lunas', 'macet')
-                   AND EXISTS (SELECT 1 FROM angsuran WHERE pinjaman_id = p.id)
+                   WHERE p.status IN ('aktif', 'macet')
+                   AND EXISTS (SELECT 1 FROM angsuran ax WHERE ax.pinjaman_id = p.id AND ax.status <> 'lunas')
                    ORDER BY p.tanggal_pencairan DESC";
 
 $stmt_pinjaman = $db->prepare($query_pinjaman);
@@ -383,6 +384,8 @@ if (isset($_GET['pinjaman_id'])) {
                        FROM angsuran a
                        JOIN pinjaman p ON a.pinjaman_id = p.id
                        WHERE a.pinjaman_id = :pinjaman_id
+                         AND p.status <> 'lunas'
+                         AND EXISTS (SELECT 1 FROM angsuran ax WHERE ax.pinjaman_id=p.id AND ax.status <> 'lunas')
                        ORDER BY a.angsuran_ke";
     $stmt_angsuran = $db->prepare($query_angsuran);
     $stmt_angsuran->bindParam(':pinjaman_id', $_GET['pinjaman_id']);

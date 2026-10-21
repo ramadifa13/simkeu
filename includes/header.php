@@ -89,7 +89,7 @@ if (isset($_SESSION['role']) && in_array($_SESSION['role'], ['admin', 'teller', 
                 ['anggota_jatuh_tempo', 'Angsuran jatuh tempo dalam 7 hari', '../notifikasi.php?target=anggota_jatuh_tempo', 'fa-calendar-day'],
                 ['anggota_terlambat', 'Angsuran melewati jatuh tempo', '../notifikasi.php?target=anggota_terlambat', 'fa-clock'],
                 ['anggota_denda', 'Tagihan denda belum lunas', '../notifikasi.php?target=anggota_denda', 'fa-triangle-exclamation'],
-                ['anggota_jaminan', 'Jaminan siap dikembalikan', '../notifikasi.php?target=anggota_jaminan', 'fa-box-open'],
+                ['anggota_jaminan', 'Status pengembalian barang AGTJ', '../notifikasi.php?target=anggota_jaminan', 'fa-box-open'],
             ];
         }
     } catch (Exception $e) {
@@ -118,7 +118,7 @@ if (isset($_SESSION['role']) && in_array($_SESSION['role'], ['admin', 'teller', 
                 <div class="ui-notification-list">
                     <?php foreach($headerNotifItems as [$key,$label,$href,$icon]): $count=(int)($headerNotif[$key] ?? 0); $detailId=(int)($headerNotif['detail'][$key] ?? 0); if($detailId>0) $href .= (strpos($href,'?')===false?'?':'&').'id='.$detailId; ?>
                     <a href="<?= htmlspecialchars($href, ENT_QUOTES) ?>" data-notif-row="<?= htmlspecialchars($key, ENT_QUOTES) ?>" data-notif-key="<?= htmlspecialchars($key, ENT_QUOTES) ?>" style="<?= $count<1?'display:none':'' ?>">
-                        <span class="ui-notification-icon"><i class="fas <?= htmlspecialchars($icon, ENT_QUOTES) ?>" aria-hidden="true"></i></span><span class="ui-notification-copy"><strong><?= htmlspecialchars($label) ?></strong><small>Perlu ditindaklanjuti</small></span>
+                        <span class="ui-notification-icon"><i class="fas <?= htmlspecialchars($icon, ENT_QUOTES) ?>" aria-hidden="true"></i></span><span class="ui-notification-copy"><strong><?= htmlspecialchars($label) ?></strong><small><?= ($_SESSION['role'] ?? '') === 'anggota' ? 'Lihat informasi status' : 'Perlu ditindaklanjuti' ?></small></span>
                         <span data-notif-pinjaman="<?= htmlspecialchars($key, ENT_QUOTES) ?>" class="badge rounded-pill bg-warning text-dark"><?= $count ?></span>
                     </a>
                     <?php endforeach; ?>
@@ -147,10 +147,10 @@ if (isset($_SESSION['role']) && in_array($_SESSION['role'], ['admin', 'teller'],
 </div>
 <?php endif; ?>
 
-<link rel="stylesheet" href="../assets/css/app-ui.css?v=20261021-6">
+<link rel="stylesheet" href="../assets/css/app-ui.css?v=20261022-1">
 <script>document.body.classList.add('ui-shell');</script>
 <script src="../assets/js/pilihan-foto.js?v=20261021-3" defer></script>
 <link rel="stylesheet" href="../assets/css/upload-foto.css?v=20261021-1">
 <link rel="stylesheet" href="../assets/css/tanda-tangan.css?v=20261021-1">
 <script src="../assets/js/brand.js?v=20261019-6" defer></script>
-<script src="../assets/js/app-ui.js?v=20261021-4" defer></script>
+<script src="../assets/js/app-ui.js?v=20261022-1" defer></script>
