@@ -491,8 +491,9 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                             <?php foreach ($anggota_list as $anggota): ?>
                                             <option value="<?php echo $anggota['id']; ?>"
                                                     data-kategori-shu="<?= htmlspecialchars($anggota['kategori_shu'] ?? 'anggota') ?>"
-                                                    data-ketua-id="<?= (int)($anggota['ketua_kelompok_id'] ?? 0) ?>">
-                                                <?php echo $anggota['kode_anggota'] . ' - ' . $anggota['nama_lengkap']; ?><?php echo $anggota['status'] !== 'aktif' ? ' (Nonaktif - akan diaktifkan saat pengajuan)' : ''; ?>
+                                                    data-ketua-id="<?= (int)($anggota['ketua_kelompok_id'] ?? 0) ?>"
+                                                    data-kode-jaminan="<?= htmlspecialchars($anggota['kode_anggota_jaminan'] ?? '') ?>">
+                                                <?php echo (!empty($anggota['kode_anggota_jaminan']) ? $anggota['kode_anggota_jaminan'] : $anggota['kode_anggota']) . ' - ' . $anggota['nama_lengkap']; ?><?php echo $anggota['status'] !== 'aktif' ? ' (Nonaktif - akan diaktifkan saat pengajuan)' : ''; ?>
                                             </option>
                                             <?php endforeach; ?>
                                         </select>
@@ -515,7 +516,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    <div class="row g-3 mb-3">
+                                    <div class="row g-3 mb-3" id="shuPengajuanWrap">
                                         <div class="col-md-6">
                                             <label class="form-label">Peran SHU pada pengajuan *</label>
                                             <select name="kategori_shu" id="kategori_shu_pengajuan" class="form-select" required>
@@ -876,11 +877,15 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             const opt = anggota && anggota.selectedOptions[0];
             const kategori = document.getElementById('kategori_shu_pengajuan');
             const ketua = document.getElementById('ketua_kelompok_id');
+            const shuWrap = document.getElementById('shuPengajuanWrap');
+            const isAgtj = opt && /^AGTJ/i.test(opt.getAttribute('data-kode-jaminan') || '');
             if (ambilProfil && opt && opt.value) {
                 kategori.value = opt.getAttribute('data-kategori-shu') || 'anggota';
                 ketua.value = opt.getAttribute('data-ketua-id') || '';
             }
-            const sebagaiKetua = kategori.value === 'ketua_kelompok';
+            if (shuWrap) shuWrap.style.display = isAgtj ? 'none' : '';
+            if (isAgtj) { kategori.value = 'anggota'; ketua.value = ''; }
+            const sebagaiKetua = !isAgtj && kategori.value === 'ketua_kelompok';
             document.getElementById('ketua_kelompok_wrap').style.display = sebagaiKetua ? 'none' : '';
             ketua.disabled = sebagaiKetua;
             if (sebagaiKetua) ketua.value = '';
