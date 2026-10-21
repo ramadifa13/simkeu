@@ -1093,6 +1093,28 @@ function formatRupiah($angka) {
         });
     </script>
 <?php if (isTeller()) { tandaiKeputusanPembatalanDilihat($db, $_SESSION['user_id']); } ?>
-<script>const cariPinjaman=document.getElementById("cariPinjaman"),clearCariPinjaman=document.getElementById("clearCariPinjaman");cariPinjaman.addEventListener("input",function(){const q=this.value.toLocaleLowerCase("id");clearCariPinjaman.hidden=!q;document.querySelectorAll(".loan-list .list-group-item-action").forEach(function(a){a.hidden=!(a.textContent+" "+a.dataset.nik).toLocaleLowerCase("id").includes(q);});});clearCariPinjaman.addEventListener("click",function(){cariPinjaman.value="";cariPinjaman.dispatchEvent(new Event("input"));cariPinjaman.focus();});</script>
+<script>
+const cariPinjaman=document.getElementById('cariPinjaman');
+const clearCariPinjaman=document.getElementById('clearCariPinjaman');
+const daftarPinjaman=document.querySelector('.ui-loan-list');
+if(cariPinjaman && daftarPinjaman){
+    let kosongCari=daftarPinjaman.querySelector('.ui-loan-search-empty');
+    if(!kosongCari){kosongCari=document.createElement('div');kosongCari.className='ui-loan-search-empty text-center text-muted py-4';kosongCari.innerHTML='<i class="fas fa-search me-1"></i>Nasabah tidak ditemukan';kosongCari.hidden=true;daftarPinjaman.appendChild(kosongCari);}
+    cariPinjaman.addEventListener('input',function(){
+        const q=this.value.trim().toLocaleLowerCase('id');
+        if(clearCariPinjaman) clearCariPinjaman.hidden=!q;
+        let terlihat=0;
+        daftarPinjaman.querySelectorAll(':scope > .list-group-item-action').forEach(function(a){
+            const cocok=!q || (a.textContent+' '+(a.dataset.nik||'')).toLocaleLowerCase('id').includes(q);
+            a.hidden=!cocok;
+            const aksi=a.nextElementSibling;
+            if(aksi && aksi.classList.contains('ui-loan-action')) aksi.hidden=!cocok;
+            if(cocok) terlihat++;
+        });
+        kosongCari.hidden=terlihat>0;
+    });
+}
+if(clearCariPinjaman && cariPinjaman){clearCariPinjaman.addEventListener('click',function(){cariPinjaman.value='';cariPinjaman.dispatchEvent(new Event('input'));cariPinjaman.focus();});}
+</script>
 </body>
 </html>

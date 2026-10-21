@@ -147,7 +147,7 @@ if (isset($_SESSION['role']) && in_array($_SESSION['role'], ['admin', 'teller'],
 </div>
 <?php endif; ?>
 
-<link rel="stylesheet" href="../assets/css/app-ui.css?v=20261021-4">
+<link rel="stylesheet" href="../assets/css/app-ui.css?v=20261021-6">
 <script>document.body.classList.add('ui-shell');</script>
 <script src="../assets/js/pilihan-foto.js?v=20261021-3" defer></script>
 <link rel="stylesheet" href="../assets/css/upload-foto.css?v=20261021-1">

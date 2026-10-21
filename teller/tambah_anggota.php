@@ -39,6 +39,12 @@ if ($_POST) {
 
         try {
             $db->beginTransaction();
+            // AGTJ tidak mengikuti pembagian SHU maupun struktur ketua kelompok.
+            // Kunci juga di server agar aturan tidak dapat dilewati lewat POST manual.
+            if ($kategori_anggota === 'jaminan') {
+                $kategori_shu_input = 'anggota';
+                $ketua_kelompok_input = 0;
+            }
             list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, 0, $kategori_shu_input, $ketua_kelompok_input);
 
             // Validasi dokumen (finfo, maks. 10 MB) sebelum data disimpan
@@ -616,11 +622,19 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 var label = kolom ? kolom.querySelector('.label-dokumen') : null;
                 if (label) label.textContent = label.dataset.label + (wajib ? ' *' : ' (opsional)');
             });
+            sesuaikanPeranShu();
         }
         if (kategori) kategori.addEventListener('change', sesuaikanKategoriAnggota);
         sesuaikanKategoriAnggota();
-        var peranShu=document.getElementById('kategori_shu'),ketuaWrap=document.getElementById('ketua_shu_wrap'),ketuaShu=document.getElementById('ketua_kelompok_id');
-        function sesuaikanPeranShu(){var ketua=peranShu&&peranShu.value==='ketua_kelompok';if(ketuaWrap)ketuaWrap.style.display=ketua?'none':'';if(ketuaShu){ketuaShu.disabled=ketua;if(ketua)ketuaShu.value='';}}
+        var peranShu=document.getElementById('kategori_shu'),shuFieldsWrap=peranShu?peranShu.closest('.row'):null,ketuaWrap=document.getElementById('ketua_shu_wrap'),ketuaShu=document.getElementById('ketua_kelompok_id');
+        function sesuaikanPeranShu(){
+            var jaminan=kategori&&kategori.value==='jaminan';
+            if(shuFieldsWrap)shuFieldsWrap.style.display=jaminan?'none':'';
+            if(peranShu){peranShu.disabled=jaminan;if(jaminan)peranShu.value='anggota';}
+            var ketua=!jaminan&&peranShu&&peranShu.value==='ketua_kelompok';
+            if(ketuaWrap)ketuaWrap.style.display=ketua?'none':'';
+            if(ketuaShu){ketuaShu.disabled=jaminan||ketua;if(jaminan||ketua)ketuaShu.value='';}
+        }
         if(peranShu)peranShu.addEventListener('change',sesuaikanPeranShu);sesuaikanPeranShu();
 
         function resetForm() {
