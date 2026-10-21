@@ -24,8 +24,10 @@ $koperasi = $db->query('SELECT * FROM koperasi WHERE id = 1')->fetch(PDO::FETCH_
 $e = function ($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); };
 $uang = function ($value) { return 'Rp ' . number_format($value, 0, ',', '.'); };
 $frekuensi = $p['frekuensi'] ?? 'bulanan';
-$tampilkanMinggu = !empty($p['memerlukan_jaminan']) && $frekuensi === 'mingguan';
+$tampilkanMinggu = !empty($p['memerlukan_jaminan'])
+    && ($frekuensi === 'mingguan' || ($frekuensi === 'bulanan' && !empty($tampilkanMingguBulanan)));
 $biayaMingguan = $tampilkanMinggu && function_exists('biayaMingguanGadai') ? biayaMingguanGadai($p['jumlah_pinjaman']) : 0;
+$jumlahMingguPerAngsuran = $frekuensi === 'bulanan' ? 4 : 1;
 $label = ['mingguan' => 'Mingguan', 'dua_mingguan' => 'Dua Mingguan', 'bulanan' => 'Bulanan'][$frekuensi] ?? 'Bulanan';
 $hari = [1 => 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 $hari_jadwal = [];
@@ -87,7 +89,7 @@ tr { break-inside: avoid; }
 <?php foreach ($jadwal as $row):
     $saldo -= (float) $row['pokok'];
     $total_pokok += (float) $row['pokok'];
-    $marginMinggu = $biayaMingguan ?: 0;
+    $marginMinggu = ($biayaMingguan ?: 0) * $jumlahMingguPerAngsuran;
     $marginDasar = max(0, (float) $row['bunga'] - $marginMinggu);
     $total_margin += $marginDasar;
     $total_minggu += $marginMinggu;

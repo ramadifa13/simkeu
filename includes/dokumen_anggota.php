@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/upload_foto.php';
+
 /**
  * Upload dokumen anggota (KTP, KK, KTP suami/istri).
  *
@@ -147,7 +149,8 @@ if (!function_exists('simpanDokumenAnggota')) {
         try {
             foreach ($dokumen as $field => $info) {
                 $nama = bin2hex(random_bytes(16)) . '.' . $info['ext'];
-                if (!move_uploaded_file($info['tmp'], $dir . '/' . $nama)) {
+                $destPath = $dir . '/' . $nama;
+                if (!kompresDanSimpanGambar($info['tmp'], $destPath, $info['ext'])) {
                     throw new Exception("Gagal menyimpan file dokumen");
                 }
                 $baru[$field] = 'anggota/' . $anggota_id . '/' . $nama;

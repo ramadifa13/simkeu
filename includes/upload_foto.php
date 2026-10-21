@@ -39,8 +39,111 @@ if (!function_exists('validasiFotoUpload')) {
     }
 }
 
+if (!function_exists('kompresDanSimpanGambar')) {
+    /**
+     * Kompres dan ubah ukuran gambar otomatis sebelum disimpan.
+     * Mengurangi ukuran file 80-90% tanpa mengurangi keterbacaan teks dokumen.
+     *
+     * @param string $sourcePath Path file sementara (tmp_name)
+     * @param string $destPath Path file tujuan lengkap
+     * @param string $ext Ekstensi target ('jpg', 'jpeg', 'png', 'webp')
+     * @param int $maxDimension Dimensi maksimal lebar/tinggi (default 1280px)
+     * @param int $quality Kualitas kompresi JPG/WebP (default 82)
+     * @return bool
+     */
+    function kompresDanSimpanGambar($sourcePath, $destPath, $ext, $maxDimension = 1280, $quality = 82) {
+        if (!extension_loaded('gd') || !function_exists('imagecreatefromstring')) {
+            return move_uploaded_file($sourcePath, $destPath);
+        }
+
+        $raw = @file_get_contents($sourcePath);
+        if ($raw === false) {
+            return move_uploaded_file($sourcePath, $destPath);
+        }
+
+        $src = @imagecreatefromstring($raw);
+        if (!$src) {
+            return move_uploaded_file($sourcePath, $destPath);
+        }
+
+        // Perbaiki orientasi EXIF untuk kamera HP (JPG)
+        if (function_exists('exif_read_data')) {
+            $exif = @exif_read_data($sourcePath);
+            if (!empty($exif['Orientation'])) {
+                switch ((int) $exif['Orientation']) {
+                    case 3:
+                        $rot = imagerotate($src, 180, 0);
+                        if ($rot !== false) { imagedestroy($src); $src = $rot; }
+                        break;
+                    case 6:
+                        $rot = imagerotate($src, -90, 0);
+                        if ($rot !== false) { imagedestroy($src); $src = $rot; }
+                        break;
+                    case 8:
+                        $rot = imagerotate($src, 90, 0);
+                        if ($rot !== false) { imagedestroy($src); $src = $rot; }
+                        break;
+                }
+            }
+        }
+
+        $origW = imagesx($src);
+        $origH = imagesy($src);
+
+        if ($origW > $maxDimension || $origH > $maxDimension) {
+            if ($origW >= $origH) {
+                $newW = $maxDimension;
+                $newH = (int) max(1, round(($origH / $origW) * $maxDimension));
+            } else {
+                $newH = $maxDimension;
+                $newW = (int) max(1, round(($origW / $origH) * $maxDimension));
+            }
+        } else {
+            $newW = $origW;
+            $newH = $origH;
+        }
+
+        $dst = imagecreatetruecolor($newW, $newH);
+        $targetExt = strtolower($ext);
+
+        if ($targetExt === 'png') {
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+        } elseif ($targetExt === 'webp' && function_exists('imagewebp')) {
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+        } else {
+            $white = imagecolorallocate($dst, 255, 255, 255);
+            imagefilledrectangle($dst, 0, 0, $newW, $newH, $white);
+        }
+
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+
+        $saved = false;
+        if ($targetExt === 'webp' && function_exists('imagewebp')) {
+            $saved = @imagewebp($dst, $destPath, $quality);
+        } elseif ($targetExt === 'png') {
+            $saved = @imagepng($dst, $destPath, 8);
+        } else {
+            $saved = @imagejpeg($dst, $destPath, $quality);
+        }
+
+        imagedestroy($src);
+        imagedestroy($dst);
+
+        if ($saved) {
+            if (file_exists($sourcePath)) {
+                @unlink($sourcePath);
+            }
+            return true;
+        }
+
+        return move_uploaded_file($sourcePath, $destPath);
+    }
+}
+
 if (!function_exists('simpanFotoUpload')) {
-    /** Pindahkan file tervalidasi ke uploads/$subfolder/ dan kembalikan path relatif terhadap uploads/. */
+    /** Pindahkan file tervalidasi ke uploads/$subfolder/ dengan kompresi otomatis dan kembalikan path relatif terhadap uploads/. */
     function simpanFotoUpload($info, $subfolder) {
         $root = realpath(__DIR__ . '/..') . '/uploads';
         $dir = $root . '/' . $subfolder;
@@ -48,11 +151,15 @@ if (!function_exists('simpanFotoUpload')) {
             throw new Exception("Folder upload tidak dapat dibuat");
         }
         $htaccess = $dir . '/.htaccess';
-        if (!file_exists($htaccess) && file_exists($root . '/anggota/.htaccess')) {
-            @copy($root . '/anggota/.htaccess', $htaccess);
+        if (file_exists($root . '/anggota/.htaccess')) {
+            $kontenHt = @file_get_contents($htaccess);
+            if (!$kontenHt || (strpos($kontenHt, 'Require all denied') !== false && strpos($kontenHt, 'FilesMatch') === false)) {
+                @copy($root . '/anggota/.htaccess', $htaccess);
+            }
         }
         $nama = bin2hex(random_bytes(16)) . '.' . $info['ext'];
-        if (!move_uploaded_file($info['tmp'], $dir . '/' . $nama)) {
+        $destPath = $dir . '/' . $nama;
+        if (!kompresDanSimpanGambar($info['tmp'], $destPath, $info['ext'])) {
             throw new Exception("Gagal menyimpan file foto");
         }
         return $subfolder . '/' . $nama;

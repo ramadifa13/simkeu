@@ -31,7 +31,27 @@ function layananValidasiToken() {
         throw new Exception('Sesi formulir tidak valid. Muat ulang halaman.');
     }
 }
+function sinkronkanProteksiUpload() {
+    $root = realpath(__DIR__ . '/..') . '/uploads';
+    $template = $root . '/anggota/.htaccess';
+    if (!file_exists($template)) return;
+    foreach (['jaminan_kembali', 'pembayaran', 'jaminan', 'pencairan'] as $sub) {
+        $dir = $root . '/' . $sub;
+        if (!is_dir($dir)) continue;
+        $ht = $dir . '/.htaccess';
+        if (!file_exists($ht)) {
+            @copy($template, $ht);
+        } else {
+            $isi = @file_get_contents($ht);
+            if ($isi !== false && strpos($isi, 'Require all denied') !== false && strpos($isi, 'FilesMatch') === false) {
+                @copy($template, $ht);
+            }
+        }
+    }
+}
+
 function layananSiap($db) {
+    sinkronkanProteksiUpload();
     static $cache=[];$key=spl_object_hash($db);
     if (!array_key_exists($key,$cache)) $cache[$key]=kolomAda($db,'layanan_audit','aksi')
         && kolomAda($db,'layanan_pembayaran','dibatalkan_at')
@@ -47,8 +67,14 @@ function layananSimpanFoto($foto, $folder) {
     if (!in_array($folder,['pembayaran','jaminan_kembali'],true)) throw new Exception('Folder bukti tidak valid.');
     $dir=__DIR__.'/../uploads/'.$folder;
     if (!is_dir($dir) && !mkdir($dir,0755,true)) throw new Exception('Folder bukti tidak dapat dibuat.');
-    // Bukti dibaca melalui kwitansi yang memeriksa sesi, bukan URL gambar publik.
-    if (file_put_contents($dir.'/.htaccess',"Options -Indexes\nRequire all denied\n")===false) throw new Exception('Proteksi folder bukti gagal dibuat.');
+    $htaccessFile = $dir.'/.htaccess';
+    $root = realpath(__DIR__ . '/..') . '/uploads';
+    if (file_exists($root . '/anggota/.htaccess')) {
+        $kontenHt = @file_get_contents($htaccessFile);
+        if (!$kontenHt || (strpos($kontenHt, 'Require all denied') !== false && strpos($kontenHt, 'FilesMatch') === false)) {
+            @copy($root . '/anggota/.htaccess', $htaccessFile);
+        }
+    }
     return simpanFotoUpload($foto,$folder);
 }
 function layananPrioritasLayak($db,$anggota) {
