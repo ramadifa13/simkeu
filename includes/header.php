@@ -114,11 +114,11 @@ if (isset($_SESSION['role']) && in_array($_SESSION['role'], ['admin', 'teller', 
                 <span data-notif-pinjaman="total" class="badge rounded-pill bg-danger ui-notification-count" style="<?= empty($headerNotif['total'])?'display:none':'' ?>"><?= (int)($headerNotif['total'] ?? 0) ?></span>
             </summary>
             <div class="ui-notification-menu">
-                <div class="ui-notification-heading"><strong>Notifikasi</strong><span data-notif-summary><?= (int)($headerNotif['total'] ?? 0) ?> perlu ditindaklanjuti</span></div>
+                <div class="ui-notification-heading"><strong><?= ($_SESSION['role'] ?? '') === 'anggota' ? 'Status & Tagihan' : 'Pekerjaan Perlu Tindakan' ?></strong><span data-notif-summary data-notif-role="<?= htmlspecialchars($_SESSION['role'] ?? '', ENT_QUOTES) ?>"><?= (int)($headerNotif['total'] ?? 0) ?> <?= ($_SESSION['role'] ?? '') === 'anggota' ? 'informasi baru' : 'perlu ditindaklanjuti' ?></span></div>
                 <div class="ui-notification-list">
-                    <?php foreach($headerNotifItems as [$key,$label,$href,$icon]): $count=(int)($headerNotif[$key] ?? 0); ?>
-                    <a href="<?= htmlspecialchars($href, ENT_QUOTES) ?>" data-notif-row="<?= htmlspecialchars($key, ENT_QUOTES) ?>" style="<?= $count<1?'display:none':'' ?>">
-                        <i class="fas <?= htmlspecialchars($icon, ENT_QUOTES) ?>" aria-hidden="true"></i><span><?= htmlspecialchars($label) ?></span>
+                    <?php foreach($headerNotifItems as [$key,$label,$href,$icon]): $count=(int)($headerNotif[$key] ?? 0); $detailId=(int)($headerNotif['detail'][$key] ?? 0); if($detailId>0) $href .= (strpos($href,'?')===false?'?':'&').'id='.$detailId; ?>
+                    <a href="<?= htmlspecialchars($href, ENT_QUOTES) ?>" data-notif-row="<?= htmlspecialchars($key, ENT_QUOTES) ?>" data-notif-key="<?= htmlspecialchars($key, ENT_QUOTES) ?>" style="<?= $count<1?'display:none':'' ?>">
+                        <span class="ui-notification-icon"><i class="fas <?= htmlspecialchars($icon, ENT_QUOTES) ?>" aria-hidden="true"></i></span><span class="ui-notification-copy"><strong><?= htmlspecialchars($label) ?></strong><small>Perlu ditindaklanjuti</small></span>
                         <span data-notif-pinjaman="<?= htmlspecialchars($key, ENT_QUOTES) ?>" class="badge rounded-pill bg-warning text-dark"><?= $count ?></span>
                     </a>
                     <?php endforeach; ?>

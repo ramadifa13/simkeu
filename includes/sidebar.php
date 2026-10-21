@@ -630,7 +630,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const total = Number(data.total || 0);
         document.querySelector('.ui-notifications')?.classList.toggle('has-notifications', total > 0);
         document.querySelectorAll('[data-notif-summary]').forEach(function(el) {
-            el.textContent = total + ' perlu ditindaklanjuti';
+            el.textContent = total + (el.dataset.notifRole === 'anggota' ? ' informasi baru' : ' perlu ditindaklanjuti');
         });
         document.querySelectorAll('.ui-notification-empty').forEach(function(el) {
             el.hidden = total > 0;

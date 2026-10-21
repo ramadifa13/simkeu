@@ -85,6 +85,10 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
             'anggota_jaminan'=>"SELECT COUNT(*) FROM layanan_jaminan_kembali k JOIN pinjaman p ON p.id=k.pinjaman_id WHERE p.anggota_id=? AND k.status='disetujui'",
         ];
         foreach($queries as $key=>$sql){$stmt=$db->prepare($sql);$stmt->execute([$anggotaId]);$hasil[$key]=(int)$stmt->fetchColumn();}
+        $hasil['detail'] = [
+            'anggota_pengajuan' => (int)$db->query("SELECT id FROM pengajuan_pinjaman WHERE anggota_id=".(int)$anggotaId." AND status='menunggu' ORDER BY id DESC LIMIT 1")->fetchColumn(),
+            'anggota_pencairan' => (int)$db->query("SELECT pp.id FROM pengajuan_pinjaman pp WHERE pp.anggota_id=".(int)$anggotaId." AND pp.status='disetujui' AND NOT EXISTS(SELECT 1 FROM pinjaman p WHERE p.pengajuan_id=pp.id) ORDER BY pp.id DESC LIMIT 1")->fetchColumn(),
+        ];
         $hasil['total']=array_sum(array_intersect_key($hasil,$queries));
         return $hasil;
     }
@@ -112,6 +116,10 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
         $hasil['layanan']+=$hasil['pembayaran_denda'];
         // Persetujuan adalah tampilan dari pengajuan yang sama, jadi jangan dihitung dua kali.
         $hasil['total']=$hasil['persetujuan']+$hasil['pembatalan']+$hasil['layanan'];
+        $hasil['detail'] = ['persetujuan'=>(int)$db->query("SELECT id FROM pengajuan_pinjaman WHERE status='menunggu' ORDER BY id DESC LIMIT 1")->fetchColumn()];
+        foreach (['hapus_denda'=>'layanan_pengajuan_hapus_denda','pelunasan_dini'=>'layanan_pelunasan','jaminan_kembali'=>'layanan_jaminan_kembali','prioritas'=>'layanan_prioritas','laporan_macet'=>'layanan_laporan_macet'] as $key=>$table) {
+            $hasil['detail'][$key]=(int)$db->query("SELECT pinjaman_id FROM $table WHERE status='menunggu' ORDER BY id DESC LIMIT 1")->fetchColumn();
+        }
     } else {
         // Persetujuan pengajuan adalah tindakan Admin, bukan Teller.
         $hasil['pengajuan']=0;$hasil['persetujuan']=0;
@@ -121,6 +129,7 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
         $stmt=$db->prepare("SELECT COUNT(*) FROM layanan_pelunasan WHERE user_id=? AND status='disetujui'");$stmt->execute([(int)$userId]);$hasil['pelunasan_disetujui']=(int)$stmt->fetchColumn();
         $stmt=$db->prepare("SELECT COUNT(*) FROM layanan_jaminan_kembali WHERE user_id=? AND status='disetujui'");$stmt->execute([(int)$userId]);$hasil['jaminan_disetujui']=(int)$stmt->fetchColumn();
         $hasil['total']=$hasil['pencairan']+$hasil['pembatalan']+$hasil['pelunasan_disetujui']+$hasil['jaminan_disetujui']+$hasil['jatuh_tempo']+$hasil['terlambat']+$hasil['denda_tertunggak'];
+        $hasil['detail'] = ['pencairan'=>(int)$db->query("SELECT pp.id FROM pengajuan_pinjaman pp WHERE pp.status='disetujui' AND NOT EXISTS(SELECT 1 FROM pinjaman p WHERE p.pengajuan_id=pp.id) ORDER BY pp.id DESC LIMIT 1")->fetchColumn()];
     }
     return $hasil;
 }
