@@ -25,6 +25,7 @@ $e = function ($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'U
 $uang = function ($value) { return 'Rp ' . number_format($value, 0, ',', '.'); };
 $frekuensi = $p['frekuensi'] ?? 'bulanan';
 $tampilkanMinggu = !empty($p['memerlukan_jaminan']) && $frekuensi === 'mingguan';
+$biayaMingguan = $tampilkanMinggu && function_exists('biayaMingguanGadai') ? biayaMingguanGadai($p['jumlah_pinjaman']) : 0;
 $label = ['mingguan' => 'Mingguan', 'dua_mingguan' => 'Dua Mingguan', 'bulanan' => 'Bulanan'][$frekuensi] ?? 'Bulanan';
 $hari = [1 => 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 $hari_jadwal = [];
@@ -32,7 +33,7 @@ foreach ($jadwal as $row) {
     $hari_jadwal[$hari[(int) date('N', strtotime($row['tanggal_jatuh_tempo']))]] = true;
 }
 $saldo = (float) $p['jumlah_pinjaman'];
-$total_pokok = $total_margin = $total_angsuran = 0;
+$total_pokok = $total_margin = $total_minggu = $total_angsuran = 0;
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -41,20 +42,20 @@ $total_pokok = $total_margin = $total_angsuran = 0;
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Buku Angsuran <?= $e($p['kode_pinjaman']) ?></title>
 <style>
-@page { size: A4 portrait; margin: 12mm; }
+@page { size: A4 portrait; margin: 10mm; }
 * { box-sizing: border-box; }
 body { font: 11pt Arial, sans-serif; color: #000; background: #eee; margin: 0; }
 .toolbar { padding: 16px; text-align: center; }
 button { padding: 8px 18px; cursor: pointer; }
-main { background: white; width: 186mm; margin: 0 auto 20px; padding: 0; }
-h1 { font-size: 16pt; text-align: center; margin: 8px 0; }
+main { background: white; width: 190mm; max-width: 100%; margin: 0 auto 20px; padding: 7mm 7mm 6mm; }
+h1 { font-size: 16pt; text-align: center; margin: 8px 0 12px; }
 .kop { text-align: center; border-bottom: 3px double; padding-bottom: 8px; }
 .kop p { margin: 4px; }
 .info { width: 100%; margin: 14px 0; }
 .info td { padding: 4px 0; vertical-align: top; overflow-wrap: anywhere; }
 .info td:first-child { width: 40mm; }
 .jadwal { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; }
-.jadwal th, .jadwal td { border: 1px solid #000; padding: 7px 4px; }
+.jadwal th, .jadwal td { border: 1px solid #000; padding: 6px 3px; vertical-align: middle; }
 .angka { text-align: right; white-space: nowrap; }
 .tengah { text-align: center; }
 .catatan { font-size: 9pt; margin-top: 12px; break-inside: avoid; }
@@ -79,19 +80,22 @@ tr { break-inside: avoid; }
 <tr><td>Hari Angsuran</td><td>: <?= $e(implode(', ', array_keys($hari_jadwal))) ?></td></tr>
 </table>
 <table class="jadwal">
-<colgroup><col style="width: 6%"><col style="width: 14%"><col style="width: 4%"><?php if($tampilkanMinggu): ?><col style="width: 10%"><?php endif; ?><col style="width: 16%"><col style="width: 14%"><col style="width: 16%"><col style="width: 18%"><col style="width: 12%"></colgroup>
-<thead><tr><th rowspan="2">Ke</th><th rowspan="2">Tanggal</th><th rowspan="2">K</th><?php if($tampilkanMinggu): ?><th rowspan="2">Minggu</th><?php endif; ?><th colspan="3">Angsuran <?= $e($label) ?></th><th colspan="2">Saldo</th></tr><tr><th>Modal Kerja</th><th>Margin</th><th>Jumlah</th><th>Modal Kerja</th><th>Ttd</th></tr></thead>
+<colgroup><?php if($tampilkanMinggu): ?><col style="width: 5%"><col style="width: 13%"><col style="width: 4%"><col style="width: 10%"><col style="width: 14%"><col style="width: 12%"><col style="width: 14%"><col style="width: 16%"><col style="width: 12%"><?php else: ?><col style="width: 6%"><col style="width: 14%"><col style="width: 4%"><col style="width: 16%"><col style="width: 14%"><col style="width: 16%"><col style="width: 18%"><col style="width: 12%"><?php endif; ?></colgroup>
+<thead><tr><th rowspan="2">Ke</th><th rowspan="2">Tanggal</th><th rowspan="2">K</th><?php if($tampilkanMinggu): ?><th rowspan="2">Minggu</th><?php endif; ?><th colspan="3">Angsuran <?= $e($label) ?></th><th colspan="2">Saldo</th></tr><tr><th>Modal Kerja</th><th>Margin Dasar</th><th>Jumlah</th><th>Modal Kerja</th><th>Ttd</th></tr></thead>
 <tbody>
 <tr><td colspan="<?= $tampilkanMinggu ? 7 : 6 ?>">Saldo awal</td><td class="angka"><?= $uang($saldo) ?></td><td></td></tr>
 <?php foreach ($jadwal as $row):
     $saldo -= (float) $row['pokok'];
     $total_pokok += (float) $row['pokok'];
-    $total_margin += (float) $row['bunga'];
+    $marginMinggu = $biayaMingguan ?: 0;
+    $marginDasar = max(0, (float) $row['bunga'] - $marginMinggu);
+    $total_margin += $marginDasar;
+    $total_minggu += $marginMinggu;
     $total_angsuran += (float) $row['jumlah_angsuran'];
 ?>
-<tr><td class="tengah"><?= (int) $row['angsuran_ke'] ?></td><td class="tengah"><?= date('d/m/Y', strtotime($row['tanggal_jatuh_tempo'])) ?></td><td></td><?php if($tampilkanMinggu): ?><td class="tengah">Minggu <?= (int)$row['angsuran_ke'] ?></td><?php endif; ?><td class="angka"><?= $uang($row['pokok']) ?></td><td class="angka"><?= $uang($row['bunga']) ?></td><td class="angka"><?= $uang($row['jumlah_angsuran']) ?></td><td class="angka"><?= $uang(abs($saldo) < 0.005 ? 0 : $saldo) ?></td><td style="min-width: 12mm"></td></tr>
+<tr><td class="tengah"><?= (int) $row['angsuran_ke'] ?></td><td class="tengah"><?= date('d/m/Y', strtotime($row['tanggal_jatuh_tempo'])) ?></td><td></td><?php if($tampilkanMinggu): ?><td class="angka"><?= $uang($marginMinggu) ?></td><?php endif; ?><td class="angka"><?= $uang($row['pokok']) ?></td><td class="angka"><?= $uang($marginDasar) ?></td><td class="angka"><?= $uang($row['jumlah_angsuran']) ?></td><td class="angka"><?= $uang(abs($saldo) < 0.005 ? 0 : $saldo) ?></td><td style="min-width: 12mm"></td></tr>
 <?php endforeach; ?>
-<tr><th colspan="<?= $tampilkanMinggu ? 4 : 3 ?>">Jumlah</th><th class="angka"><?= $uang($total_pokok) ?></th><th class="angka"><?= $uang($total_margin) ?></th><th class="angka"><?= $uang($total_angsuran) ?></th><td colspan="2"></td></tr>
+<tr><th colspan="3">Jumlah</th><?php if($tampilkanMinggu): ?><th class="angka"><?= $uang($total_minggu) ?></th><?php endif; ?><th class="angka"><?= $uang($total_pokok) ?></th><th class="angka"><?= $uang($total_margin) ?></th><th class="angka"><?= $uang($total_angsuran) ?></th><td colspan="2"></td></tr>
 </tbody></table>
 <div class="catatan">K = Kode / keterangan. Kolom K dan tanda tangan diisi saat pembayaran.<br>Tanggal libur: ____________________<br>Jadwal ini mengikuti data pinjaman. Denda keterlambatan mengikuti ketentuan koperasi.</div>
 </main>

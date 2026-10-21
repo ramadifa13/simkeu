@@ -12,11 +12,13 @@ $routes = [
     'admin' => [
         'persetujuan' => 'admin/persetujuan.php',
         'pembatalan' => 'admin/angsuran.php',
-        'hapus_denda' => 'admin/layanan.php?tab=macet#perlu-ditinjau',
-        'pelunasan_dini' => 'admin/layanan.php?tab=macet#perlu-ditinjau',
-        'jaminan_kembali' => 'admin/laporan_lunas.php?tab=lunas#detail',
-        'prioritas' => 'admin/laporan_lunas.php?tab=lunas#detail',
-        'laporan_macet' => 'admin/laporan_lunas.php?tab=lunas#detail',
+        // Semua notifikasi layanan Admin dibuka melalui laporan lunas Admin,
+        // bukan halaman pinjaman/layanan milik Teller.
+        'hapus_denda' => 'admin/laporan_lunas.php?tab=lunas',
+        'pelunasan_dini' => 'admin/laporan_lunas.php?tab=lunas',
+        'jaminan_kembali' => 'admin/laporan_lunas.php?tab=lunas',
+        'prioritas' => 'admin/laporan_lunas.php?tab=lunas',
+        'laporan_macet' => 'admin/laporan_lunas.php?tab=lunas',
         'pembayaran_denda' => 'admin/laporan_denda.php',
     ],
     'teller' => [

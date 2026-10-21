@@ -405,10 +405,9 @@ function formatRupiah($angka) {
                                         <div class="col-md-6 mb-3"><label class="form-label">Versi Surat</label><input class="form-control" value="Lengkap" readonly><input type="hidden" name="template_default" value="lengkap"></div>
                                     </div>
                                     <div class="mb-3"><label class="form-label">Isi Surat Perjanjian Lengkap</label><textarea class="form-control" rows="14" name="isi_lengkap" required><?php echo htmlspecialchars($pengaturan_perjanjian['isi_lengkap']); ?></textarea></div>
-                                    <label class="form-label">TTD Admin (gambar langsung di layar)</label>
-                                    <canvas id="ttdAdminCanvas" class="border rounded w-100" style="height:180px;touch-action:none;background:#fff"></canvas>
+                                    <div class="signature-field"><div class="signature-field-head"><div><label class="signature-field-title mb-0">TTD Admin</label><small class="signature-field-help">Gambar langsung menggunakan mouse atau layar sentuh.</small></div><span class="signature-status" id="ttdAdminStatus"><i class="fas fa-pen-nib"></i> Belum diisi</span></div><div class="signature-canvas-wrap"><canvas id="ttdAdminCanvas" class="signature" width="700" height="180"></canvas></div>
                                     <input type="hidden" name="ttd_admin" id="ttd_admin">
-                                    <div class="mt-2"><button type="button" class="btn btn-outline-secondary btn-sm" id="hapusTtdAdmin">Hapus / gambar ulang</button> <button type="submit" name="update_perjanjian" class="btn btn-primary"><i class="fas fa-save me-1"></i>Simpan Pengaturan</button></div>
+                                    <div class="signature-field-foot"><span class="signature-field-note">Tanda tangan tersimpan bersama pengaturan surat.</span><button type="button" class="signature-clear btn btn-outline-danger btn-sm" id="hapusTtdAdmin"><i class="fas fa-eraser me-1"></i>Hapus / gambar ulang</button></div></div><div class="mt-2"><button type="submit" name="update_perjanjian" class="btn btn-primary"><i class="fas fa-save me-1"></i>Simpan Pengaturan</button></div>
                                 </form>
                             </div>
                         </div>
@@ -465,10 +464,11 @@ function formatRupiah($angka) {
       var c=document.getElementById('ttdAdminCanvas'); if(!c)return; var x=c.getContext('2d'), drawing=false, dirty=false;
       function size(){var old=dirty?c.toDataURL():null;c.width=c.clientWidth*devicePixelRatio;c.height=180*devicePixelRatio;x.scale(devicePixelRatio,devicePixelRatio);x.lineWidth=2;x.lineCap='round';if(old){var i=new Image;i.onload=function(){x.drawImage(i,0,0,c.clientWidth,180)};i.src=old;}}
       function p(e){var r=c.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
-      c.addEventListener('pointerdown',function(e){drawing=true;dirty=true;var a=p(e);x.beginPath();x.moveTo(a[0],a[1]);c.setPointerCapture(e.pointerId)});
+      function setStatus(ready){var s=document.getElementById('ttdAdminStatus'),w=c.closest('.signature-canvas-wrap');s.classList.toggle('is-ready',ready);s.innerHTML=ready?'<i class="fas fa-check-circle"></i> Siap disimpan':'<i class="fas fa-pen-nib"></i> Belum diisi';w.classList.toggle('has-signature',ready)}
+      c.addEventListener('pointerdown',function(e){drawing=true;dirty=true;setStatus(true);var a=p(e);x.beginPath();x.moveTo(a[0],a[1]);c.setPointerCapture(e.pointerId)});
       c.addEventListener('pointermove',function(e){if(!drawing)return;var a=p(e);x.lineTo(a[0],a[1]);x.stroke()}); c.addEventListener('pointerup',function(){drawing=false});
-      size(); var existing=<?php echo json_encode((string)($pengaturan_perjanjian['ttd_admin'] ?? '')); ?>;if(existing){var i=new Image;i.onload=function(){x.drawImage(i,0,0,c.clientWidth,180);dirty=true};i.src=existing}
-      document.getElementById('hapusTtdAdmin').onclick=function(){x.clearRect(0,0,c.width,c.height);dirty=false;document.getElementById('ttd_admin').value=''};
+      size(); var existing=<?php echo json_encode((string)($pengaturan_perjanjian['ttd_admin'] ?? '')); ?>;if(existing){var i=new Image;i.onload=function(){x.drawImage(i,0,0,c.clientWidth,180);dirty=true;setStatus(true)};i.src=existing}
+      document.getElementById('hapusTtdAdmin').onclick=function(){x.clearRect(0,0,c.width,c.height);dirty=false;setStatus(false);document.getElementById('ttd_admin').value=''};
       var saving=false;
       document.getElementById('formPerjanjian').addEventListener('submit',async function(e){
         e.preventDefault();

@@ -76,7 +76,11 @@ document.addEventListener('DOMContentLoaded', function () {
         input.removeAttribute('capture');
 
         var pilihan = document.createElement('div');
-        pilihan.className = 'd-flex flex-wrap gap-2 mb-2';
+        pilihan.className = 'foto-upload-actions d-flex flex-wrap gap-2 mb-2';
+        var status = document.createElement('div');
+        status.className = 'foto-upload-status';
+        status.textContent = 'Belum ada foto dipilih';
+        input.classList.add('foto-upload-native');
         var label = input.getAttribute('data-label');
         if (!label) {
             var wadah = input.closest('.mb-3, .col-md-4');
@@ -102,12 +106,22 @@ document.addEventListener('DOMContentLoaded', function () {
         tambahTombol('Ambil Foto', true);
         tambahTombol('Pilih dari Galeri', false);
         input.parentNode.insertBefore(pilihan, input);
+        input.parentNode.insertBefore(status, input.nextSibling);
         // Klik langsung pada input bawaan selalu menawarkan pemilihan berkas.
         input.addEventListener('click', function (event) {
             if (event.isTrusted) input.removeAttribute('capture');
         });
         input.addEventListener('change', function () {
             input.removeAttribute('capture');
+            if (!input.files || !input.files.length) {
+                status.textContent = 'Belum ada foto dipilih';
+                status.classList.remove('has-file');
+                return;
+            }
+            var file = input.files[0];
+            var ukuran = file.size >= 1048576 ? (file.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(file.size / 1024)) + ' KB';
+            status.textContent = file.name + ' · ' + ukuran;
+            status.classList.add('has-file');
         });
         input.form && input.form.addEventListener('reset', function () {
             input.removeAttribute('capture');

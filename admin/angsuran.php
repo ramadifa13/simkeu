@@ -100,9 +100,11 @@ if ($_POST) {
             if ($pinjaman_kunci['status'] === 'lunas') throw new Exception('Histori pinjaman lunas terkunci.');
             
             // Get data angsuran lengkap sebelum diupdate
-            $query_angsuran = "SELECT a.*, p.anggota_id, p.kode_pinjaman, p.jumlah_pinjaman, p.sisa_pokok 
+            $query_angsuran = "SELECT a.*, p.anggota_id, p.kode_pinjaman, p.jumlah_pinjaman, p.sisa_pokok,
+                                      jp.memerlukan_jaminan
                               FROM angsuran a
                               JOIN pinjaman p ON a.pinjaman_id = p.id
+                              JOIN jenis_pinjaman jp ON jp.id = p.jenis_pinjaman_id
                               WHERE a.id = :id FOR UPDATE";
             $stmt_angsuran = $db->prepare($query_angsuran);
             $stmt_angsuran->bindParam(':id', $id);
@@ -200,13 +202,14 @@ if ($_POST) {
                                 jumlah, saldo_sebelum, saldo_sesudah, keterangan, user_id, tanggal_transaksi) 
                                VALUES 
                                (:kode_transaksi, :anggota_id, :jenis_angsuran_id, 'setoran', 
-                                :jumlah, 0, :jumlah, :keterangan, :user_id, NOW())";
+                                :jumlah, 0, :saldo_sesudah, :keterangan, :user_id, NOW())";
             $stmt_transaksi = $db->prepare($query_transaksi);
             $keterangan_transaksi = "Pembayaran angsuran ke-" . $angsuran_data['angsuran_ke'] . " - " . $angsuran_data['kode_pinjaman'];
             $stmt_transaksi->bindParam(':kode_transaksi', $kode_transaksi);
             $stmt_transaksi->bindParam(':anggota_id', $angsuran_data['anggota_id']);
             $stmt_transaksi->bindParam(':jenis_angsuran_id', $jenis_angsuran_id);
-            $stmt_transaksi->bindParam(':jumlah', $total_bayar);
+            $stmt_transaksi->bindValue(':jumlah', $total_bayar);
+            $stmt_transaksi->bindValue(':saldo_sesudah', $total_bayar);
             $stmt_transaksi->bindParam(':keterangan', $keterangan_transaksi);
             $stmt_transaksi->bindParam(':user_id', $user_id);
             $stmt_transaksi->execute();

@@ -100,13 +100,14 @@ if ($_POST) {
             if ($pinjaman_kunci['status'] === 'lunas') throw new Exception('Histori pinjaman lunas terkunci.');
             
             // Get data angsuran lengkap sebelum diupdate
-            $query_angsuran = "SELECT a.*, p.anggota_id, p.kode_pinjaman, p.jumlah_pinjaman, p.sisa_pokok 
+            $query_angsuran = "SELECT a.*, p.anggota_id, p.kode_pinjaman, p.jumlah_pinjaman, p.sisa_pokok,
+                                      jp.memerlukan_jaminan
                               FROM angsuran a
                               JOIN pinjaman p ON a.pinjaman_id = p.id
+                              JOIN jenis_pinjaman jp ON jp.id = p.jenis_pinjaman_id
                               WHERE a.id = :id FOR UPDATE";
             $stmt_angsuran = $db->prepare($query_angsuran);
-            $stmt_angsuran->bindParam(':id', $id);
-            $stmt_angsuran->execute();
+            $stmt_angsuran->execute([':id' => (int) $id]);
             $angsuran_data = $stmt_angsuran->fetch(PDO::FETCH_ASSOC);
             
             if (!$angsuran_data) {
@@ -136,10 +137,7 @@ if ($_POST) {
             $set_manual = kolomAda($db, 'angsuran', 'denda_manual') ? ", denda_manual = " . (int) $denda_manual : '';
             $query = "UPDATE angsuran SET tanggal_bayar = CURDATE(), status = 'lunas', denda = :denda" . $set_manual . " WHERE id = :id";
             $stmt = $db->prepare($query);
-            $stmt->bindParam(':id', $id);
-            $stmt->bindParam(':denda', $denda);
-            
-            if (!$stmt->execute()) {
+            if (!$stmt->execute([':id' => (int) $id, ':denda' => $denda])) {
                 throw new Exception("Gagal mengupdate status angsuran");
             }
             
@@ -152,10 +150,7 @@ if ($_POST) {
                                       status = :status 
                                       WHERE id = :pinjaman_id";
             $stmt_update = $db->prepare($query_update_pinjaman);
-            $stmt_update->bindParam(':sisa_pokok', $sisa_pokok_baru);
-            $stmt_update->bindParam(':status', $status_pinjaman);
-            $stmt_update->bindParam(':pinjaman_id', $angsuran_data['pinjaman_id']);
-            $stmt_update->execute();
+            $stmt_update->execute([':sisa_pokok' => $sisa_pokok_baru, ':status' => $status_pinjaman, ':pinjaman_id' => (int) $angsuran_data['pinjaman_id']]);
 
             // Semua cicilan lunas -> pinjaman lunas + catat tanggal lunas
             tandaiLunasBilaSelesai($db, $angsuran_data['pinjaman_id']);
@@ -200,16 +195,10 @@ if ($_POST) {
                                 jumlah, saldo_sebelum, saldo_sesudah, keterangan, user_id, tanggal_transaksi) 
                                VALUES 
                                (:kode_transaksi, :anggota_id, :jenis_angsuran_id, 'setoran', 
-                                :jumlah, 0, :jumlah, :keterangan, :user_id, NOW())";
+                                 :jumlah, 0, :saldo_sesudah, :keterangan, :user_id, NOW())";
             $stmt_transaksi = $db->prepare($query_transaksi);
             $keterangan_transaksi = "Pembayaran angsuran ke-" . $angsuran_data['angsuran_ke'] . " - " . $angsuran_data['kode_pinjaman'];
-            $stmt_transaksi->bindParam(':kode_transaksi', $kode_transaksi);
-            $stmt_transaksi->bindParam(':anggota_id', $angsuran_data['anggota_id']);
-            $stmt_transaksi->bindParam(':jenis_angsuran_id', $jenis_angsuran_id);
-            $stmt_transaksi->bindParam(':jumlah', $total_bayar);
-            $stmt_transaksi->bindParam(':keterangan', $keterangan_transaksi);
-            $stmt_transaksi->bindParam(':user_id', $user_id);
-            $stmt_transaksi->execute();
+            $stmt_transaksi->execute([':kode_transaksi' => $kode_transaksi, ':anggota_id' => (int) $angsuran_data['anggota_id'], ':jenis_angsuran_id' => (int) $jenis_angsuran_id, ':jumlah' => $total_bayar, ':saldo_sesudah' => $total_bayar, ':keterangan' => $keterangan_transaksi, ':user_id' => (int) $user_id]);
             
             // Dapatkan ID transaksi yang baru diinsert
             $transaksi_id = $db->lastInsertId();
@@ -232,12 +221,7 @@ if ($_POST) {
             $query_kas = "INSERT INTO kas (transaksi_id, jenis, jumlah, saldo_sebelum, saldo_sesudah, keterangan, tanggal) 
                          VALUES (:transaksi_id, 'masuk', :jumlah, :saldo_sebelum, :saldo_sesudah, :keterangan, NOW())";
             $stmt_kas = $db->prepare($query_kas);
-            $stmt_kas->bindParam(':transaksi_id', $transaksi_id);
-            $stmt_kas->bindParam(':jumlah', $total_bayar);
-            $stmt_kas->bindParam(':saldo_sebelum', $saldo_sebelum);
-            $stmt_kas->bindParam(':saldo_sesudah', $saldo_sesudah);
-            $stmt_kas->bindParam(':keterangan', $keterangan_kas);
-            $stmt_kas->execute();
+            $stmt_kas->execute([':transaksi_id' => (int) $transaksi_id, ':jumlah' => $total_bayar, ':saldo_sebelum' => $saldo_sebelum, ':saldo_sesudah' => $saldo_sesudah, ':keterangan' => $keterangan_kas]);
             
             // ============================================
             // TAMBAHKAN KE TABEL SIMPANAN (UNTUK JENIS 'ANG')
@@ -246,9 +230,7 @@ if ($_POST) {
             $query_cek_simpanan = "SELECT id, saldo FROM simpanan 
                                   WHERE anggota_id = :anggota_id AND jenis_simpanan_id = :jenis_angsuran_id";
             $stmt_cek_simpanan = $db->prepare($query_cek_simpanan);
-            $stmt_cek_simpanan->bindParam(':anggota_id', $angsuran_data['anggota_id']);
-            $stmt_cek_simpanan->bindParam(':jenis_angsuran_id', $jenis_angsuran_id);
-            $stmt_cek_simpanan->execute();
+            $stmt_cek_simpanan->execute([':anggota_id' => (int) $angsuran_data['anggota_id'], ':jenis_angsuran_id' => (int) $jenis_angsuran_id]);
             $simpanan = $stmt_cek_simpanan->fetch(PDO::FETCH_ASSOC);
             
             if ($simpanan) {
@@ -256,18 +238,13 @@ if ($_POST) {
                 $saldo_baru = $simpanan['saldo'] + $total_bayar;
                 $query_update_simpanan = "UPDATE simpanan SET saldo = :saldo WHERE id = :id";
                 $stmt_update_simpanan = $db->prepare($query_update_simpanan);
-                $stmt_update_simpanan->bindParam(':saldo', $saldo_baru);
-                $stmt_update_simpanan->bindParam(':id', $simpanan['id']);
-                $stmt_update_simpanan->execute();
+                $stmt_update_simpanan->execute([':saldo' => $saldo_baru, ':id' => (int) $simpanan['id']]);
             } else {
                 // Insert record baru
                 $query_insert_simpanan = "INSERT INTO simpanan (anggota_id, jenis_simpanan_id, saldo) 
                                          VALUES (:anggota_id, :jenis_angsuran_id, :saldo)";
                 $stmt_insert_simpanan = $db->prepare($query_insert_simpanan);
-                $stmt_insert_simpanan->bindParam(':anggota_id', $angsuran_data['anggota_id']);
-                $stmt_insert_simpanan->bindParam(':jenis_angsuran_id', $jenis_angsuran_id);
-                $stmt_insert_simpanan->bindParam(':saldo', $total_bayar);
-                $stmt_insert_simpanan->execute();
+                $stmt_insert_simpanan->execute([':anggota_id' => (int) $angsuran_data['anggota_id'], ':jenis_angsuran_id' => (int) $jenis_angsuran_id, ':saldo' => $total_bayar]);
             }
             
             $db->prepare("INSERT INTO layanan_pembayaran (angsuran_id,pinjaman_id,user_id,jenis,jumlah,metode,bukti) VALUES (?,?,?,'angsuran',?,?,?)")->execute([$id,$angsuran_data['pinjaman_id'],$user_id,$total_bayar,$metode,'']);
@@ -275,10 +252,11 @@ if ($_POST) {
             $db->commit();
             $_SESSION['success'] = "Pembayaran angsuran ke-" . $angsuran_data['angsuran_ke'] . " berhasil dicatat. Kas bertambah " . formatRupiah($total_bayar);
             
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             if ($db->inTransaction()) $db->rollBack();
             if ($bukti_path) hapusFotoUpload($bukti_path);
-            $_SESSION['error'] = "Gagal mencatat pembayaran: " . $e->getMessage();
+            error_log('Gagal mencatat pembayaran angsuran: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            $_SESSION['error'] = "Gagal mencatat pembayaran: " . $e->getMessage() . ' (baris ' . $e->getLine() . ')';
         }
         
         // Redirect untuk menghindari resubmission

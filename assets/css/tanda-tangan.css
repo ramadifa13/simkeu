@@ -1,0 +1,14 @@
+.signature-field{margin-top:10px;padding:14px;border:1px solid #dbe7ea;border-radius:14px;background:#fff;box-shadow:0 4px 14px rgba(28,72,84,.06)}
+.signature-field-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+.signature-field-title{display:block;margin:0;color:#183f49;font-weight:700}
+.signature-field-help{display:block;margin-top:3px;color:#71858e;font-size:12px}
+.signature-status{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:999px;background:#f2f5f6;color:#71858e;font-size:11px;font-weight:700;white-space:nowrap}
+.signature-status.is-ready{background:#eaf8f0;color:#26734a}
+.signature-canvas-wrap{position:relative;overflow:hidden;border:1px dashed #b9cdd2;border-radius:11px;background:repeating-linear-gradient(0deg,#fff,#fff 31px,#f5f9fa 32px)}
+.signature-canvas-wrap:after{content:'Goreskan tanda tangan di sini';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#a6b6bb;font-size:13px;pointer-events:none}
+.signature-canvas-wrap.has-signature:after{display:none}
+.signature-field canvas.signature,.signature-field canvas.signature-pad{display:block;width:100%;height:180px;border:0!important;background:transparent!important;touch-action:none;cursor:crosshair}
+.signature-field-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px}
+.signature-field-note{color:#87989e;font-size:11px}
+.signature-clear{border-radius:8px!important}
+@media(max-width:576px){.signature-field{padding:11px}.signature-field-head{display:block}.signature-status{margin-top:8px}.signature-field canvas.signature,.signature-field canvas.signature-pad{height:150px}.signature-field-foot{align-items:flex-start;flex-direction:column-reverse}}

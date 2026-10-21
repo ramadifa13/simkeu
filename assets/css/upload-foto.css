@@ -1,0 +1,7 @@
+.foto-upload-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px}
+.foto-upload-actions .btn{border-radius:9px;font-weight:600;padding:7px 12px;box-shadow:0 1px 2px rgba(24,58,72,.06)}
+input[type=file].form-control{border-radius:10px;padding:.48rem .7rem;color:#526873;background:#fff}
+input[type=file].form-control::file-selector-button{margin:-.48rem .7rem -.48rem -.7rem;padding:.48rem .8rem;border:0;border-right:1px solid #dce6e9;background:#f1f5f6;color:#39515b}
+.foto-upload-status{display:block;margin:0 0 8px;padding:7px 10px;border:1px dashed #c8d9df;border-radius:8px;color:#71858e;background:#fbfdfd;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.foto-upload-status.has-file{border-color:#9bd2b0;color:#26734a;background:#f1fbf5}
+.foto-upload-native{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
