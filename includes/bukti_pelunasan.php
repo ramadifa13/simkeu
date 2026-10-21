@@ -6,7 +6,8 @@
  */
 
 $pinjaman_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
-$stmt = $db->prepare("SELECT p.*, a.nama_lengkap, a.kode_anggota, jp.nama_jenis,
+$stmt = $db->prepare("SELECT p.*, a.nama_lengkap, a.kode_anggota, a.kode_anggota_jaminan,
+                             jp.nama_jenis, jp.memerlukan_jaminan,
                              (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) AS total_cicilan,
                              (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status <> 'lunas') AS cicilan_belum,
                              (SELECT COALESCE(SUM(jumlah_angsuran), 0) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') AS total_angsuran_dibayar,
@@ -42,7 +43,10 @@ if (layananSiap($db)) {
     if ($diskon_lunas) $total_dibayar-=round($diskon_lunas['sisa_bunga']*$diskon_lunas['diskon_persen']/100,2);
 }
 $e = function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
-// Kolom tanda tangan: Admin (yang menyetujui pengajuan) dan Teller (yang mencairkan; cadangan: teller pencetak)
+$khusus_agtj = strpos((string) $b['kode_anggota'], 'AGTJ') === 0
+    || strpos((string) ($b['kode_anggota_jaminan'] ?? ''), 'AGTJ') === 0;
+// AGTJ ditandatangani Nasabah dan Teller; pinjaman lain tetap Admin dan Teller.
+// Nama petugas diambil dari pihak yang menyetujui/mencairkan, dengan pengguna pencetak sebagai cadangan.
 $stmt_ttd = $db->prepare("SELECT ua.nama_lengkap AS admin_nama, ut.nama_lengkap AS teller_nama
                           FROM pinjaman p
                           LEFT JOIN pengajuan_pinjaman pp ON p.pengajuan_id = pp.id
@@ -131,7 +135,11 @@ $nama_teller = ($ttd && $ttd['teller_nama']) ? $ttd['teller_nama'] : (isTeller()
 
         <div class="ttd-section">
             <div class="ttd-box">
-                <div class="ttd-line"><strong>ADMIN</strong><br><?php echo $nama_admin !== '' ? $e($nama_admin) : '&nbsp;'; ?></div>
+                <?php if ($khusus_agtj): ?>
+                    <div class="ttd-line"><strong>NASABAH</strong><br><?php echo $e($b['nama_lengkap']); ?></div>
+                <?php else: ?>
+                    <div class="ttd-line"><strong>ADMIN</strong><br><?php echo $nama_admin !== '' ? $e($nama_admin) : '&nbsp;'; ?></div>
+                <?php endif; ?>
             </div>
             <div class="ttd-box">
                 <div class="ttd-line"><strong>TELLER</strong><br><?php echo $nama_teller !== '' ? $e($nama_teller) : '&nbsp;'; ?></div>

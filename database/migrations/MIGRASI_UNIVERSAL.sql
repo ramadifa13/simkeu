@@ -106,6 +106,9 @@ CREATE TABLE IF NOT EXISTS `pelunasan_dini` (
   CONSTRAINT `fk_pelunasan_pinjaman` FOREIGN KEY (`pinjaman_id`) REFERENCES `pinjaman` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_pelunasan_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+ALTER TABLE `pelunasan_dini`
+  ADD COLUMN IF NOT EXISTS `cek_jaminan_nasabah` TINYINT(1) NOT NULL DEFAULT 0 AFTER `user_id`,
+  ADD COLUMN IF NOT EXISTS `ttd_jaminan_nasabah` MEDIUMTEXT DEFAULT NULL AFTER `cek_jaminan_nasabah`;
 
 CREATE TABLE IF NOT EXISTS `pengaturan_perjanjian` (
   `id` INT NOT NULL DEFAULT 1, `nama_pihak_pertama` VARCHAR(120) DEFAULT NULL, `nik_pihak_pertama` VARCHAR(30) DEFAULT NULL,

@@ -64,11 +64,13 @@ if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filter_sampai)) { $filter_where[] = 'DA
 
 // Get active loans that can be settled early
 $query = "SELECT p.*, a.nama_lengkap, a.telepon, a.kode_anggota, jp.nama_jenis, jp.memerlukan_jaminan,
+                 j.jenis_barang, j.identitas_barang, j.deskripsi_barang, j.foto_barang, j.foto_nasabah_barang,
                  (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status IN ('belum_bayar','telat')) as sisa_angsuran,
                  (SELECT SUM(jumlah_angsuran + denda) FROM angsuran WHERE pinjaman_id = p.id AND status IN ('belum_bayar','telat')) as total_sisa_bayar
           FROM pinjaman p
           JOIN anggota a ON p.anggota_id = a.id
           JOIN jenis_pinjaman jp ON p.jenis_pinjaman_id = jp.id
+          LEFT JOIN jaminan_pinjaman j ON j.pinjaman_id = p.id
           WHERE " . implode(' AND ', $filter_where) . "
           ORDER BY p.tanggal_pencairan DESC";
 
@@ -291,6 +293,10 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     data-nama="<?php echo $pinjaman['nama_lengkap']; ?>"
                                                     data-telepon="<?php echo htmlspecialchars($pinjaman['telepon'] ?? '', ENT_QUOTES); ?>"
                                                     data-gadai="<?php echo !empty($pinjaman['memerlukan_jaminan']) ? '1' : '0'; ?>"
+                                                    data-jaminan-jenis="<?php echo htmlspecialchars($pinjaman['jenis_barang'] ?? '', ENT_QUOTES); ?>"
+                                                    data-jaminan-identitas="<?php echo htmlspecialchars($pinjaman['identitas_barang'] ?? '', ENT_QUOTES); ?>"
+                                                    data-jaminan-deskripsi="<?php echo htmlspecialchars($pinjaman['deskripsi_barang'] ?? '', ENT_QUOTES); ?>"
+                                                    data-jaminan-foto="<?php echo htmlspecialchars(urlFoto($pinjaman['foto_barang'] ?? ''), ENT_QUOTES); ?>"
                                                     data-kode_anggota="<?php echo $pinjaman['kode_anggota']; ?>"
                                                     data-jenis="<?php echo $pinjaman['nama_jenis']; ?>"
                                                     data-jumlah_pinjaman="<?php echo $pinjaman['jumlah_pinjaman']; ?>"
@@ -436,6 +442,16 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                             <div class="form-text">Total dihitung dari sisa tagihan setelah pembayaran denda dan kredit yang telah tercatat.</div>
                         </div>
 
+                        <div id="konfirmasiJaminanPelunasan" class="border rounded p-3 mb-3 bg-light d-none">
+                            <h6 class="text-success"><i class="fas fa-box-open me-1"></i>Konfirmasi Barang Jaminan</h6>
+                            <p class="small mb-2" id="detailJaminanPelunasan"></p><img id="fotoJaminanPelunasan" class="img-fluid rounded border mb-3 d-none" style="max-height:180px;object-fit:contain" alt="Foto barang jaminan">
+                            <label class="form-check d-flex gap-2 align-items-start mb-3"><input class="form-check-input mt-1" type="checkbox" name="cek_jaminan_nasabah" id="cekJaminanNasabah"><span>Saya sudah mengecek barang jaminan secara keseluruhan dan menyatakan barang dalam kondisi normal/tidak rusak.</span></label>
+                            <label class="form-label">TTD Nasabah sebagai bukti pemeriksaan *</label>
+                            <div class="signature-canvas-wrap"><canvas id="ttdJaminanPelunasan" width="600" height="180" class="signature" style="height:160px"></canvas></div>
+                            <input type="hidden" name="ttd_jaminan_nasabah" id="ttdJaminanNasabah">
+                            <small class="text-muted d-block mt-2">Tanda tangan nasabah diperlukan untuk melanjutkan pelunasan gadai.</small>
+                        </div>
+
                         <div class="mb-3">
                             <label for="lunaskan_keterangan" class="form-label">Keterangan (Opsional)</label>
                             <textarea class="form-control" id="lunaskan_keterangan" name="keterangan" rows="3" placeholder="Catatan pelunasan..."></textarea>
@@ -479,6 +495,8 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         });
 
         // Lunaskan Modal
+        var ttdJaminanCanvas = document.getElementById('ttdJaminanPelunasan'), ttdJaminanCtx = ttdJaminanCanvas ? ttdJaminanCanvas.getContext('2d') : null, ttdJaminanDrawing = false;
+        if (ttdJaminanCanvas) { ttdJaminanCtx.lineWidth=2.4; ttdJaminanCtx.lineCap='round'; ttdJaminanCtx.lineJoin='round'; ttdJaminanCtx.strokeStyle='#183f49'; function ttdPos(e){var r=ttdJaminanCanvas.getBoundingClientRect();return [(e.clientX-r.left)*ttdJaminanCanvas.width/r.width,(e.clientY-r.top)*ttdJaminanCanvas.height/r.height]} ttdJaminanCanvas.addEventListener('pointerdown',function(e){ttdJaminanDrawing=true;ttdJaminanCanvas.setPointerCapture(e.pointerId);var p=ttdPos(e);ttdJaminanCtx.beginPath();ttdJaminanCtx.moveTo(p[0],p[1])});ttdJaminanCanvas.addEventListener('pointermove',function(e){if(!ttdJaminanDrawing)return;var p=ttdPos(e);ttdJaminanCtx.lineTo(p[0],p[1]);ttdJaminanCtx.stroke()});['pointerup','pointercancel'].forEach(function(ev){ttdJaminanCanvas.addEventListener(ev,function(){ttdJaminanDrawing=false;document.getElementById('ttdJaminanNasabah').value=ttdJaminanCanvas.toDataURL('image/png')})}) }
         var lunaskanModal = document.getElementById('lunaskanModal');
         lunaskanModal.addEventListener('show.bs.modal', function (event) {
             var button = event.relatedTarget;
@@ -497,6 +515,9 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 wa.href = 'https://wa.me/' + telepon + '?text=' + encodeURIComponent('Halo ' + button.getAttribute('data-nama') + ', proses pelunasan pinjaman ' + button.getAttribute('data-kode') + ' sedang diproses.');
                 wa.classList.remove('d-none');
             } else if (wa) { wa.classList.add('d-none'); wa.removeAttribute('href'); }
+            var blokJaminan = document.getElementById('konfirmasiJaminanPelunasan'), detailJaminan = document.getElementById('detailJaminanPelunasan'), cekJaminan = document.getElementById('cekJaminanNasabah'), ttdJaminan = document.getElementById('ttdJaminanNasabah');
+            var isGadai = button.getAttribute('data-gadai') === '1';
+            if (blokJaminan) { blokJaminan.classList.toggle('d-none', !isGadai); var fotoJaminan=document.getElementById('fotoJaminanPelunasan'); if (!isGadai) { cekJaminan.checked=false; ttdJaminan.value=''; fotoJaminan.classList.add('d-none'); } else { detailJaminan.textContent = [button.getAttribute('data-jaminan-jenis'), button.getAttribute('data-jaminan-identitas'), button.getAttribute('data-jaminan-deskripsi')].filter(Boolean).join(' · ') || 'Detail barang jaminan belum tersedia'; var foto=button.getAttribute('data-jaminan-foto')||'';fotoJaminan.src=foto;fotoJaminan.classList.toggle('d-none',!foto); } }
         });
     </script>
 </body>

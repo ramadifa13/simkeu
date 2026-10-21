@@ -104,6 +104,11 @@ function prosesLayanan($db, $aksi, $id, &$files) {
         if (abs($jumlah-$s['total'])>0.001 || !$s['jumlah']) throw new Exception('Nominal harus sama dengan sisa tagihan terbaru setelah diskon Admin.');
         if ($s['denda']-$s['denda_dibayar']>0.005) throw new Exception('Bayar sisa denda melalui menu Denda terlebih dahulu. Foto bukti pembayaran denda wajib dicatat.');
         $metode=$_POST['metode'] ?? '';if (!in_array($metode,['cash','transfer'],true)) throw new Exception('Metode tidak valid.');
+        if ($aksi==='pelunasan_langsung' && $p['memerlukan_jaminan']) {
+            if (empty($_POST['cek_jaminan_nasabah'])) throw new Exception('Nasabah wajib mencentang konfirmasi pemeriksaan barang jaminan.');
+            $ttdJaminan=trim((string)($_POST['ttd_jaminan_nasabah'] ?? ''));
+            if ($ttdJaminan==='' || strpos($ttdJaminan,'data:image/')!==0) throw new Exception('TTD nasabah untuk pemeriksaan jaminan wajib diisi.');
+        } else $ttdJaminan=null;
         if ($aksi!=='pelunasan_langsung' && $p['memerlukan_jaminan'] && empty($_POST['cek_fisik'])) throw new Exception('Verifikasi fisik jaminan wajib dilakukan.');
         $path='';
         if ($aksi!=='pelunasan_langsung') {
@@ -116,7 +121,9 @@ function prosesLayanan($db, $aksi, $id, &$files) {
             $db->prepare('UPDATE layanan_lelang SET kelebihan=kelebihan+kredit,kredit=0 WHERE pinjaman_id=?')->execute([$id]);
         }
         $db->prepare("UPDATE angsuran SET status='lunas',tanggal_bayar=CURDATE(),cara_bayar='pelunasan' WHERE pinjaman_id=? AND status<>'lunas'")->execute([$id]);
-        $db->prepare('INSERT INTO pelunasan_dini (pinjaman_id,jumlah_pelunasan,keterangan,user_id) VALUES (?,?,?,?)')->execute([$id,$jumlah,($approval['admin_id']?'Disetujui Admin '.$approval['admin_id']:'Pelunasan tanpa diskon').'; diskon bunga '.$s['diskon_bunga'],$uid]);
+        $keteranganPelunasan=($approval['admin_id']?'Disetujui Admin '.$approval['admin_id']:'Pelunasan tanpa diskon').'; diskon bunga '.$s['diskon_bunga'];
+        if (kolomAda($db,'pelunasan_dini','cek_jaminan_nasabah')) $db->prepare('INSERT INTO pelunasan_dini (pinjaman_id,jumlah_pelunasan,keterangan,user_id,cek_jaminan_nasabah,ttd_jaminan_nasabah) VALUES (?,?,?,?,?,?)')->execute([$id,$jumlah,$keteranganPelunasan,$uid,$ttdJaminan?1:0,$ttdJaminan]);
+        else $db->prepare('INSERT INTO pelunasan_dini (pinjaman_id,jumlah_pelunasan,keterangan,user_id) VALUES (?,?,?,?)')->execute([$id,$jumlah,$keteranganPelunasan,$uid]);
         $db->prepare("INSERT INTO layanan_pembayaran (pinjaman_id,user_id,jenis,jumlah,metode,bukti,bunga_diskon) VALUES (?,?,'pelunasan',?,?,?,?)")->execute([$id,$uid,$jumlah,$metode,$path,$s['diskon_bunga']]);
         $db->prepare("UPDATE layanan_pelunasan SET status='selesai' WHERE pinjaman_id=?")->execute([$id]);
         tandaiLunasBilaSelesai($db,$id);

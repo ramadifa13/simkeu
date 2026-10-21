@@ -11,7 +11,7 @@ function nomorWhatsApp($nomor) {
 function tombolWhatsApp($nomor, $pesan = '', $label = 'WhatsApp') {
     $nomor = nomorWhatsApp($nomor);
     if (!$nomor) return '';
-    return '<a class="btn btn-sm btn-outline-success mt-1" target="_blank" rel="noopener noreferrer" href="https://wa.me/' . $nomor . '?text=' . rawurlencode($pesan) . '"><i class="fab fa-whatsapp"></i> ' . layananEscape($label) . '</a>';
+    return '<a class="btn btn-sm btn-outline-success mt-1 service-wa-button" target="_blank" rel="noopener noreferrer" href="https://wa.me/' . $nomor . '?text=' . rawurlencode($pesan) . '"><i class="fab fa-whatsapp me-1"></i> ' . layananEscape($label) . '</a>';
 }
 function statusKolektibilitas($hari) {
     $hari = max(0, (int) $hari);
@@ -191,11 +191,11 @@ function layananCatatKas($db, $p, $jumlah, $keterangan) {
     return $id;
 }
 function layananDaftar($db) {
-    return $db->query("SELECT p.*, ag.nama_lengkap,ag.kode_anggota,ag.ktp,ag.telepon,jp.memerlukan_jaminan,
+    return $db->query("SELECT p.*, ag.nama_lengkap,ag.kode_anggota,ag.ktp,ag.foto_ktp,ag.telepon,jp.memerlukan_jaminan,
         (SELECT COALESCE(SUM(ax.jumlah_angsuran),0) FROM angsuran ax WHERE ax.pinjaman_id=p.id) total_balik,
         COALESCE(s.sisa,0) sisa_tagihan, COALESCE(s.denda,0) sisa_denda, COALESCE(s.jumlah,0) sisa_cicilan,
         s.jatuh_tempo, s.terakhir, GREATEST(0,COALESCE(DATEDIFF(CURDATE(),s.jatuh_tempo),0)) hari_telat,
-        j.nilai_taksiran,j.status_jaminan,ro.pinjaman_id AS repeat_selesai
+        j.nilai_taksiran,j.status_jaminan,j.foto_barang,j.foto_nasabah_barang,ro.pinjaman_id AS repeat_selesai
         FROM pinjaman p JOIN anggota ag ON ag.id=p.anggota_id JOIN jenis_pinjaman jp ON jp.id=p.jenis_pinjaman_id
         LEFT JOIN (SELECT pinjaman_id, SUM(jumlah_angsuran+denda) sisa,SUM(jumlah_angsuran) total_balik,SUM(denda) denda,COUNT(*) jumlah,
         MIN(tanggal_jatuh_tempo) jatuh_tempo,MAX(tanggal_jatuh_tempo) terakhir FROM angsuran WHERE status<>'lunas' GROUP BY pinjaman_id) s ON s.pinjaman_id=p.id

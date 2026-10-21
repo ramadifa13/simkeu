@@ -35,14 +35,15 @@ $savings_query = "SELECT
     COALESCE((
         SELECT COALESCE(SUM(CASE WHEN jenis_transaksi = 'setoran' THEN jumlah ELSE -jumlah END), 0)
         FROM transaksi t 
-        WHERE t.anggota_id = :id AND t.jenis_simpanan_id = js.id
+        WHERE t.anggota_id = :id_transaksi AND t.jenis_simpanan_id = js.id
     ), 0) as saldo_transaksi
 FROM jenis_simpanan js
-LEFT JOIN simpanan s ON js.id = s.jenis_simpanan_id AND s.anggota_id = :id
+LEFT JOIN simpanan s ON js.id = s.jenis_simpanan_id AND s.anggota_id = :id_simpanan
 WHERE js.status = 'aktif'
 ORDER BY js.id";
 $stmt_savings = $db->prepare($savings_query);
-$stmt_savings->bindParam(':id', $id);
+$stmt_savings->bindValue(':id_transaksi', $id, PDO::PARAM_INT);
+$stmt_savings->bindValue(':id_simpanan', $id, PDO::PARAM_INT);
 $stmt_savings->execute();
 $savings_data = $stmt_savings->fetchAll(PDO::FETCH_ASSOC);
 

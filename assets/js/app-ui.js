@@ -46,7 +46,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('main .btn,.modal .btn').forEach(classifyButton);
     const sidebar = document.getElementById('sidebarMenu');
     const toggle = document.querySelector('.ui-menu-button');
-    const small = window.matchMedia('(max-width: 1023.98px)');
+    // Samakan breakpoint dengan CSS agar sidebar tidak menimpa konten pada tablet.
+    const small = window.matchMedia('(max-width: 1199.98px)');
     let overlay;
     if (sidebar && toggle) {
         overlay = document.createElement('div');overlay.className='sidebar-overlay';overlay.setAttribute('aria-hidden','true');document.body.appendChild(overlay);
