@@ -15,15 +15,31 @@ document.addEventListener('DOMContentLoaded', function () {
         function options(){return Array.from(select.options).filter(o=>!o.disabled);}
         function selectedLabel(){const o=select.selectedOptions[0];return o&&o.value?o.textContent.trim():'';}
         function close(){list.hidden=true;input.setAttribute('aria-expanded','false');active=-1;}
-        function validate(){input.setCustomValidity(wasRequired&&!select.value?'Pilih salah satu data dari daftar.':'');}
+        function validate(){input.setCustomValidity(select.required&&!select.value?'Pilih salah satu data dari daftar.':'');}
         function choose(value){select.value=value;input.value=selectedLabel();validate();select.dispatchEvent(new Event('change',{bubbles:true}));close();}
-        function render(term){const q=(term||'').trim().toLocaleLowerCase('id');const matches=options().filter(o=>(o.value||!q)&&o.textContent.toLocaleLowerCase('id').includes(q)).slice(0,100);list.replaceChildren();active=-1;if(!matches.length){const empty=document.createElement('div');empty.className='ui-combobox-empty';empty.textContent='Data tidak ditemukan';list.append(empty);}matches.forEach(o=>{const item=document.createElement('button');item.type='button';item.className='ui-combobox-option';item.setAttribute('role','option');item.dataset.value=o.value;item.textContent=o.textContent.trim()||(o.value?'Pilihan':'Kosongkan pilihan');if(o.selected)item.setAttribute('aria-selected','true');item.addEventListener('mousedown',e=>e.preventDefault());item.addEventListener('click',()=>choose(o.value));list.append(item);});list.hidden=false;input.setAttribute('aria-expanded','true');}
+        function render(term){const q=(term||'').trim().toLocaleLowerCase('id');const seen=new Set();const matches=options().filter(o=>(o.value||!q)&&o.textContent.toLocaleLowerCase('id').includes(q)).filter(o=>{if(seen.has(o.value))return false;seen.add(o.value);return true;}).slice(0,100);list.replaceChildren();active=-1;if(!matches.length){const empty=document.createElement('div');empty.className='ui-combobox-empty';empty.textContent='Data tidak ditemukan';list.append(empty);}matches.forEach(o=>{const item=document.createElement('button');item.type='button';item.className='ui-combobox-option';item.setAttribute('role','option');item.dataset.value=o.value;item.textContent=o.textContent.trim()||(o.value?'Pilihan':'Kosongkan pilihan');if(o.selected)item.setAttribute('aria-selected','true');item.addEventListener('mousedown',e=>e.preventDefault());item.addEventListener('click',()=>choose(o.value));list.append(item);});list.hidden=false;input.setAttribute('aria-expanded','true');}
         function move(step){const items=Array.from(list.querySelectorAll('.ui-combobox-option'));if(!items.length)return;active=(active+step+items.length)%items.length;items.forEach((el,i)=>el.classList.toggle('is-active',i===active));items[active].scrollIntoView({block:'nearest'});}
         input.value=selectedLabel();input.addEventListener('focus',()=>render(''));input.addEventListener('input',()=>{if(input.value!==selectedLabel())select.value='';validate();render(input.value);});input.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();if(list.hidden)render(input.value);move(1);}else if(e.key==='ArrowUp'){e.preventDefault();move(-1);}else if(e.key==='Enter'&&!list.hidden){const items=list.querySelectorAll('.ui-combobox-option');if(active>=0&&items[active]){e.preventDefault();choose(items[active].dataset.value);}}else if(e.key==='Escape'){close();input.value=selectedLabel();validate();}});
-        input.addEventListener('blur',()=>setTimeout(()=>{close();input.value=selectedLabel();validate();},120));toggle.addEventListener('click',()=>{if(list.hidden){input.focus();render('');}else close();});select.addEventListener('change',()=>{input.value=selectedLabel();validate();});
-        const sync=()=>{input.disabled=select.disabled;box.classList.toggle('is-disabled',select.disabled);input.value=selectedLabel();validate();};new MutationObserver(sync).observe(select,{childList:true,subtree:true,attributes:true});sync();
+        input.addEventListener('blur',e=>{if(e.relatedTarget===toggle)return;setTimeout(()=>{if(document.activeElement!==toggle){close();input.value=selectedLabel();validate();}},120);});toggle.addEventListener('mousedown',e=>{e.preventDefault();if(list.hidden){input.focus();render('');}else close();});select.addEventListener('change',()=>{input.value=selectedLabel();validate();});
+        const sync=()=>{input.disabled=select.disabled;input.required=select.required;box.classList.toggle('is-disabled',select.disabled);input.value=selectedLabel();validate();};new MutationObserver(sync).observe(select,{childList:true,subtree:true,attributes:true});sync();
     }
     document.querySelectorAll('main select,.modal select').forEach(initAutocompleteSelect);
+
+    // Native validation pada input autocomplete sering hanya menampilkan tooltip
+    // kecil yang tidak terlihat. Tampilkan alasan yang jelas dan fokus ke fieldnya.
+    document.querySelectorAll('form').forEach(form=>{
+        form.addEventListener('invalid',e=>{
+            const field=e.target;
+            if(!field||form.dataset.uiInvalidShown==='1')return;
+            form.dataset.uiInvalidShown='1';
+            field.dataset.uiInvalidShown='1';
+            setTimeout(()=>{delete field.dataset.uiInvalidShown;form.dataset.uiInvalidShown='';},400);
+            const label=field.closest('.mb-3,.col-md-6,.col-md-4,.col-12')?.querySelector('label')?.textContent?.trim() || field.getAttribute('name') || 'Field';
+            const message=field.validity.valueMissing?' wajib diisi.':' belum valid.';
+            alert(label.replace(/\\s+/g,' ')+message);
+            field.focus();
+        },true);
+    });
 
     const actionRules=[['danger',/(hapus|delete|tolak|batalkan|koreksi)/],['whatsapp',/(whatsapp|\bwa\b|tagih)/],['export',/(excel|csv|export)/],['print',/(cetak|print|pdf|kwitansi|surat|bast)/],['edit',/(edit|ubah|pengaturan)/],['view',/(lihat|detail|preview|foto|dokumen)/],['pay',/(bayar|pelunasan|cairkan|setujui|approve)/],['muted',/(reset|batal|tutup|kembali|hapus tanda tangan)/],['primary',/(simpan|tambah|buat|proses|kirim|cari|filter|terapkan|login)/]];
     function classifyButton(button){if(button.classList.contains('badge')||button.classList.contains('btn-close')||button.classList.contains('ui-combobox-toggle'))return;const label=((button.getAttribute('aria-label')||'')+' '+(button.title||'')+' '+button.textContent).trim().toLocaleLowerCase('id');let type=label.includes('hapus tanda tangan')?'muted':'';for(const rule of actionRules)if(!type&&rule[1].test(label)){type=rule[0];break;}if(!type){const icon=button.querySelector('i')?.className||'';if(/trash/.test(icon))type='danger';else if(/edit|pen/.test(icon))type='edit';else if(/eye|camera|image/.test(icon))type='view';else if(/print|file-pdf/.test(icon))type='print';else if(/whatsapp/.test(icon))type='whatsapp';else if(/file-excel|download/.test(icon))type='export';}if(type)button.classList.add('ui-action','ui-action-'+type);}

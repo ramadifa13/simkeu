@@ -492,6 +492,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                             <option value="<?php echo $anggota['id']; ?>"
                                                     data-kategori-shu="<?= htmlspecialchars($anggota['kategori_shu'] ?? 'anggota') ?>"
                                                     data-ketua-id="<?= (int)($anggota['ketua_kelompok_id'] ?? 0) ?>"
+                                                    data-kode-utama="<?= htmlspecialchars($anggota['kode_anggota'] ?? '') ?>"
                                                     data-kode-jaminan="<?= htmlspecialchars($anggota['kode_anggota_jaminan'] ?? '') ?>">
                                                 <?php echo (!empty($anggota['kode_anggota_jaminan']) ? $anggota['kode_anggota_jaminan'] : $anggota['kode_anggota']) . ' - ' . $anggota['nama_lengkap']; ?><?php echo $anggota['status'] !== 'aktif' ? ' (Nonaktif - akan diaktifkan saat pengajuan)' : ''; ?>
                                             </option>
@@ -509,9 +510,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     data-tarif="<?php echo htmlspecialchars(json_encode((object) $jenis['tarif']), ENT_QUOTES); ?>"
                                                     data-frekuensi="<?php echo $jenis['frekuensi_diizinkan']; ?>"
                                                     data-jaminan="<?php echo !empty($jenis['memerlukan_jaminan']) ? '1' : '0'; ?>">
-                                                <?php echo $jenis['nama_jenis']; ?>
-                                                (Maks: <?php echo formatRupiah($jenis['maksimal_pinjaman']); ?> |
-                                                Tenor: <?php echo implode('/', array_keys($jenis['tarif'])); ?> bln)
+                                                <?php echo htmlspecialchars($jenis['nama_jenis'] . (!empty($jenis['memerlukan_jaminan']) ? ' — Gadai' : ' — Tanpa jaminan') . ' — Maks ' . formatRupiah($jenis['maksimal_pinjaman']), ENT_QUOTES, 'UTF-8'); ?>
                                             </option>
                                             <?php endforeach; ?>
                                         </select>
@@ -878,7 +877,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             const kategori = document.getElementById('kategori_shu_pengajuan');
             const ketua = document.getElementById('ketua_kelompok_id');
             const shuWrap = document.getElementById('shuPengajuanWrap');
-            const isAgtj = opt && /^AGTJ/i.test(opt.getAttribute('data-kode-jaminan') || '');
+            const isAgtj = opt && (/^AGTJ/i.test(opt.getAttribute('data-kode-utama') || '') || /^AGTJ/i.test(opt.getAttribute('data-kode-jaminan') || ''));
             if (ambilProfil && opt && opt.value) {
                 kategori.value = opt.getAttribute('data-kategori-shu') || 'anggota';
                 ketua.value = opt.getAttribute('data-ketua-id') || '';
