@@ -318,6 +318,9 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             z-index: 1080;
         }
         .action-menu.show { display: grid !important; gap: .25rem; }
+        .table-actions { position: relative; overflow: visible !important; }
+        .table-actions:has(.action-menu.show) { z-index: 1100; }
+        .table-actions .dropdown:has(.action-menu.show) { z-index: 1101; }
         .action-menu .btn, .action-menu .badge {
             width: 100%;
             min-height: 38px;
