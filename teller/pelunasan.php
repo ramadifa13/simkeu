@@ -316,6 +316,12 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     data-id="<?php echo $pinjaman['id']; ?>"
                                                     data-kode="<?php echo $pinjaman['kode_pinjaman']; ?>"
                                                     data-nama="<?php echo $pinjaman['nama_lengkap']; ?>"
+                                                    data-telepon="<?php echo htmlspecialchars($pinjaman['telepon'] ?? '', ENT_QUOTES); ?>"
+                                                    data-gadai="<?php echo !empty($pinjaman['memerlukan_jaminan']) ? '1' : '0'; ?>"
+                                                    data-jaminan-jenis="<?php echo htmlspecialchars($pinjaman['jenis_barang'] ?? '', ENT_QUOTES); ?>"
+                                                    data-jaminan-identitas="<?php echo htmlspecialchars($pinjaman['identitas_barang'] ?? '', ENT_QUOTES); ?>"
+                                                    data-jaminan-deskripsi="<?php echo htmlspecialchars($pinjaman['deskripsi_barang'] ?? '', ENT_QUOTES); ?>"
+                                                    data-jaminan-foto="<?php echo htmlspecialchars(urlFoto($pinjaman['foto_barang'] ?? ''), ENT_QUOTES); ?>"
                                                     data-sisa_pokok="<?php echo $pinjaman['sisa_pokok']; ?>"
                                                     data-total_sisa_bayar="<?php echo $pinjaman['total_sisa_bayar']; ?>"
                                                     title="Lunaskan">
@@ -517,6 +523,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             } else if (wa) { wa.classList.add('d-none'); wa.removeAttribute('href'); }
             var blokJaminan = document.getElementById('konfirmasiJaminanPelunasan'), detailJaminan = document.getElementById('detailJaminanPelunasan'), cekJaminan = document.getElementById('cekJaminanNasabah'), ttdJaminan = document.getElementById('ttdJaminanNasabah');
             var isGadai = button.getAttribute('data-gadai') === '1';
+            cekJaminan.required = isGadai;
             if (blokJaminan) { blokJaminan.classList.toggle('d-none', !isGadai); var fotoJaminan=document.getElementById('fotoJaminanPelunasan'); if (!isGadai) { cekJaminan.checked=false; ttdJaminan.value=''; fotoJaminan.classList.add('d-none'); } else { detailJaminan.textContent = [button.getAttribute('data-jaminan-jenis'), button.getAttribute('data-jaminan-identitas'), button.getAttribute('data-jaminan-deskripsi')].filter(Boolean).join(' · ') || 'Detail barang jaminan belum tersedia'; var foto=button.getAttribute('data-jaminan-foto')||'';fotoJaminan.src=foto;fotoJaminan.classList.toggle('d-none',!foto); } }
         });
     </script>

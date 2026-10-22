@@ -94,6 +94,7 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
         'hapus_denda'=>0, 'pelunasan_dini'=>0, 'jaminan_kembali'=>0,
         'prioritas'=>0, 'laporan_macet'=>0, 'pembayaran_denda'=>0, 'layanan'=>0, 'total'=>0,
         'pelunasan_disetujui'=>0, 'jaminan_disetujui'=>0,
+        'pengajuan_menunggu'=>0, 'pengajuan_disetujui'=>0, 'pengajuan_ditolak'=>0, 'pengajuan_dicairkan'=>0,
         'jatuh_tempo'=>0, 'terlambat'=>0, 'denda_tertunggak'=>0,
         'anggota_pengajuan'=>0, 'anggota_pencairan'=>0, 'anggota_jatuh_tempo'=>0,
         'anggota_terlambat'=>0, 'anggota_denda'=>0, 'anggota_jaminan'=>0,
@@ -159,8 +160,18 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
         $hasil['pembatalan']=(int)($keputusan['disetujui']??0)+(int)($keputusan['ditolak']??0);
         $stmt=$db->prepare("SELECT COUNT(*) FROM layanan_pelunasan WHERE user_id=? AND status='disetujui'");$stmt->execute([(int)$userId]);$hasil['pelunasan_disetujui']=(int)$stmt->fetchColumn();
         $stmt=$db->prepare("SELECT COUNT(*) FROM layanan_jaminan_kembali WHERE user_id=? AND status='disetujui'");$stmt->execute([(int)$userId]);$hasil['jaminan_disetujui']=(int)$stmt->fetchColumn();
-        $hasil['total']=$hasil['pencairan']+$hasil['pembatalan']+$hasil['pelunasan_disetujui']+$hasil['jaminan_disetujui']+$hasil['jatuh_tempo']+$hasil['terlambat']+$hasil['denda_tertunggak'];
+        foreach (['menunggu','disetujui','ditolak','dicairkan'] as $statusPengajuan) {
+            $stmt=$db->prepare('SELECT COUNT(*) FROM pengajuan_pinjaman WHERE user_id=? AND status=?');
+            $stmt->execute([(int)$userId,$statusPengajuan]);
+            $hasil['pengajuan_'.$statusPengajuan]=(int)$stmt->fetchColumn();
+        }
+        $hasil['total']=$hasil['pencairan']+$hasil['pembatalan']+$hasil['pelunasan_disetujui']+$hasil['jaminan_disetujui']+$hasil['jatuh_tempo']+$hasil['terlambat']+$hasil['denda_tertunggak']+$hasil['pengajuan_menunggu']+$hasil['pengajuan_disetujui']+$hasil['pengajuan_ditolak']+$hasil['pengajuan_dicairkan'];
         $hasil['detail'] = ['pencairan'=>(int)$db->query("SELECT pp.id FROM pengajuan_pinjaman pp WHERE pp.status='disetujui' AND NOT EXISTS(SELECT 1 FROM pinjaman p WHERE p.pengajuan_id=pp.id) ORDER BY pp.id DESC LIMIT 1")->fetchColumn()];
+        foreach (['menunggu','disetujui','ditolak','dicairkan'] as $statusPengajuan) {
+            $stmt=$db->prepare('SELECT id FROM pengajuan_pinjaman WHERE user_id=? AND status=? ORDER BY tanggal_persetujuan DESC,id DESC LIMIT 1');
+            $stmt->execute([(int)$userId,$statusPengajuan]);
+            $hasil['detail']['pengajuan_'.$statusPengajuan]=(int)$stmt->fetchColumn();
+        }
     }
     return $hasil;
 }

@@ -23,6 +23,10 @@ $routes = [
         'pembayaran_denda' => 'admin/laporan_denda.php',
     ],
     'teller' => [
+        'pengajuan_menunggu' => 'teller/pengajuan.php',
+        'pengajuan_disetujui' => 'teller/pengajuan.php',
+        'pengajuan_ditolak' => 'teller/pengajuan.php',
+        'pengajuan_dicairkan' => 'teller/pengajuan.php',
         'pencairan' => 'teller/pencairan.php',
         'pembatalan' => 'teller/angsuran.php',
         'pelunasan_disetujui' => 'teller/laporan_lunas.php?tab=lunas#detail',

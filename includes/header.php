@@ -74,6 +74,10 @@ if (isset($_SESSION['role']) && in_array($_SESSION['role'], ['admin', 'teller', 
             ];
         } elseif ($_SESSION['role'] === 'teller') {
             $headerNotifItems = [
+                ['pengajuan_menunggu', 'Pengajuan menunggu persetujuan Admin', '../notifikasi.php?target=pengajuan_menunggu', 'fa-hourglass-half'],
+                ['pengajuan_disetujui', 'Pengajuan disetujui Admin', '../notifikasi.php?target=pengajuan_disetujui', 'fa-circle-check'],
+                ['pengajuan_ditolak', 'Pengajuan ditolak Admin', '../notifikasi.php?target=pengajuan_ditolak', 'fa-circle-xmark'],
+                ['pengajuan_dicairkan', 'Pengajuan sudah dicairkan', '../notifikasi.php?target=pengajuan_dicairkan', 'fa-money-bill-wave'],
                 ['pencairan', 'Pinjaman siap dicairkan', '../notifikasi.php?target=pencairan', 'fa-money-bill-wave'],
                 ['pembatalan', 'Keputusan pembatalan angsuran', '../notifikasi.php?target=pembatalan', 'fa-calendar-check'],
                 ['pelunasan_disetujui', 'Pelunasan dipercepat disetujui', '../notifikasi.php?target=pelunasan_disetujui', 'fa-flag-checkered'],

@@ -329,6 +329,16 @@ foreach ($stmt_jenis->fetchAll(PDO::FETCH_ASSOC) as $jenis) {
     }
 }
 
+// Filter riwayat pengajuan Teller.
+$riwayat_q = trim($_GET['q'] ?? '');
+$riwayat_mulai = trim($_GET['tanggal_mulai'] ?? '');
+$riwayat_sampai = trim($_GET['tanggal_sampai'] ?? '');
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $riwayat_mulai)) $riwayat_mulai = '';
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $riwayat_sampai)) $riwayat_sampai = '';
+if ($riwayat_mulai !== '' && $riwayat_sampai !== '' && $riwayat_mulai > $riwayat_sampai) {
+    [$riwayat_mulai, $riwayat_sampai] = [$riwayat_sampai, $riwayat_mulai];
+}
+
 // Get pengajuan yang dibuat oleh teller ini
 $query_pengajuan = "SELECT 
                     pp.*, 
@@ -345,11 +355,21 @@ $query_pengajuan = "SELECT
                     JOIN anggota a ON pp.anggota_id = a.id
                     JOIN jenis_pinjaman jp ON pp.jenis_pinjaman_id = jp.id
                     LEFT JOIN users u ON pp.admin_id = u.id
-                    WHERE pp.user_id = :user_id
+                    WHERE pp.user_id = :user_id";
+if ($riwayat_q !== '') {
+    $query_pengajuan .= " AND (a.nama_lengkap LIKE :riwayat_q OR a.kode_anggota LIKE :riwayat_q OR COALESCE(a.kode_anggota_jaminan,'') LIKE :riwayat_q OR pp.kode_pengajuan LIKE :riwayat_q)";
+}
+if ($riwayat_mulai !== '') $query_pengajuan .= " AND DATE(pp.tanggal_pengajuan) >= :riwayat_mulai";
+if ($riwayat_sampai !== '') $query_pengajuan .= " AND DATE(pp.tanggal_pengajuan) <= :riwayat_sampai";
+$query_pengajuan .= "
                     ORDER BY pp.tanggal_pengajuan DESC";
 
 $stmt_pengajuan = $db->prepare($query_pengajuan);
 $stmt_pengajuan->bindParam(':user_id', $_SESSION['user_id']);
+$riwayat_nilai_q = '%' . $riwayat_q . '%';
+if ($riwayat_q !== '') $stmt_pengajuan->bindParam(':riwayat_q', $riwayat_nilai_q);
+if ($riwayat_mulai !== '') $stmt_pengajuan->bindParam(':riwayat_mulai', $riwayat_mulai);
+if ($riwayat_sampai !== '') $stmt_pengajuan->bindParam(':riwayat_sampai', $riwayat_sampai);
 $stmt_pengajuan->execute();
 $pengajuan_list = $stmt_pengajuan->fetchAll(PDO::FETCH_ASSOC);
 
@@ -711,6 +731,12 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                 </span>
                             </div>
                             <div class="card-body">
+                                <form method="get" class="row g-2 mb-3" aria-label="Filter riwayat pengajuan">
+                                    <div class="col-12"><label for="riwayat_q" class="form-label mb-1">Cari nama anggota atau kode</label><input type="search" class="form-control" id="riwayat_q" name="q" value="<?= htmlspecialchars($riwayat_q, ENT_QUOTES) ?>" placeholder="Nama anggota, kode anggota, atau kode pengajuan"></div>
+                                    <div class="col-md-5"><label for="riwayat_mulai" class="form-label mb-1">Tanggal pengajuan dari</label><input type="date" class="form-control" id="riwayat_mulai" name="tanggal_mulai" value="<?= htmlspecialchars($riwayat_mulai, ENT_QUOTES) ?>"></div>
+                                    <div class="col-md-5"><label for="riwayat_sampai" class="form-label mb-1">Sampai</label><input type="date" class="form-control" id="riwayat_sampai" name="tanggal_sampai" value="<?= htmlspecialchars($riwayat_sampai, ENT_QUOTES) ?>"></div>
+                                    <div class="col-md-2 d-flex align-items-end gap-1"><button class="btn btn-success" type="submit">Cari</button><a class="btn btn-outline-secondary" href="pengajuan.php">Reset</a></div>
+                                </form>
                                 <?php if (empty($pengajuan_list)): ?>
                                 <div class="text-center py-4">
                                     <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
