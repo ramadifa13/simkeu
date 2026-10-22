@@ -28,13 +28,14 @@ INSERT INTO anggota (kode_anggota,kode_anggota_jaminan,nama_lengkap,alamat,telep
 ('DMO008','DMJG008','Demo TC Disetujui','Mojokerto','081200000008','3510010000000008','aktif',CURDATE()),
 ('DMO009','DMJG009','Demo TC Ditolak','Mojokerto','081200000009','3510010000000009','aktif',CURDATE()),
 ('DMO010','DMJG010','Demo Jaminan Diserahkan','Mojokerto','081200000010','3510010000000010','aktif',CURDATE()),
-('DMO011','DMJG011','Demo Jaminan Ditolak','Mojokerto','081200000011','3510010000000011','aktif',CURDATE());
+('DMO011','DMJG011','Demo Jaminan Ditolak','Mojokerto','081200000011','3510010000000011','aktif',CURDATE()),
+('DMO012','DMJG012','Demo Jaminan Disetujui','Mojokerto','081200000012','3510010000000012','aktif',CURDATE());
 
 INSERT INTO pengajuan_pinjaman (kode_pengajuan,anggota_id,jenis_pinjaman_id,jumlah_pinjaman,tenor,bunga,skema_bunga,frekuensi,tujuan_pinjaman,status,catatan_admin,admin_id,user_id,tanggal_pengajuan,tanggal_persetujuan) 
-SELECT CONCAT('DEMO-PJG-',LPAD(n,3,'0')),a.id,IF(n IN (4,5,6,10,11),@gadai,@reguler),2000000,3,10,'flat','bulanan','Data demonstrasi semua status',
+SELECT CONCAT('DEMO-PJG-',LPAD(n,3,'0')),a.id,IF(n IN (4,5,6,10,11,12),@gadai,@reguler),2000000,3,10,'flat','bulanan','Data demonstrasi semua status',
 CASE n WHEN 1 THEN 'menunggu' WHEN 2 THEN 'disetujui' WHEN 3 THEN 'ditolak' ELSE 'dicairkan' END,
 CONCAT('Data demo status ',n),IF(n IN (1),NULL,@admin),@teller,NOW(),IF(n=1,NULL,NOW())
-FROM (SELECT 1 n UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11) x
+FROM (SELECT 1 n UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11 UNION SELECT 12) x
 JOIN anggota a ON a.kode_anggota=CONCAT('DMO',LPAD(n,3,'0'));
 
 -- Tiga pengajuan TC tetap berstatus disetujui/belum cair.
@@ -66,6 +67,7 @@ INSERT INTO layanan_jaminan_kembali (pinjaman_id,user_id,status,admin_id,alasan,
 INSERT INTO layanan_jaminan_kembali (pinjaman_id,user_id,status,admin_id,alasan,bukti_jaminan,bukti_lunas,catatan_admin,diperiksa_at) SELECT id,@teller,'pengecekan',@admin,'Pengembalian demo pengecekan','jaminan_kembali/demo-bukti.jpeg','pembayaran/demo-bukti.jpeg','Sedang diperiksa',NOW() FROM pinjaman WHERE kode_pinjaman='DEMO-PJN-005';
 INSERT INTO layanan_jaminan_kembali (pinjaman_id,user_id,status,admin_id,alasan,bukti_jaminan,bukti_lunas,catatan_admin,diperiksa_at) SELECT id,@teller,'diserahkan',@admin,'Pengembalian demo selesai','jaminan_kembali/demo-bukti.jpeg','pembayaran/demo-bukti.jpeg','Diserahkan kepada nasabah',NOW() FROM pinjaman WHERE kode_pinjaman='DEMO-PJN-010';
 INSERT INTO layanan_jaminan_kembali (pinjaman_id,user_id,status,admin_id,alasan,bukti_jaminan,bukti_lunas,catatan_admin,diperiksa_at) SELECT id,@teller,'ditolak',@admin,'Pengembalian demo ditolak','jaminan_kembali/demo-bukti.jpeg','pembayaran/demo-bukti.jpeg','Dokumen belum sesuai',NOW() FROM pinjaman WHERE kode_pinjaman='DEMO-PJN-011';
+INSERT INTO layanan_jaminan_kembali (pinjaman_id,user_id,status,admin_id,alasan,bukti_jaminan,bukti_lunas,catatan_admin,diperiksa_at) SELECT id,@teller,'disetujui',@admin,'Pengembalian demo disetujui','jaminan_kembali/demo-bukti.jpeg','pembayaran/demo-bukti.jpeg','Jaminan siap diserahkan',NOW() FROM pinjaman WHERE kode_pinjaman='DEMO-PJN-012';
 
 INSERT INTO layanan_pelunasan (pinjaman_id,user_id,status,diskon_persen,admin_id,catatan) SELECT id,@teller,'menunggu',0,NULL,'Demo pelunasan menunggu' FROM pinjaman WHERE kode_pinjaman='DEMO-PJN-004';
 INSERT INTO layanan_pelunasan (pinjaman_id,user_id,status,diskon_persen,admin_id,catatan) SELECT id,@teller,'disetujui',10,@admin,'Demo pelunasan disetujui' FROM pinjaman WHERE kode_pinjaman='DEMO-PJN-006';
