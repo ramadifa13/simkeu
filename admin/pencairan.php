@@ -115,7 +115,6 @@ $tcMenunggu=$db->query("SELECT tc.*,pp.kode_pengajuan,a.nama_lengkap,a.kode_angg
 $query_dicairkan = "SELECT p.*, a.nama_lengkap,
                    CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
                    jp.nama_jenis, j.jenis_barang, j.foto_barang, j.foto_nasabah_barang, pr.id AS perjanjian_id,
-                   (SELECT lk.id FROM layanan_jaminan_kembali lk WHERE lk.pinjaman_id=p.id AND lk.status='diserahkan' LIMIT 1) AS bast_id,
                    (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status <> 'lunas') AS cicilan_belum,
           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) AS total_cicilan
                    FROM pinjaman p
@@ -423,9 +422,7 @@ function formatRupiah($angka) {
                                             <td><?php echo labelTenorRow($p); ?></td>
                                             <td><?php echo date('d/m/Y', strtotime($p['tanggal_pencairan'])); ?></td>
                                             <td>
-                                                <span class="badge bg-<?php echo $p['status'] == 'aktif' ? 'success' : 'secondary'; ?>">
-                                                    <?php echo ucfirst($p['status']); ?>
-                                                </span>
+                                                <span class="badge bg-info">Dicairkan</span>
                                             </td>
                                             <td>
                                                 <?php if (!empty($p['foto_pencairan'])): ?>
@@ -449,13 +446,6 @@ function formatRupiah($angka) {
                                                     <i class="fas fa-user-tag"></i>
                                                 </button>
                                                 <?php endif; ?>
-                                                <?php if ((int) $p['total_cicilan'] > 0 && (int) $p['cicilan_belum'] === 0): ?>
-                                                <a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener"
-                                                   href="cetak_bukti_pelunasan.php?id=<?php echo (int) $p['id']; ?>" title="Cetak Bukti Pelunasan">
-                                                    <i class="fas fa-file-invoice"></i>
-                                                </a>
-                                                <?php endif; ?>
-                                                <?php if (!empty($p['bast_id'])): ?><a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" href="../includes/kwitansi_layanan.php?jenis=bast&id=<?php echo (int)$p['bast_id']; ?>" title="Cetak Akad Serah Terima Barang"><i class="fas fa-file-signature"></i></a><?php endif; ?>
                                                 <a class="btn btn-sm btn-success" target="_blank" rel="noopener"
                                                    href="cetak_slip_pencairan.php?id=<?php echo (int) $p['id']; ?>" title="Cetak Slip">
                                                     <i class="fas fa-print"></i>

@@ -226,7 +226,6 @@ $query = "SELECT pp.*, a.nama_lengkap,
           p.id as pinjaman_id, p.kode_pinjaman, p.tanggal_pencairan, p.status as status_pinjaman,
           p.foto_pencairan, uc.nama_lengkap as teller_name,
           pr.id AS perjanjian_id, tc.status AS status_tc, tc.alasan AS alasan_tc, tc.catatan_admin AS catatan_tc,
-          (SELECT lk.id FROM layanan_jaminan_kembali lk WHERE lk.pinjaman_id=p.id AND lk.status='diserahkan' LIMIT 1) AS bast_id,
           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status <> 'lunas') AS cicilan_belum,
           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) AS total_cicilan
           FROM pengajuan_pinjaman pp
@@ -238,7 +237,7 @@ $query = "SELECT pp.*, a.nama_lengkap,
           LEFT JOIN users uc ON p.dicairkan_oleh = uc.id
           LEFT JOIN perjanjian_pinjaman pr ON pr.pinjaman_id = p.id
           LEFT JOIN layanan_tunda_cair tc ON tc.pengajuan_id = pp.id
-          WHERE (pp.status IN ('disetujui', 'dicairkan', 'develop')
+          WHERE (pp.status IN ('menunggu', 'disetujui', 'dicairkan', 'develop')
           OR (pp.status = '' AND pp.tanggal_persetujuan IS NOT NULL))";
 $params_filter = [];
 if ($filter_cari !== '') {
@@ -549,12 +548,11 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                             if ($status == 'develop' || ($status == '' && $pengajuan['tanggal_persetujuan'])) {
                                                 $status = 'disetujui';
                                             }
-                                            if (!empty($pengajuan['pinjaman_id'])) {
-                                                $status = $pengajuan['status_pinjaman'] == 'lunas' ? 'lunas' : 'dicairkan';
-                                            }
+                                            // Di menu Pencairan status selalu mengikuti tahap pencairan,
+                                            // bukan siklus pelunasan pinjaman.
+                                            if (!empty($pengajuan['pinjaman_id'])) $status = 'dicairkan';
                                             $belum_cair = ($status == 'disetujui' && empty($pengajuan['pinjaman_id']));
                                             $status_class = [
-                                                'lunas' => 'secondary',
                                                 'menunggu' => 'warning',
                                                 'disetujui' => 'success',
                                                 'dicairkan' => 'info',
@@ -644,14 +642,6 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                                 <i class="fas fa-user-tag"></i>
                                             </button>
                                             <?php endif; ?>
-                                            <?php if (!empty($pengajuan['pinjaman_id']) && (int) $pengajuan['total_cicilan'] > 0 && (int) $pengajuan['cicilan_belum'] === 0): ?>
-                                            <a class="btn btn-sm btn-success btn-action" target="_blank" rel="noopener"
-                                               href="cetak_bukti_pelunasan.php?id=<?php echo (int) $pengajuan['pinjaman_id']; ?>"
-                                               title="Cetak Bukti Pelunasan">
-                                                <i class="fas fa-file-invoice"></i>
-                                            </a>
-                                            <?php endif; ?>
-                                            <?php if (!empty($pengajuan['bast_id'])): ?><a class="btn btn-sm btn-outline-primary btn-action" target="_blank" rel="noopener" href="../includes/kwitansi_layanan.php?jenis=bast&id=<?php echo (int)$pengajuan['bast_id']; ?>" title="Cetak Akad Serah Terima Barang"><i class="fas fa-file-signature me-1"></i>Akad</a><?php endif; ?>
                                             <!-- Slip pencairan (A5) - hanya untuk pengajuan yang sudah menjadi pinjaman -->
                                             <?php if (!empty($pengajuan['pinjaman_id'])): ?>
                                             <a class="btn btn-sm btn-success btn-action" target="_blank" rel="noopener"
