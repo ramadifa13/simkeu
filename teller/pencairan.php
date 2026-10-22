@@ -35,6 +35,23 @@ $aturan_perjanjian_form = pengaturanPerjanjian($db);
 // Upload melebihi post_max_size membuat $_POST kosong; tampilkan pesan yang jelas
 cekPostMelebihiBatas();
 
+// Tunda cair (TC) harus disetujui atau ditolak Admin sebelum Teller dapat
+// melanjutkan pencairan. Status pengajuan tetap "disetujui" agar data tidak hilang.
+if ($_POST && isset($_POST['ajukan_tc'])) {
+    try {
+        layananValidasiToken();
+        $id=(int)($_POST['id'] ?? 0); $alasan=trim((string)($_POST['alasan_tc'] ?? ''));
+        if (strlen($alasan)<5 || strlen($alasan)>2000) throw new Exception('Keterangan TC wajib 5–2000 karakter.');
+        $stmt=$db->prepare("SELECT id FROM pengajuan_pinjaman WHERE id=? AND status='disetujui' AND NOT EXISTS (SELECT 1 FROM pinjaman WHERE pengajuan_id=pengajuan_pinjaman.id) FOR UPDATE");
+        $db->beginTransaction(); $stmt->execute([$id]);
+        if (!$stmt->fetchColumn()) throw new Exception('Pengajuan tidak tersedia untuk TC.');
+        $db->prepare("INSERT INTO layanan_tunda_cair (pengajuan_id,user_id,status,alasan,admin_id,catatan_admin,diputuskan_at) VALUES (?,?, 'menunggu', ?,NULL,NULL,NULL) ON DUPLICATE KEY UPDATE user_id=VALUES(user_id),status='menunggu',alasan=VALUES(alasan),admin_id=NULL,catatan_admin=NULL,diputuskan_at=NULL,created_at=NOW()")
+           ->execute([$id,$_SESSION['user_id'],$alasan]);
+        $db->commit(); $_SESSION['success']='Pengajuan TC dikirim dan menunggu persetujuan Admin.';
+    } catch(Exception $e) { if($db->inTransaction())$db->rollBack(); $_SESSION['error']='Gagal mengajukan TC: '.$e->getMessage(); }
+    header('Location: pencairan.php'); exit;
+}
+
 // ============================================
 // PROSES PENCAIRAN (hanya Teller, foto nasabah wajib)
 // Persetujuan Admin hanya mengubah status; pinjaman + jadwal angsuran dibuat di sini,
@@ -59,7 +76,8 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
                               JOIN jenis_pinjaman jp ON jp.id = pp.jenis_pinjaman_id
                               JOIN anggota a ON a.id = pp.anggota_id
                               LEFT JOIN jaminan_pinjaman j ON j.pengajuan_id = pp.id
-                              WHERE pp.id = ? AND pp.status = 'disetujui' FOR UPDATE");
+                              WHERE pp.id = ? AND pp.status = 'disetujui'
+                              AND NOT EXISTS (SELECT 1 FROM layanan_tunda_cair tc WHERE tc.pengajuan_id=pp.id AND tc.status IN ('menunggu','disetujui')) FOR UPDATE");
         $stmt->execute([$id]);
         $pengajuan = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$pengajuan) {
@@ -207,7 +225,8 @@ $query = "SELECT pp.*, a.nama_lengkap,
           j.jenis_barang, j.foto_barang, j.foto_nasabah_barang,
           p.id as pinjaman_id, p.kode_pinjaman, p.tanggal_pencairan, p.status as status_pinjaman,
           p.foto_pencairan, uc.nama_lengkap as teller_name,
-          pr.id AS perjanjian_id,
+          pr.id AS perjanjian_id, tc.status AS status_tc, tc.alasan AS alasan_tc, tc.catatan_admin AS catatan_tc,
+          (SELECT lk.id FROM layanan_jaminan_kembali lk WHERE lk.pinjaman_id=p.id AND lk.status='diserahkan' LIMIT 1) AS bast_id,
           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status <> 'lunas') AS cicilan_belum,
           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) AS total_cicilan
           FROM pengajuan_pinjaman pp
@@ -218,6 +237,7 @@ $query = "SELECT pp.*, a.nama_lengkap,
           LEFT JOIN pinjaman p ON pp.id = p.pengajuan_id
           LEFT JOIN users uc ON p.dicairkan_oleh = uc.id
           LEFT JOIN perjanjian_pinjaman pr ON pr.pinjaman_id = p.id
+          LEFT JOIN layanan_tunda_cair tc ON tc.pengajuan_id = pp.id
           WHERE (pp.status IN ('disetujui', 'dicairkan', 'develop')
           OR (pp.status = '' AND pp.tanggal_persetujuan IS NOT NULL))";
 $params_filter = [];
@@ -580,7 +600,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                                 <i class="fas fa-eye"></i>
                                             </button>
                                             
-                                            <?php if ($belum_cair): ?>
+                                            <?php if ($belum_cair && !in_array(($pengajuan['status_tc'] ?? ''), ['menunggu','disetujui'], true)): ?>
                                             <button class="btn btn-sm btn-primary btn-action" data-bs-toggle="modal"
                                                     data-bs-target="#pencairanModal"
                                                     data-id="<?php echo (int) $pengajuan['id']; ?>"
@@ -595,12 +615,14 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                                     data-ringkas="<?php echo htmlspecialchars(labelTenorRow($pengajuan) . ' | ' . ringkasanAngsuran(hitungDariPinjaman($pengajuan))); ?>">
                                                 <i class="fas fa-hand-holding-usd me-1"></i>Proses Pencairan
                                             </button>
+                                            <button class="btn btn-sm btn-outline-warning btn-action" data-bs-toggle="modal" data-bs-target="#tcModal" data-id="<?php echo (int)$pengajuan['id']; ?>" data-nama="<?php echo htmlspecialchars($pengajuan['nama_lengkap'], ENT_QUOTES); ?>" data-kode="<?php echo htmlspecialchars($pengajuan['kode_pengajuan'], ENT_QUOTES); ?>" title="Tunda Cair"><i class="fas fa-pause-circle me-1"></i>TC</button>
                                             <a class="btn btn-sm btn-outline-primary btn-action" target="_blank" rel="noopener"
                                                href="cetak_draft_perjanjian.php?id=<?php echo (int)$pengajuan['id']; ?>"
                                                title="Cetak surat perjanjian sebelum pencairan">
                                                 <i class="fas fa-file-contract me-1"></i>Perjanjian
                                             </a>
                                             <?php endif; ?>
+                                            <?php if (($pengajuan['status_tc'] ?? '')==='menunggu'): ?><span class="badge bg-warning text-dark">TC menunggu Admin</span><?php elseif(($pengajuan['status_tc'] ?? '')==='disetujui'): ?><span class="badge bg-secondary" title="<?= htmlspecialchars($pengajuan['alasan_tc'] ?? '',ENT_QUOTES) ?>">TC disetujui</span><?php elseif(($pengajuan['status_tc'] ?? '')==='ditolak'): ?><span class="badge bg-danger" title="<?= htmlspecialchars($pengajuan['catatan_tc'] ?? '',ENT_QUOTES) ?>">TC ditolak</span><?php endif; ?>
                                             <?php if (!empty($pengajuan['foto_pencairan'])): ?>
                                             <button class="btn btn-sm btn-outline-secondary btn-action" type="button"
                                                     onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($pengajuan['foto_pencairan']), ENT_QUOTES); ?>', 'Foto nasabah - <?php echo htmlspecialchars($pengajuan['nama_lengkap'], ENT_QUOTES); ?>')"
@@ -629,6 +651,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                                 <i class="fas fa-file-invoice"></i>
                                             </a>
                                             <?php endif; ?>
+                                            <?php if (!empty($pengajuan['bast_id'])): ?><a class="btn btn-sm btn-outline-primary btn-action" target="_blank" rel="noopener" href="../includes/kwitansi_layanan.php?jenis=bast&id=<?php echo (int)$pengajuan['bast_id']; ?>" title="Cetak Akad Serah Terima Barang"><i class="fas fa-file-signature me-1"></i>Akad</a><?php endif; ?>
                                             <!-- Slip pencairan (A5) - hanya untuk pengajuan yang sudah menjadi pinjaman -->
                                             <?php if (!empty($pengajuan['pinjaman_id'])): ?>
                                             <a class="btn btn-sm btn-success btn-action" target="_blank" rel="noopener"
@@ -806,6 +829,9 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
         </div>
     </div>
 
+    <!-- Tunda Cair Modal -->
+    <div class="modal fade" id="tcModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="post"><?= layananToken() ?><input type="hidden" name="ajukan_tc" value="1"><input type="hidden" name="id" id="tc_id"><div class="modal-header bg-warning"><h5 class="modal-title"><i class="fas fa-pause-circle me-2"></i>Tunda Cair (TC)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p>Ajukan penundaan pencairan untuk <strong id="tc_nama"></strong> (<span id="tc_kode"></span>).</p><label class="form-label">Keterangan alasan TC <span class="text-danger">*</span></label><textarea name="alasan_tc" class="form-control" rows="4" minlength="5" maxlength="2000" required placeholder="Contoh: Nasabah meminta pencairan ditunda hingga dokumen dilengkapi."></textarea><small class="text-muted">Pengajuan akan diperiksa Admin. Pencairan tidak dapat diproses selama TC menunggu atau disetujui.</small></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-warning">Ajukan TC</button></div></form></div></div></div>
+
     <!-- Proses Pencairan Modal -->
     <div class="modal fade" id="pencairanModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -888,6 +914,8 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
     <?php include __DIR__ . '/../includes/modal_dokumen.php'; ?>
     <script>
         var pencairanModal = document.getElementById('pencairanModal');
+        var tcModal=document.getElementById('tcModal');
+        tcModal.addEventListener('show.bs.modal',function(event){var b=event.relatedTarget;document.getElementById('tc_id').value=b.getAttribute('data-id');document.getElementById('tc_nama').textContent=b.getAttribute('data-nama');document.getElementById('tc_kode').textContent=b.getAttribute('data-kode');});
         function updatePencairanViewport() {
             var height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
             pencairanModal.style.setProperty('--pencairan-viewport-height', height + 'px');

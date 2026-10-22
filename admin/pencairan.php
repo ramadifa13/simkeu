@@ -20,6 +20,22 @@ if (!isAdmin()) {
 
 $page_title = "Pencairan Pinjaman";
 
+// Keputusan TC: Admin memeriksa alasan Teller. Approve mempertahankan
+// penundaan, Tolak membuka kembali pengajuan untuk diproses Teller.
+if ($_POST && isset($_POST['keputusan_tc'])) {
+    try {
+        layananValidasiToken();
+        $tcId=(int)($_POST['tc_id'] ?? 0); $aksi=$_POST['keputusan_tc']; $catatan=trim((string)($_POST['catatan_tc'] ?? ''));
+        if (!in_array($aksi,['disetujui','ditolak'],true)) throw new Exception('Keputusan TC tidak valid.');
+        if (strlen($catatan)<5 || strlen($catatan)>2000) throw new Exception('Keterangan Admin wajib 5–2000 karakter.');
+        $stmt=$db->prepare("UPDATE layanan_tunda_cair SET status=?,admin_id=?,catatan_admin=?,diputuskan_at=NOW() WHERE id=? AND status='menunggu'");
+        $stmt->execute([$aksi,$_SESSION['user_id'],$catatan,$tcId]);
+        if(!$stmt->rowCount()) throw new Exception('Pengajuan TC tidak ditemukan atau sudah diputuskan.');
+        $_SESSION['success']='Keputusan TC berhasil disimpan.';
+    } catch(Exception $e) { $_SESSION['error']='Gagal menyimpan keputusan TC: '.$e->getMessage(); }
+    header('Location: pencairan.php'); exit;
+}
+
 // ============================================
 // SINKRONISASI DATA
 // ============================================
@@ -93,10 +109,13 @@ $stmt = $db->prepare($query);
 $stmt->execute($params_siap);
 $pengajuan_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+$tcMenunggu=$db->query("SELECT tc.*,pp.kode_pengajuan,a.nama_lengkap,a.kode_anggota,u.nama_lengkap teller FROM layanan_tunda_cair tc JOIN pengajuan_pinjaman pp ON pp.id=tc.pengajuan_id JOIN anggota a ON a.id=pp.anggota_id JOIN users u ON u.id=tc.user_id WHERE tc.status='menunggu' ORDER BY tc.created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+
 // Get disbursed loans dengan JOIN lengkap
 $query_dicairkan = "SELECT p.*, a.nama_lengkap,
                    CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
                    jp.nama_jenis, j.jenis_barang, j.foto_barang, j.foto_nasabah_barang, pr.id AS perjanjian_id,
+                   (SELECT lk.id FROM layanan_jaminan_kembali lk WHERE lk.pinjaman_id=p.id AND lk.status='diserahkan' LIMIT 1) AS bast_id,
                    (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status <> 'lunas') AS cicilan_belum,
           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) AS total_cicilan
                    FROM pinjaman p
@@ -311,6 +330,9 @@ function formatRupiah($angka) {
                 </div>
                 <?php endif; ?>
 
+                <!-- Persetujuan Tunda Cair -->
+                <div class="card mb-4 border-warning"><div class="card-header bg-warning"><h5 class="mb-0"><i class="fas fa-pause-circle me-2"></i>Pengajuan Tunda Cair (TC) <span class="badge bg-light text-dark ms-2"><?= count($tcMenunggu) ?> Data</span></h5></div><div class="card-body"><?php if(!$tcMenunggu): ?><p class="text-muted mb-0">Tidak ada TC yang menunggu keputusan.</p><?php else: ?><div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Pengajuan</th><th>Nasabah</th><th>Alasan Teller</th><th>Waktu</th><th>Keputusan Admin</th></tr></thead><tbody><?php foreach($tcMenunggu as $tc): ?><tr><td><?= htmlspecialchars($tc['kode_pengajuan']) ?></td><td><strong><?= htmlspecialchars($tc['nama_lengkap']) ?></strong><br><small><?= htmlspecialchars($tc['kode_anggota']) ?></small></td><td><?= nl2br(htmlspecialchars($tc['alasan'])) ?></td><td><?= date('d/m/Y H:i',strtotime($tc['created_at'])) ?><br><small><?= htmlspecialchars($tc['teller']) ?></small></td><td><form method="post" class="d-flex flex-column gap-1"><?= layananToken() ?><input type="hidden" name="tc_id" value="<?= (int)$tc['id'] ?>"><textarea name="catatan_tc" class="form-control form-control-sm" rows="2" minlength="5" maxlength="2000" required placeholder="Keterangan keputusan Admin"></textarea><div class="btn-group"><button name="keputusan_tc" value="disetujui" class="btn btn-sm btn-success">Approve TC</button><button name="keputusan_tc" value="ditolak" class="btn btn-sm btn-danger">Tolak TC</button></div></form></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?></div></div>
+
                 <!-- Pengajuan Siap Dicairkan -->
                 <div class="card mb-4">
                     <div class="card-header bg-success text-white">
@@ -433,6 +455,7 @@ function formatRupiah($angka) {
                                                     <i class="fas fa-file-invoice"></i>
                                                 </a>
                                                 <?php endif; ?>
+                                                <?php if (!empty($p['bast_id'])): ?><a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" href="../includes/kwitansi_layanan.php?jenis=bast&id=<?php echo (int)$p['bast_id']; ?>" title="Cetak Akad Serah Terima Barang"><i class="fas fa-file-signature"></i></a><?php endif; ?>
                                                 <a class="btn btn-sm btn-success" target="_blank" rel="noopener"
                                                    href="cetak_slip_pencairan.php?id=<?php echo (int) $p['id']; ?>" title="Cetak Slip">
                                                     <i class="fas fa-print"></i>
