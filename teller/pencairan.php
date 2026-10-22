@@ -45,7 +45,10 @@ if ($_POST && isset($_POST['ajukan_tc'])) {
         $stmt=$db->prepare("SELECT id FROM pengajuan_pinjaman WHERE id=? AND status='disetujui' AND NOT EXISTS (SELECT 1 FROM pinjaman WHERE pengajuan_id=pengajuan_pinjaman.id) FOR UPDATE");
         $db->beginTransaction(); $stmt->execute([$id]);
         if (!$stmt->fetchColumn()) throw new Exception('Pengajuan tidak tersedia untuk TC.');
-        $db->prepare("INSERT INTO layanan_tunda_cair (pengajuan_id,user_id,status,alasan,admin_id,catatan_admin,diputuskan_at) VALUES (?,?, 'menunggu', ?,NULL,NULL,NULL) ON DUPLICATE KEY UPDATE user_id=VALUES(user_id),status='menunggu',alasan=VALUES(alasan),admin_id=NULL,catatan_admin=NULL,diputuskan_at=NULL,created_at=NOW()")
+        $cekTc=$db->prepare("SELECT status FROM layanan_tunda_cair WHERE pengajuan_id=? FOR UPDATE");
+        $cekTc->execute([$id]);
+        if ($cekTc->fetchColumn() !== false) throw new Exception('TC sudah pernah diputuskan Admin dan tidak dapat diajukan ulang.');
+        $db->prepare("INSERT INTO layanan_tunda_cair (pengajuan_id,user_id,status,alasan) VALUES (?,?, 'menunggu', ?)")
            ->execute([$id,$_SESSION['user_id'],$alasan]);
         $db->commit(); $_SESSION['success']='Pengajuan TC dikirim dan menunggu persetujuan Admin.';
     } catch(Exception $e) { if($db->inTransaction())$db->rollBack(); $_SESSION['error']='Gagal mengajukan TC: '.$e->getMessage(); }
@@ -613,14 +616,14 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                                     data-ringkas="<?php echo htmlspecialchars(labelTenorRow($pengajuan) . ' | ' . ringkasanAngsuran(hitungDariPinjaman($pengajuan))); ?>">
                                                 <i class="fas fa-hand-holding-usd me-1"></i>Proses Pencairan
                                             </button>
-                                            <button class="btn btn-sm btn-outline-warning btn-action" data-bs-toggle="modal" data-bs-target="#tcModal" data-id="<?php echo (int)$pengajuan['id']; ?>" data-nama="<?php echo htmlspecialchars($pengajuan['nama_lengkap'], ENT_QUOTES); ?>" data-kode="<?php echo htmlspecialchars($pengajuan['kode_pengajuan'], ENT_QUOTES); ?>" title="Tunda Cair"><i class="fas fa-pause-circle me-1"></i>TC</button>
                                             <a class="btn btn-sm btn-outline-primary btn-action" target="_blank" rel="noopener"
                                                href="cetak_draft_perjanjian.php?id=<?php echo (int)$pengajuan['id']; ?>"
                                                title="Cetak surat perjanjian sebelum pencairan">
                                                 <i class="fas fa-file-contract me-1"></i>Perjanjian
                                             </a>
                                             <?php endif; ?>
-                                            <?php if (($pengajuan['status_tc'] ?? '')==='menunggu'): ?><span class="badge bg-warning text-dark">TC menunggu Admin</span><?php elseif(($pengajuan['status_tc'] ?? '')==='disetujui'): ?><span class="badge bg-secondary" title="<?= htmlspecialchars($pengajuan['alasan_tc'] ?? '',ENT_QUOTES) ?>">TC disetujui</span><?php elseif(($pengajuan['status_tc'] ?? '')==='ditolak'): ?><span class="badge bg-danger" title="<?= htmlspecialchars($pengajuan['catatan_tc'] ?? '',ENT_QUOTES) ?>">TC ditolak</span><?php endif; ?>
+                                            <?php if ($belum_cair && empty($pengajuan['status_tc'])): ?><button class="btn btn-sm btn-outline-warning btn-action" data-bs-toggle="modal" data-bs-target="#tcModal" data-id="<?php echo (int)$pengajuan['id']; ?>" data-nama="<?php echo htmlspecialchars($pengajuan['nama_lengkap'], ENT_QUOTES); ?>" data-kode="<?php echo htmlspecialchars($pengajuan['kode_pengajuan'], ENT_QUOTES); ?>" title="Tunda Cair"><i class="fas fa-pause-circle me-1"></i>TC</button><?php endif; ?>
+                                            <?php if (($pengajuan['status_tc'] ?? '')==='menunggu'): ?><span class="badge bg-warning text-dark">TC menunggu Admin</span><?php elseif(($pengajuan['status_tc'] ?? '')==='disetujui'): ?><span class="badge bg-secondary" title="<?= htmlspecialchars($pengajuan['alasan_tc'] ?? '',ENT_QUOTES) ?>">TC disetujui</span><?php elseif(($pengajuan['status_tc'] ?? '')==='ditolak'): ?><button type="button" class="btn btn-sm btn-outline-secondary btn-action" disabled title="TC yang sudah ditolak tidak dapat diajukan ulang"><i class="fas fa-ban me-1"></i>TC ditolak</button><?php endif; ?>
                                             <?php if (!empty($pengajuan['foto_pencairan'])): ?>
                                             <button class="btn btn-sm btn-outline-secondary btn-action" type="button"
                                                     onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($pengajuan['foto_pencairan']), ENT_QUOTES); ?>', 'Foto nasabah - <?php echo htmlspecialchars($pengajuan['nama_lengkap'], ENT_QUOTES); ?>')"
