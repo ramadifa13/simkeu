@@ -21,15 +21,23 @@ $html.='<h4>PIHAK PERTAMA — PEMBERI PINJAMAN</h4><table cellpadding="2"><tr><t
 $lahir=trim(($a['tempat_lahir'] ?? '').(!empty($a['tanggal_lahir'])?', '.date('d/m/Y',strtotime($a['tanggal_lahir'])):''));
 $html.='<h4>PIHAK KEDUA — PENERIMA PINJAMAN</h4><table cellpadding="2"><tr><td width="25%">Nama / Kode</td><td>: <b>'.$e($a['nama']).'</b> / '.$e($a['kode']).'</td></tr><tr><td>NIK / Tempat, Tgl Lahir</td><td>: '.$e($a['nik']).' / '.$e($lahir).'</td></tr><tr><td>Alamat / No. HP</td><td>: '.$e($a['alamat']).' / '.$e($a['telepon']).'</td></tr></table>';
 $html.='<h4>RINCIAN PINJAMAN</h4><table cellpadding="2"><tr><td width="30%">Jenis / Nilai Pinjaman</td><td width="70%">: '.$e($p['jenis']).' / <b>'.$rp($p['jumlah']).'</b></td></tr><tr><td>Tujuan Pinjaman</td><td>: '.$e($p['tujuan'] ?? '-').'</td></tr><tr><td>Tenor / Frekuensi</td><td>: '.$e($p['tenor']).' bulan / '.$e($p['frekuensi']).' ('.$e($p['jumlah_cicilan'] ?? '').' kali)</td></tr><tr><td>Bunga / Total / Angsuran</td><td>: '.$e($p['bunga']).'% / '.$rp($p['total']).' / '.$rp($p['angsuran']).'</td></tr><tr><td>Pencairan / Jatuh Tempo</td><td>: '.$e(date('d/m/Y',strtotime($p['tanggal_pencairan']))).' / <b>'.$e(date('d/m/Y',strtotime($p['jatuh_tempo']))).'</b></td></tr></table>';
-if (!empty($data['jaminan']['ada'])) $html.='<p><b>Jaminan:</b> '.$e($data['jaminan']['jenis']).'<br>'.$e($data['jaminan']['detail']).'</p>';
-$html.='<h4>Ketentuan Perjanjian</h4><div style="line-height:1.5">'.nl2br($e($data['isi_perjanjian'])).'</div><p>Dengan membubuhkan tanda tangan di bawah ini, para pihak menyatakan data telah dibaca dan disetujui.</p>';
+if (!empty($data['jaminan']['ada'])) {
+    $html.='<h4>PASAL 3 - JAMINAN</h4><p>Sebagai jaminan atas hutang tersebut, PIHAK KEDUA menyerahkan jaminan berupa:<br><b>Jenis:</b> '.$e($data['jaminan']['jenis']).'<br>'.nl2br($e($data['jaminan']['detail'])).'<br>Jaminan dikembalikan sepenuhnya setelah seluruh hutang dan bunga lunas 100%.</p>';
+    $html.='<h4>PASAL 4 - WANPRESTASI</h4><p>Apabila PIHAK KEDUA tidak melunasi pada tanggal jatuh tempo, PIHAK PERTAMA berhak menjual atau mengalihkan jaminan untuk pelunasan hutang. Kelebihan hasil penjualan dikembalikan kepada PIHAK KEDUA; kekurangannya tetap menjadi kewajiban PIHAK KEDUA.</p>';
+    $html.='<h4>PASAL 5 - PENYELESAIAN SENGKETA</h4><p>Perselisihan diselesaikan terlebih dahulu secara musyawarah mufakat. Jika tidak tercapai, diselesaikan melalui jalur hukum yang berlaku.</p>';
+} else {
+    $html.='<h4>Ketentuan Perjanjian</h4><div style="line-height:1.5">'.nl2br($e($data['isi_perjanjian'])).'</div>';
+}
+$html.='<p>Dengan membubuhkan tanda tangan di bawah ini, para pihak menyatakan data telah dibaca dan disetujui.</p>';
+$tanggalSurat=!empty($p['tanggal_pencairan']) ? date('d/m/Y',strtotime($p['tanggal_pencairan'])) : date('d/m/Y');
+$html.='<p style="text-align:right">Dibuat di Mojokerto<br>Pada tanggal: '.$e($tanggalSurat).'</p>';
 $pdf->writeHTML($html,true,false,true,false,'');
 
 $ttds=['ttd_nasabah'=>'Nasabah','ttd_teller'=>'Teller','ttd_admin'=>$data['penandatangan']['jabatan_admin'],'ttd_saksi_1'=>'Saksi 1','ttd_saksi_2'=>'Saksi 2'];
 $names=['ttd_nasabah'=>$data['penandatangan']['nasabah'],'ttd_teller'=>$data['penandatangan']['teller'],'ttd_admin'=>$data['penandatangan']['admin'],'ttd_saksi_1'=>$surat['nama_saksi_1'],'ttd_saksi_2'=>$surat['nama_saksi_2']];
 $x=[18,78,138,48,108]; $y=$pdf->GetY()+7; if($y>225){$pdf->AddPage();$y=25;}
 $temps=[];
-foreach(array_keys($ttds) as $i=>$field){ if($i===3){$y+=39;} $tx=$x[$i]; $pdf->SetXY($tx,$y);$pdf->Cell(55,5,$ttds[$field],0,0,'C');$tmp=dataUrlKeFileSementara($surat[$field]);if($tmp){$temps[]=$tmp;$pdf->Image($tmp,$tx+10,$y+5,35,20,'PNG');}$pdf->SetXY($tx,$y+27);$pdf->Cell(55,5,$names[$field],0,0,'C'); }
+foreach(array_keys($ttds) as $i=>$field){ if($i===3){$y+=39;} $tx=$x[$i]; $pdf->SetXY($tx,$y);$pdf->Cell(55,5,$ttds[$field],0,0,'C');if($field==='ttd_nasabah'){$pdf->SetFont('dejavusans','',6);$pdf->SetXY($tx,$y+14);$pdf->Cell(55,3,'Meterai Rp10.000',0,0,'C');$pdf->SetFont('dejavusans','',9.5);}$tmp=dataUrlKeFileSementara($surat[$field]);if($tmp){$temps[]=$tmp;$pdf->Image($tmp,$tx+10,$y+8,35,17,'PNG');}$pdf->SetXY($tx,$y+27);$pdf->Cell(55,5,$names[$field],0,0,'C'); }
 $pdf->SetY($y+40); $pdf->SetFont('dejavusans','',7); $pdf->MultiCell(0,4,'Arsip ditandatangani: '.date('d/m/Y H:i',strtotime($surat['ditandatangani_at'])).' WIB | SHA-256: '.$surat['hash_dokumen'],0,'L');
 
 if (!empty($data['jadwal_angsuran'])) {

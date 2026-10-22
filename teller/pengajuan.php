@@ -182,11 +182,13 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
                 $merk = $wajib('hp_merk_tipe', 'Merk/tipe HP');
                 $warna = $wajib('hp_warna', 'Warna HP');
                 $imei = $wajib('hp_imei', 'IMEI');
+                $nomor_seri = $wajib('hp_nomor_seri', 'Nomor seri HP');
+                $nomor_model = $wajib('hp_nomor_model', 'Nomor model HP');
                 $kelengkapan = $wajib('hp_kelengkapan', 'Kelengkapan HP');
                 $kondisi = $wajib('hp_kondisi', 'Kondisi HP');
                 $jenis_barang = 'HP - ' . $jenis;
                 $identitas_barang = 'IMEI: ' . $imei;
-                $deskripsi_barang = "Merk/tipe: $merk\nWarna: $warna\nKelengkapan: $kelengkapan\nKondisi: $kondisi";
+                $deskripsi_barang = "Merk/tipe: $merk\nWarna: $warna\nNomor seri: $nomor_seri\nNomor model: $nomor_model\nKelengkapan: $kelengkapan\nKondisi: $kondisi";
             } elseif ($kategori === 'sepeda_motor') {
                 $jenis = $wajib('motor_jenis_kendaraan', 'Jenis kendaraan');
                 $merk = $wajib('motor_merk_tipe', 'Merk/tipe kendaraan');
@@ -197,9 +199,10 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
                 $warna = $wajib('motor_warna', 'Warna kendaraan');
                 $atas_nama = $wajib('motor_atas_nama_bpkb', 'Atas nama BPKB');
                 $no_bpkb = $wajib('motor_no_bpkb', 'Nomor BPKB');
+                $kondisi = $wajib('motor_kondisi', 'Kondisi sepeda motor');
                 $jenis_barang = 'Sepeda Motor - ' . $jenis;
                 $identitas_barang = "Nopol: $nopol; BPKB: $no_bpkb";
-                $deskripsi_barang = "Merk/tipe: $merk\nTahun: $tahun\nNo. rangka: $rangka\nNo. mesin: $mesin\nWarna: $warna\nAtas nama BPKB: $atas_nama";
+                $deskripsi_barang = "Merk/tipe: $merk\nTahun: $tahun\nNo. rangka: $rangka\nNo. mesin: $mesin\nWarna: $warna\nAtas nama BPKB: $atas_nama\nKondisi: $kondisi";
             } elseif ($kategori === 'emas') {
                 $jenis = $wajib('emas_jenis_barang', 'Jenis barang emas');
                 $berat = $wajib('emas_berat', 'Berat emas');
@@ -574,6 +577,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                         <div class="jaminan-detail" data-kategori="hp" style="display:none"><div class="row">
                                             <div class="col-md-6 mb-2"><label>Jenis *</label><input class="form-control detail-required" name="hp_jenis"></div><div class="col-md-6 mb-2"><label>Merk/tipe HP *</label><input class="form-control detail-required" name="hp_merk_tipe"></div>
                                             <div class="col-md-6 mb-2"><label>Warna *</label><input class="form-control detail-required" name="hp_warna"></div><div class="col-md-6 mb-2"><label>IMEI *</label><input class="form-control detail-required" name="hp_imei"></div>
+                                            <div class="col-md-6 mb-2"><label>Nomor seri *</label><input class="form-control detail-required" name="hp_nomor_seri"></div><div class="col-md-6 mb-2"><label>Nomor model *</label><input class="form-control detail-required" name="hp_nomor_model"></div>
                                             <div class="col-md-6 mb-2"><label>Kelengkapan *</label><input class="form-control detail-required" name="hp_kelengkapan"></div><div class="col-md-6 mb-2"><label>Kondisi *</label><input class="form-control detail-required" name="hp_kondisi"></div>
                                         </div></div>
                                         <div class="jaminan-detail" data-kategori="sepeda_motor" style="display:none"><div class="row">
@@ -581,6 +585,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                             <div class="col-md-4 mb-2"><label>Tahun *</label><input type="number" min="1900" max="<?php echo date('Y') + 1; ?>" class="form-control detail-required" name="motor_tahun"></div><div class="col-md-4 mb-2"><label>Nopol *</label><input class="form-control detail-required" name="motor_nopol"></div><div class="col-md-4 mb-2"><label>Warna *</label><input class="form-control detail-required" name="motor_warna"></div>
                                             <div class="col-md-6 mb-2"><label>No. rangka *</label><input class="form-control detail-required" name="motor_no_rangka"></div><div class="col-md-6 mb-2"><label>No. mesin *</label><input class="form-control detail-required" name="motor_no_mesin"></div>
                                             <div class="col-md-6 mb-2"><label>Atas nama BPKB *</label><input class="form-control detail-required" name="motor_atas_nama_bpkb"></div><div class="col-md-6 mb-2"><label>No. BPKB *</label><input class="form-control detail-required" name="motor_no_bpkb"></div>
+                                            <div class="col-12 mb-2"><label>Kondisi *</label><input class="form-control detail-required" name="motor_kondisi"></div>
                                         </div></div>
                                         <div class="jaminan-detail" data-kategori="emas" style="display:none"><div class="row">
                                             <div class="col-md-6 mb-2"><label>Jenis barang *</label><input class="form-control detail-required" name="emas_jenis_barang"></div><div class="col-md-6 mb-2"><label>Berat *</label><input class="form-control detail-required" name="emas_berat" placeholder="Contoh: 10 gram"></div>
