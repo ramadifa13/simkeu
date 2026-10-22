@@ -33,3 +33,22 @@ foreach($fineDueRows as $fd):if(($fd['denda']<=0 && empty($fd['denda_manual'])) 
 $fineMessage=strtr($settings['wa_denda'],['{nama}'=>$fd['nama_lengkap'],'{hari}'=>$calc['hari_telat'],'{denda}'=>number_format($fd['denda'],0,',','.')]); ?>
 <tr><td><?= layananEscape($fd['nama_lengkap']) ?></td><td><?= $calc['hari_telat'] ?> hari</td><td><?= formatRupiah($calc['denda']) ?></td><td><?= formatRupiah(max(0,$calc['denda']-$fd['denda'])) ?></td><td><?= formatRupiah($fd['denda']) ?></td><td>Rp 0</td><td><?= $fd['denda']>0?'Belum':'Lunas (pemutihan)' ?></td><td>—</td><td>Belum dibayar</td><td><a href="?tab=denda&id=<?= (int)$fd['pinjaman_id'] ?>#detail">Detail / Bayar</a> <?= tombolWhatsApp($fd['telepon'],$fineMessage,'WA') ?></td></tr>
 <?php endforeach; ?></tbody></table></div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.table-responsive table tbody tr').forEach(function (row) {
+        var cells = row.cells;
+        if (cells.length < 10) return;
+        [6, 8].forEach(function (index) {
+            var cell = cells[index], value = cell.textContent.trim();
+            if (!cell || cell.querySelector('.badge') || !value) return;
+            var success = /^Lunas|^Disetujui/.test(value);
+            cell.innerHTML = '<span class="badge bg-' + (success ? 'success' : 'warning text-dark') + '"></span>';
+            cell.querySelector('.badge').textContent = value;
+        });
+        var action = cells[9];
+        action.querySelectorAll('a').forEach(function (link) {
+            if (!link.classList.contains('btn')) link.className = 'btn btn-sm ' + (/Kwitansi/.test(link.textContent) ? 'btn-outline-secondary' : 'btn-outline-primary');
+        });
+    });
+});
+</script>

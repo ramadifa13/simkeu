@@ -199,15 +199,27 @@ $metodeField='<label class="form-label">Metode</label><select name="metode" clas
 <?php if($tab==='lunas'): ?>
 <div class="service-table-toolbar"><div><strong>Riwayat pinjaman lunas</strong><span>Pilih detail untuk melihat angsuran, dokumen, BAST, dan aktivitas layanan.</span></div><span class="service-result-count"><?= count($list) ?> data</span></div>
 <div class="table-responsive"><table class="table service-paid-table" data-empty-message="Belum ada pinjaman lunas yang sesuai dengan pencarian."><thead><tr><th>Anggota / Pinjaman</th><th>Tanggal lunas</th><th>Pelunasan</th><th>Total pinjaman</th><th>Bunga diterima</th><th>Jaminan</th><th>Teller</th><th>Status layanan</th><th>Aksi</th></tr></thead><tbody>
-<?php foreach($list as $r):
+<?php $labelPelunasanRows=[]; foreach($list as $r):
 $stmt=$db->prepare("SELECT COALESCE(SUM(bunga),0) FROM angsuran WHERE pinjaman_id=? AND status='lunas'");$stmt->execute([$r['id']]);$bunga=(float)$stmt->fetchColumn();
 $stmt=$db->prepare("SELECT diskon_persen,(SELECT COALESCE(SUM(bunga),0) FROM angsuran WHERE pinjaman_id=? AND cara_bayar='pelunasan') bunga FROM layanan_pelunasan WHERE pinjaman_id=? AND status='selesai'");$stmt->execute([$r['id'],$r['id']]);$pl=$stmt->fetch(PDO::FETCH_ASSOC);if($pl)$bunga-=round($pl['bunga']*$pl['diskon_persen']/100,2);
+$stmt=$db->prepare('SELECT COUNT(*) FROM pelunasan_dini WHERE pinjaman_id=?');$stmt->execute([$r['id']]);$adaPelunasan=(bool)$stmt->fetchColumn();
+$labelPelunasanRows[]=$pl?['Dipercepat','info']:($adaPelunasan?['Pelunasan','success']:['Normal','secondary']);
 $stmt=$db->prepare("SELECT u.nama_lengkap FROM layanan_pembayaran b JOIN users u ON u.id=b.user_id WHERE b.pinjaman_id=? AND b.dibatalkan_at IS NULL ORDER BY b.id DESC LIMIT 1");$stmt->execute([$r['id']]);$tellerLunas=$stmt->fetchColumn();
 $stmt=$db->prepare("SELECT status FROM layanan_jaminan_kembali WHERE pinjaman_id=? UNION ALL SELECT status FROM layanan_prioritas WHERE pinjaman_id=?");$stmt->execute([$r['id'],$r['id']]);$statusLayanan=$stmt->fetchAll(PDO::FETCH_COLUMN);
 $statusLayanan=array_values(array_unique(array_filter($statusLayanan)));
 $statusAktual='';foreach(['ditolak','menunggu','pengecekan','koreksi_prioritas','disetujui','diserahkan'] as $statusCari){if(in_array($statusCari,$statusLayanan,true)){$statusAktual=$statusCari;break;}} if(!$statusAktual && !empty($r['memerlukan_jaminan']) && ($r['status_jaminan']??'')==='dititipkan') $statusAktual='jaminan_belum_diambil'; if($statusAktual==='disetujui' && ($r['status_jaminan']??'')==='dititipkan') $statusAktual='jaminan_siap_diambil'; if(($r['status_jaminan']??'')==='dikembalikan') $statusAktual='jaminan_dikembalikan'; ?>
 <tr><td><strong class="service-member-name"><?= layananEscape($r['nama_lengkap']) ?></strong><small class="service-loan-code"><?= layananEscape($r['kode_pinjaman']) ?></small></td><td><?= !empty($r['tanggal_lunas']) ? layananEscape(date('d/m/Y', strtotime($r['tanggal_lunas']))) : '—' ?></td><td><span class="badge bg-<?= $pl?'info':'secondary' ?>"><?= $pl?'Dipercepat':'Normal' ?></span></td><td class="service-money"><?= formatRupiah($r['jumlah_pinjaman']) ?></td><td class="service-money"><?= formatRupiah($bunga) ?></td><td><?= layananEscape($r['status_jaminan'] ?: 'Tanpa jaminan') ?></td><td><?= layananEscape($tellerLunas ?: 'Data lama') ?></td><td><?= $statusAktual ? layananStatusBadgeHtml($statusAktual) : '<span class="badge bg-secondary">Tidak ada pengajuan</span>' ?></td><td class="no-print"><div class="service-row-actions"><a class="btn btn-sm btn-outline-primary" href="cetak_bukti_pelunasan.php?id=<?= (int)$r['id'] ?>" target="_blank" rel="noopener"><i class="fas fa-file-lines" aria-hidden="true"></i><span>Surat</span></a><a class="btn btn-sm btn-primary" href="?tab=lunas&id=<?= (int)$r['id'] ?>#detail"><i class="fas fa-eye" aria-hidden="true"></i><span>Detail</span></a></div></td></tr><?php endforeach; ?></tbody></table></div>
-
+<script>
+(function () {
+    var labels = <?= json_encode($labelPelunasanRows, JSON_UNESCAPED_UNICODE) ?>;
+    document.querySelectorAll('.service-paid-table tbody tr').forEach(function (row, index) {
+        var badge = row.cells[2] && row.cells[2].querySelector('.badge');
+        if (!badge || !labels[index]) return;
+        badge.textContent = labels[index][0];
+        badge.className = 'badge bg-' + labels[index][1];
+    });
+}());
+</script>
 <?php endif; ?>
 </div></section>
 <?php if($selected): $p=$selected;

@@ -55,12 +55,24 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
         }
 
         // Kunci baris anggota agar dua pengajuan bersamaan tidak lolos validasi.
-        $stmt_anggota_kunci = $db->prepare("SELECT id, kode_anggota, kode_anggota_jaminan, status
+        $stmt_anggota_kunci = $db->prepare("SELECT id, kode_anggota, kode_anggota_jaminan, status, foto_kk, foto_ktp_pasangan
                                              FROM anggota WHERE id = ? FOR UPDATE");
         $stmt_anggota_kunci->execute([$anggota_id]);
         $anggota_info = $stmt_anggota_kunci->fetch(PDO::FETCH_ASSOC);
         if (!$anggota_info) {
             throw new Exception("Anggota tidak valid");
+        }
+        $dokumenAgtj = [];
+        $agjtAjukanAgt = !$kategori_gadai
+            && strpos((string) $anggota_info['kode_anggota'], 'AGTJ') === 0
+            && (empty($anggota_info['foto_kk']) || empty($anggota_info['foto_ktp_pasangan']));
+        if ($agjtAjukanAgt) {
+            $dokumenAgtj = validasiDokumenAnggota($anggota_info);
+            foreach (['foto_kk' => 'Foto Kartu Keluarga (KK)', 'foto_ktp_pasangan' => 'Foto KTP Suami/Istri'] as $field => $label) {
+                if (empty($anggota_info[$field]) && empty($dokumenAgtj[$field])) {
+                    throw new Exception($label . ' wajib diunggah untuk pengajuan AGT nasabah AGTJ');
+                }
+            }
         }
         list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, $anggota_id, $kategori_shu_input, $ketua_kelompok_input);
 
@@ -276,6 +288,7 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
             $stmt_jaminan->execute([$pengajuan_id, $jaminan['jenis_barang'], $jaminan['identitas_barang'],
                 $jaminan['deskripsi_barang'], $jaminan['nilai_taksiran']]);
         }
+        if ($dokumenAgtj) simpanDokumenAnggota($db, $anggota_id, $dokumenAgtj, $anggota_info);
 
         // Pengajuan baru mengaktifkan kembali akun lama; kode dan akun tetap sama.
         aktifkanKembaliAnggota($db, $anggota_id);
@@ -493,7 +506,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                 </h5>
                             </div>
                             <div class="card-body form-card">
-                                <form method="POST" id="formPengajuan"><?php echo layananToken(); ?><input type="hidden" name="ajukan_pinjaman" value="1"><label class="d-block mb-3"><input type="checkbox" name="fasilitas_prioritas" value="1"> Gunakan fasilitas anggota prioritas (tanpa jaminan, maksimal Rp 1 juta; wajib persetujuan prioritas Admin)</label>
+                                <form method="POST" enctype="multipart/form-data" id="formPengajuan"><?php echo layananToken(); ?><input type="hidden" name="ajukan_pinjaman" value="1"><label class="d-block mb-3"><input type="checkbox" name="fasilitas_prioritas" value="1"> Gunakan fasilitas anggota prioritas (tanpa jaminan, maksimal Rp 1 juta; wajib persetujuan prioritas Admin)</label>
                                     <div class="mb-3">
                                         <label class="form-label">Pilih Anggota *</label>
                                         <select name="anggota_id" class="form-select" required id="anggotaSelect">
@@ -503,7 +516,9 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     data-kategori-shu="<?= htmlspecialchars($anggota['kategori_shu'] ?? 'anggota') ?>"
                                                     data-ketua-id="<?= (int)($anggota['ketua_kelompok_id'] ?? 0) ?>"
                                                     data-kode-utama="<?= htmlspecialchars($anggota['kode_anggota'] ?? '') ?>"
-                                                    data-kode-jaminan="<?= htmlspecialchars($anggota['kode_anggota_jaminan'] ?? '') ?>">
+                                                    data-kode-jaminan="<?= htmlspecialchars($anggota['kode_anggota_jaminan'] ?? '') ?>"
+                                                    data-foto-kk="<?= empty($anggota['foto_kk'])?'0':'1' ?>"
+                                                    data-foto-ktp-pasangan="<?= empty($anggota['foto_ktp_pasangan'])?'0':'1' ?>">
                                                 <?php echo (!empty($anggota['kode_anggota_jaminan']) ? $anggota['kode_anggota_jaminan'] : $anggota['kode_anggota']) . ' - ' . $anggota['nama_lengkap']; ?><?php echo $anggota['status'] !== 'aktif' ? ' (Nonaktif - akan diaktifkan saat pengajuan)' : ''; ?>
                                             </option>
                                             <?php endforeach; ?>
@@ -524,6 +539,20 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                             </option>
                                             <?php endforeach; ?>
                                         </select>
+                                    </div>
+                                    <div id="dokumenAgtjAgt" class="alert alert-warning d-none">
+                                        <strong><i class="fas fa-triangle-exclamation me-1"></i>Dokumen AGT belum lengkap</strong>
+                                        <p class="small mb-3">Nasabah AGTJ ini belum memiliki foto KK dan/atau KTP suami/istri. Lengkapi dokumen sebelum pengajuan dikirim agar Admin dapat memeriksa pengajuan dengan lengkap.</p>
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">Foto Kartu Keluarga (KK) <span class="text-danger">*</span></label>
+                                            <input type="file" name="foto_kk" id="foto_kk_pengajuan" class="form-control" accept="image/*">
+                                            <small class="text-muted">JPG, PNG, atau WEBP; maksimal 10 MB.</small>
+                                        </div>
+                                        <div>
+                                            <label class="form-label fw-semibold">Foto KTP Suami/Istri <span class="text-danger">*</span></label>
+                                            <input type="file" name="foto_ktp_pasangan" id="foto_ktp_pasangan_pengajuan" class="form-control" accept="image/*">
+                                            <small class="text-muted">JPG, PNG, atau WEBP; maksimal 10 MB.</small>
+                                        </div>
                                     </div>
                                     <div class="row g-3 mb-3" id="shuPengajuanWrap">
                                         <div class="col-md-6">
@@ -904,9 +933,26 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             ketua.disabled = gadai || sebagaiKetua;
             if (sebagaiKetua) ketua.value = '';
         }
-        document.getElementById('anggotaSelect').addEventListener('change', function(){ sesuaikanPeranShu(true); });
+        function sesuaikanDokumenAgtjAgt() {
+            const anggota = document.getElementById('anggotaSelect').selectedOptions[0];
+            const jenis = document.getElementById('jenisPinjamanSelect').selectedOptions[0];
+            const agtj = anggota && (anggota.getAttribute('data-kode-utama') || '').indexOf('AGTJ') === 0;
+            const tanpaJaminan = jenis && jenis.value && jenis.getAttribute('data-jaminan') !== '1';
+            const butuhKk = agtj && tanpaJaminan && anggota.getAttribute('data-foto-kk') === '0';
+            const butuhPasangan = agtj && tanpaJaminan && anggota.getAttribute('data-foto-ktp-pasangan') === '0';
+            const tampil = butuhKk || butuhPasangan;
+            document.getElementById('dokumenAgtjAgt').classList.toggle('d-none', !tampil);
+            document.getElementById('foto_kk_pengajuan').required = butuhKk;
+            document.getElementById('foto_ktp_pasangan_pengajuan').required = butuhPasangan;
+            if (!tampil) {
+                document.getElementById('foto_kk_pengajuan').value = '';
+                document.getElementById('foto_ktp_pasangan_pengajuan').value = '';
+            }
+        }
+        document.getElementById('anggotaSelect').addEventListener('change', function(){ sesuaikanPeranShu(true); sesuaikanDokumenAgtjAgt(); });
         document.getElementById('kategori_shu_pengajuan').addEventListener('change', function(){ sesuaikanPeranShu(false); });
         sesuaikanPeranShu(true);
+        sesuaikanDokumenAgtjAgt();
 
         function getFrekuensiTerpilih() {
             const r = document.querySelector('input[name="frekuensi"]:checked');
@@ -971,6 +1017,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 hariSelect.value = '';
             }
             sesuaikanPeranShu(true);
+            sesuaikanDokumenAgtjAgt();
 
             updateCalculation();
         });
