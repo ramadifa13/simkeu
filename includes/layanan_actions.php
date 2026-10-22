@@ -124,6 +124,12 @@ function prosesLayanan($db, $aksi, $id, &$files) {
         $db->prepare("UPDATE angsuran SET status='lunas',tanggal_bayar=CURDATE(),cara_bayar='pelunasan' WHERE pinjaman_id=? AND status<>'lunas'")->execute([$id]);
         if ($ambilJaminanLangsung) {
             $db->prepare("UPDATE jaminan_pinjaman SET status_jaminan='dikembalikan',tanggal_dikembalikan=CURDATE() WHERE pinjaman_id=? AND status_jaminan='dititipkan'")->execute([$id]);
+            // Buat BAST otomatis agar pengambilan bersamaan dengan pelunasan
+            // tetap memiliki akad serah-terima yang dapat dicetak dari laporan lunas.
+            $db->prepare("INSERT INTO layanan_jaminan_kembali (pinjaman_id,user_id,status,foto,ttd,diserahkan_at,alasan,catatan_admin)
+                          VALUES (?,?,'diserahkan',NULL,?,NOW(),'Pengambilan langsung saat pelunasan.','Diserahkan bersamaan dengan pelunasan.')
+                          ON DUPLICATE KEY UPDATE user_id=VALUES(user_id),status='diserahkan',foto=NULL,ttd=VALUES(ttd),diserahkan_at=NOW(),alasan=VALUES(alasan),catatan_admin=VALUES(catatan_admin)")
+               ->execute([$id,$uid,$ttdJaminan]);
         }
         $keteranganPelunasan=($approval['admin_id']?'Disetujui Admin '.$approval['admin_id']:'Pelunasan tanpa diskon').'; diskon bunga '.$s['diskon_bunga'];
         if (kolomAda($db,'pelunasan_dini','cek_jaminan_nasabah')) $db->prepare('INSERT INTO pelunasan_dini (pinjaman_id,jumlah_pelunasan,keterangan,user_id,cek_jaminan_nasabah,ttd_jaminan_nasabah) VALUES (?,?,?,?,?,?)')->execute([$id,$jumlah,$keteranganPelunasan,$uid,$ttdJaminan?1:0,$ttdJaminan]);

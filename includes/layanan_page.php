@@ -220,6 +220,18 @@ $statusAktual='';foreach(['ditolak','menunggu','pengecekan','koreksi_prioritas',
     });
 }());
 </script>
+<script>
+(function () {
+    var icon = {dititipkan: 'fa-box-archive text-warning', dikembalikan: 'fa-box-open text-success'};
+    document.querySelectorAll('.service-paid-table tbody tr').forEach(function (row) {
+        var cell = row.cells[5];
+        if (!cell) return;
+        var label = cell.textContent.trim(), key = label.toLowerCase();
+        var iconClass = icon[key] || 'fa-shield-halved text-secondary';
+        cell.innerHTML = '<strong><i class="fas ' + iconClass + ' me-1" aria-hidden="true"></i>' + label + '</strong>';
+    });
+}());
+</script>
 <?php endif; ?>
 </div></section>
 <?php if($selected): $p=$selected;
