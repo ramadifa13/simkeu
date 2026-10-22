@@ -449,6 +449,8 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         </div>
 
                         <div id="konfirmasiJaminanPelunasan" class="border rounded p-3 mb-3 bg-light d-none">
+                            <label class="form-check d-flex gap-2 align-items-start mb-3"><input class="form-check-input mt-1" type="checkbox" name="ambil_jaminan_langsung" id="ambilJaminanLangsung"><span><strong>Barang jaminan diambil sekarang</strong><br><small class="text-muted">Pilih hanya jika nasabah mengambil barang bersamaan dengan pelunasan.</small></span></label>
+                            <div id="detailPengambilanJaminan" class="d-none">
                             <h6 class="text-success"><i class="fas fa-box-open me-1"></i>Konfirmasi Barang Jaminan</h6>
                             <p class="small mb-2" id="detailJaminanPelunasan"></p><img id="fotoJaminanPelunasan" class="img-fluid rounded border mb-3 d-none" style="max-height:180px;object-fit:contain" alt="Foto barang jaminan">
                             <label class="form-check d-flex gap-2 align-items-start mb-3"><input class="form-check-input mt-1" type="checkbox" name="cek_jaminan_nasabah" id="cekJaminanNasabah"><span>Saya sudah mengecek barang jaminan secara keseluruhan dan menyatakan barang dalam kondisi normal/tidak rusak.</span></label>
@@ -456,6 +458,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                             <div class="signature-canvas-wrap"><canvas id="ttdJaminanPelunasan" width="600" height="180" class="signature" style="height:160px"></canvas></div>
                             <input type="hidden" name="ttd_jaminan_nasabah" id="ttdJaminanNasabah">
                             <small class="text-muted d-block mt-2">Tanda tangan nasabah diperlukan untuk melanjutkan pelunasan gadai.</small>
+                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -523,7 +526,17 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             } else if (wa) { wa.classList.add('d-none'); wa.removeAttribute('href'); }
             var blokJaminan = document.getElementById('konfirmasiJaminanPelunasan'), detailJaminan = document.getElementById('detailJaminanPelunasan'), cekJaminan = document.getElementById('cekJaminanNasabah'), ttdJaminan = document.getElementById('ttdJaminanNasabah');
             var isGadai = button.getAttribute('data-gadai') === '1';
-            cekJaminan.required = isGadai;
+            var ambilJaminan = document.getElementById('ambilJaminanLangsung');
+            var detailPengambilan = document.getElementById('detailPengambilanJaminan');
+            ambilJaminan.checked = false;
+            function aturPengambilanJaminan() {
+                var ambil = isGadai && ambilJaminan.checked;
+                detailPengambilan.classList.toggle('d-none', !ambil);
+                cekJaminan.required = ambil;
+                if (!ambil) { cekJaminan.checked = false; ttdJaminan.value = ''; }
+            }
+            ambilJaminan.onchange = aturPengambilanJaminan;
+            aturPengambilanJaminan();
             if (blokJaminan) { blokJaminan.classList.toggle('d-none', !isGadai); var fotoJaminan=document.getElementById('fotoJaminanPelunasan'); if (!isGadai) { cekJaminan.checked=false; ttdJaminan.value=''; fotoJaminan.classList.add('d-none'); } else { detailJaminan.textContent = [button.getAttribute('data-jaminan-jenis'), button.getAttribute('data-jaminan-identitas'), button.getAttribute('data-jaminan-deskripsi')].filter(Boolean).join(' · ') || 'Detail barang jaminan belum tersedia'; var foto=button.getAttribute('data-jaminan-foto')||'';fotoJaminan.src=foto;fotoJaminan.classList.toggle('d-none',!foto); } }
         });
     </script>
