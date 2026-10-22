@@ -352,18 +352,16 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                         </td>
                                         <td>
                                             <?php
+                                            // Tahap pencairan hanya ditampilkan di menu Pencairan.
+                                            $statusTampil = $pengajuan['status']==='dicairkan' ? 'disetujui' : $pengajuan['status'];
                                             $status_class = [
                                                 'menunggu' => 'warning',
                                                 'disetujui' => 'success',
-                                                'dicairkan' => 'info',
                                                 'ditolak' => 'danger'
                                             ];
-                                            $label_status = ucfirst($pengajuan['status']);
-                                            if ($pengajuan['status'] == 'disetujui') {
-                                                $label_status = $pengajuan['sudah_cair'] ? 'Dicairkan' : 'Disetujui (belum dicairkan)';
-                                            }
+                                            $label_status = ucfirst($statusTampil);
                                             ?>
-                                            <span class="badge bg-<?php echo isset($status_class[$pengajuan['status']]) ? $status_class[$pengajuan['status']] : 'secondary'; ?> status-badge">
+                                            <span class="badge bg-<?php echo $status_class[$statusTampil] ?? 'secondary'; ?> status-badge">
                                                 <?php echo $label_status; ?>
                                             </span>
                                             <?php if ($pengajuan['admin_name']): ?>
@@ -395,7 +393,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     data-tenor="<?php echo $pengajuan['tenor']; ?>"
                                                     data-bunga="<?php echo labelBungaRow($pengajuan); ?>"
                                                     data-tujuan="<?php echo $pengajuan['tujuan_pinjaman']; ?>"
-                                                    data-status="<?php echo $pengajuan['status']; ?>"
+                                                    data-status="<?php echo $statusTampil; ?>"
                                                     data-tanggal="<?php echo date('d/m/Y H:i', strtotime($pengajuan['tanggal_pengajuan'])); ?>"
                                                     data-catatan="<?php echo $pengajuan['catatan_admin']; ?>"
                                                     data-jaminan="<?php echo !empty($pengajuan['memerlukan_jaminan']) ? '1' : '0'; ?>"

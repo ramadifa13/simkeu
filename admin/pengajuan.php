@@ -312,7 +312,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     data-tenor="<?php echo $pengajuan['tenor']; ?>"
                                                     data-bunga="<?php echo labelBungaRow($pengajuan); ?>"
                                                     data-tujuan="<?php echo $pengajuan['tujuan_pinjaman']; ?>"
-                                                    data-status="<?php echo $pengajuan['status']; ?>"
+                                                    data-status="<?php echo $pengajuan['status']==='dicairkan' ? 'disetujui' : $pengajuan['status']; ?>"
                                                     data-tanggal="<?php echo date('d/m/Y H:i', strtotime($pengajuan['tanggal_pengajuan'])); ?>"
                                                     data-teller="<?php echo $pengajuan['teller_name'] ?? 'System'; ?>"
                                                     data-jaminan="<?php echo htmlspecialchars(!empty($pengajuan['jenis_barang']) ? $pengajuan['jenis_barang'] . ' — ' . $pengajuan['identitas_barang'] . ' — ' . $pengajuan['deskripsi_barang'] : '', ENT_QUOTES); ?>"
