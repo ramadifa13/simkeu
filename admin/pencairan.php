@@ -228,8 +228,9 @@ function formatRupiah($angka) {
             z-index: 1080;
         }
         .action-menu.show { display: grid !important; gap: .25rem; }
-        .table-responsive td:has(.action-menu.show) { position: relative; z-index: 1100; overflow: visible !important; }
-        .table-responsive .dropdown:has(.action-menu.show) { z-index: 1101; }
+        .table-responsive td:has(.action-menu.show) { position: relative; z-index: 2000 !important; overflow: visible !important; }
+        .ui-shell .ui-actions-cell:last-child:has(.action-menu.show) { z-index: 2000 !important; }
+        .table-responsive .dropdown:has(.action-menu.show) { z-index: 2001; }
         .action-menu .btn {
             width: 100%;
             min-height: 38px;
