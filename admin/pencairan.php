@@ -218,6 +218,29 @@ function formatRupiah($angka) {
             background: linear-gradient(135deg, #5a67d8 0%, #6b46a1 100%);
             color: white;
         }
+        .action-menu {
+            min-width: 255px;
+            max-width: calc(100vw - 24px);
+            padding: .45rem;
+            border: 1px solid #dbe7ea;
+            border-radius: .75rem;
+            box-shadow: 0 .75rem 1.75rem rgba(31, 66, 80, .18);
+            z-index: 1080;
+        }
+        .action-menu.show { display: grid !important; gap: .25rem; }
+        .action-menu .btn {
+            width: 100%;
+            min-height: 38px;
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            text-align: left;
+            white-space: normal;
+        }
+        .action-menu .btn i { width: 1rem; text-align: center; }
+        @media (max-width: 576px) {
+            .action-menu { min-width: min(255px, calc(100vw - 24px)); }
+        }
     </style>
 </head>
 <body>
@@ -424,36 +447,36 @@ function formatRupiah($angka) {
                                             <td>
                                                 <span class="badge bg-info">Dicairkan</span>
                                             </td>
-                                            <td><div class="dropdown"><button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-v me-1"></i>Aksi</button><div class="dropdown-menu dropdown-menu-end p-2 d-grid gap-1" style="min-width:190px">
+                                            <td><div class="dropdown"><button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-v me-1"></i>Aksi</button><div class="dropdown-menu dropdown-menu-end action-menu">
                                                 <?php if (!empty($p['foto_pencairan'])): ?>
                                                 <button type="button" class="btn btn-sm btn-outline-secondary"
                                                         onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($p['foto_pencairan']), ENT_QUOTES); ?>', 'Foto nasabah - <?php echo htmlspecialchars($p['nama_lengkap'], ENT_QUOTES); ?>')"
                                                         title="Foto nasabah saat pencairan">
-                                                    <i class="fas fa-camera"></i>
+                                                    <i class="fas fa-camera"></i><span>Foto nasabah</span>
                                                 </button>
                                                 <?php endif; ?>
                                                 <?php if (!empty($p['foto_barang'])): ?>
                                                 <button type="button" class="btn btn-sm btn-outline-warning"
                                                         onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($p['foto_barang']), ENT_QUOTES); ?>', 'Foto <?php echo htmlspecialchars($p['jenis_barang'], ENT_QUOTES); ?>')"
                                                         title="Foto barang jaminan">
-                                                    <i class="fas fa-box"></i>
+                                                    <i class="fas fa-box"></i><span>Foto barang jaminan</span>
                                                 </button>
                                                 <?php endif; ?>
                                                 <?php if (!empty($p['foto_nasabah_barang'])): ?>
                                                 <button type="button" class="btn btn-sm btn-outline-warning"
                                                         onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($p['foto_nasabah_barang']), ENT_QUOTES); ?>', 'Foto nasabah dengan barang jaminan')"
                                                         title="Foto nasabah dengan barang jaminan">
-                                                    <i class="fas fa-user-tag"></i>
+                                                    <i class="fas fa-user-tag"></i><span>Foto nasabah &amp; barang</span>
                                                 </button>
                                                 <?php endif; ?>
                                                 <a class="btn btn-sm btn-success" target="_blank" rel="noopener"
                                                    href="cetak_slip_pencairan.php?id=<?php echo (int) $p['id']; ?>" title="Cetak Slip">
-                                                    <i class="fas fa-print"></i>
+                                                    <i class="fas fa-print"></i><span>Cetak slip pencairan</span>
                                                 </a>
                                                 <?php if (!empty($p['perjanjian_id'])): ?>
-                                                <a class="btn btn-sm btn-primary" target="_blank" rel="noopener" href="cetak_perjanjian.php?id=<?php echo (int)$p['id']; ?>" title="Cetak Surat Perjanjian & Lampiran"><i class="fas fa-file-pdf me-1"></i>PDF</a>
+                                                <a class="btn btn-sm btn-primary" target="_blank" rel="noopener" href="cetak_perjanjian.php?id=<?php echo (int)$p['id']; ?>" title="Cetak Surat Perjanjian & Lampiran"><i class="fas fa-file-pdf"></i><span>PDF perjanjian</span></a>
                                                 <?php else: ?>
-                                                <button type="button" class="btn btn-sm btn-secondary" disabled title="PDF tersedia untuk pencairan baru yang sudah menyimpan seluruh TTD"><i class="fas fa-file-pdf me-1"></i>PDF</button>
+                                                <button type="button" class="btn btn-sm btn-secondary" disabled title="PDF tersedia untuk pencairan baru yang sudah menyimpan seluruh TTD"><i class="fas fa-file-pdf"></i><span>PDF perjanjian</span></button>
                                                 <?php endif; ?>
                                             </div></div></td>
                                         </tr>

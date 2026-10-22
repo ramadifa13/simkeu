@@ -308,8 +308,30 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
         .btn-action {
             margin: 2px;
         }
-        .action-menu { min-width: 210px; }
-        .action-menu .btn, .action-menu .badge { width: 100%; margin: 0; text-align: left; }
+        .action-menu {
+            min-width: 255px;
+            max-width: calc(100vw - 24px);
+            padding: .45rem;
+            border: 1px solid #dbe7ea;
+            border-radius: .75rem;
+            box-shadow: 0 .75rem 1.75rem rgba(31, 66, 80, .18);
+            z-index: 1080;
+        }
+        .action-menu.show { display: grid !important; gap: .25rem; }
+        .action-menu .btn, .action-menu .badge {
+            width: 100%;
+            min-height: 38px;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            text-align: left;
+            white-space: normal;
+        }
+        .action-menu .btn i { width: 1rem; text-align: center; }
+        @media (max-width: 576px) {
+            .action-menu { min-width: min(255px, calc(100vw - 24px)); }
+        }
         .info-alert {
             background-color: #e7f3ff;
             border-left: 4px solid #3498db;
@@ -581,7 +603,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                         <td>
                                             <small><?php echo $pengajuan['admin_name'] ?: '-'; ?></small>
                                         </td>
-                                        <td class="table-actions"><div class="dropdown"><button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-v me-1"></i>Aksi</button><div class="dropdown-menu dropdown-menu-end action-menu p-2 d-grid gap-1">
+                                        <td class="table-actions"><div class="dropdown"><button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-v me-1"></i>Aksi</button><div class="dropdown-menu dropdown-menu-end action-menu">
                                             <!-- View Details Button -->
                                             <button class="btn btn-sm btn-info btn-action" data-bs-toggle="modal" 
                                                     data-bs-target="#detailModal" 
@@ -600,7 +622,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                                     data-kode_pinjaman="<?php echo $pengajuan['kode_pinjaman'] ?: '-'; ?>"
                                                     data-tanggal_pencairan="<?php echo $pengajuan['tanggal_pencairan'] ? date('d/m/Y', strtotime($pengajuan['tanggal_pencairan'])) : '-'; ?>"
                                                     title="Detail">
-                                                <i class="fas fa-eye"></i>
+                                                <i class="fas fa-eye"></i><span>Detail pengajuan</span>
                                             </button>
                                             
                                             <?php if ($belum_cair && !in_array(($pengajuan['status_tc'] ?? ''), ['menunggu','disetujui'], true)): ?>
@@ -621,30 +643,30 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                             <a class="btn btn-sm btn-outline-primary btn-action" target="_blank" rel="noopener"
                                                href="cetak_draft_perjanjian.php?id=<?php echo (int)$pengajuan['id']; ?>"
                                                title="Cetak surat perjanjian sebelum pencairan">
-                                                <i class="fas fa-file-contract me-1"></i>Perjanjian
+                                                <i class="fas fa-file-contract"></i><span>Draft perjanjian</span>
                                             </a>
                                             <?php endif; ?>
-                                            <?php if ($belum_cair && empty($pengajuan['status_tc'])): ?><button class="btn btn-sm btn-outline-warning btn-action" data-bs-toggle="modal" data-bs-target="#tcModal" data-id="<?php echo (int)$pengajuan['id']; ?>" data-nama="<?php echo htmlspecialchars($pengajuan['nama_lengkap'], ENT_QUOTES); ?>" data-kode="<?php echo htmlspecialchars($pengajuan['kode_pengajuan'], ENT_QUOTES); ?>" title="Tunda Cair"><i class="fas fa-pause-circle me-1"></i>TC</button><?php endif; ?>
+                                            <?php if ($belum_cair && empty($pengajuan['status_tc'])): ?><button class="btn btn-sm btn-outline-warning btn-action" data-bs-toggle="modal" data-bs-target="#tcModal" data-id="<?php echo (int)$pengajuan['id']; ?>" data-nama="<?php echo htmlspecialchars($pengajuan['nama_lengkap'], ENT_QUOTES); ?>" data-kode="<?php echo htmlspecialchars($pengajuan['kode_pengajuan'], ENT_QUOTES); ?>" title="Tunda Cair"><i class="fas fa-pause-circle"></i><span>Tunda cair (TC)</span></button><?php endif; ?>
                                             <?php if (($pengajuan['status_tc'] ?? '')==='menunggu'): ?><span class="badge bg-warning text-dark">TC menunggu Admin</span><?php elseif(($pengajuan['status_tc'] ?? '')==='disetujui'): ?><span class="badge bg-secondary" title="<?= htmlspecialchars($pengajuan['alasan_tc'] ?? '',ENT_QUOTES) ?>">TC disetujui</span><?php elseif(($pengajuan['status_tc'] ?? '')==='ditolak'): ?><button type="button" class="btn btn-sm btn-outline-secondary btn-action" disabled title="TC yang sudah ditolak tidak dapat diajukan ulang"><i class="fas fa-ban me-1"></i>TC ditolak</button><?php endif; ?>
                                             <?php if (!empty($pengajuan['foto_pencairan'])): ?>
                                             <button class="btn btn-sm btn-outline-secondary btn-action" type="button"
                                                     onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($pengajuan['foto_pencairan']), ENT_QUOTES); ?>', 'Foto nasabah - <?php echo htmlspecialchars($pengajuan['nama_lengkap'], ENT_QUOTES); ?>')"
                                                     title="Foto nasabah saat pencairan">
-                                                <i class="fas fa-camera"></i>
+                                                <i class="fas fa-camera"></i><span>Foto nasabah</span>
                                             </button>
                                             <?php endif; ?>
                                             <?php if (!empty($pengajuan['foto_barang'])): ?>
                                             <button class="btn btn-sm btn-outline-warning btn-action" type="button"
                                                     onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($pengajuan['foto_barang']), ENT_QUOTES); ?>', 'Foto <?php echo htmlspecialchars($pengajuan['jenis_barang'], ENT_QUOTES); ?>')"
                                                     title="Foto barang jaminan">
-                                                <i class="fas fa-box"></i>
+                                                <i class="fas fa-box"></i><span>Foto barang jaminan</span>
                                             </button>
                                             <?php endif; ?>
                                             <?php if (!empty($pengajuan['foto_nasabah_barang'])): ?>
                                             <button class="btn btn-sm btn-outline-warning btn-action" type="button"
                                                     onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($pengajuan['foto_nasabah_barang']), ENT_QUOTES); ?>', 'Foto nasabah dengan barang jaminan')"
                                                     title="Foto nasabah dengan barang jaminan">
-                                                <i class="fas fa-user-tag"></i>
+                                                <i class="fas fa-user-tag"></i><span>Foto nasabah &amp; barang</span>
                                             </button>
                                             <?php endif; ?>
                                             <!-- Slip pencairan (A5) - hanya untuk pengajuan yang sudah menjadi pinjaman -->
@@ -652,12 +674,12 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                             <a class="btn btn-sm btn-success btn-action" target="_blank" rel="noopener"
                                                href="cetak_slip_pencairan.php?id=<?php echo (int) $pengajuan['pinjaman_id']; ?>"
                                                title="Cetak Slip">
-                                                <i class="fas fa-print"></i>
+                                                <i class="fas fa-print"></i><span>Cetak slip pencairan</span>
                                             </a>
                                             <?php if (!empty($pengajuan['perjanjian_id'])): ?>
-                                            <a class="btn btn-sm btn-primary btn-action" target="_blank" rel="noopener" href="cetak_perjanjian.php?id=<?php echo (int)$pengajuan['pinjaman_id']; ?>" title="Cetak Surat Perjanjian & Lampiran"><i class="fas fa-file-pdf me-1"></i>PDF</a>
+                                            <a class="btn btn-sm btn-primary btn-action" target="_blank" rel="noopener" href="cetak_perjanjian.php?id=<?php echo (int)$pengajuan['pinjaman_id']; ?>" title="Cetak Surat Perjanjian & Lampiran"><i class="fas fa-file-pdf"></i><span>PDF perjanjian</span></a>
                                             <?php else: ?>
-                                            <button type="button" class="btn btn-sm btn-secondary btn-action" disabled title="PDF tersedia setelah pencairan dan seluruh TTD disimpan"><i class="fas fa-file-pdf me-1"></i>PDF</button>
+                                            <button type="button" class="btn btn-sm btn-secondary btn-action" disabled title="PDF tersedia setelah pencairan dan seluruh TTD disimpan"><i class="fas fa-file-pdf"></i><span>PDF perjanjian</span></button>
                                             <?php endif; ?>
                                             <?php endif; ?>
                                         </div></div></td>
