@@ -424,7 +424,7 @@ function formatRupiah($angka) {
                                             <td>
                                                 <span class="badge bg-info">Dicairkan</span>
                                             </td>
-                                            <td>
+                                            <td><div class="dropdown"><button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-v me-1"></i>Aksi</button><div class="dropdown-menu dropdown-menu-end p-2 d-grid gap-1" style="min-width:190px">
                                                 <?php if (!empty($p['foto_pencairan'])): ?>
                                                 <button type="button" class="btn btn-sm btn-outline-secondary"
                                                         onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($p['foto_pencairan']), ENT_QUOTES); ?>', 'Foto nasabah - <?php echo htmlspecialchars($p['nama_lengkap'], ENT_QUOTES); ?>')"
@@ -455,7 +455,7 @@ function formatRupiah($angka) {
                                                 <?php else: ?>
                                                 <button type="button" class="btn btn-sm btn-secondary" disabled title="PDF tersedia untuk pencairan baru yang sudah menyimpan seluruh TTD"><i class="fas fa-file-pdf me-1"></i>PDF</button>
                                                 <?php endif; ?>
-                                            </td>
+                                            </div></div></td>
                                         </tr>
                                         <?php endforeach; ?>
                                     </tbody>

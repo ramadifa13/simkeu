@@ -308,6 +308,8 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
         .btn-action {
             margin: 2px;
         }
+        .action-menu { min-width: 210px; }
+        .action-menu .btn, .action-menu .badge { width: 100%; margin: 0; text-align: left; }
         .info-alert {
             background-color: #e7f3ff;
             border-left: 4px solid #3498db;
@@ -579,7 +581,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                         <td>
                                             <small><?php echo $pengajuan['admin_name'] ?: '-'; ?></small>
                                         </td>
-                                        <td class="table-actions">
+                                        <td class="table-actions"><div class="dropdown"><button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-v me-1"></i>Aksi</button><div class="dropdown-menu dropdown-menu-end action-menu p-2 d-grid gap-1">
                                             <!-- View Details Button -->
                                             <button class="btn btn-sm btn-info btn-action" data-bs-toggle="modal" 
                                                     data-bs-target="#detailModal" 
@@ -658,7 +660,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                             <button type="button" class="btn btn-sm btn-secondary btn-action" disabled title="PDF tersedia setelah pencairan dan seluruh TTD disimpan"><i class="fas fa-file-pdf me-1"></i>PDF</button>
                                             <?php endif; ?>
                                             <?php endif; ?>
-                                        </td>
+                                        </div></div></td>
                                     </tr>
                                     <?php endforeach; ?>
                                 </tbody>
