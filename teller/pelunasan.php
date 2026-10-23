@@ -34,6 +34,14 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['lunaskan'])) {
         prosesLayanan($db,'pelunasan_langsung',(int)($_POST['id'] ?? 0),$files);
         $db->commit();
         $_SESSION['success']='Pinjaman berhasil dilunaskan dan pembayaran dicatat ke kas.';
+        if (!empty($_POST['ambil_jaminan_langsung']) && ($_POST['mode_cetak_akad'] ?? '') === 'otomatis') {
+            $bast=$db->prepare("SELECT id FROM layanan_jaminan_kembali WHERE pinjaman_id=? AND status='diserahkan' ORDER BY id DESC LIMIT 1");
+            $bast->execute([(int)($_POST['id'] ?? 0)]);
+            if ($bastId=(int)$bast->fetchColumn()) {
+                header('Location: ../includes/kwitansi_layanan.php?jenis=bast&id='.$bastId);
+                exit;
+            }
+        }
     } catch (Exception $e) {
         if ($db->inTransaction()) $db->rollBack();
         foreach ($files as $file) hapusFotoUpload($file);
@@ -423,7 +431,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="lunaskanModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST">
+                <form method="POST" enctype="multipart/form-data">
                     <div class="modal-header">
                         <h5 class="modal-title text-success">Pelunasan Pinjaman</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -458,6 +466,16 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                             <div class="signature-canvas-wrap"><canvas id="ttdJaminanPelunasan" width="600" height="180" class="signature" style="height:160px"></canvas></div>
                             <input type="hidden" name="ttd_jaminan_nasabah" id="ttdJaminanNasabah">
                             <small class="text-muted d-block mt-2">Tanda tangan nasabah diperlukan untuk melanjutkan pelunasan gadai.</small>
+                            <div class="mt-3">
+                                <label for="fotoSerahTerimaJaminan" class="form-label">Foto penyerahan barang jaminan *</label>
+                                <input type="file" class="form-control" name="foto_serah_terima_jaminan" id="fotoSerahTerimaJaminan" accept="image/jpeg,image/png,image/webp">
+                                <div class="form-text">Foto kondisi barang saat diserahkan kepada nasabah. Maksimal 5 MB.</div>
+                            </div>
+                            <div class="mt-3 pt-3 border-top">
+                                <label class="form-label fw-bold mb-2">Cetak akad serah terima</label>
+                                <label class="form-check"><input class="form-check-input" type="radio" name="mode_cetak_akad" value="otomatis" checked> Otomatis — akad langsung terbuka dengan data dan TTD transaksi terisi.</label>
+                                <label class="form-check mt-1"><input class="form-check-input" type="radio" name="mode_cetak_akad" value="manual"> Manual — formulir kosong dicetak dari Laporan Pelunasan untuk dilengkapi tulisan tangan.</label>
+                            </div>
                             </div>
                         </div>
 
@@ -524,7 +542,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 wa.href = 'https://wa.me/' + telepon + '?text=' + encodeURIComponent('Halo ' + button.getAttribute('data-nama') + ', proses pelunasan pinjaman ' + button.getAttribute('data-kode') + ' sedang diproses.');
                 wa.classList.remove('d-none');
             } else if (wa) { wa.classList.add('d-none'); wa.removeAttribute('href'); }
-            var blokJaminan = document.getElementById('konfirmasiJaminanPelunasan'), detailJaminan = document.getElementById('detailJaminanPelunasan'), cekJaminan = document.getElementById('cekJaminanNasabah'), ttdJaminan = document.getElementById('ttdJaminanNasabah');
+            var blokJaminan = document.getElementById('konfirmasiJaminanPelunasan'), detailJaminan = document.getElementById('detailJaminanPelunasan'), cekJaminan = document.getElementById('cekJaminanNasabah'), ttdJaminan = document.getElementById('ttdJaminanNasabah'), fotoSerahTerima = document.getElementById('fotoSerahTerimaJaminan');
             var isGadai = button.getAttribute('data-gadai') === '1';
             var ambilJaminan = document.getElementById('ambilJaminanLangsung');
             var detailPengambilan = document.getElementById('detailPengambilanJaminan');
@@ -533,11 +551,12 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 var ambil = isGadai && ambilJaminan.checked;
                 detailPengambilan.classList.toggle('d-none', !ambil);
                 cekJaminan.required = ambil;
-                if (!ambil) { cekJaminan.checked = false; ttdJaminan.value = ''; }
+                fotoSerahTerima.required = ambil;
+                if (!ambil) { cekJaminan.checked = false; ttdJaminan.value = ''; fotoSerahTerima.value = ''; }
             }
             ambilJaminan.onchange = aturPengambilanJaminan;
             aturPengambilanJaminan();
-            if (blokJaminan) { blokJaminan.classList.toggle('d-none', !isGadai); var fotoJaminan=document.getElementById('fotoJaminanPelunasan'); if (!isGadai) { cekJaminan.checked=false; ttdJaminan.value=''; fotoJaminan.classList.add('d-none'); } else { detailJaminan.textContent = [button.getAttribute('data-jaminan-jenis'), button.getAttribute('data-jaminan-identitas'), button.getAttribute('data-jaminan-deskripsi')].filter(Boolean).join(' · ') || 'Detail barang jaminan belum tersedia'; var foto=button.getAttribute('data-jaminan-foto')||'';fotoJaminan.src=foto;fotoJaminan.classList.toggle('d-none',!foto); } }
+            if (blokJaminan) { blokJaminan.classList.toggle('d-none', !isGadai); var fotoJaminan=document.getElementById('fotoJaminanPelunasan'); if (!isGadai) { cekJaminan.checked=false; ttdJaminan.value=''; fotoSerahTerima.required=false; fotoSerahTerima.value=''; fotoJaminan.classList.add('d-none'); } else { detailJaminan.textContent = [button.getAttribute('data-jaminan-jenis'), button.getAttribute('data-jaminan-identitas'), button.getAttribute('data-jaminan-deskripsi')].filter(Boolean).join(' · ') || 'Detail barang jaminan belum tersedia'; var foto=button.getAttribute('data-jaminan-foto')||'';fotoJaminan.src=foto;fotoJaminan.classList.toggle('d-none',!foto); } }
         });
     </script>
 </body>

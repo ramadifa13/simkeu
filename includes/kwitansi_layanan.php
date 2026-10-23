@@ -5,6 +5,7 @@ require_once __DIR__.'/auth.php';
 if (!isLoggedIn()) { header('Location: ../login.php');exit; }
 if (!isAdmin() && !isTeller()) { http_response_code(403);exit('Akses ditolak.'); }
 $jenis=$_GET['jenis'] ?? '';$id=(int)($_GET['id'] ?? 0);
+$manualBast=$jenis==='bast' && ($_GET['mode'] ?? '')==='manual';
 $tables=['denda'=>'layanan_bayar_denda','bayar'=>'layanan_pembayaran','bast'=>'layanan_jaminan_kembali','lelang'=>'layanan_lelang','bonus'=>'layanan_bonus'];
 if($jenis==='bonus' && !isAdmin()){http_response_code(403);exit('Khusus Admin.');}
 if (!isset($tables[$jenis]) || !layananSiap($db)) { http_response_code(404);exit('Dokumen tidak ditemukan.'); }
@@ -28,10 +29,10 @@ $judulMap=['bast'=>'BERITA ACARA SERAH TERIMA JAMINAN','denda'=>'KWITANSI PEMBAY
 $judul=$judulMap[$jenis];
 $nomor=strtoupper($jenis).'-'.str_pad($id,8,'0',STR_PAD_LEFT);
 $tanggalDokumen=$jenis==='bast'?($b['diserahkan_at']??''):($b['created_at']??'');
-$tanggalTampil=$tanggalDokumen?formatDateIndonesian(date('Y-m-d',strtotime($tanggalDokumen))):'-';
+$tanggalTampil=$manualBast?'':($tanggalDokumen?formatDateIndonesian(date('Y-m-d',strtotime($tanggalDokumen))):'-');
 $koperasi=$db->query('SELECT * FROM koperasi WHERE id=1')->fetch(PDO::FETCH_ASSOC) ?: ['nama'=>APP_NAME,'alamat'=>'-','telepon'=>'-','email'=>'-'];
 $logoKoperasi=!empty($koperasi['logo']) ? brandLogo($koperasi['logo'],'../') : '';
-$teksBast='';if($jenis==='bast'){$template=$db->query('SELECT bast_jaminan FROM layanan_pengaturan WHERE id=1')->fetchColumn();$teksBast=strtr((string)$template,['{nama}'=>$b['nama_lengkap'],'{norek}'=>$b['kode_pinjaman'],'{tanggal}'=>$tanggalTampil]);}
+$teksBast='';if($jenis==='bast'&&!$manualBast){$template=$db->query('SELECT bast_jaminan FROM layanan_pengaturan WHERE id=1')->fetchColumn();$teksBast=strtr((string)$template,['{nama}'=>$b['nama_lengkap'],'{norek}'=>$b['kode_pinjaman'],'{tanggal}'=>$tanggalTampil]);}
 $pernyataanMap=[
     'denda'=>'Telah diterima pembayaran denda pinjaman dari nasabah sebagaimana rincian transaksi di bawah ini.',
     'bayar'=>'Telah diterima pembayaran pinjaman dari nasabah sebagaimana rincian transaksi di bawah ini.',
@@ -49,9 +50,9 @@ header('Cache-Control: private, no-store');
 </style></head><body>
 <div class="toolbar"><button type="button" onclick="window.print()">Cetak / Simpan PDF</button><button type="button" class="secondary" onclick="window.close()">Tutup</button></div>
 <main class="sheet"><header class="letterhead"><div class="letterhead-mark<?= $logoKoperasi?' has-logo':'' ?>"><?php if($logoKoperasi): ?><?= $logoKoperasi ?><?php else: ?>KSP<?php endif; ?></div><div><h1><?= layananEscape($koperasi['nama']) ?></h1><p><?= layananEscape($koperasi['alamat']) ?></p><p>Telp. <?= layananEscape($koperasi['telepon']) ?> · <?= layananEscape($koperasi['email']) ?></p></div><div></div></header>
-<div class="document-title"><h2><?= layananEscape($judul) ?></h2><p>Nomor: <?= layananEscape($nomor) ?></p></div>
-<?php if($teksBast): ?><p class="statement"><?= nl2br(layananEscape($teksBast)) ?></p><?php elseif(isset($pernyataanMap[$jenis])): ?><p class="statement"><?= layananEscape($pernyataanMap[$jenis]) ?></p><?php endif; ?>
-<section class="info-grid" aria-label="Informasi dokumen"><div class="info-item"><span>Nama nasabah</span><strong><?= layananEscape($b['nama_lengkap']) ?></strong></div><div class="info-item"><span>Kode anggota</span><strong><?= layananEscape($b['kode_anggota']) ?></strong></div><div class="info-item"><span>Nomor identitas</span><strong><?= layananEscape($b['ktp']) ?></strong></div><div class="info-item"><span>Kode pinjaman</span><strong><?= layananEscape($b['kode_pinjaman']) ?></strong></div><div class="info-item"><span>Petugas</span><strong><?= layananEscape($b['petugas']) ?></strong></div><div class="info-item"><span>Tanggal transaksi</span><strong><?= layananEscape($tanggalTampil) ?></strong></div></section>
+<div class="document-title"><h2><?= layananEscape($judul) ?><?= $manualBast?' (FORMULIR MANUAL)':'' ?></h2><p>Nomor: <?= layananEscape($nomor) ?></p></div>
+<?php if($manualBast): ?><p class="statement">Formulir ini diisi secara manual saat barang jaminan diserahkan kembali kepada nasabah.</p><?php elseif($teksBast): ?><p class="statement"><?= nl2br(layananEscape($teksBast)) ?></p><?php elseif(isset($pernyataanMap[$jenis])): ?><p class="statement"><?= layananEscape($pernyataanMap[$jenis]) ?></p><?php endif; ?>
+<?php $manualLine='................................................................'; ?><section class="info-grid" aria-label="Informasi dokumen"><div class="info-item"><span>Nama nasabah</span><strong><?= $manualBast?$manualLine:layananEscape($b['nama_lengkap']) ?></strong></div><div class="info-item"><span>Kode anggota</span><strong><?= $manualBast?$manualLine:layananEscape($b['kode_anggota']) ?></strong></div><div class="info-item"><span>Nomor identitas</span><strong><?= $manualBast?$manualLine:layananEscape($b['ktp']) ?></strong></div><div class="info-item"><span>Kode pinjaman</span><strong><?= $manualBast?$manualLine:layananEscape($b['kode_pinjaman']) ?></strong></div><div class="info-item"><span>Petugas</span><strong><?= $manualBast?$manualLine:layananEscape($b['petugas']) ?></strong></div><div class="info-item"><span>Tanggal transaksi</span><strong><?= $manualBast?$manualLine:layananEscape($tanggalTampil) ?></strong></div></section>
 <?php if($jenis==='bast'): ?>
 <section class="section"><h3>Rincian barang jaminan</h3><div class="asset-box"><h4 class="asset-name"><?= layananEscape($b['jenis_barang'] ?: 'Barang jaminan') ?></h4><p class="asset-meta"><span>Identitas / nomor</span><strong><?= layananEscape($b['identitas_barang'] ?: '-') ?></strong></p><p class="asset-meta"><span>Deskripsi / kondisi</span><strong><?= nl2br(layananEscape($b['deskripsi_barang'] ?: '-')) ?></strong></p></div><div class="confirmation"><span class="confirmation-mark">✓</span><div><strong>Jaminan telah diserahkan kembali</strong><br>Barang telah diperiksa fisiknya dan diterima oleh nasabah dalam kondisi yang telah diketahui bersama.</div></div></section>
 <?php elseif($jenis==='denda'): ?>
@@ -65,4 +66,12 @@ header('Cache-Control: private, no-store');
 <?php endif; ?>
 <section class="section"><h3><?= $jenis==='bast'?'Dokumentasi & pengesahan':'Bukti transaksi' ?></h3><div class="evidence-grid"><div class="evidence"><div class="evidence-label"><?= layananEscape($labelBukti) ?></div><?php if($foto): ?><img class="foto" src="<?= layananEscape($foto) ?>" alt="<?= layananEscape($labelBukti) ?>"><?php else: ?><div class="photo-empty">Bukti foto tidak tersedia.</div><?php endif; ?></div><?php if($jenis==='bast'): ?><div class="signature"><div class="signature-label">Tanda tangan penerima</div><?php if(!empty($b['ttd'])): ?><img class="ttd" src="<?= layananEscape($b['ttd']) ?>" alt="Tanda tangan nasabah penerima jaminan"><?php endif; ?><div class="signature-name"><strong><?= layananEscape($b['nama_lengkap']) ?></strong><span>Nasabah / penerima jaminan</span></div></div><?php endif; ?></div></section>
 <footer class="footer-note">Dokumen ini diterbitkan oleh sistem <?= layananEscape(APP_NAME) ?> dan menjadi bukti serah terima yang sah.</footer></main>
+<?php if($manualBast): ?><script>
+(function(){
+    var line='................................................................';
+    document.querySelectorAll('.info-grid strong,.asset-box h4,.asset-box strong,.signature-name strong').forEach(function(el){el.textContent=line;});
+    document.querySelectorAll('.evidence img,.signature img').forEach(function(el){el.remove();});
+    document.querySelectorAll('.evidence .photo-empty').forEach(function(el){el.textContent='Tempelkan foto bukti penyerahan di sini.';});
+})();
+</script><?php endif; ?>
 </body></html>

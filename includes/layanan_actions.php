@@ -109,7 +109,9 @@ function prosesLayanan($db, $aksi, $id, &$files) {
             if (empty($_POST['cek_jaminan_nasabah'])) throw new Exception('Nasabah wajib mencentang konfirmasi pemeriksaan barang jaminan.');
             $ttdJaminan=trim((string)($_POST['ttd_jaminan_nasabah'] ?? ''));
             if ($ttdJaminan==='' || strpos($ttdJaminan,'data:image/')!==0) throw new Exception('TTD nasabah untuk pemeriksaan jaminan wajib diisi.');
-        } else $ttdJaminan=null;
+            $fotoSerahTerima=validasiFotoUpload('foto_serah_terima_jaminan','Foto penyerahan barang jaminan',5*1024*1024,true);
+            $fotoSerahTerimaPath=layananSimpanFoto($fotoSerahTerima,'jaminan_kembali');$files[]=$fotoSerahTerimaPath;
+        } else {$ttdJaminan=null;$fotoSerahTerimaPath=null;}
         if ($aksi!=='pelunasan_langsung' && $p['memerlukan_jaminan'] && empty($_POST['cek_fisik'])) throw new Exception('Verifikasi fisik jaminan wajib dilakukan.');
         $path='';
         if ($aksi!=='pelunasan_langsung') {
@@ -127,9 +129,9 @@ function prosesLayanan($db, $aksi, $id, &$files) {
             // Buat BAST otomatis agar pengambilan bersamaan dengan pelunasan
             // tetap memiliki akad serah-terima yang dapat dicetak dari laporan lunas.
             $db->prepare("INSERT INTO layanan_jaminan_kembali (pinjaman_id,user_id,status,foto,ttd,diserahkan_at,alasan,catatan_admin)
-                          VALUES (?,?,'diserahkan',NULL,?,NOW(),'Pengambilan langsung saat pelunasan.','Diserahkan bersamaan dengan pelunasan.')
-                          ON DUPLICATE KEY UPDATE user_id=VALUES(user_id),status='diserahkan',foto=NULL,ttd=VALUES(ttd),diserahkan_at=NOW(),alasan=VALUES(alasan),catatan_admin=VALUES(catatan_admin)")
-               ->execute([$id,$uid,$ttdJaminan]);
+                          VALUES (?,?,'diserahkan',?,?,NOW(),'Pengambilan langsung saat pelunasan.','Diserahkan bersamaan dengan pelunasan.')
+                          ON DUPLICATE KEY UPDATE user_id=VALUES(user_id),status='diserahkan',foto=VALUES(foto),ttd=VALUES(ttd),diserahkan_at=NOW(),alasan=VALUES(alasan),catatan_admin=VALUES(catatan_admin)")
+               ->execute([$id,$uid,$fotoSerahTerimaPath,$ttdJaminan]);
         }
         $keteranganPelunasan=($approval['admin_id']?'Disetujui Admin '.$approval['admin_id']:'Pelunasan tanpa diskon').'; diskon bunga '.$s['diskon_bunga'];
         if (kolomAda($db,'pelunasan_dini','cek_jaminan_nasabah')) $db->prepare('INSERT INTO pelunasan_dini (pinjaman_id,jumlah_pelunasan,keterangan,user_id,cek_jaminan_nasabah,ttd_jaminan_nasabah) VALUES (?,?,?,?,?,?)')->execute([$id,$jumlah,$keteranganPelunasan,$uid,$ttdJaminan?1:0,$ttdJaminan]);
