@@ -153,7 +153,7 @@ if (isset($_SESSION['role']) && in_array($_SESSION['role'], ['admin', 'teller'],
 
 <link rel="stylesheet" href="../assets/css/app-ui.css?v=20261022-1">
 <script>document.body.classList.add('ui-shell');</script>
-<script src="../assets/js/pilihan-foto.js?v=20261021-3" defer></script>
+<script src="../assets/js/pilihan-foto.js?v=20261023-1" defer></script>
 <link rel="stylesheet" href="../assets/css/upload-foto.css?v=20261021-1">
 <link rel="stylesheet" href="../assets/css/tanda-tangan.css?v=20261021-1">
 <script src="../assets/js/brand.js?v=20261019-6" defer></script>

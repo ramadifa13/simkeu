@@ -40,7 +40,7 @@ if ($_POST) {
             if ($telepon !== '' && !preg_match('/^[0-9+\-\s()]{5,20}$/', $telepon)) {
                 throw new Exception("Nomor telepon tidak valid (5-20 digit)");
             }
-            $foto = validasiFotoUpload('foto_profil', 'Foto profil', 2 * 1024 * 1024, false);
+            $foto = validasiFotoUpload('foto_profil', 'Foto profil', 1024 * 1024, false);
 
             if (migrasiRevisiBelumDijalankan($db)) {
                 throw new Exception("Database belum di-update, jalankan file migrasi (lihat README)");
@@ -383,7 +383,7 @@ $activities = $stmt_activities->fetchAll(PDO::FETCH_ASSOC);
                                                         <label class="form-label">Foto Profil</label>
                                                         <input type="file" name="foto_profil" id="fotoProfil" class="form-control"
                                                                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
-                                                        <div class="form-text">JPG/PNG/WEBP, maksimal 2 MB. Kosongkan bila tidak diganti.</div>
+                                                        <div class="form-text">JPG/PNG/WEBP, maksimal 1 MB. Kosongkan bila tidak diganti.</div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -587,9 +587,8 @@ $activities = $stmt_activities->fetchAll(PDO::FETCH_ASSOC);
             if (['image/jpeg', 'image/png', 'image/webp'].indexOf(f.type) === -1) {
                 alert('Foto profil harus berupa JPG, PNG, atau WEBP.');
                 this.value = '';
-            } else if (f.size > 2 * 1024 * 1024) {
-                alert('Foto profil melebihi 2 MB.');
-                this.value = '';
+            } else if (f.size > 1024 * 1024) {
+                alert('Foto profil melebihi 1 MB. Foto akan dikompres otomatis saat formulir disimpan.');
             }
         });
 

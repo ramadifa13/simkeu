@@ -37,7 +37,7 @@ function validasiTtdDataUrl($nilai, $label) {
         throw new Exception("$label wajib ditandatangani langsung pada kotak tanda tangan");
     }
     $bin = base64_decode($m[1], true);
-    if ($bin === false || strlen($bin) < 100 || strlen($bin) > 2 * 1024 * 1024) {
+    if ($bin === false || strlen($bin) < 100 || strlen($bin) > 1024 * 1024) {
         throw new Exception("$label tidak valid atau terlalu besar");
     }
     return $nilai;
@@ -50,8 +50,8 @@ function bacaTtdRequest($field, $label) {
         || $upload['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($upload['tmp_name'])) {
         throw new Exception("Unggah $label gagal. Silakan coba lagi.");
     }
-    if ($upload['size'] < 100 || $upload['size'] > 2 * 1024 * 1024) {
-        throw new Exception("$label tidak valid atau melebihi 2 MB.");
+    if ($upload['size'] < 100 || $upload['size'] > 1024 * 1024) {
+        throw new Exception("$label tidak valid atau melebihi 1 MB.");
     }
     $gambar = @getimagesize($upload['tmp_name']);
     if (!$gambar || $gambar[2] !== IMAGETYPE_PNG) {

@@ -97,10 +97,10 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         if ($adalah_gadai && empty($pengajuan['jaminan_id'])) {
             throw new Exception("Data barang jaminan tidak ditemukan");
         }
-        $foto = validasiFotoUpload('foto_nasabah', 'Foto nasabah saat menerima uang', 5 * 1024 * 1024, true);
-        $foto_barang = validasiFotoUpload('foto_barang_jaminan', 'Foto barang jaminan', 5 * 1024 * 1024, $adalah_gadai);
-        $foto_nasabah_barang = validasiFotoUpload('foto_nasabah_barang', 'Foto nasabah dengan barang jaminan', 5 * 1024 * 1024, $adalah_gadai);
-        $lampiran_upload = validasiBanyakFotoUpload('surat_tambahan', 'Lampiran surat perjanjian', 5 * 1024 * 1024, 10);
+        $foto = validasiFotoUpload('foto_nasabah', 'Foto nasabah saat menerima uang', 1024 * 1024, true);
+        $foto_barang = validasiFotoUpload('foto_barang_jaminan', 'Foto barang jaminan', 1024 * 1024, $adalah_gadai);
+        $foto_nasabah_barang = validasiFotoUpload('foto_nasabah_barang', 'Foto nasabah dengan barang jaminan', 1024 * 1024, $adalah_gadai);
+        $lampiran_upload = validasiBanyakFotoUpload('surat_tambahan', 'Lampiran surat perjanjian', 1024 * 1024, 10);
         $versi_perjanjian = 'lengkap';
         $nama_saksi_1 = trim($_POST['nama_saksi_1'] ?? '');
         $nama_saksi_2 = trim($_POST['nama_saksi_2'] ?? '');
@@ -1022,7 +1022,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
 
         // PHP menolak berkas yang sudah melewati upload_max_filesize sebelum kode
         // server berjalan. Karena itu foto besar dikompres dahulu di browser/HP.
-        var BATAS_FOTO = 5 * 1024 * 1024;
+        var BATAS_FOTO = 1024 * 1024;
         var TARGET_FOTO = 300 * 1024;
 
         function canvasKeBlob(canvas, kualitas) {
@@ -1070,7 +1070,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                 blob = await canvasKeBlob(canvas, 0.7);
             }
             if (!blob || blob.size > BATAS_FOTO) {
-                throw new Error('Foto "' + file.name + '" masih melebihi 5 MB setelah dikompres.');
+                throw new Error('Foto "' + file.name + '" masih melebihi 1 MB setelah dikompres.');
             }
 
             var nama = file.name.replace(/\.[^.]+$/, '') + '-kompres.jpg';
@@ -1096,7 +1096,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                 for (var key of Object.keys(signaturePads)) {
                     data.delete('ttd_' + key);
                     var blob = await new Promise(function(resolve){signaturePads[key].canvas.toBlob(resolve, 'image/png')});
-                    if (!blob || blob.size > 2 * 1024 * 1024) throw new Error('TTD gagal dibuat atau melebihi 2 MB.');
+                    if (!blob || blob.size > 1024 * 1024) throw new Error('TTD gagal dibuat atau melebihi 1 MB.');
                     data.append('ttd_' + key + '_file', blob, 'ttd-' + key + '.png');
                 }
                 tombol.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Mencairkan...';

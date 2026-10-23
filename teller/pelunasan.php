@@ -486,15 +486,15 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                             <p class="small mb-2" id="detailJaminanPelunasan"></p><img id="fotoJaminanPelunasan" class="img-fluid rounded border mb-3 d-none" style="max-height:180px;object-fit:contain" alt="Foto barang jaminan">
                             <label class="form-check d-flex gap-2 align-items-start mb-3"><input class="form-check-input mt-1" type="checkbox" name="cek_jaminan_nasabah" id="cekJaminanNasabah"><span>Saya sudah mengecek barang jaminan secara keseluruhan dan menyatakan barang dalam kondisi normal/tidak rusak.</span></label>
                             <label class="form-label">TTD Nasabah sebagai bukti pemeriksaan *</label>
-                            <div class="signature-canvas-wrap"><canvas id="ttdJaminanPelunasan" width="600" height="220" class="signature" style="height:220px"></canvas></div>
+                            <div class="signature-canvas-wrap"><canvas id="ttdJaminanPelunasan" width="420" height="154" class="signature" style="height:220px"></canvas></div>
                             <input type="hidden" name="ttd_jaminan_nasabah" id="ttdJaminanNasabah">
                             <button type="button" class="btn btn-sm btn-outline-danger mt-2 reset-ttd" data-canvas="ttdJaminanPelunasan"><i class="fas fa-eraser me-1"></i>Reset TTD Nasabah</button>
                             <label class="form-label mt-3">TTD Teller / petugas penyerahan *</label>
-                            <div class="signature-canvas-wrap"><canvas id="ttdJaminanTellerCanvas" width="600" height="220" class="signature" style="height:220px"></canvas></div>
+                            <div class="signature-canvas-wrap"><canvas id="ttdJaminanTellerCanvas" width="420" height="154" class="signature" style="height:220px"></canvas></div>
                             <input type="hidden" name="ttd_jaminan_teller" id="ttdJaminanTeller">
                             <button type="button" class="btn btn-sm btn-outline-danger mt-2 reset-ttd" data-canvas="ttdJaminanTellerCanvas"><i class="fas fa-eraser me-1"></i>Reset TTD Teller</button>
                             <small class="text-muted d-block mt-2">Tanda tangan nasabah dan Teller dicetak pada akad serah terima barang.</small>
-                            <div class="mt-3"><label for="fotoSerahTerimaJaminan" class="form-label">Foto penyerahan barang jaminan *</label><input type="file" class="form-control" name="foto_serah_terima_jaminan" id="fotoSerahTerimaJaminan" accept="image/jpeg,image/png,image/webp"><div class="form-text">Foto kondisi barang saat diserahkan kepada nasabah. Maksimal 5 MB.</div></div>
+                            <div class="mt-3"><label for="fotoSerahTerimaJaminan" class="form-label">Foto penyerahan barang jaminan *</label><input type="file" class="form-control" name="foto_serah_terima_jaminan" id="fotoSerahTerimaJaminan" accept="image/jpeg,image/png,image/webp"><div class="form-text">Foto kondisi barang saat diserahkan kepada nasabah. Maksimal 1 MB; otomatis dikompres sebelum dikirim.</div></div>
                             <div class="mt-3 pt-3 border-top"><label class="form-label fw-bold mb-2">Cetak akad serah terima</label><label class="form-check"><input class="form-check-input" type="radio" name="mode_cetak_akad" value="otomatis" checked> Otomatis — akad langsung terbuka dengan data, foto, dan TTD terisi.</label><label class="form-check mt-1"><input class="form-check-input" type="radio" name="mode_cetak_akad" value="manual"> Manual — formulir kosong dicetak dari Laporan Pelunasan.</label></div>
                             </div>
                         </div>
@@ -548,6 +548,8 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             if(!c)return;
             x.lineWidth=2.4;x.lineCap='round';x.lineJoin='round';x.strokeStyle='#183f49';
             function pos(e){var r=c.getBoundingClientRect();return [(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]}
+            // Kanvas dibuat lebih kecil agar data TTD tidak membebani POST/WAF server.
+            // PNG tetap dipakai agar garis tanda tangan tajam saat dicetak.
             function simpan(){document.getElementById(inputId).value=c.toDataURL('image/png');}
             function berhenti(e){if(!drawing)return;drawing=false;if(c.hasPointerCapture && c.hasPointerCapture(e.pointerId))c.releasePointerCapture(e.pointerId);simpan();}
             c.addEventListener('pointerdown',function(e){

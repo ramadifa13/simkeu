@@ -11,6 +11,9 @@ if (!function_exists('validasiFotoUpload')) {
      * @throws Exception bila tidak valid, atau bila $wajib dan tidak ada file
      */
     function validasiFotoUpload($field, $label, $maks_byte, $wajib = false) {
+        // Kebijakan global: tidak ada gambar yang diterima aplikasi lebih besar dari 1 MB.
+        // Parameter lama dipertahankan agar seluruh pemanggil lama tetap kompatibel.
+        $maks_byte = min((int) $maks_byte, 1024 * 1024);
         $file = isset($_FILES[$field]) ? $_FILES[$field] : null;
         if (!$file || $file['error'] === UPLOAD_ERR_NO_FILE) {
             if ($wajib) {

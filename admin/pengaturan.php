@@ -81,49 +81,22 @@ if ($_POST && isset($_POST['update_koperasi'])) {
 
 // Handle logo upload
 if ($_POST && isset($_POST['upload_logo']) && isset($_FILES['logo'])) {
-    $logo = $_FILES['logo'];
-    
-    if ($logo['error'] === UPLOAD_ERR_OK) {
-        $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-        $max_size = 2 * 1024 * 1024; // 2MB
-        
-        if (in_array($logo['type'], $allowed_types) && $logo['size'] <= $max_size) {
-            // Create uploads directory if not exists
-            $upload_dir = '../uploads/logo/';
-            if (!is_dir($upload_dir)) {
-                mkdir($upload_dir, 0755, true);
-            }
-            
-            $file_extension = pathinfo($logo['name'], PATHINFO_EXTENSION);
-            $filename = 'logo_' . time() . '.' . $file_extension;
-            $upload_path = $upload_dir . $filename;
-            
-            if (move_uploaded_file($logo['tmp_name'], $upload_path)) {
-                // Delete old logo if exists
-                $old_logo_query = "SELECT logo FROM koperasi WHERE id = 1";
-                $old_logo_stmt = $db->prepare($old_logo_query);
-                $old_logo_stmt->execute();
-                $old_logo = $old_logo_stmt->fetch(PDO::FETCH_ASSOC);
-                
-                if ($old_logo && $old_logo['logo'] && file_exists($upload_dir . $old_logo['logo'])) {
-                    unlink($upload_dir . $old_logo['logo']);
-                }
-                
-                // Update database
-                $logo_query = "UPDATE koperasi SET logo = :logo WHERE id = 1";
-                $logo_stmt = $db->prepare($logo_query);
-                $logo_stmt->bindParam(':logo', $filename);
-                $logo_stmt->execute();
-                
-                $_SESSION['success'] = "Logo berhasil diupload!";
-            } else {
-                $_SESSION['error'] = "Gagal mengupload logo! Pastikan folder uploads memiliki permission yang tepat.";
-            }
-        } else {
-            $_SESSION['error'] = "File harus berupa gambar (JPEG, PNG, GIF) dan maksimal 2MB!";
-        }
-    } else {
-        $_SESSION['error'] = "Terjadi kesalahan saat upload logo! Error code: " . $logo['error'];
+    try {
+        $logo = validasiFotoUpload('logo', 'Logo koperasi', 1024 * 1024, true);
+        $upload_dir = '../uploads/logo/';
+        if (!is_dir($upload_dir) && !mkdir($upload_dir, 0755, true)) throw new Exception('Folder logo tidak dapat dibuat.');
+        $filename = 'logo_' . time() . '.' . $logo['ext'];
+        $upload_path = $upload_dir . $filename;
+        if (!kompresDanSimpanGambar($logo['tmp'], $upload_path, $logo['ext'])) throw new Exception('Gagal menyimpan logo.');
+        $old_logo_stmt = $db->prepare("SELECT logo FROM koperasi WHERE id = 1");
+        $old_logo_stmt->execute();
+        $old_logo = $old_logo_stmt->fetch(PDO::FETCH_ASSOC);
+        if ($old_logo && $old_logo['logo'] && file_exists($upload_dir . $old_logo['logo'])) unlink($upload_dir . $old_logo['logo']);
+        $logo_stmt = $db->prepare("UPDATE koperasi SET logo = :logo WHERE id = 1");
+        $logo_stmt->execute([':logo' => $filename]);
+        $_SESSION['success'] = "Logo berhasil diupload!";
+    } catch (Exception $e) {
+        $_SESSION['error'] = 'Gagal mengunggah logo: ' . $e->getMessage();
     }
     
     header("Location: pengaturan.php");
@@ -439,9 +412,9 @@ function formatRupiah($angka) {
                                         <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
                                             <div class="mb-3">
                                                 <label class="form-label">Upload Logo Baru</label>
-                                                <input type="file" name="logo" class="form-control" accept="image/*" required>
+                                                <input type="file" name="logo" class="form-control" accept="image/jpeg,image/png,image/webp" required>
                                                 <div class="form-text">
-                                                    Format: JPEG, PNG, GIF. Maksimal: 2MB
+                                                    Format: JPEG, PNG, WEBP. Maksimal: 1 MB; otomatis dikompres sebelum dikirim.
                                                 </div>
                                             </div>
                                             <button type="submit" name="upload_logo" class="btn btn-info">
@@ -485,7 +458,7 @@ function formatRupiah($angka) {
           if(dirty){
             var blob=await new Promise(function(resolve){c.toBlob(resolve,'image/png')});
             if(!blob)throw new Error('Tanda tangan gagal dibuat. Silakan coba lagi.');
-            if(blob.size>2*1024*1024)throw new Error('Tanda tangan melebihi 2 MB.');
+            if(blob.size>1024*1024)throw new Error('Tanda tangan melebihi 1 MB.');
             data.append('ttd_admin_file',blob,'ttd-admin.png');
           }
           var response=await fetch(form.action,{method:'POST',body:data,credentials:'same-origin'});
