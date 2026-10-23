@@ -20,6 +20,22 @@ if (!isAdmin()) {
 
 $page_title = "Pencairan Pinjaman";
 
+// Keputusan TC: Admin memeriksa alasan Teller. Approve mempertahankan
+// penundaan, Tolak membuka kembali pengajuan untuk diproses Teller.
+if ($_POST && isset($_POST['keputusan_tc'])) {
+    try {
+        layananValidasiToken();
+        $tcId=(int)($_POST['tc_id'] ?? 0); $aksi=$_POST['keputusan_tc']; $catatan=trim((string)($_POST['catatan_tc'] ?? ''));
+        if (!in_array($aksi,['disetujui','ditolak'],true)) throw new Exception('Keputusan TC tidak valid.');
+        if (strlen($catatan)<5 || strlen($catatan)>2000) throw new Exception('Keterangan Admin wajib 5–2000 karakter.');
+        $stmt=$db->prepare("UPDATE layanan_tunda_cair SET status=?,admin_id=?,catatan_admin=?,diputuskan_at=NOW() WHERE id=? AND status='menunggu'");
+        $stmt->execute([$aksi,$_SESSION['user_id'],$catatan,$tcId]);
+        if(!$stmt->rowCount()) throw new Exception('Pengajuan TC tidak ditemukan atau sudah diputuskan.');
+        $_SESSION['success']='Keputusan TC berhasil disimpan.';
+    } catch(Exception $e) { $_SESSION['error']='Gagal menyimpan keputusan TC: '.$e->getMessage(); }
+    header('Location: pencairan.php'); exit;
+}
+
 // ============================================
 // SINKRONISASI DATA
 // ============================================
@@ -92,6 +108,8 @@ $query .= " ORDER BY pp.tanggal_persetujuan DESC";
 $stmt = $db->prepare($query);
 $stmt->execute($params_siap);
 $pengajuan_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$tcMenunggu=$db->query("SELECT tc.*,pp.kode_pengajuan,a.nama_lengkap,a.kode_anggota,u.nama_lengkap teller FROM layanan_tunda_cair tc JOIN pengajuan_pinjaman pp ON pp.id=tc.pengajuan_id JOIN anggota a ON a.id=pp.anggota_id JOIN users u ON u.id=tc.user_id WHERE tc.status='menunggu' ORDER BY tc.created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
 
 // Get disbursed loans dengan JOIN lengkap
 $query_dicairkan = "SELECT p.*, a.nama_lengkap,
@@ -199,6 +217,32 @@ function formatRupiah($angka) {
         .btn-sync:hover {
             background: linear-gradient(135deg, #5a67d8 0%, #6b46a1 100%);
             color: white;
+        }
+        .action-menu {
+            min-width: 255px;
+            max-width: calc(100vw - 24px);
+            padding: .45rem;
+            border: 1px solid #dbe7ea;
+            border-radius: .75rem;
+            box-shadow: 0 .75rem 1.75rem rgba(31, 66, 80, .18);
+            z-index: 1080;
+        }
+        .action-menu.show { display: grid !important; gap: .25rem; }
+        .table-responsive td:has(.action-menu.show) { position: relative; z-index: 2000 !important; overflow: visible !important; }
+        .ui-shell .ui-actions-cell:last-child:has(.action-menu.show) { z-index: 2000 !important; }
+        .table-responsive .dropdown:has(.action-menu.show) { z-index: 2001; }
+        .action-menu .btn {
+            width: 100%;
+            min-height: 38px;
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            text-align: left;
+            white-space: normal;
+        }
+        .action-menu .btn i { width: 1rem; text-align: center; }
+        @media (max-width: 576px) {
+            .action-menu { min-width: min(255px, calc(100vw - 24px)); }
         }
     </style>
 </head>
@@ -311,6 +355,9 @@ function formatRupiah($angka) {
                 </div>
                 <?php endif; ?>
 
+                <!-- Persetujuan Tunda Cair -->
+                <div class="card mb-4 border-warning"><div class="card-header bg-warning"><h5 class="mb-0"><i class="fas fa-pause-circle me-2"></i>Pengajuan Tunda Cair (TC) <span class="badge bg-light text-dark ms-2"><?= count($tcMenunggu) ?> Data</span></h5></div><div class="card-body"><?php if(!$tcMenunggu): ?><p class="text-muted mb-0">Tidak ada TC yang menunggu keputusan.</p><?php else: ?><div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Pengajuan</th><th>Nasabah</th><th>Alasan Teller</th><th>Waktu</th><th>Keputusan Admin</th></tr></thead><tbody><?php foreach($tcMenunggu as $tc): ?><tr><td><?= htmlspecialchars($tc['kode_pengajuan']) ?></td><td><strong><?= htmlspecialchars($tc['nama_lengkap']) ?></strong><br><small><?= htmlspecialchars($tc['kode_anggota']) ?></small></td><td><?= nl2br(htmlspecialchars($tc['alasan'])) ?></td><td><?= date('d/m/Y H:i',strtotime($tc['created_at'])) ?><br><small><?= htmlspecialchars($tc['teller']) ?></small></td><td><form method="post" class="d-flex flex-column gap-1"><?= layananToken() ?><input type="hidden" name="tc_id" value="<?= (int)$tc['id'] ?>"><textarea name="catatan_tc" class="form-control form-control-sm" rows="2" minlength="5" maxlength="2000" required placeholder="Keterangan keputusan Admin"></textarea><div class="btn-group"><button name="keputusan_tc" value="disetujui" class="btn btn-sm btn-success">Approve TC</button><button name="keputusan_tc" value="ditolak" class="btn btn-sm btn-danger">Tolak TC</button></div></form></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?></div></div>
+
                 <!-- Pengajuan Siap Dicairkan -->
                 <div class="card mb-4">
                     <div class="card-header bg-success text-white">
@@ -401,48 +448,40 @@ function formatRupiah($angka) {
                                             <td><?php echo labelTenorRow($p); ?></td>
                                             <td><?php echo date('d/m/Y', strtotime($p['tanggal_pencairan'])); ?></td>
                                             <td>
-                                                <span class="badge bg-<?php echo $p['status'] == 'aktif' ? 'success' : 'secondary'; ?>">
-                                                    <?php echo ucfirst($p['status']); ?>
-                                                </span>
+                                                <span class="badge bg-info">Dicairkan</span>
                                             </td>
-                                            <td>
+                                            <td><div class="dropdown"><button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-v me-1"></i>Aksi</button><div class="dropdown-menu dropdown-menu-end action-menu">
                                                 <?php if (!empty($p['foto_pencairan'])): ?>
                                                 <button type="button" class="btn btn-sm btn-outline-secondary"
                                                         onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($p['foto_pencairan']), ENT_QUOTES); ?>', 'Foto nasabah - <?php echo htmlspecialchars($p['nama_lengkap'], ENT_QUOTES); ?>')"
                                                         title="Foto nasabah saat pencairan">
-                                                    <i class="fas fa-camera"></i>
+                                                    <i class="fas fa-camera"></i><span>Foto nasabah</span>
                                                 </button>
                                                 <?php endif; ?>
                                                 <?php if (!empty($p['foto_barang'])): ?>
                                                 <button type="button" class="btn btn-sm btn-outline-warning"
                                                         onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($p['foto_barang']), ENT_QUOTES); ?>', 'Foto <?php echo htmlspecialchars($p['jenis_barang'], ENT_QUOTES); ?>')"
                                                         title="Foto barang jaminan">
-                                                    <i class="fas fa-box"></i>
+                                                    <i class="fas fa-box"></i><span>Foto barang jaminan</span>
                                                 </button>
                                                 <?php endif; ?>
                                                 <?php if (!empty($p['foto_nasabah_barang'])): ?>
                                                 <button type="button" class="btn btn-sm btn-outline-warning"
                                                         onclick="lihatDokumen('<?php echo htmlspecialchars(urlFoto($p['foto_nasabah_barang']), ENT_QUOTES); ?>', 'Foto nasabah dengan barang jaminan')"
                                                         title="Foto nasabah dengan barang jaminan">
-                                                    <i class="fas fa-user-tag"></i>
+                                                    <i class="fas fa-user-tag"></i><span>Foto nasabah &amp; barang</span>
                                                 </button>
-                                                <?php endif; ?>
-                                                <?php if ((int) $p['total_cicilan'] > 0 && (int) $p['cicilan_belum'] === 0): ?>
-                                                <a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener"
-                                                   href="cetak_bukti_pelunasan.php?id=<?php echo (int) $p['id']; ?>" title="Cetak Bukti Pelunasan">
-                                                    <i class="fas fa-file-invoice"></i>
-                                                </a>
                                                 <?php endif; ?>
                                                 <a class="btn btn-sm btn-success" target="_blank" rel="noopener"
                                                    href="cetak_slip_pencairan.php?id=<?php echo (int) $p['id']; ?>" title="Cetak Slip">
-                                                    <i class="fas fa-print"></i>
+                                                    <i class="fas fa-print"></i><span>Cetak slip pencairan</span>
                                                 </a>
                                                 <?php if (!empty($p['perjanjian_id'])): ?>
-                                                <a class="btn btn-sm btn-primary" target="_blank" rel="noopener" href="cetak_perjanjian.php?id=<?php echo (int)$p['id']; ?>" title="Cetak Surat Perjanjian & Lampiran"><i class="fas fa-file-pdf me-1"></i>PDF</a>
+                                                <a class="btn btn-sm btn-primary" target="_blank" rel="noopener" href="cetak_perjanjian.php?id=<?php echo (int)$p['id']; ?>" title="Cetak Surat Perjanjian & Lampiran"><i class="fas fa-file-pdf"></i><span>PDF perjanjian</span></a>
                                                 <?php else: ?>
-                                                <button type="button" class="btn btn-sm btn-secondary" disabled title="PDF tersedia untuk pencairan baru yang sudah menyimpan seluruh TTD"><i class="fas fa-file-pdf me-1"></i>PDF</button>
+                                                <button type="button" class="btn btn-sm btn-secondary" disabled title="PDF tersedia untuk pencairan baru yang sudah menyimpan seluruh TTD"><i class="fas fa-file-pdf"></i><span>PDF perjanjian</span></button>
                                                 <?php endif; ?>
-                                            </td>
+                                            </div></div></td>
                                         </tr>
                                         <?php endforeach; ?>
                                     </tbody>

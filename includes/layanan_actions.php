@@ -109,9 +109,11 @@ function prosesLayanan($db, $aksi, $id, &$files) {
             if (empty($_POST['cek_jaminan_nasabah'])) throw new Exception('Nasabah wajib mencentang konfirmasi pemeriksaan barang jaminan.');
             $ttdJaminan=trim((string)($_POST['ttd_jaminan_nasabah'] ?? ''));
             if ($ttdJaminan==='' || strpos($ttdJaminan,'data:image/')!==0) throw new Exception('TTD nasabah untuk pemeriksaan jaminan wajib diisi.');
+            $ttdJaminanTeller=trim((string)($_POST['ttd_jaminan_teller'] ?? ''));
+            if ($ttdJaminanTeller==='' || strpos($ttdJaminanTeller,'data:image/')!==0) throw new Exception('TTD Teller untuk serah terima jaminan wajib diisi.');
             $fotoSerahTerima=validasiFotoUpload('foto_serah_terima_jaminan','Foto penyerahan barang jaminan',5*1024*1024,true);
             $fotoSerahTerimaPath=layananSimpanFoto($fotoSerahTerima,'jaminan_kembali');$files[]=$fotoSerahTerimaPath;
-        } else {$ttdJaminan=null;$fotoSerahTerimaPath=null;}
+        } else {$ttdJaminan=null;$ttdJaminanTeller=null;$fotoSerahTerimaPath=null;}
         if ($aksi!=='pelunasan_langsung' && $p['memerlukan_jaminan'] && empty($_POST['cek_fisik'])) throw new Exception('Verifikasi fisik jaminan wajib dilakukan.');
         $path='';
         if ($aksi!=='pelunasan_langsung') {
@@ -128,10 +130,10 @@ function prosesLayanan($db, $aksi, $id, &$files) {
             $db->prepare("UPDATE jaminan_pinjaman SET status_jaminan='dikembalikan',tanggal_dikembalikan=CURDATE() WHERE pinjaman_id=? AND status_jaminan='dititipkan'")->execute([$id]);
             // Buat BAST otomatis agar pengambilan bersamaan dengan pelunasan
             // tetap memiliki akad serah-terima yang dapat dicetak dari laporan lunas.
-            $db->prepare("INSERT INTO layanan_jaminan_kembali (pinjaman_id,user_id,status,foto,ttd,diserahkan_at,alasan,catatan_admin)
-                          VALUES (?,?,'diserahkan',?,?,NOW(),'Pengambilan langsung saat pelunasan.','Diserahkan bersamaan dengan pelunasan.')
-                          ON DUPLICATE KEY UPDATE user_id=VALUES(user_id),status='diserahkan',foto=VALUES(foto),ttd=VALUES(ttd),diserahkan_at=NOW(),alasan=VALUES(alasan),catatan_admin=VALUES(catatan_admin)")
-               ->execute([$id,$uid,$fotoSerahTerimaPath,$ttdJaminan]);
+            $db->prepare("INSERT INTO layanan_jaminan_kembali (pinjaman_id,user_id,status,foto,ttd,ttd_teller,diserahkan_at,alasan,catatan_admin)
+                          VALUES (?,?,'diserahkan',?,?,?,NOW(),'Pengambilan langsung saat pelunasan.','Diserahkan bersamaan dengan pelunasan.')
+                          ON DUPLICATE KEY UPDATE user_id=VALUES(user_id),status='diserahkan',foto=VALUES(foto),ttd=VALUES(ttd),ttd_teller=VALUES(ttd_teller),diserahkan_at=NOW(),alasan=VALUES(alasan),catatan_admin=VALUES(catatan_admin)")
+               ->execute([$id,$uid,$fotoSerahTerimaPath,$ttdJaminan,$ttdJaminanTeller]);
         }
         $keteranganPelunasan=($approval['admin_id']?'Disetujui Admin '.$approval['admin_id']:'Pelunasan tanpa diskon').'; diskon bunga '.$s['diskon_bunga'];
         if (kolomAda($db,'pelunasan_dini','cek_jaminan_nasabah')) $db->prepare('INSERT INTO pelunasan_dini (pinjaman_id,jumlah_pelunasan,keterangan,user_id,cek_jaminan_nasabah,ttd_jaminan_nasabah) VALUES (?,?,?,?,?,?)')->execute([$id,$jumlah,$keteranganPelunasan,$uid,$ttdJaminan?1:0,$ttdJaminan]);
@@ -165,12 +167,15 @@ function prosesLayanan($db, $aksi, $id, &$files) {
         $stmt=$db->prepare("SELECT * FROM layanan_jaminan_kembali WHERE pinjaman_id=? AND status='disetujui' FOR UPDATE");$stmt->execute([$id]);
         if (!$stmt->fetch()) throw new Exception('Pengembalian wajib mendapat persetujuan Admin.');
         $foto=validasiFotoUpload('bukti','Foto serah terima jaminan',5*1024*1024,true);
-        $ttd=$_POST['ttd'] ?? '';
+        $ttd=$_POST['ttd'] ?? ''; $ttdTeller=$_POST['ttd_teller'] ?? '';
         if (strlen($ttd)>300000 || !preg_match('#^data:image/png;base64,([A-Za-z0-9+/=]+)$#D',$ttd,$matches)) throw new Exception('Tanda tangan nasabah wajib diisi.');
         $raw=base64_decode($matches[1],true);$info=$raw!==false?@getimagesizefromstring($raw):false;
         if (!$info || $info['mime']!=='image/png') throw new Exception('Tanda tangan tidak valid.');
+        if (strlen($ttdTeller)>300000 || !preg_match('#^data:image/png;base64,([A-Za-z0-9+/=]+)$#D',$ttdTeller,$tellerMatches)) throw new Exception('Tanda tangan Teller wajib diisi.');
+        $rawTeller=base64_decode($tellerMatches[1],true);$infoTeller=$rawTeller!==false?@getimagesizefromstring($rawTeller):false;
+        if (!$infoTeller || $infoTeller['mime']!=='image/png') throw new Exception('Tanda tangan Teller tidak valid.');
         $path=layananSimpanFoto($foto,'jaminan_kembali');$files[]=$path;
-        $db->prepare("UPDATE layanan_jaminan_kembali SET status='diserahkan',foto=?,ttd=?,diserahkan_at=NOW(),user_id=? WHERE pinjaman_id=?")->execute([$path,$ttd,$uid,$id]);
+        $db->prepare("UPDATE layanan_jaminan_kembali SET status='diserahkan',foto=?,ttd=?,ttd_teller=?,diserahkan_at=NOW(),user_id=? WHERE pinjaman_id=?")->execute([$path,$ttd,$ttdTeller,$uid,$id]);
         $stmt=$db->prepare("UPDATE jaminan_pinjaman SET status_jaminan='dikembalikan',tanggal_dikembalikan=CURDATE() WHERE pinjaman_id=? AND status_jaminan='dititipkan'");$stmt->execute([$id]);
         if (!$stmt->rowCount()) throw new Exception('Jaminan sudah diserahkan atau dieksekusi.');
     } elseif ($aksi === 'prioritas') {

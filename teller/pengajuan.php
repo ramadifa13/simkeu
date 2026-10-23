@@ -780,15 +780,15 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                 </td>
                                                 <td>
                                                     <?php
+                                                    $statusTampil = $pengajuan['status']==='dicairkan' ? 'disetujui' : $pengajuan['status'];
                                                     $status_class = [
                                                         'menunggu' => 'warning',
                                                         'disetujui' => 'success',
-                                                        'ditolak' => 'danger',
-                                                        'dicairkan' => 'info'
+                                                        'ditolak' => 'danger'
                                                     ];
                                                     ?>
-                                                    <span class="badge bg-<?php echo $status_class[$pengajuan['status']]; ?> status-badge">
-                                                        <?php echo ucfirst($pengajuan['status']); ?>
+                                                    <span class="badge bg-<?php echo $status_class[$statusTampil]; ?> status-badge">
+                                                        <?php echo ucfirst($statusTampil); ?>
                                                     </span>
                                                     <?php if ($pengajuan['admin_name']): ?>
                                                         <br>
@@ -812,7 +812,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                             data-tenor="<?php echo $pengajuan['tenor'] . ' bulan, ' . ringkasanAngsuran(hitungDariPinjaman($pengajuan)); ?>"
                                                             data-bunga="<?php echo labelBunga($pengajuan['bunga'], $pengajuan['skema_bunga']); ?>"
                                                             data-tujuan="<?php echo $pengajuan['tujuan_pinjaman']; ?>"
-                                                            data-status="<?php echo $pengajuan['status']; ?>"
+                                                            data-status="<?php echo $statusTampil; ?>"
                                                             data-tanggal="<?php echo date('d/m/Y H:i', strtotime($pengajuan['tanggal_pengajuan'])); ?>"
                                                             data-catatan="<?php echo $pengajuan['catatan_admin']; ?>"
                                                             data-admin="<?php echo $pengajuan['admin_name']; ?>"
@@ -1118,8 +1118,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             var statusClass = {
                 'menunggu': 'warning',
                 'disetujui': 'success',
-                'ditolak': 'danger',
-                'dicairkan': 'info'
+                'ditolak': 'danger'
             };
             document.getElementById('detail_status').innerHTML = '<span class="badge bg-' + statusClass[status] + '">' + status.charAt(0).toUpperCase() + status.slice(1) + '</span>';
             

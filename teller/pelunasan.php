@@ -37,10 +37,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['lunaskan'])) {
         if (!empty($_POST['ambil_jaminan_langsung']) && ($_POST['mode_cetak_akad'] ?? '') === 'otomatis') {
             $bast=$db->prepare("SELECT id FROM layanan_jaminan_kembali WHERE pinjaman_id=? AND status='diserahkan' ORDER BY id DESC LIMIT 1");
             $bast->execute([(int)($_POST['id'] ?? 0)]);
-            if ($bastId=(int)$bast->fetchColumn()) {
-                header('Location: ../includes/kwitansi_layanan.php?jenis=bast&id='.$bastId);
-                exit;
-            }
+            if ($bastId=(int)$bast->fetchColumn()) { header('Location: ../includes/kwitansi_layanan.php?jenis=bast&id='.$bastId); exit; }
         }
     } catch (Exception $e) {
         if ($db->inTransaction()) $db->rollBack();
@@ -463,19 +460,14 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                             <p class="small mb-2" id="detailJaminanPelunasan"></p><img id="fotoJaminanPelunasan" class="img-fluid rounded border mb-3 d-none" style="max-height:180px;object-fit:contain" alt="Foto barang jaminan">
                             <label class="form-check d-flex gap-2 align-items-start mb-3"><input class="form-check-input mt-1" type="checkbox" name="cek_jaminan_nasabah" id="cekJaminanNasabah"><span>Saya sudah mengecek barang jaminan secara keseluruhan dan menyatakan barang dalam kondisi normal/tidak rusak.</span></label>
                             <label class="form-label">TTD Nasabah sebagai bukti pemeriksaan *</label>
-                            <div class="signature-canvas-wrap"><canvas id="ttdJaminanPelunasan" width="600" height="180" class="signature" style="height:160px"></canvas></div>
+                            <div class="signature-canvas-wrap"><canvas id="ttdJaminanPelunasan" width="600" height="220" class="signature" style="height:220px"></canvas></div>
                             <input type="hidden" name="ttd_jaminan_nasabah" id="ttdJaminanNasabah">
-                            <small class="text-muted d-block mt-2">Tanda tangan nasabah diperlukan untuk melanjutkan pelunasan gadai.</small>
-                            <div class="mt-3">
-                                <label for="fotoSerahTerimaJaminan" class="form-label">Foto penyerahan barang jaminan *</label>
-                                <input type="file" class="form-control" name="foto_serah_terima_jaminan" id="fotoSerahTerimaJaminan" accept="image/jpeg,image/png,image/webp">
-                                <div class="form-text">Foto kondisi barang saat diserahkan kepada nasabah. Maksimal 5 MB.</div>
-                            </div>
-                            <div class="mt-3 pt-3 border-top">
-                                <label class="form-label fw-bold mb-2">Cetak akad serah terima</label>
-                                <label class="form-check"><input class="form-check-input" type="radio" name="mode_cetak_akad" value="otomatis" checked> Otomatis — akad langsung terbuka dengan data dan TTD transaksi terisi.</label>
-                                <label class="form-check mt-1"><input class="form-check-input" type="radio" name="mode_cetak_akad" value="manual"> Manual — formulir kosong dicetak dari Laporan Pelunasan untuk dilengkapi tulisan tangan.</label>
-                            </div>
+                            <label class="form-label mt-3">TTD Teller / petugas penyerahan *</label>
+                            <div class="signature-canvas-wrap"><canvas id="ttdJaminanTellerCanvas" width="600" height="220" class="signature" style="height:220px"></canvas></div>
+                            <input type="hidden" name="ttd_jaminan_teller" id="ttdJaminanTeller">
+                            <small class="text-muted d-block mt-2">Tanda tangan nasabah dan Teller dicetak pada akad serah terima barang.</small>
+                            <div class="mt-3"><label for="fotoSerahTerimaJaminan" class="form-label">Foto penyerahan barang jaminan *</label><input type="file" class="form-control" name="foto_serah_terima_jaminan" id="fotoSerahTerimaJaminan" accept="image/jpeg,image/png,image/webp"><div class="form-text">Foto kondisi barang saat diserahkan kepada nasabah. Maksimal 5 MB.</div></div>
+                            <div class="mt-3 pt-3 border-top"><label class="form-label fw-bold mb-2">Cetak akad serah terima</label><label class="form-check"><input class="form-check-input" type="radio" name="mode_cetak_akad" value="otomatis" checked> Otomatis — akad langsung terbuka dengan data, foto, dan TTD terisi.</label><label class="form-check mt-1"><input class="form-check-input" type="radio" name="mode_cetak_akad" value="manual"> Manual — formulir kosong dicetak dari Laporan Pelunasan.</label></div>
                             </div>
                         </div>
 
@@ -522,8 +514,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         });
 
         // Lunaskan Modal
-        var ttdJaminanCanvas = document.getElementById('ttdJaminanPelunasan'), ttdJaminanCtx = ttdJaminanCanvas ? ttdJaminanCanvas.getContext('2d') : null, ttdJaminanDrawing = false;
-        if (ttdJaminanCanvas) { ttdJaminanCtx.lineWidth=2.4; ttdJaminanCtx.lineCap='round'; ttdJaminanCtx.lineJoin='round'; ttdJaminanCtx.strokeStyle='#183f49'; function ttdPos(e){var r=ttdJaminanCanvas.getBoundingClientRect();return [(e.clientX-r.left)*ttdJaminanCanvas.width/r.width,(e.clientY-r.top)*ttdJaminanCanvas.height/r.height]} ttdJaminanCanvas.addEventListener('pointerdown',function(e){ttdJaminanDrawing=true;ttdJaminanCanvas.setPointerCapture(e.pointerId);var p=ttdPos(e);ttdJaminanCtx.beginPath();ttdJaminanCtx.moveTo(p[0],p[1])});ttdJaminanCanvas.addEventListener('pointermove',function(e){if(!ttdJaminanDrawing)return;var p=ttdPos(e);ttdJaminanCtx.lineTo(p[0],p[1]);ttdJaminanCtx.stroke()});['pointerup','pointercancel'].forEach(function(ev){ttdJaminanCanvas.addEventListener(ev,function(){ttdJaminanDrawing=false;document.getElementById('ttdJaminanNasabah').value=ttdJaminanCanvas.toDataURL('image/png')})}) }
+        function pasangTtdJaminan(canvasId,inputId){var c=document.getElementById(canvasId),x=c?c.getContext('2d'):null,drawing=false;if(!c)return;x.lineWidth=2.4;x.lineCap='round';x.lineJoin='round';x.strokeStyle='#183f49';function pos(e){var r=c.getBoundingClientRect();return [(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]}c.addEventListener('pointerdown',function(e){drawing=true;c.setPointerCapture(e.pointerId);var p=pos(e);x.beginPath();x.moveTo(p[0],p[1])});c.addEventListener('pointermove',function(e){if(!drawing)return;var p=pos(e);x.lineTo(p[0],p[1]);x.stroke()});['pointerup','pointercancel'].forEach(function(ev){c.addEventListener(ev,function(){drawing=false;document.getElementById(inputId).value=c.toDataURL('image/png')})})}pasangTtdJaminan('ttdJaminanPelunasan','ttdJaminanNasabah');pasangTtdJaminan('ttdJaminanTellerCanvas','ttdJaminanTeller');
         var lunaskanModal = document.getElementById('lunaskanModal');
         lunaskanModal.addEventListener('show.bs.modal', function (event) {
             var button = event.relatedTarget;
@@ -542,7 +533,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 wa.href = 'https://wa.me/' + telepon + '?text=' + encodeURIComponent('Halo ' + button.getAttribute('data-nama') + ', proses pelunasan pinjaman ' + button.getAttribute('data-kode') + ' sedang diproses.');
                 wa.classList.remove('d-none');
             } else if (wa) { wa.classList.add('d-none'); wa.removeAttribute('href'); }
-            var blokJaminan = document.getElementById('konfirmasiJaminanPelunasan'), detailJaminan = document.getElementById('detailJaminanPelunasan'), cekJaminan = document.getElementById('cekJaminanNasabah'), ttdJaminan = document.getElementById('ttdJaminanNasabah'), fotoSerahTerima = document.getElementById('fotoSerahTerimaJaminan');
+            var blokJaminan = document.getElementById('konfirmasiJaminanPelunasan'), detailJaminan = document.getElementById('detailJaminanPelunasan'), cekJaminan = document.getElementById('cekJaminanNasabah'), ttdJaminan = document.getElementById('ttdJaminanNasabah'), ttdJaminanTeller=document.getElementById('ttdJaminanTeller'), fotoSerahTerima=document.getElementById('fotoSerahTerimaJaminan');
             var isGadai = button.getAttribute('data-gadai') === '1';
             var ambilJaminan = document.getElementById('ambilJaminanLangsung');
             var detailPengambilan = document.getElementById('detailPengambilanJaminan');
@@ -552,11 +543,11 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 detailPengambilan.classList.toggle('d-none', !ambil);
                 cekJaminan.required = ambil;
                 fotoSerahTerima.required = ambil;
-                if (!ambil) { cekJaminan.checked = false; ttdJaminan.value = ''; fotoSerahTerima.value = ''; }
+                if (!ambil) { cekJaminan.checked = false; ttdJaminan.value = ''; ttdJaminanTeller.value=''; fotoSerahTerima.value=''; }
             }
             ambilJaminan.onchange = aturPengambilanJaminan;
             aturPengambilanJaminan();
-            if (blokJaminan) { blokJaminan.classList.toggle('d-none', !isGadai); var fotoJaminan=document.getElementById('fotoJaminanPelunasan'); if (!isGadai) { cekJaminan.checked=false; ttdJaminan.value=''; fotoSerahTerima.required=false; fotoSerahTerima.value=''; fotoJaminan.classList.add('d-none'); } else { detailJaminan.textContent = [button.getAttribute('data-jaminan-jenis'), button.getAttribute('data-jaminan-identitas'), button.getAttribute('data-jaminan-deskripsi')].filter(Boolean).join(' · ') || 'Detail barang jaminan belum tersedia'; var foto=button.getAttribute('data-jaminan-foto')||'';fotoJaminan.src=foto;fotoJaminan.classList.toggle('d-none',!foto); } }
+            if (blokJaminan) { blokJaminan.classList.toggle('d-none', !isGadai); var fotoJaminan=document.getElementById('fotoJaminanPelunasan'); if (!isGadai) { cekJaminan.checked=false; ttdJaminan.value=''; fotoJaminan.classList.add('d-none'); } else { detailJaminan.textContent = [button.getAttribute('data-jaminan-jenis'), button.getAttribute('data-jaminan-identitas'), button.getAttribute('data-jaminan-deskripsi')].filter(Boolean).join(' · ') || 'Detail barang jaminan belum tersedia'; var foto=button.getAttribute('data-jaminan-foto')||'';fotoJaminan.src=foto;fotoJaminan.classList.toggle('d-none',!foto); } }
         });
     </script>
 </body>

@@ -1,5 +1,5 @@
 document.querySelectorAll('canvas.signature').forEach(function (canvas) {
-    const form = canvas.closest('form'); const field = form && form.querySelector('[name="ttd"]'); const wrap = canvas.closest('.signature-canvas-wrap'); const status = canvas.closest('.signature-field')?.querySelector('.signature-status');
+    const form = canvas.closest('form'); const target = canvas.dataset.target || 'ttd'; const field = form && form.querySelector('[name="'+target+'"]'); const wrap = canvas.closest('.signature-canvas-wrap'); const status = canvas.closest('.signature-field')?.querySelector('.signature-status');
     if (!field) return; const ctx = canvas.getContext('2d'); let drawing = false;
     ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#183f49';
     function point(e) { const r=canvas.getBoundingClientRect(); return [(e.clientX-r.left)*canvas.width/r.width,(e.clientY-r.top)*canvas.height/r.height]; }

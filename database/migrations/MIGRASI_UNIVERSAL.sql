@@ -179,7 +179,15 @@ ALTER TABLE layanan_jaminan_kembali
  ADD COLUMN IF NOT EXISTS bukti_jaminan VARCHAR(255) NULL,
  ADD COLUMN IF NOT EXISTS bukti_lunas VARCHAR(255) NULL,
  ADD COLUMN IF NOT EXISTS catatan_admin TEXT NULL,
- ADD COLUMN IF NOT EXISTS diperiksa_at DATETIME NULL;
+ ADD COLUMN IF NOT EXISTS diperiksa_at DATETIME NULL,
+ ADD COLUMN IF NOT EXISTS ttd_teller MEDIUMTEXT NULL;
+CREATE TABLE IF NOT EXISTS layanan_tunda_cair (
+ id INT AUTO_INCREMENT PRIMARY KEY, pengajuan_id INT NOT NULL, user_id INT NOT NULL,
+ status VARCHAR(20) NOT NULL DEFAULT 'menunggu', alasan TEXT NOT NULL,
+ admin_id INT NULL, catatan_admin TEXT NULL, diputuskan_at DATETIME NULL,
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uniq_tunda_cair_pengajuan(pengajuan_id), KEY idx_tunda_cair_status(status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS layanan_prioritas (
  id INT AUTO_INCREMENT PRIMARY KEY, pinjaman_id INT NOT NULL, anggota_id INT NOT NULL, user_id INT NOT NULL,
  status VARCHAR(20) NOT NULL DEFAULT 'menunggu', admin_id INT NULL,
