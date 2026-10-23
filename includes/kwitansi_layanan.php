@@ -6,6 +6,7 @@ if (!isLoggedIn()) { header('Location: ../login.php');exit; }
 if (!isAdmin() && !isTeller()) { http_response_code(403);exit('Akses ditolak.'); }
 $jenis=$_GET['jenis'] ?? '';$id=(int)($_GET['id'] ?? 0);
 $manualBast=$jenis==='bast' && ($_GET['mode'] ?? '')==='manual';
+$halamanKembali=($_GET['kembali'] ?? '')==='pelunasan'?'pelunasan.php':'layanan.php';
 $tables=['denda'=>'layanan_bayar_denda','bayar'=>'layanan_pembayaran','bast'=>'layanan_jaminan_kembali','lelang'=>'layanan_lelang','bonus'=>'layanan_bonus'];
 if($jenis==='bonus' && !isAdmin()){http_response_code(403);exit('Khusus Admin.');}
 if (!isset($tables[$jenis]) || !layananSiap($db)) { http_response_code(404);exit('Dokumen tidak ditemukan.'); }
@@ -49,7 +50,14 @@ header('Cache-Control: private, no-store');
 @media(max-width:800px){body{background:#fff}.sheet{width:100%;min-height:0;margin:0;padding:22px 18px;box-shadow:none}.info-grid{grid-template-columns:1fr}.info-item:nth-child(odd){border-right:0}.info-item:nth-last-child(2){border-bottom:1px solid #dce5e9}.evidence-grid{grid-template-columns:1fr}.evidence,.signature{min-height:210px}.transaction-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:480px){.letterhead{grid-template-columns:64px 1fr 64px}.letterhead-mark{width:58px;height:58px}.letterhead h1{font-size:14px}.info-item{grid-template-columns:98px 1fr;padding:8px}.asset-meta{grid-template-columns:110px 1fr}.transaction-grid{grid-template-columns:1fr}.payment-foot{align-items:flex-start;flex-direction:column}.toolbar{justify-content:stretch}.toolbar button{flex:1;padding:7px 9px}}
 @media print{body{background:#fff;color:#000}.toolbar{display:none}.sheet{width:auto;min-height:0;margin:0;padding:0;box-shadow:none}.evidence,.signature,.asset-box,.info-grid{break-inside:avoid}.section{break-inside:avoid}.foto{height:190px}}
 </style></head><body>
-<div class="toolbar"><button type="button" onclick="window.print()">Cetak / Simpan PDF</button><button type="button" class="secondary" onclick="if(window.opener){window.close()}else{window.location.href='pelunasan.php'}">Tutup</button></div>
+<div class="toolbar"><button type="button" onclick="window.print()">Cetak / Simpan PDF</button><button type="button" class="secondary" onclick="tutupKwitansi()">Tutup</button></div>
+<script>
+function tutupKwitansi(){
+    if(window.opener && !window.opener.closed){ window.close(); return; }
+    if(window.history.length > 1){ window.history.back(); return; }
+    window.location.href=<?= json_encode($halamanKembali, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+}
+</script>
 <main class="sheet"><header class="letterhead"><div class="letterhead-mark<?= $logoKoperasi?' has-logo':'' ?>"><?php if($logoKoperasi): ?><?= $logoKoperasi ?><?php else: ?>KSP<?php endif; ?></div><div><h1><?= layananEscape($koperasi['nama']) ?></h1><p><?= layananEscape($koperasi['alamat']) ?></p><p>Telp. <?= layananEscape($koperasi['telepon']) ?> · <?= layananEscape($koperasi['email']) ?></p></div><div></div></header>
 <div class="document-title"><h2><?= layananEscape($judul) ?><?= $manualBast?' (FORMULIR MANUAL)':'' ?></h2><p>Nomor: <?= layananEscape($nomor) ?></p></div>
 <?php if($manualBast): ?><p class="statement">Formulir ini diisi secara manual saat barang jaminan diserahkan kembali kepada nasabah.</p><?php elseif($teksBast): ?><p class="statement"><?= nl2br(layananEscape($teksBast)) ?></p><?php elseif(isset($pernyataanMap[$jenis])): ?><p class="statement"><?= layananEscape($pernyataanMap[$jenis]) ?></p><?php endif; ?>
