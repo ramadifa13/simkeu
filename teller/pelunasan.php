@@ -22,9 +22,10 @@ $page_title = "Pelunasan Pinjaman";
 
 // Pertahankan tampilan pelunasan lama; pencatatan kas tetap melalui layanan bersama.
 require_once __DIR__.'/../includes/layanan_actions.php';
-// Jangan bergantung pada nama tombol submit: tombol dapat dinonaktifkan oleh
-// indikator "Memproses" sebelum browser membentuk payload POST.
-if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['id'])) {
+// Halaman ini hanya memiliki satu formulir POST, yaitu pelunasan. Jangan
+// bergantung pada field tombol submit karena browser dapat menghilangkannya
+// saat tombol dinonaktifkan oleh indikator "Memproses".
+if ($_SERVER['REQUEST_METHOD']==='POST') {
     $files=[];
     try {
         layananValidasiToken();
@@ -39,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['id'])) {
         if (!empty($_POST['ambil_jaminan_langsung']) && ($_POST['mode_cetak_akad'] ?? '') === 'otomatis') {
             $bast=$db->prepare("SELECT id FROM layanan_jaminan_kembali WHERE pinjaman_id=? AND status='diserahkan' ORDER BY id DESC LIMIT 1");
             $bast->execute([(int)($_POST['id'] ?? 0)]);
-            if ($bastId=(int)$bast->fetchColumn()) { header('Location: ../includes/kwitansi_layanan.php?jenis=bast&id='.$bastId); exit; }
+            if ($bastId=(int)$bast->fetchColumn()) { header('Location: kwitansi_layanan.php?jenis=bast&id='.$bastId); exit; }
         }
     } catch (Exception $e) {
         if ($db->inTransaction()) $db->rollBack();
