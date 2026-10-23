@@ -22,7 +22,9 @@ $page_title = "Pelunasan Pinjaman";
 
 // Pertahankan tampilan pelunasan lama; pencatatan kas tetap melalui layanan bersama.
 require_once __DIR__.'/../includes/layanan_actions.php';
-if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['lunaskan'])) {
+// Jangan bergantung pada nama tombol submit: tombol dapat dinonaktifkan oleh
+// indikator "Memproses" sebelum browser membentuk payload POST.
+if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['id'])) {
     $files=[];
     try {
         layananValidasiToken();
