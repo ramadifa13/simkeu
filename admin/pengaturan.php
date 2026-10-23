@@ -465,8 +465,10 @@ function formatRupiah($angka) {
       function size(){var old=dirty?c.toDataURL():null;c.width=c.clientWidth*devicePixelRatio;c.height=180*devicePixelRatio;x.scale(devicePixelRatio,devicePixelRatio);x.lineWidth=2;x.lineCap='round';if(old){var i=new Image;i.onload=function(){x.drawImage(i,0,0,c.clientWidth,180)};i.src=old;}}
       function p(e){var r=c.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
       function setStatus(ready){var s=document.getElementById('ttdAdminStatus'),w=c.closest('.signature-canvas-wrap');s.classList.toggle('is-ready',ready);s.innerHTML=ready?'<i class="fas fa-check-circle"></i> Siap disimpan':'<i class="fas fa-pen-nib"></i> Belum diisi';w.classList.toggle('has-signature',ready)}
-      c.addEventListener('pointerdown',function(e){drawing=true;dirty=true;setStatus(true);var a=p(e);x.beginPath();x.moveTo(a[0],a[1]);c.setPointerCapture(e.pointerId)});
-      c.addEventListener('pointermove',function(e){if(!drawing)return;var a=p(e);x.lineTo(a[0],a[1]);x.stroke()}); c.addEventListener('pointerup',function(){drawing=false});
+      c.addEventListener('pointerdown',function(e){e.preventDefault();drawing=true;dirty=true;setStatus(true);var a=p(e);x.beginPath();x.moveTo(a[0],a[1]);c.setPointerCapture(e.pointerId)},{passive:false});
+      c.addEventListener('pointermove',function(e){if(!drawing)return;e.preventDefault();var a=p(e);x.lineTo(a[0],a[1]);x.stroke()},{passive:false});
+      function stopTtd(e){drawing=false;if(c.hasPointerCapture && c.hasPointerCapture(e.pointerId))c.releasePointerCapture(e.pointerId)}
+      c.addEventListener('pointerup',stopTtd);c.addEventListener('pointercancel',stopTtd);c.addEventListener('lostpointercapture',stopTtd);
       size(); var existing=<?php echo json_encode((string)($pengaturan_perjanjian['ttd_admin'] ?? '')); ?>;if(existing){var i=new Image;i.onload=function(){x.drawImage(i,0,0,c.clientWidth,180);dirty=true;setStatus(true)};i.src=existing}
       document.getElementById('hapusTtdAdmin').onclick=function(){x.clearRect(0,0,c.width,c.height);dirty=false;setStatus(false);document.getElementById('ttd_admin').value=''};
       var saving=false;

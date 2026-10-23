@@ -1010,8 +1010,10 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             var c=document.getElementById('canvas_'+key), ctx=c.getContext('2d'), drawing=false, dirty=false;
             function resize(){c.width=c.clientWidth*devicePixelRatio;c.height=140*devicePixelRatio;ctx.scale(devicePixelRatio,devicePixelRatio);ctx.lineWidth=2;ctx.lineCap='round'} resize();
             function pos(e){var r=c.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
-            c.addEventListener('pointerdown',function(e){drawing=true;dirty=true;var p=pos(e);ctx.beginPath();ctx.moveTo(p[0],p[1]);c.setPointerCapture(e.pointerId);setStatus(true)});
-            c.addEventListener('pointermove',function(e){if(!drawing)return;var p=pos(e);ctx.lineTo(p[0],p[1]);ctx.stroke()}); c.addEventListener('pointerup',function(){drawing=false});
+            c.addEventListener('pointerdown',function(e){e.preventDefault();drawing=true;dirty=true;var p=pos(e);ctx.beginPath();ctx.moveTo(p[0],p[1]);c.setPointerCapture(e.pointerId);setStatus(true)},{passive:false});
+            c.addEventListener('pointermove',function(e){if(!drawing)return;e.preventDefault();var p=pos(e);ctx.lineTo(p[0],p[1]);ctx.stroke()},{passive:false});
+            function stopTtd(e){drawing=false;if(c.hasPointerCapture && c.hasPointerCapture(e.pointerId))c.releasePointerCapture(e.pointerId)}
+            c.addEventListener('pointerup',stopTtd);c.addEventListener('pointercancel',stopTtd);c.addEventListener('lostpointercapture',stopTtd);
             function setStatus(ready){var s=document.getElementById('status_'+key),w=c.closest('.signature-canvas-wrap');if(!s)return;s.classList.toggle('is-ready',ready);s.innerHTML=ready?'<i class="fas fa-check-circle"></i> Siap disimpan':'<i class="fas fa-pen-nib"></i> Belum diisi';w.classList.toggle('has-signature',ready)}
             signaturePads[key]={canvas:c,ctx:ctx,resize:resize,isDirty:function(){return dirty},clear:function(){ctx.clearRect(0,0,c.width,c.height);dirty=false;document.getElementById('ttd_'+key).value='';setStatus(false)}};
         });

@@ -131,6 +131,28 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         .progress {
             height: 8px;
         }
+        /* Area TTD harus menangkap sapuan jari, bukan menggeser modal di HP/tablet. */
+        #lunaskanModal .signature-canvas-wrap {
+            position: relative;
+            overflow: hidden;
+            border: 1px dashed #b9cdd2;
+            border-radius: .5rem;
+            background: repeating-linear-gradient(0deg, #fff, #fff 31px, #f5f9fa 32px);
+        }
+        #lunaskanModal canvas.signature {
+            display: block;
+            width: 100%;
+            height: 220px !important;
+            max-width: 100%;
+            background: transparent;
+            cursor: crosshair;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        @media (max-width: 576px) {
+            #lunaskanModal canvas.signature { height: 200px !important; }
+        }
     </style>
 </head>
 <body>
@@ -466,9 +488,11 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                             <label class="form-label">TTD Nasabah sebagai bukti pemeriksaan *</label>
                             <div class="signature-canvas-wrap"><canvas id="ttdJaminanPelunasan" width="600" height="220" class="signature" style="height:220px"></canvas></div>
                             <input type="hidden" name="ttd_jaminan_nasabah" id="ttdJaminanNasabah">
+                            <button type="button" class="btn btn-sm btn-outline-danger mt-2 reset-ttd" data-canvas="ttdJaminanPelunasan"><i class="fas fa-eraser me-1"></i>Reset TTD Nasabah</button>
                             <label class="form-label mt-3">TTD Teller / petugas penyerahan *</label>
                             <div class="signature-canvas-wrap"><canvas id="ttdJaminanTellerCanvas" width="600" height="220" class="signature" style="height:220px"></canvas></div>
                             <input type="hidden" name="ttd_jaminan_teller" id="ttdJaminanTeller">
+                            <button type="button" class="btn btn-sm btn-outline-danger mt-2 reset-ttd" data-canvas="ttdJaminanTellerCanvas"><i class="fas fa-eraser me-1"></i>Reset TTD Teller</button>
                             <small class="text-muted d-block mt-2">Tanda tangan nasabah dan Teller dicetak pada akad serah terima barang.</small>
                             <div class="mt-3"><label for="fotoSerahTerimaJaminan" class="form-label">Foto penyerahan barang jaminan *</label><input type="file" class="form-control" name="foto_serah_terima_jaminan" id="fotoSerahTerimaJaminan" accept="image/jpeg,image/png,image/webp"><div class="form-text">Foto kondisi barang saat diserahkan kepada nasabah. Maksimal 5 MB.</div></div>
                             <div class="mt-3 pt-3 border-top"><label class="form-label fw-bold mb-2">Cetak akad serah terima</label><label class="form-check"><input class="form-check-input" type="radio" name="mode_cetak_akad" value="otomatis" checked> Otomatis — akad langsung terbuka dengan data, foto, dan TTD terisi.</label><label class="form-check mt-1"><input class="form-check-input" type="radio" name="mode_cetak_akad" value="manual"> Manual — formulir kosong dicetak dari Laporan Pelunasan.</label></div>
@@ -518,7 +542,27 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         });
 
         // Lunaskan Modal
-        function pasangTtdJaminan(canvasId,inputId){var c=document.getElementById(canvasId),x=c?c.getContext('2d'):null,drawing=false;if(!c)return;x.lineWidth=2.4;x.lineCap='round';x.lineJoin='round';x.strokeStyle='#183f49';function pos(e){var r=c.getBoundingClientRect();return [(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]}c.addEventListener('pointerdown',function(e){drawing=true;c.setPointerCapture(e.pointerId);var p=pos(e);x.beginPath();x.moveTo(p[0],p[1])});c.addEventListener('pointermove',function(e){if(!drawing)return;var p=pos(e);x.lineTo(p[0],p[1]);x.stroke()});['pointerup','pointercancel'].forEach(function(ev){c.addEventListener(ev,function(){drawing=false;document.getElementById(inputId).value=c.toDataURL('image/png')})})}pasangTtdJaminan('ttdJaminanPelunasan','ttdJaminanNasabah');pasangTtdJaminan('ttdJaminanTellerCanvas','ttdJaminanTeller');
+        var ttdJaminanPads = {};
+        function pasangTtdJaminan(canvasId,inputId){
+            var c=document.getElementById(canvasId),x=c?c.getContext('2d'):null,drawing=false;
+            if(!c)return;
+            x.lineWidth=2.4;x.lineCap='round';x.lineJoin='round';x.strokeStyle='#183f49';
+            function pos(e){var r=c.getBoundingClientRect();return [(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]}
+            function simpan(){document.getElementById(inputId).value=c.toDataURL('image/png');}
+            function berhenti(e){if(!drawing)return;drawing=false;if(c.hasPointerCapture && c.hasPointerCapture(e.pointerId))c.releasePointerCapture(e.pointerId);simpan();}
+            c.addEventListener('pointerdown',function(e){
+                e.preventDefault();drawing=true;c.setPointerCapture(e.pointerId);
+                var p=pos(e);x.beginPath();x.moveTo(p[0],p[1]);
+            },{passive:false});
+            c.addEventListener('pointermove',function(e){
+                if(!drawing)return;e.preventDefault();var p=pos(e);x.lineTo(p[0],p[1]);x.stroke();
+            },{passive:false});
+            ['pointerup','pointercancel','lostpointercapture'].forEach(function(ev){c.addEventListener(ev,berhenti);});
+            ttdJaminanPads[canvasId]=function(){x.clearRect(0,0,c.width,c.height);document.getElementById(inputId).value='';drawing=false;};
+        }
+        pasangTtdJaminan('ttdJaminanPelunasan','ttdJaminanNasabah');pasangTtdJaminan('ttdJaminanTellerCanvas','ttdJaminanTeller');
+        document.querySelectorAll('.reset-ttd').forEach(function(button){button.addEventListener('click',function(){var reset=ttdJaminanPads[button.dataset.canvas];if(reset)reset();});});
+        function resetSemuaTtdJaminan(){Object.keys(ttdJaminanPads).forEach(function(canvasId){ttdJaminanPads[canvasId]();});}
         var lunaskanModal = document.getElementById('lunaskanModal');
         var formPelunasan = document.getElementById('formPelunasan'), feedbackPelunasan = document.getElementById('pelunasanFeedback'), submitPelunasan = document.getElementById('submitPelunasan');
         function tampilkanFeedbackPelunasan(pesan, tipe) { feedbackPelunasan.textContent=pesan; feedbackPelunasan.className='alert alert-'+tipe; feedbackPelunasan.classList.remove('d-none'); feedbackPelunasan.scrollIntoView({block:'nearest'}); }
@@ -563,7 +607,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 detailPengambilan.classList.toggle('d-none', !ambil);
                 cekJaminan.required = ambil;
                 fotoSerahTerima.required = ambil;
-                if (!ambil) { cekJaminan.checked = false; ttdJaminan.value = ''; ttdJaminanTeller.value=''; fotoSerahTerima.value=''; }
+                if (!ambil) { cekJaminan.checked = false; resetSemuaTtdJaminan(); fotoSerahTerima.value=''; }
             }
             ambilJaminan.onchange = aturPengambilanJaminan;
             aturPengambilanJaminan();
