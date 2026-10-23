@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         if (!empty($_POST['ambil_jaminan_langsung']) && ($_POST['mode_cetak_akad'] ?? '') === 'otomatis') {
             $bast=$db->prepare("SELECT id FROM layanan_jaminan_kembali WHERE pinjaman_id=? AND status='diserahkan' ORDER BY id DESC LIMIT 1");
             $bast->execute([(int)($_POST['id'] ?? 0)]);
-            if ($bastId=(int)$bast->fetchColumn()) { header('Location: kwitansi_layanan.php?jenis=bast&id='.$bastId); exit; }
+            if ($bastId=(int)$bast->fetchColumn()) { header('Location: kwitansi_layanan.php?jenis=bast&id='.$bastId.'&kembali=pelunasan'); exit; }
         }
     } catch (Exception $e) {
         if ($db->inTransaction()) $db->rollBack();
