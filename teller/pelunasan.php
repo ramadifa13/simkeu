@@ -428,12 +428,13 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <div class="modal fade" id="lunaskanModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" enctype="multipart/form-data">
+                <form method="POST" enctype="multipart/form-data" id="formPelunasan">
                     <div class="modal-header">
                         <h5 class="modal-title text-success">Pelunasan Pinjaman</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="pelunasanFeedback" class="alert d-none" role="alert" aria-live="polite"></div>
                         <?= layananToken() ?>
                         <input type="hidden" name="id" id="lunaskan_id">
                         <label class="form-label">Metode pembayaran</label><select name="metode" class="form-select mb-3"><option value="cash">Cash</option><option value="transfer">Transfer</option></select>
@@ -486,7 +487,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                     <div class="modal-footer">
                         <a href="#" id="waPelunasan" class="btn btn-outline-success d-none" target="_blank" rel="noopener"><i class="fab fa-whatsapp me-1"></i>Cek WhatsApp</a>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="lunaskan" class="btn btn-success">Konfirmasi Pelunasan</button>
+                        <button type="submit" name="lunaskan" id="submitPelunasan" class="btn btn-success"><span class="submit-label">Konfirmasi Pelunasan</span></button>
                     </div>
                 </form>
             </div>
@@ -516,8 +517,24 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         // Lunaskan Modal
         function pasangTtdJaminan(canvasId,inputId){var c=document.getElementById(canvasId),x=c?c.getContext('2d'):null,drawing=false;if(!c)return;x.lineWidth=2.4;x.lineCap='round';x.lineJoin='round';x.strokeStyle='#183f49';function pos(e){var r=c.getBoundingClientRect();return [(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]}c.addEventListener('pointerdown',function(e){drawing=true;c.setPointerCapture(e.pointerId);var p=pos(e);x.beginPath();x.moveTo(p[0],p[1])});c.addEventListener('pointermove',function(e){if(!drawing)return;var p=pos(e);x.lineTo(p[0],p[1]);x.stroke()});['pointerup','pointercancel'].forEach(function(ev){c.addEventListener(ev,function(){drawing=false;document.getElementById(inputId).value=c.toDataURL('image/png')})})}pasangTtdJaminan('ttdJaminanPelunasan','ttdJaminanNasabah');pasangTtdJaminan('ttdJaminanTellerCanvas','ttdJaminanTeller');
         var lunaskanModal = document.getElementById('lunaskanModal');
+        var formPelunasan = document.getElementById('formPelunasan'), feedbackPelunasan = document.getElementById('pelunasanFeedback'), submitPelunasan = document.getElementById('submitPelunasan');
+        function tampilkanFeedbackPelunasan(pesan, tipe) { feedbackPelunasan.textContent=pesan; feedbackPelunasan.className='alert alert-'+tipe; feedbackPelunasan.classList.remove('d-none'); feedbackPelunasan.scrollIntoView({block:'nearest'}); }
+        if (formPelunasan) formPelunasan.addEventListener('submit', function(e) {
+            var ambil=document.getElementById('ambilJaminanLangsung'), cek=document.getElementById('cekJaminanNasabah'), nasabah=document.getElementById('ttdJaminanNasabah'), teller=document.getElementById('ttdJaminanTeller'), foto=document.getElementById('fotoSerahTerimaJaminan');
+            feedbackPelunasan.classList.add('d-none');
+            if (ambil && ambil.checked) {
+                var kurang=[];
+                if (!cek.checked) kurang.push('konfirmasi pemeriksaan barang');
+                if (!nasabah.value) kurang.push('TTD digital nasabah');
+                if (!teller.value) kurang.push('TTD digital Teller');
+                if (!foto.files || !foto.files.length) kurang.push('foto penyerahan barang');
+                if (kurang.length) { e.preventDefault(); tampilkanFeedbackPelunasan('Belum dapat diproses. Lengkapi: '+kurang.join(', ')+'.','danger'); return; }
+            }
+            submitPelunasan.disabled=true; submitPelunasan.querySelector('.submit-label').textContent='Memproses pelunasan...'; tampilkanFeedbackPelunasan('Data sedang disimpan. Mohon jangan menutup halaman.','info');
+        });
         lunaskanModal.addEventListener('show.bs.modal', function (event) {
             var button = event.relatedTarget;
+            feedbackPelunasan.classList.add('d-none'); submitPelunasan.disabled=false; submitPelunasan.querySelector('.submit-label').textContent='Konfirmasi Pelunasan';
             document.getElementById('lunaskan_id').value = button.getAttribute('data-id');
             document.getElementById('lunaskan_nama').textContent = button.getAttribute('data-nama');
             document.getElementById('lunaskan_kode').textContent = button.getAttribute('data-kode');
