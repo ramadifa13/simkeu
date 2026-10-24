@@ -39,6 +39,9 @@ UPDATE `pinjaman` p SET p.`tanggal_lunas`=(SELECT MAX(DATE(a.`tanggal_bayar`)) F
 SET @status_type=(SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pengajuan_pinjaman' AND COLUMN_NAME='status');
 SET @sql_status=IF(@status_type LIKE '%''dicairkan''%','SELECT 1',CONCAT('ALTER TABLE `pengajuan_pinjaman` MODIFY `status` ',LEFT(@status_type,CHAR_LENGTH(@status_type)-1),',''dicairkan'') DEFAULT ''menunggu'''));
 PREPARE stmt_status FROM @sql_status; EXECUTE stmt_status; DEALLOCATE PREPARE stmt_status;
+SET @status_type=(SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pengajuan_pinjaman' AND COLUMN_NAME='status');
+SET @sql_status=IF(@status_type LIKE '%''batal_cair''%','SELECT 1',CONCAT('ALTER TABLE `pengajuan_pinjaman` MODIFY `status` ',LEFT(@status_type,CHAR_LENGTH(@status_type)-1),',''batal_cair'') DEFAULT ''menunggu'''));
+PREPARE stmt_status_batal FROM @sql_status; EXECUTE stmt_status_batal; DEALLOCATE PREPARE stmt_status_batal;
 
 CREATE TABLE IF NOT EXISTS `jenis_pinjaman_tarif` (
   `id` INT(11) NOT NULL AUTO_INCREMENT, `jenis_pinjaman_id` INT(11) NOT NULL, `tenor_bulan` INT(11) NOT NULL,
@@ -188,6 +191,11 @@ CREATE TABLE IF NOT EXISTS layanan_tunda_cair (
  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
  UNIQUE KEY uniq_tunda_cair_pengajuan(pengajuan_id), KEY idx_tunda_cair_status(status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- TC yang sudah disetujui sebelum revisi ini dianggap pembatalan pencairan.
+UPDATE pengajuan_pinjaman pp JOIN layanan_tunda_cair tc ON tc.pengajuan_id=pp.id
+LEFT JOIN pinjaman p ON p.pengajuan_id=pp.id
+SET pp.status='batal_cair'
+WHERE tc.status='disetujui' AND p.id IS NULL AND pp.status='disetujui';
 CREATE TABLE IF NOT EXISTS layanan_prioritas (
  id INT AUTO_INCREMENT PRIMARY KEY, pinjaman_id INT NOT NULL, anggota_id INT NOT NULL, user_id INT NOT NULL,
  status VARCHAR(20) NOT NULL DEFAULT 'menunggu', admin_id INT NULL,
