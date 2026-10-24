@@ -133,7 +133,7 @@ if ($_POST) {
     }
     
     if (isset($_POST['edit'])) {
-        $id = $_POST['id'];
+        $id = (int) ($_POST['id'] ?? 0);
         // Kode anggota TIDAK bisa diubah: selalu diambil dari database berdasarkan ID (kiriman form diabaikan)
         $stmt_kode = $db->prepare("SELECT kode_anggota FROM anggota WHERE id = ?");
         $stmt_kode->execute([$id]);
@@ -151,6 +151,10 @@ if ($_POST) {
         list($kategori_shu_input,$ketua_kelompok_input)=shuProfilUntukKode($kode_anggota,$_POST['kategori_shu'] ?? 'anggota',$_POST['ketua_kelompok_id'] ?? 0);
         
         try {
+            layananValidasiToken();
+            if ($id < 1 || $kode_anggota === '') throw new Exception('Anggota tidak ditemukan.');
+            if (!in_array($status, ['aktif','nonaktif'], true)) throw new Exception('Status anggota tidak valid.');
+            if (!in_array($jenis_kelamin, ['L','P'], true)) throw new Exception('Jenis kelamin tidak valid.');
             $db->beginTransaction();
             list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, $id, $kategori_shu_input, $ketua_kelompok_input);
             
@@ -210,11 +214,13 @@ if ($_POST) {
                 
                 $db->commit();
                 $_SESSION['success'] = "Data anggota berhasil diupdate";
+                header('Location: anggota.php');
+                exit();
             } else {
                 throw new Exception("Gagal mengupdate data anggota");
             }
-        } catch (Exception $e) {
-            $db->rollBack();
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) $db->rollBack();
             $_SESSION['error'] = $e->getMessage();
         }
     }
