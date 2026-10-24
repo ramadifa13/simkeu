@@ -243,21 +243,31 @@ if ($_POST) {
                     throw new Exception("Gagal mengupdate data anggota");
                 }
                 
-                // Update user data
-                $query_user = "UPDATE users SET 
-                    username = :username, 
-                    nama_lengkap = :nama_lengkap, 
-                    status = :status 
-                    WHERE id = (SELECT user_id FROM anggota WHERE id = :id)";
-                    
-                $stmt_user = $db->prepare($query_user);
-                $stmt_user->bindParam(':username', $kode_anggota);
-                $stmt_user->bindParam(':nama_lengkap', $nama_lengkap);
-                $stmt_user->bindParam(':status', $status);
-                $stmt_user->bindParam(':id', $id);
-                
-                if (!$stmt_user->execute()) {
-                    throw new Exception("Gagal mengupdate data user");
+                // Nama/status di akun login anggota harus selalu sama dengan daftar anggota.
+                $akun = $db->prepare("SELECT user_id FROM anggota WHERE id = ? FOR UPDATE");
+                $akun->execute([$id]);
+                $user_id = (int) $akun->fetchColumn();
+                if ($user_id <= 0) {
+                    $cari_user = $db->prepare("SELECT id, role FROM users WHERE username = ? FOR UPDATE");
+                    $cari_user->execute([$kode_anggota]);
+                    $akun_lama = $cari_user->fetch(PDO::FETCH_ASSOC);
+                    if ($akun_lama) {
+                        if ($akun_lama['role'] !== 'anggota') throw new Exception('Kode anggota sudah dipakai akun selain anggota.');
+                        $user_id = (int) $akun_lama['id'];
+                    } else {
+                        $buat_user = $db->prepare("INSERT INTO users (username, password, nama_lengkap, role, status) VALUES (?, ?, ?, 'anggota', ?)");
+                        $buat_user->execute([$kode_anggota, password_hash('123456', PASSWORD_DEFAULT), $nama_lengkap, $status]);
+                        $user_id = (int) $db->lastInsertId();
+                    }
+                    $tautkan_user = $db->prepare("UPDATE anggota SET user_id = ? WHERE id = ?");
+                    if (!$tautkan_user->execute([$user_id, $id])) throw new Exception('Gagal menautkan akun login anggota.');
+                }
+                $stmt_user = $db->prepare("UPDATE users SET username = ?, nama_lengkap = ?, status = ? WHERE id = ? AND role = 'anggota'");
+                $stmt_user->execute([$kode_anggota, $nama_lengkap, $status, $user_id]);
+                if ($stmt_user->rowCount() === 0) {
+                    $cek_user = $db->prepare("SELECT id FROM users WHERE id = ? AND role = 'anggota'");
+                    $cek_user->execute([$user_id]);
+                    if (!$cek_user->fetchColumn()) throw new Exception('Akun login anggota tidak ditemukan atau bukan akun anggota.');
                 }
                 
                 simpanDokumenAnggota($db, $id, $dokumen, $dokumen_lama);

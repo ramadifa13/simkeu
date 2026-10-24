@@ -153,11 +153,15 @@ if (PHP_SAPI !== 'cli') {
         if(!isLoggedIn()) { header('Location: ../login.php');exit; }
         $authAllowed=$authArea==='admin'?isAdmin():($authArea==='anggota'?isAnggota():(isAdmin()||isTeller()));
         if(!$authAllowed){http_response_code(403);exit('Akses ditolak. Halaman ini tidak tersedia untuk peran Anda.');}
-        $authUser=$db->prepare('SELECT role,status FROM users WHERE id=?');$authUser->execute([$_SESSION['user_id']]);$authAccount=$authUser->fetch(PDO::FETCH_ASSOC);
+        $authUser=$db->prepare('SELECT username,nama_lengkap,role,status FROM users WHERE id=?');$authUser->execute([$_SESSION['user_id']]);$authAccount=$authUser->fetch(PDO::FETCH_ASSOC);
         if(!$authAccount || $authAccount['status']!=='aktif' || $authAccount['role']!==($_SESSION['role'] ?? '')) {
             $_SESSION=[];session_regenerate_id(true);$_SESSION['error']='Sesi akun tidak aktif. Silakan masuk kembali.';
             header('Location: ../login.php');exit;
         }
+        // Nama akun dapat diperbarui oleh Admin/Teller saat anggota sedang login.
+        // Segarkan session agar header dan halaman anggota langsung memakai data terbaru.
+        $_SESSION['username']=$authAccount['username'];
+        $_SESSION['nama_lengkap']=$authAccount['nama_lengkap'];
         if(($_SERVER['REQUEST_METHOD'] ?? 'GET')==='POST') {
             try { layananValidasiToken(); }
             catch(Exception $e) { http_response_code(403);exit('Formulir kedaluwarsa atau tidak valid. Muat ulang halaman sebelum mencoba kembali.'); }

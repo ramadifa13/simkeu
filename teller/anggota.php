@@ -132,42 +132,41 @@ if ($_POST) {
         }
     }
     
-    if (isset($_POST['edit'])) {
+    if (($_POST['aksi'] ?? '') === 'edit' || isset($_POST['edit'])) {
         $id = (int) ($_POST['id'] ?? 0);
-        // Kode anggota TIDAK bisa diubah: selalu diambil dari database berdasarkan ID (kiriman form diabaikan)
-        $stmt_kode = $db->prepare("SELECT kode_anggota FROM anggota WHERE id = ?");
-        $stmt_kode->execute([$id]);
-        $kode_anggota = (string) $stmt_kode->fetchColumn();
         $nama_lengkap = trim((string) ($_POST['nama_lengkap'] ?? ''));
         $alamat = trim((string) ($_POST['alamat'] ?? ''));
         $telepon = trim((string) ($_POST['telepon'] ?? ''));
         $tempat_lahir = trim((string) ($_POST['tempat_lahir'] ?? ''));
         $tanggal_lahir = tanggalAtauNull(isset($_POST['tanggal_lahir']) ? $_POST['tanggal_lahir'] : '');
-        $jenis_kelamin = $_POST['jenis_kelamin'];
+        // Data lama dapat belum memiliki jenis kelamin; gunakan pilihan awal form agar tetap dapat diperbarui.
+        $jenis_kelamin = $_POST['jenis_kelamin'] ?? 'L';
+        if ($jenis_kelamin === '') $jenis_kelamin = 'L';
         $pekerjaan = trim((string) ($_POST['pekerjaan'] ?? ''));
         $ktp = trim((string) ($_POST['ktp'] ?? ''));
         $rekening_bank = trim((string) ($_POST['rekening_bank'] ?? ''));
-        $status = $_POST['status'];
-        list($kategori_shu_input,$ketua_kelompok_input)=shuProfilUntukKode($kode_anggota,$_POST['kategori_shu'] ?? 'anggota',$_POST['ketua_kelompok_id'] ?? 0);
+        $status = $_POST['status'] ?? '';
         
         try {
             layananValidasiToken();
-            if ($id < 1 || $kode_anggota === '') throw new Exception('Anggota tidak ditemukan.');
+            if ($id < 1) throw new Exception('Anggota tidak ditemukan.');
             if ($nama_lengkap === '') throw new Exception('Nama lengkap wajib diisi.');
             if (!in_array($status, ['aktif','nonaktif'], true)) throw new Exception('Status anggota tidak valid.');
             if (!in_array($jenis_kelamin, ['L','P'], true)) throw new Exception('Jenis kelamin tidak valid.');
             $db->beginTransaction();
+            // Ambil kode dan akun asli dari database agar tidak dapat dimanipulasi dari form.
+            $stmt_anggota = $db->prepare("SELECT id, kode_anggota, user_id, foto_ktp, foto_kk, foto_ktp_pasangan FROM anggota WHERE id = ? FOR UPDATE");
+            $stmt_anggota->execute([$id]);
+            $anggota_lama = $stmt_anggota->fetch(PDO::FETCH_ASSOC);
+            if (!$anggota_lama) throw new Exception('Anggota tidak ditemukan.');
+            $kode_anggota = (string) $anggota_lama['kode_anggota'];
+            list($kategori_shu_input,$ketua_kelompok_input)=shuProfilUntukKode($kode_anggota,$_POST['kategori_shu'] ?? 'anggota',$_POST['ketua_kelompok_id'] ?? 0);
             list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, $id, $kategori_shu_input, $ketua_kelompok_input);
             
             // Dokumen lama (untuk cek wajib & hapus file yang diganti)
-            $stmt_dok = $db->prepare("SELECT foto_ktp, foto_kk, foto_ktp_pasangan FROM anggota WHERE id = ?");
-            $stmt_dok->execute([$id]);
-            $dokumen_lama = $stmt_dok->fetch(PDO::FETCH_ASSOC);
+            $dokumen_lama = $anggota_lama;
             $dokumen = validasiDokumenAnggota($dokumen_lama);
             
-            if ($kode_anggota === '') {
-                throw new Exception("Anggota tidak ditemukan");
-            }
             // No. KTP wajib & unik (sama dengan Admin)
             if (trim($ktp) === '') {
                 throw new Exception("No. KTP harus diisi");
@@ -200,30 +199,44 @@ if ($_POST) {
             $stmt->bindValue(':kategori_shu', $kategori_shu);
             $stmt->bindValue(':ketua_kelompok_id', $ketua_kelompok_id, $ketua_kelompok_id === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
             
-            if ($stmt->execute()) {
-                // Update user data
-                $query_user = "UPDATE users SET username = :username, nama_lengkap = :nama_lengkap, 
-                              status = :status WHERE id = (SELECT user_id FROM anggota WHERE id = :id)";
-                $stmt_user = $db->prepare($query_user);
-                $stmt_user->bindParam(':username', $kode_anggota);
-                $stmt_user->bindParam(':nama_lengkap', $nama_lengkap);
-                $stmt_user->bindParam(':status', $status);
-                $stmt_user->bindParam(':id', $id);
-                $stmt_user->execute();
-                
-                simpanDokumenAnggota($db, $id, $dokumen, $dokumen_lama);
-                
-                $db->commit();
-                $_SESSION['success'] = "Data anggota berhasil diupdate";
-                header('Location: anggota.php');
-                exit();
-            } else {
+            if (!$stmt->execute()) {
                 throw new Exception("Gagal mengupdate data anggota");
             }
+
+            // Pastikan perubahan daftar anggota ikut tampil di akun login anggota.
+            $user_id = (int) ($anggota_lama['user_id'] ?? 0);
+            if ($user_id <= 0) {
+                $cari_user = $db->prepare("SELECT id, role FROM users WHERE username = ? FOR UPDATE");
+                $cari_user->execute([$kode_anggota]);
+                $akun_lama = $cari_user->fetch(PDO::FETCH_ASSOC);
+                if ($akun_lama) {
+                    if ($akun_lama['role'] !== 'anggota') throw new Exception('Kode anggota sudah dipakai akun selain anggota.');
+                    $user_id = (int) $akun_lama['id'];
+                } else {
+                    $buat_user = $db->prepare("INSERT INTO users (username, password, nama_lengkap, role, status) VALUES (?, ?, ?, 'anggota', ?)");
+                    $buat_user->execute([$kode_anggota, password_hash('123456', PASSWORD_DEFAULT), $nama_lengkap, $status]);
+                    $user_id = (int) $db->lastInsertId();
+                }
+                $tautkan_user = $db->prepare("UPDATE anggota SET user_id = ? WHERE id = ?");
+                if (!$tautkan_user->execute([$user_id, $id])) throw new Exception('Gagal menautkan akun login anggota.');
+            }
+            $stmt_user = $db->prepare("UPDATE users SET username = ?, nama_lengkap = ?, status = ? WHERE id = ? AND role = 'anggota'");
+            $stmt_user->execute([$kode_anggota, $nama_lengkap, $status, $user_id]);
+            if ($stmt_user->rowCount() === 0) {
+                $cek_user = $db->prepare("SELECT id FROM users WHERE id = ? AND role = 'anggota'");
+                $cek_user->execute([$user_id]);
+                if (!$cek_user->fetchColumn()) throw new Exception('Akun login anggota tidak ditemukan atau bukan akun anggota.');
+            }
+
+            simpanDokumenAnggota($db, $id, $dokumen, $dokumen_lama);
+            $db->commit();
+            $_SESSION['success'] = "Data anggota dan akun login anggota berhasil diupdate";
         } catch (Throwable $e) {
             if ($db->inTransaction()) $db->rollBack();
-            $_SESSION['error'] = $e->getMessage();
+            $_SESSION['error'] = 'Gagal mengupdate anggota: ' . $e->getMessage();
         }
+        header('Location: anggota.php');
+        exit();
     }
     
     if (isset($_POST['reset_password'])) {
@@ -717,6 +730,7 @@ $buka_modal_tambah = isset($_GET['tambah'])
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
+                    <input type="hidden" name="aksi" value="edit">
                     <div class="modal-header">
                         <h5 class="modal-title">Edit Data Anggota</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -879,7 +893,8 @@ $buka_modal_tambah = isset($_GET['tambah'])
             document.getElementById('edit_telepon').value = button.getAttribute('data-telepon');
             document.getElementById('edit_tempat_lahir').value = button.getAttribute('data-tempat_lahir');
             document.getElementById('edit_tanggal_lahir').value = button.getAttribute('data-tanggal_lahir');
-            document.getElementById('edit_jenis_kelamin').value = button.getAttribute('data-jenis_kelamin');
+            var jenisKelamin = button.getAttribute('data-jenis_kelamin');
+            document.getElementById('edit_jenis_kelamin').value = jenisKelamin === 'P' ? 'P' : 'L';
             document.getElementById('edit_pekerjaan').value = button.getAttribute('data-pekerjaan');
             document.getElementById('edit_ktp').value = button.getAttribute('data-ktp');
             document.getElementById('edit_rekening_bank').value = button.getAttribute('data-rekening_bank');

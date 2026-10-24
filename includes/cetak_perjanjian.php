@@ -35,10 +35,10 @@ $pdf->writeHTML($html,true,false,true,false,'');
 
 $ttds=['ttd_nasabah'=>'Nasabah','ttd_teller'=>'Teller','ttd_admin'=>$data['penandatangan']['jabatan_admin'],'ttd_saksi_1'=>'Saksi 1','ttd_saksi_2'=>'Saksi 2'];
 $names=['ttd_nasabah'=>$data['penandatangan']['nasabah'],'ttd_teller'=>$data['penandatangan']['teller'],'ttd_admin'=>$data['penandatangan']['admin'],'ttd_saksi_1'=>$surat['nama_saksi_1'],'ttd_saksi_2'=>$surat['nama_saksi_2']];
-$x=[18,78,138,48,108]; $y=$pdf->GetY()+7; if($y>225){$pdf->AddPage();$y=25;}
+$x=[18,78,138,48,108]; $y=$pdf->GetY()+7; if($y>202){$pdf->AddPage();$y=25;}
 $temps=[];
-foreach(array_keys($ttds) as $i=>$field){ if($i===3){$y+=39;} $tx=$x[$i]; $pdf->SetXY($tx,$y);$pdf->Cell(55,5,$ttds[$field],0,0,'C');if($field==='ttd_nasabah'){$pdf->SetFont('dejavusans','',6);$pdf->SetXY($tx,$y+14);$pdf->Cell(55,3,'Meterai Rp10.000',0,0,'C');$pdf->SetFont('dejavusans','',9.5);}$tmp=dataUrlKeFileSementara($surat[$field]);if($tmp){$temps[]=$tmp;$pdf->Image($tmp,$tx+10,$y+8,35,17,'PNG');}$pdf->SetXY($tx,$y+27);$pdf->Cell(55,5,$names[$field],0,0,'C'); }
-$pdf->SetY($y+40); $pdf->SetFont('dejavusans','',7); $pdf->MultiCell(0,4,'Arsip ditandatangani: '.date('d/m/Y H:i',strtotime($surat['ditandatangani_at'])).' WIB | SHA-256: '.$surat['hash_dokumen'],0,'L');
+foreach(array_keys($ttds) as $i=>$field){ if($i===3){$y+=50;} $tx=$x[$i]; $pdf->SetXY($tx,$y);$pdf->Cell(55,5,$ttds[$field],0,0,'C');if($field==='ttd_nasabah'){$pdf->SetFont('dejavusans','',6);$pdf->SetXY($tx,$y+22);$pdf->Cell(55,3,'Meterai Rp10.000',0,0,'C');$pdf->SetFont('dejavusans','',9.5);}$tmp=dataUrlKeFileSementara($surat[$field]);if($tmp){$temps[]=$tmp;$pdf->Image($tmp,$tx+10,$y+8,35,17,'PNG');}$pdf->SetXY($tx,$y+42);$pdf->Cell(55,5,$names[$field],0,0,'C'); }
+$pdf->SetY($y+55); $pdf->SetFont('dejavusans','',7); $pdf->MultiCell(0,4,'Arsip ditandatangani: '.date('d/m/Y H:i',strtotime($surat['ditandatangani_at'])).' WIB | SHA-256: '.$surat['hash_dokumen'],0,'L');
 
 if (!empty($data['jadwal_angsuran'])) {
     $pdf->AddPage(); $pdf->SetFont('dejavusans','B',12); $pdf->Cell(0,8,'LAMPIRAN JADWAL ANGSURAN',0,1,'C');
