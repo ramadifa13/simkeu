@@ -138,21 +138,22 @@ if ($_POST) {
         $stmt_kode = $db->prepare("SELECT kode_anggota FROM anggota WHERE id = ?");
         $stmt_kode->execute([$id]);
         $kode_anggota = (string) $stmt_kode->fetchColumn();
-        $nama_lengkap = $_POST['nama_lengkap'];
-        $alamat = $_POST['alamat'];
-        $telepon = $_POST['telepon'];
-        $tempat_lahir = $_POST['tempat_lahir'];
+        $nama_lengkap = trim((string) ($_POST['nama_lengkap'] ?? ''));
+        $alamat = trim((string) ($_POST['alamat'] ?? ''));
+        $telepon = trim((string) ($_POST['telepon'] ?? ''));
+        $tempat_lahir = trim((string) ($_POST['tempat_lahir'] ?? ''));
         $tanggal_lahir = tanggalAtauNull(isset($_POST['tanggal_lahir']) ? $_POST['tanggal_lahir'] : '');
         $jenis_kelamin = $_POST['jenis_kelamin'];
-        $pekerjaan = $_POST['pekerjaan'];
-        $ktp = $_POST['ktp'];
-        $rekening_bank = $_POST['rekening_bank'];
+        $pekerjaan = trim((string) ($_POST['pekerjaan'] ?? ''));
+        $ktp = trim((string) ($_POST['ktp'] ?? ''));
+        $rekening_bank = trim((string) ($_POST['rekening_bank'] ?? ''));
         $status = $_POST['status'];
         list($kategori_shu_input,$ketua_kelompok_input)=shuProfilUntukKode($kode_anggota,$_POST['kategori_shu'] ?? 'anggota',$_POST['ketua_kelompok_id'] ?? 0);
         
         try {
             layananValidasiToken();
             if ($id < 1 || $kode_anggota === '') throw new Exception('Anggota tidak ditemukan.');
+            if ($nama_lengkap === '') throw new Exception('Nama lengkap wajib diisi.');
             if (!in_array($status, ['aktif','nonaktif'], true)) throw new Exception('Status anggota tidak valid.');
             if (!in_array($jenis_kelamin, ['L','P'], true)) throw new Exception('Jenis kelamin tidak valid.');
             $db->beginTransaction();
