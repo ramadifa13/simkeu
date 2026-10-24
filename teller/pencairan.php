@@ -378,7 +378,14 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             display: block;
             width: calc(100% - 2rem) !important;
             margin-inline: 1rem;
+            height: 260px !important;
+            touch-action: none !important;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
+        #pencairanModal .signature-canvas-wrap.has-signature { background: #fff; }
+        @media (max-width: 576px) { #pencairanModal .signature-pad { height: 280px !important; } }
     </style>
 </head>
 <body>
@@ -911,7 +918,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                         <div class="mb-3"><label class="form-label">Lampiran surat tambahan (opsional, maksimal 10 halaman)</label><input type="file" class="form-control" id="surat_tambahan" name="surat_tambahan[]" accept="image/*" multiple><small class="text-muted">Setiap gambar maksimal 5 MB dan akan digabung ke PDF.</small></div>
                         <div class="row"><div class="col-md-6 mb-3"><label class="form-label">Nama Saksi 1 *</label><input class="form-control" name="nama_saksi_1" required></div><div class="col-md-6 mb-3"><label class="form-label">Nama Saksi 2 *</label><input class="form-control" name="nama_saksi_2" required></div></div>
                         <?php foreach (['nasabah'=>'Nasabah','teller'=>'Teller','saksi_1'=>'Saksi 1','saksi_2'=>'Saksi 2'] as $key=>$label): ?>
-                        <div class="signature-field mb-3"><div class="signature-field-head"><div><label class="signature-field-title mb-0">TTD <?php echo $label; ?> *</label><small class="signature-field-help">Gunakan mouse atau layar sentuh untuk menandatangani.</small></div><span class="signature-status" id="status_<?php echo $key; ?>"><i class="fas fa-pen-nib"></i> Belum diisi</span></div><div class="signature-canvas-wrap"><canvas id="canvas_<?php echo $key; ?>" class="signature-pad" width="700" height="180"></canvas></div><input type="hidden" name="ttd_<?php echo $key; ?>" id="ttd_<?php echo $key; ?>"><div class="signature-field-foot"><span class="signature-field-note">Pastikan tanda tangan jelas.</span><button type="button" class="signature-clear btn btn-sm btn-outline-danger clear-signature" data-key="<?php echo $key; ?>"><i class="fas fa-eraser me-1"></i>Hapus</button></div></div>
+                        <div class="signature-field mb-3"><div class="signature-field-head"><div><label class="signature-field-title mb-0">TTD <?php echo $label; ?> *</label><small class="signature-field-help">Goreskan tanda tangan pada area putih. Area ini tidak menggeser halaman di HP.</small></div><span class="signature-status" id="status_<?php echo $key; ?>"><i class="fas fa-pen-nib"></i> Belum diisi</span></div><div class="signature-canvas-wrap"><canvas id="canvas_<?php echo $key; ?>" class="signature-pad" width="700" height="260"></canvas></div><input type="hidden" name="ttd_<?php echo $key; ?>" id="ttd_<?php echo $key; ?>"><div class="signature-field-foot"><span class="signature-field-note">Status berubah hijau setelah tanda tangan terdeteksi.</span><button type="button" class="signature-clear btn btn-sm btn-outline-danger clear-signature" data-key="<?php echo $key; ?>"><i class="fas fa-eraser me-1"></i>Hapus</button></div></div>
                         <?php endforeach; ?>
                         <div class="alert alert-secondary"><small>TTD Admin diambil otomatis dari Pengaturan Admin. Seluruh data transaksi disimpan sebagai arsip tetap saat pencairan.</small></div>
                         <div class="alert alert-info mb-0" id="info_jadwal">
@@ -1008,9 +1015,9 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
         var signaturePads = {};
         ['nasabah','teller','saksi_1','saksi_2'].forEach(function(key){
             var c=document.getElementById('canvas_'+key), ctx=c.getContext('2d'), drawing=false, dirty=false;
-            function resize(){c.width=c.clientWidth*devicePixelRatio;c.height=140*devicePixelRatio;ctx.scale(devicePixelRatio,devicePixelRatio);ctx.lineWidth=2;ctx.lineCap='round'} resize();
+            function resize(){var tinggi=c.clientHeight || 260;c.width=Math.max(1,Math.round(c.clientWidth*devicePixelRatio));c.height=Math.round(tinggi*devicePixelRatio);ctx=c.getContext('2d');ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.lineWidth=2.5;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#183f49'} resize();
             function pos(e){var r=c.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
-            c.addEventListener('pointerdown',function(e){e.preventDefault();drawing=true;dirty=true;var p=pos(e);ctx.beginPath();ctx.moveTo(p[0],p[1]);c.setPointerCapture(e.pointerId);setStatus(true)},{passive:false});
+            c.addEventListener('pointerdown',function(e){e.preventDefault();drawing=true;dirty=true;var p=pos(e);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(p[0]+0.01,p[1]+0.01);ctx.stroke();c.setPointerCapture(e.pointerId);setStatus(true)},{passive:false});
             c.addEventListener('pointermove',function(e){if(!drawing)return;e.preventDefault();var p=pos(e);ctx.lineTo(p[0],p[1]);ctx.stroke()},{passive:false});
             function stopTtd(e){drawing=false;if(c.hasPointerCapture && c.hasPointerCapture(e.pointerId))c.releasePointerCapture(e.pointerId)}
             c.addEventListener('pointerup',stopTtd);c.addEventListener('pointercancel',stopTtd);c.addEventListener('lostpointercapture',stopTtd);
