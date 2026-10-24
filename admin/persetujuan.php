@@ -357,9 +357,10 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                             $status_class = [
                                                 'menunggu' => 'warning',
                                                 'disetujui' => 'success',
-                                                'ditolak' => 'danger'
+                                                'ditolak' => 'danger',
+                                                'batal_cair' => 'secondary'
                                             ];
-                                            $label_status = ucfirst($statusTampil);
+                                            $label_status = $statusTampil === 'batal_cair' ? 'Batal Cair' : ucfirst($statusTampil);
                                             ?>
                                             <span class="badge bg-<?php echo $status_class[$statusTampil] ?? 'secondary'; ?> status-badge">
                                                 <?php echo $label_status; ?>
