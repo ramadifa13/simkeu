@@ -20,6 +20,68 @@ if (!isAdmin() && !isTeller()) {
 
 $page_title = "Pembayaran Angsuran";
 
+/**
+ * Mencatat satu item keranjang. Pemanggil wajib sudah membuka transaksi database;
+ * dengan begitu checkout banyak angsuran bersifat all-or-nothing.
+ */
+function checkoutItemAngsuran(PDO $db, int $id, string $denda_input, string $metode, int $user_id): array {
+    if (!in_array($metode, ['cash', 'transfer'], true)) throw new Exception('Metode pembayaran tidak valid.');
+    $pid = $db->prepare('SELECT pinjaman_id FROM angsuran WHERE id=? FOR UPDATE');
+    $pid->execute([$id]);
+    $pinjaman_kunci = layananPinjaman($db, $pid->fetchColumn());
+    layananSegarkanDenda($db, $pinjaman_kunci);
+    if ($pinjaman_kunci['status'] === 'lunas') throw new Exception('Histori pinjaman lunas terkunci.');
+
+    $stmt = $db->prepare("SELECT a.*, p.anggota_id, p.kode_pinjaman, p.jumlah_pinjaman, p.sisa_pokok
+        FROM angsuran a JOIN pinjaman p ON a.pinjaman_id=p.id WHERE a.id=? FOR UPDATE");
+    $stmt->execute([$id]); $a = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$a) throw new Exception('Data angsuran tidak ditemukan.');
+    if ($a['status'] === 'lunas') throw new Exception('Angsuran ke-'.$a['angsuran_ke'].' sudah dibayar.');
+
+    $otomatis = hitungDendaAngsuran($db, $a, $a['jumlah_pinjaman']);
+    $nilai = dendaUntukPembayaran($denda_input, $otomatis['denda'], $a['denda'], !empty($a['denda_manual']), isAdmin());
+    $denda = (float) $nilai['denda'];
+    $ketetapan = !empty($a['denda_manual']) ? (float)$a['denda'] : (float)$otomatis['denda'];
+    if (isAdmin() && $denda < $ketetapan && !$db->query('SELECT pemutihan FROM layanan_pengaturan WHERE id=1')->fetchColumn()) {
+        throw new Exception('Pemutihan sedang dinonaktifkan.');
+    }
+    $cek = $db->prepare('SELECT COALESCE(SUM(jumlah),0) FROM layanan_bayar_denda WHERE angsuran_id=?');
+    $cek->execute([$id]);
+    $denda_sudah = (float) $cek->fetchColumn();
+    if ($denda - $denda_sudah > 0.005) throw new Exception('Bayar sisa denda melalui menu Denda terlebih dahulu.');
+
+    $manual = kolomAda($db, 'angsuran', 'denda_manual') ? ', denda_manual='.(int)$nilai['manual'] : '';
+    $db->prepare("UPDATE angsuran SET tanggal_bayar=CURDATE(), status='lunas', denda=?$manual WHERE id=?")->execute([$denda, $id]);
+    $db->prepare("UPDATE pinjaman SET sisa_pokok=?, status='aktif' WHERE id=?")
+        ->execute([max(0, (float)$a['sisa_pokok']-(float)$a['pokok']), $a['pinjaman_id']]);
+    tandaiLunasBilaSelesai($db, $a['pinjaman_id']);
+
+    $total = (float)$a['jumlah_angsuran'] + max(0, $denda-$denda_sudah);
+    $kredit = layananPakaiKredit($db, $a['pinjaman_id'], $id, $total);
+    $total -= $kredit;
+    $jenis = $db->query("SELECT id FROM jenis_simpanan WHERE kode_jenis='ANG' LIMIT 1")->fetchColumn();
+    if (!$jenis) {
+        $db->exec("INSERT INTO jenis_simpanan (kode_jenis,nama_jenis,deskripsi,status) VALUES ('ANG','Pembayaran Angsuran','Pembayaran angsuran pinjaman','aktif')");
+        $jenis = $db->lastInsertId();
+    }
+    $kode = 'ANG-'.date('Ymd').'-'.random_int(100000,999999);
+    $ket = 'Pembayaran angsuran ke-'.$a['angsuran_ke'].' - '.$a['kode_pinjaman'];
+    $db->prepare("INSERT INTO transaksi (kode_transaksi,anggota_id,jenis_simpanan_id,jenis_transaksi,jumlah,saldo_sebelum,saldo_sesudah,keterangan,user_id,tanggal_transaksi) VALUES (?,?,?,'setoran',?,0,?,?,?,NOW())")
+        ->execute([$kode,$a['anggota_id'],$jenis,$total,$total,$ket,$user_id]);
+    $transaksi_id = $db->lastInsertId();
+    $db->query('SELECT id FROM koperasi WHERE id=1 FOR UPDATE')->fetchColumn();
+    $saldo = (float)$db->query('SELECT saldo_sesudah FROM kas ORDER BY id DESC LIMIT 1 FOR UPDATE')->fetchColumn();
+    $db->prepare("INSERT INTO kas (transaksi_id,jenis,jumlah,saldo_sebelum,saldo_sesudah,keterangan,tanggal) VALUES (?,'masuk',?,?,?,?,NOW())")
+        ->execute([$transaksi_id,$total,$saldo,$saldo+$total,$ket]);
+    $s = $db->prepare('SELECT id,saldo FROM simpanan WHERE anggota_id=? AND jenis_simpanan_id=? FOR UPDATE'); $s->execute([$a['anggota_id'],$jenis]); $simpanan=$s->fetch(PDO::FETCH_ASSOC);
+    if ($simpanan) $db->prepare('UPDATE simpanan SET saldo=? WHERE id=?')->execute([(float)$simpanan['saldo']+$total,$simpanan['id']]);
+    else $db->prepare('INSERT INTO simpanan (anggota_id,jenis_simpanan_id,saldo) VALUES (?,?,?)')->execute([$a['anggota_id'],$jenis,$total]);
+    $db->prepare("INSERT INTO layanan_pembayaran (angsuran_id,pinjaman_id,user_id,jenis,jumlah,metode,bukti) VALUES (?,?,?,'angsuran',?,?, '')")
+        ->execute([$id,$a['pinjaman_id'],$user_id,$total,$metode]);
+    layananAudit($db,$a['pinjaman_id'],'bayar_angsuran','Checkout keranjang; angsuran '.$id.'; Rp '.$total.'; '.$metode);
+    return ['nomor' => $a['angsuran_ke'], 'total' => $total];
+}
+
 // Denda otomatis (sekali sehari); denda yang diinput manual tidak ditimpa
 // Paksa hitung ulang saat halaman pembayaran dibuka agar perubahan jatuh tempo
 // langsung terlihat tanpa menunggu proses harian berikutnya.
@@ -28,6 +90,36 @@ perbaruiDendaOtomatis($db, true);
 // Handle payment
 if ($_POST) {
     try { layananValidasiToken(); } catch (Exception $e) { $_SESSION['error']=$e->getMessage();header('Location: angsuran.php');exit; }
+    $cartKey = 'keranjang_angsuran_' . (int)$_SESSION['user_id'];
+    if (!isset($_SESSION[$cartKey]) || !is_array($_SESSION[$cartKey])) $_SESSION[$cartKey] = [];
+    if (isset($_POST['tambah_keranjang'])) {
+        try {
+            $id = (int)($_POST['id'] ?? 0); $metode = $_POST['metode'] ?? 'cash';
+            if (!in_array($metode, ['cash','transfer'], true)) throw new Exception('Metode pembayaran tidak valid.');
+            $q=$db->prepare("SELECT a.id,a.angsuran_ke,a.jumlah_angsuran,a.denda,a.status,p.kode_pinjaman,ag.nama_lengkap FROM angsuran a JOIN pinjaman p ON p.id=a.pinjaman_id JOIN anggota ag ON ag.id=p.anggota_id WHERE a.id=?");
+            $q->execute([$id]); $item=$q->fetch(PDO::FETCH_ASSOC);
+            if (!$item || $item['status']==='lunas') throw new Exception('Angsuran tidak tersedia atau sudah dibayar.');
+            $dendaInput = (string)($_POST['denda'] ?? '');
+            $_SESSION[$cartKey][$id] = ['id'=>$id,'nama'=>$item['nama_lengkap'],'kode'=>$item['kode_pinjaman'],'angsuran_ke'=>$item['angsuran_ke'],'jumlah'=>(float)$item['jumlah_angsuran'],'denda_input'=>$dendaInput,'denda_tampil'=>is_numeric($dendaInput) ? (float)$dendaInput : (float)$item['denda'],'metode'=>$metode];
+            $_SESSION['success']='Angsuran '.$item['nama_lengkap'].' ditambahkan ke daftar pembayaran.';
+        } catch (Throwable $e) { $_SESSION['error']='Gagal menambahkan: '.$e->getMessage(); }
+        header('Location: angsuran.php'); exit;
+    }
+    if (isset($_POST['hapus_keranjang'])) {
+        unset($_SESSION[$cartKey][(int)($_POST['id'] ?? 0)]);
+        $_SESSION['success']='Item dihapus dari daftar pembayaran.';
+        header('Location: angsuran.php'); exit;
+    }
+    if (isset($_POST['checkout_keranjang'])) {
+        try {
+            if (!$_SESSION[$cartKey]) throw new Exception('Daftar pembayaran masih kosong.');
+            $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); $db->beginTransaction();
+            $hasil=[]; foreach ($_SESSION[$cartKey] as $item) $hasil[]=checkoutItemAngsuran($db,(int)$item['id'],(string)$item['denda_input'],(string)$item['metode'],(int)$_SESSION['user_id']);
+            $db->commit(); $_SESSION[$cartKey]=[];
+            $_SESSION['success']=count($hasil).' pembayaran berhasil diproses sekaligus. Total: '.formatRupiah(array_sum(array_column($hasil,'total')));
+        } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); $_SESSION['error']='Checkout dibatalkan. Tidak ada pembayaran yang dicatat: '.$e->getMessage(); }
+        header('Location: angsuran.php'); exit;
+    }
     // Koreksi langsung (HANYA Admin; fungsi memeriksa peran di server)
     if (isset($_POST['batalkan_bayar'])) {
         try {
@@ -77,7 +169,8 @@ if ($_POST) {
         exit();
     }
 
-    if (isset($_POST['bayar'])) {
+    // Jalur lama sengaja dinonaktifkan: pembayaran harus melewati daftar sementara.
+    if (isset($_POST['bayar_legacy_nonaktif'])) {
         $bukti_path = null;
         $id = $_POST['id'];
         // Denda: kosong = otomatis (tarif per hari x hari terlambat); diisi = manual
@@ -491,10 +584,26 @@ function formatRupiah($angka) {
                     </div>
                 <?php endif; ?>
 
+                <?php $keranjang = $_SESSION['keranjang_angsuran_' . (int)$_SESSION['user_id']] ?? []; $totalKeranjang = 0; foreach ($keranjang as $keranjangItem) { $totalKeranjang += (float)$keranjangItem['jumlah'] + max(0, (float)$keranjangItem['denda_tampil']); } ?>
+                <div class="card border-success mb-3">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <strong><i class="fas fa-shopping-cart me-2"></i>Daftar Pembayaran Sementara</strong>
+                        <span class="badge bg-light text-success"><?php echo count($keranjang); ?> nasabah</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <?php if ($keranjang): ?>
+                        <div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Nasabah</th><th>Pinjaman</th><th>Angsuran</th><th>Metode</th><th class="text-end">Nominal</th><th></th></tr></thead><tbody>
+                        <?php foreach ($keranjang as $item): ?><tr><td><?php echo htmlspecialchars($item['nama']); ?></td><td><?php echo htmlspecialchars($item['kode']); ?></td><td>Ke-<?php echo (int)$item['angsuran_ke']; ?></td><td class="text-capitalize"><?php echo htmlspecialchars($item['metode']); ?></td><td class="text-end fw-semibold"><?php echo formatRupiah((float)$item['jumlah'] + max(0,(float)$item['denda_tampil'])); ?></td><td class="text-end"><form method="POST" class="d-inline"><?php echo layananToken(); ?><input type="hidden" name="id" value="<?php echo (int)$item['id']; ?>"><button name="hapus_keranjang" class="btn btn-sm btn-outline-danger" title="Hapus"><i class="fas fa-times"></i></button></form></td></tr><?php endforeach; ?>
+                        </tbody></table></div>
+                        <div class="p-3 d-flex justify-content-between align-items-center bg-light"><strong>Total akhir: <?php echo formatRupiah($totalKeranjang); ?></strong><form method="POST"><?php echo layananToken(); ?><button type="submit" name="checkout_keranjang" class="btn btn-success" onclick="return confirm('Proses seluruh pembayaran pada daftar ini? Data akan masuk ke kas dan laporan.');"><i class="fas fa-cash-register me-1"></i>Proses Semua Pembayaran</button></form></div>
+                        <?php else: ?><div class="p-3 text-muted">Belum ada pembayaran dalam daftar. Tambahkan angsuran, kemudian periksa total sebelum diproses.</div><?php endif; ?>
+                    </div>
+                </div>
+
                 <!-- Info Penting -->
                 <div class="info-card">
                     <i class="fas fa-info-circle me-2 text-primary"></i>
-                    <strong>Informasi:</strong> Pembayaran angsuran akan otomatis menambah saldo kas dan tercatat di laporan transaksi.
+                    <strong>Informasi:</strong> Angsuran ditampung terlebih dahulu pada daftar pembayaran. Kas dan laporan baru diperbarui saat seluruh daftar diproses.
                 </div>
 
                 <?php if ($jumlah_menunggu > 0): ?>
@@ -900,7 +1009,7 @@ function formatRupiah($angka) {
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="bayar" class="btn btn-success">Bayar Sekarang</button>
+                        <button type="submit" name="tambah_keranjang" class="btn btn-success"><i class="fas fa-cart-plus me-1"></i>Tambah ke Daftar Pembayaran</button>
                     </div>
                 </form>
             </div>
