@@ -20,19 +20,28 @@ if (!isAdmin()) {
 
 $page_title = "Pencairan Pinjaman";
 
-// Keputusan TC: Admin memeriksa alasan Teller. Approve mempertahankan
-// penundaan, Tolak membuka kembali pengajuan untuk diproses Teller.
+// Keputusan TC: persetujuan berarti pencairan dibatalkan, sehingga nasabah
+// dapat membuat pengajuan baru. Penolakan membuka kembali pengajuan lama.
 if ($_POST && isset($_POST['keputusan_tc'])) {
     try {
         layananValidasiToken();
         $tcId=(int)($_POST['tc_id'] ?? 0); $aksi=$_POST['keputusan_tc']; $catatan=trim((string)($_POST['catatan_tc'] ?? ''));
         if (!in_array($aksi,['disetujui','ditolak'],true)) throw new Exception('Keputusan TC tidak valid.');
         if (strlen($catatan)<5 || strlen($catatan)>2000) throw new Exception('Keterangan Admin wajib 5–2000 karakter.');
+        $db->beginTransaction();
         $stmt=$db->prepare("UPDATE layanan_tunda_cair SET status=?,admin_id=?,catatan_admin=?,diputuskan_at=NOW() WHERE id=? AND status='menunggu'");
         $stmt->execute([$aksi,$_SESSION['user_id'],$catatan,$tcId]);
         if(!$stmt->rowCount()) throw new Exception('Pengajuan TC tidak ditemukan atau sudah diputuskan.');
-        $_SESSION['success']='Keputusan TC berhasil disimpan.';
-    } catch(Exception $e) { $_SESSION['error']='Gagal menyimpan keputusan TC: '.$e->getMessage(); }
+        if ($aksi === 'disetujui') {
+            $batal=$db->prepare("UPDATE pengajuan_pinjaman pp JOIN layanan_tunda_cair tc ON tc.pengajuan_id=pp.id SET pp.status='batal_cair', pp.catatan_admin=CONCAT(COALESCE(pp.catatan_admin,''), '\nBatal cair: ', tc.catatan_admin), pp.admin_id=?, pp.tanggal_persetujuan=NOW() WHERE tc.id=? AND NOT EXISTS (SELECT 1 FROM pinjaman p WHERE p.pengajuan_id=pp.id)");
+            $batal->execute([$_SESSION['user_id'],$tcId]);
+            if (!$batal->rowCount()) throw new Exception('Pengajuan tidak dapat dibatalkan karena sudah dicairkan.');
+            $_SESSION['success']='TC disetujui. Pengajuan ditandai Batal Cair dan nasabah dapat mengajukan kembali.';
+        } else {
+            $_SESSION['success']='TC ditolak. Pengajuan lama kembali dapat diproses untuk pencairan.';
+        }
+        $db->commit();
+    } catch(Exception $e) { if ($db->inTransaction()) $db->rollBack(); $_SESSION['error']='Gagal menyimpan keputusan TC: '.$e->getMessage(); }
     header('Location: pencairan.php'); exit;
 }
 
