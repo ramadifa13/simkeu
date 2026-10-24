@@ -784,11 +784,12 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                     $status_class = [
                                                         'menunggu' => 'warning',
                                                         'disetujui' => 'success',
-                                                        'ditolak' => 'danger'
+                                                        'ditolak' => 'danger',
+                                                        'batal_cair' => 'secondary'
                                                     ];
                                                     ?>
                                                     <span class="badge bg-<?php echo $status_class[$statusTampil]; ?> status-badge">
-                                                        <?php echo ucfirst($statusTampil); ?>
+                                                        <?php echo $statusTampil === 'batal_cair' ? 'Batal Cair' : ucfirst($statusTampil); ?>
                                                     </span>
                                                     <?php if ($pengajuan['admin_name']): ?>
                                                         <br>
