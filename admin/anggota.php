@@ -162,125 +162,122 @@ if ($_POST) {
         }
     }
     
-    if (isset($_POST['edit'])) {
-        $id = $_POST['id'];
-        // Kode anggota TIDAK bisa diubah: selalu diambil dari database berdasarkan ID (kiriman form diabaikan)
-        $stmt_kode = $db->prepare("SELECT kode_anggota FROM anggota WHERE id = ?");
-        $stmt_kode->execute([$id]);
-        $kode_anggota = (string) $stmt_kode->fetchColumn();
-        $nama_lengkap = trim($_POST['nama_lengkap']);
-        $alamat = trim($_POST['alamat']);
-        $telepon = trim($_POST['telepon']);
-        $tempat_lahir = trim($_POST['tempat_lahir']);
+    if (($_POST['aksi'] ?? '') === 'edit' || isset($_POST['edit'])) {
+        $id = (int) ($_POST['id'] ?? 0);
+        $nama_lengkap = trim((string) ($_POST['nama_lengkap'] ?? ''));
+        $alamat = trim((string) ($_POST['alamat'] ?? ''));
+        $telepon = trim((string) ($_POST['telepon'] ?? ''));
+        $tempat_lahir = trim((string) ($_POST['tempat_lahir'] ?? ''));
         $tanggal_lahir = tanggalAtauNull(isset($_POST['tanggal_lahir']) ? $_POST['tanggal_lahir'] : '');
-        $jenis_kelamin = $_POST['jenis_kelamin'];
-        $pekerjaan = trim($_POST['pekerjaan']);
-        $ktp = trim($_POST['ktp']);
-        $rekening_bank = trim($_POST['rekening_bank']);
-        $status = $_POST['status'];
-        list($kategori_shu_input,$ketua_kelompok_input)=shuProfilUntukKode($kode_anggota,$_POST['kategori_shu'] ?? 'anggota',$_POST['ketua_kelompok_id'] ?? 0);
+        // Data lama dapat belum memiliki jenis kelamin; gunakan pilihan awal form agar tetap dapat diperbarui.
+        $jenis_kelamin = $_POST['jenis_kelamin'] ?? 'L';
+        if ($jenis_kelamin === '') $jenis_kelamin = 'L';
+        $pekerjaan = trim((string) ($_POST['pekerjaan'] ?? ''));
+        $ktp = trim((string) ($_POST['ktp'] ?? ''));
+        $rekening_bank = trim((string) ($_POST['rekening_bank'] ?? ''));
+        $status = $_POST['status'] ?? '';
         
-        // Validasi
-        $errors = [];
-        if (empty($kode_anggota)) $errors[] = "Kode anggota harus diisi";
-        if (empty($nama_lengkap)) $errors[] = "Nama lengkap harus diisi";
-        if (empty($ktp)) $errors[] = "No. KTP harus diisi";
-        
-        if (empty($errors)) {
-            try {
-                $db->beginTransaction();
-                list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, $id, $kategori_shu_input, $ketua_kelompok_input);
-                
-                // Dokumen lama (untuk cek wajib & hapus file yang diganti)
-                $stmt_dok = $db->prepare("SELECT foto_ktp, foto_kk, foto_ktp_pasangan FROM anggota WHERE id = ?");
-                $stmt_dok->execute([$id]);
-                $dokumen_lama = $stmt_dok->fetch(PDO::FETCH_ASSOC);
-                $dokumen = validasiDokumenAnggota($dokumen_lama);
-                
-                // Check if KTP already exists (excluding current record)
-                $check_ktp_query = "SELECT id FROM anggota WHERE ktp = :ktp AND id != :id";
-                $check_ktp_stmt = $db->prepare($check_ktp_query);
-                $check_ktp_stmt->bindParam(':ktp', $ktp);
-                $check_ktp_stmt->bindParam(':id', $id);
-                $check_ktp_stmt->execute();
-                
-                if ($check_ktp_stmt->rowCount() > 0) {
-                    throw new Exception("No. KTP sudah terdaftar");
-                }
+        try {
+            layananValidasiToken();
+            if ($id < 1) throw new Exception('Anggota tidak ditemukan.');
+            if ($nama_lengkap === '') throw new Exception('Nama lengkap wajib diisi.');
+            if (!in_array($status, ['aktif','nonaktif'], true)) throw new Exception('Status anggota tidak valid.');
+            if (!in_array($jenis_kelamin, ['L','P'], true)) throw new Exception('Jenis kelamin tidak valid.');
+            $db->beginTransaction();
+            // Ambil kode dan akun asli dari database agar tidak dapat dimanipulasi dari form.
+            $stmt_anggota = $db->prepare("SELECT id, kode_anggota, user_id, foto_ktp, foto_kk, foto_ktp_pasangan FROM anggota WHERE id = ? FOR UPDATE");
+            $stmt_anggota->execute([$id]);
+            $anggota_lama = $stmt_anggota->fetch(PDO::FETCH_ASSOC);
+            if (!$anggota_lama) throw new Exception('Anggota tidak ditemukan.');
+            $kode_anggota = (string) $anggota_lama['kode_anggota'];
+            list($kategori_shu_input,$ketua_kelompok_input)=shuProfilUntukKode($kode_anggota,$_POST['kategori_shu'] ?? 'anggota',$_POST['ketua_kelompok_id'] ?? 0);
+            list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, $id, $kategori_shu_input, $ketua_kelompok_input);
             
-                // kode_anggota & email sengaja tidak di-UPDATE (kode tetap, email lama tidak tertimpa)
-                $query = "UPDATE anggota SET
-                    nama_lengkap = :nama_lengkap,
-                    alamat = :alamat,
-                    telepon = :telepon,
-                    tempat_lahir = :tempat_lahir,
-                    tanggal_lahir = :tanggal_lahir, 
-                    jenis_kelamin = :jenis_kelamin, 
-                    pekerjaan = :pekerjaan,
-                    ktp = :ktp, 
-                    rekening_bank = :rekening_bank, 
-                    status = :status,
-                    kategori_shu = :kategori_shu,
-                    ketua_kelompok_id = :ketua_kelompok_id
-                    WHERE id = :id";
-                    
-                $stmt = $db->prepare($query);
-                $stmt->bindParam(':id', $id);
-                $stmt->bindParam(':nama_lengkap', $nama_lengkap);
-                $stmt->bindParam(':alamat', $alamat);
-                $stmt->bindParam(':telepon', $telepon);
-                $stmt->bindParam(':tempat_lahir', $tempat_lahir);
-                $stmt->bindParam(':tanggal_lahir', $tanggal_lahir);
-                $stmt->bindParam(':jenis_kelamin', $jenis_kelamin);
-                $stmt->bindParam(':pekerjaan', $pekerjaan);
-                $stmt->bindParam(':ktp', $ktp);
-                $stmt->bindParam(':rekening_bank', $rekening_bank);
-                $stmt->bindParam(':status', $status);
-                $stmt->bindValue(':kategori_shu', $kategori_shu);
-                $stmt->bindValue(':ketua_kelompok_id', $ketua_kelompok_id, $ketua_kelompok_id === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
-
-                if (!$stmt->execute()) {
-                    throw new Exception("Gagal mengupdate data anggota");
-                }
-                
-                // Nama/status di akun login anggota harus selalu sama dengan daftar anggota.
-                $akun = $db->prepare("SELECT user_id FROM anggota WHERE id = ? FOR UPDATE");
-                $akun->execute([$id]);
-                $user_id = (int) $akun->fetchColumn();
-                if ($user_id <= 0) {
-                    $cari_user = $db->prepare("SELECT id, role FROM users WHERE username = ? FOR UPDATE");
-                    $cari_user->execute([$kode_anggota]);
-                    $akun_lama = $cari_user->fetch(PDO::FETCH_ASSOC);
-                    if ($akun_lama) {
-                        if ($akun_lama['role'] !== 'anggota') throw new Exception('Kode anggota sudah dipakai akun selain anggota.');
-                        $user_id = (int) $akun_lama['id'];
-                    } else {
-                        $buat_user = $db->prepare("INSERT INTO users (username, password, nama_lengkap, role, status) VALUES (?, ?, ?, 'anggota', ?)");
-                        $buat_user->execute([$kode_anggota, password_hash('123456', PASSWORD_DEFAULT), $nama_lengkap, $status]);
-                        $user_id = (int) $db->lastInsertId();
-                    }
-                    $tautkan_user = $db->prepare("UPDATE anggota SET user_id = ? WHERE id = ?");
-                    if (!$tautkan_user->execute([$user_id, $id])) throw new Exception('Gagal menautkan akun login anggota.');
-                }
-                $stmt_user = $db->prepare("UPDATE users SET username = ?, nama_lengkap = ?, status = ? WHERE id = ? AND role = 'anggota'");
-                $stmt_user->execute([$kode_anggota, $nama_lengkap, $status, $user_id]);
-                if ($stmt_user->rowCount() === 0) {
-                    $cek_user = $db->prepare("SELECT id FROM users WHERE id = ? AND role = 'anggota'");
-                    $cek_user->execute([$user_id]);
-                    if (!$cek_user->fetchColumn()) throw new Exception('Akun login anggota tidak ditemukan atau bukan akun anggota.');
-                }
-                
-                simpanDokumenAnggota($db, $id, $dokumen, $dokumen_lama);
-                
-                $db->commit();
-                $_SESSION['success'] = "Data anggota berhasil diupdate";
-                
-            } catch (Exception $e) {
-                $db->rollBack();
-                $_SESSION['error'] = "Gagal mengupdate anggota: " . $e->getMessage();
+            // Dokumen lama (untuk cek wajib & hapus file yang diganti)
+            $dokumen_lama = $anggota_lama;
+            $dokumen = validasiDokumenAnggota($dokumen_lama);
+            
+            // No. KTP wajib & unik (sama dengan Teller)
+            if (trim($ktp) === '') {
+                throw new Exception("No. KTP harus diisi");
             }
-        } else {
-            $_SESSION['error'] = implode("<br>", $errors);
+            $check_ktp_stmt = $db->prepare("SELECT id FROM anggota WHERE ktp = :ktp AND id != :id");
+            $check_ktp_stmt->bindParam(':ktp', $ktp);
+            $check_ktp_stmt->bindParam(':id', $id);
+            $check_ktp_stmt->execute();
+            
+            if ($check_ktp_stmt->rowCount() > 0) {
+                throw new Exception("No. KTP sudah terdaftar");
+            }
+        
+            // kode_anggota & email sengaja tidak di-UPDATE (kode tetap, email lama tidak tertimpa)
+            $query = "UPDATE anggota SET
+                nama_lengkap = :nama_lengkap,
+                alamat = :alamat,
+                telepon = :telepon,
+                tempat_lahir = :tempat_lahir,
+                tanggal_lahir = :tanggal_lahir, 
+                jenis_kelamin = :jenis_kelamin, 
+                pekerjaan = :pekerjaan,
+                ktp = :ktp, 
+                rekening_bank = :rekening_bank, 
+                status = :status,
+                kategori_shu = :kategori_shu,
+                ketua_kelompok_id = :ketua_kelompok_id
+                WHERE id = :id";
+                
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':id', $id);
+            $stmt->bindParam(':nama_lengkap', $nama_lengkap);
+            $stmt->bindParam(':alamat', $alamat);
+            $stmt->bindParam(':telepon', $telepon);
+            $stmt->bindParam(':tempat_lahir', $tempat_lahir);
+            $stmt->bindParam(':tanggal_lahir', $tanggal_lahir);
+            $stmt->bindParam(':jenis_kelamin', $jenis_kelamin);
+            $stmt->bindParam(':pekerjaan', $pekerjaan);
+            $stmt->bindParam(':ktp', $ktp);
+            $stmt->bindParam(':rekening_bank', $rekening_bank);
+            $stmt->bindParam(':status', $status);
+            $stmt->bindValue(':kategori_shu', $kategori_shu);
+            $stmt->bindValue(':ketua_kelompok_id', $ketua_kelompok_id, $ketua_kelompok_id === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+
+            if (!$stmt->execute()) {
+                throw new Exception("Gagal mengupdate data anggota");
+            }
+            
+            // Nama/status di akun login anggota harus selalu sama dengan daftar anggota.
+            $user_id = (int) ($anggota_lama['user_id'] ?? 0);
+            if ($user_id <= 0) {
+                $cari_user = $db->prepare("SELECT id, role FROM users WHERE username = ? FOR UPDATE");
+                $cari_user->execute([$kode_anggota]);
+                $akun_lama = $cari_user->fetch(PDO::FETCH_ASSOC);
+                if ($akun_lama) {
+                    if ($akun_lama['role'] !== 'anggota') throw new Exception('Kode anggota sudah dipakai akun selain anggota.');
+                    $user_id = (int) $akun_lama['id'];
+                } else {
+                    $buat_user = $db->prepare("INSERT INTO users (username, password, nama_lengkap, role, status) VALUES (?, ?, ?, 'anggota', ?)");
+                    $buat_user->execute([$kode_anggota, password_hash('123456', PASSWORD_DEFAULT), $nama_lengkap, $status]);
+                    $user_id = (int) $db->lastInsertId();
+                }
+                $tautkan_user = $db->prepare("UPDATE anggota SET user_id = ? WHERE id = ?");
+                if (!$tautkan_user->execute([$user_id, $id])) throw new Exception('Gagal menautkan akun login anggota.');
+            }
+            $stmt_user = $db->prepare("UPDATE users SET username = ?, nama_lengkap = ?, status = ? WHERE id = ? AND role = 'anggota'");
+            $stmt_user->execute([$kode_anggota, $nama_lengkap, $status, $user_id]);
+            if ($stmt_user->rowCount() === 0) {
+                $cek_user = $db->prepare("SELECT id FROM users WHERE id = ? AND role = 'anggota'");
+                $cek_user->execute([$user_id]);
+                if (!$cek_user->fetchColumn()) throw new Exception('Akun login anggota tidak ditemukan atau bukan akun anggota.');
+            }
+            
+            simpanDokumenAnggota($db, $id, $dokumen, $dokumen_lama);
+            
+            $db->commit();
+            $_SESSION['success'] = "Data anggota dan akun login anggota berhasil diupdate";
+            
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            $_SESSION['error'] = "Gagal mengupdate anggota: " . $e->getMessage();
         }
         
         header("Location: anggota.php");
@@ -1103,6 +1100,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
+                    <input type="hidden" name="aksi" value="edit">
                     <div class="modal-header">
                         <h5 class="modal-title">
                             <i class="fas fa-edit me-2"></i>Edit Data Anggota
@@ -1287,7 +1285,8 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                     document.getElementById('edit_telepon').value = button.getAttribute('data-telepon') || '';
                     document.getElementById('edit_tempat_lahir').value = button.getAttribute('data-tempat_lahir') || '';
                     document.getElementById('edit_tanggal_lahir').value = button.getAttribute('data-tanggal_lahir') || '';
-                    document.getElementById('edit_jenis_kelamin').value = button.getAttribute('data-jenis_kelamin') || 'L';
+                    var jenisKelamin = button.getAttribute('data-jenis_kelamin');
+                    document.getElementById('edit_jenis_kelamin').value = jenisKelamin === 'P' ? 'P' : 'L';
                     document.getElementById('edit_pekerjaan').value = button.getAttribute('data-pekerjaan') || '';
                     document.getElementById('edit_ktp').value = button.getAttribute('data-ktp') || '';
                     document.getElementById('edit_rekening_bank').value = button.getAttribute('data-rekening_bank') || '';

@@ -687,8 +687,8 @@ unset($daftar_lunas);
                                                     <td><small><?php echo formatRupiah($pengajuan['jumlah_pinjaman']); ?></small></td>
                                                     <td><small><?php echo $pengajuan['tenor']; ?> bulan</small></td>
                                                     <td>
-                                                        <span class="badge bg-<?php echo $pengajuan['status'] == 'disetujui' ? 'success' : ($pengajuan['status'] == 'ditolak' ? 'danger' : 'warning'); ?>">
-                                                            <?php echo ucfirst($pengajuan['status']); ?>
+                                                        <span class="badge bg-<?php echo $pengajuan['status'] == 'disetujui' ? 'success' : ($pengajuan['status'] == 'ditolak' ? 'danger' : ($pengajuan['status'] == 'batal_cair' ? 'secondary' : 'warning')); ?>">
+                                                            <?php echo $pengajuan['status'] === 'batal_cair' ? 'Batal Cair' : ucfirst($pengajuan['status']); ?>
                                                         </span>
                                                     </td>
                                                     <td><small><?php echo date('d/m/Y H:i', strtotime($pengajuan['tanggal_pengajuan'])); ?></small></td>

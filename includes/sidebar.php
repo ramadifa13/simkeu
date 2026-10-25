@@ -604,7 +604,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function tampilkanNotif(data) {
-        ['pengajuan', 'persetujuan', 'pencairan', 'pembatalan', 'hapus_denda', 'pelunasan_dini', 'jaminan_kembali', 'prioritas', 'laporan_macet', 'pembayaran_denda', 'pelunasan_disetujui', 'jaminan_disetujui', 'jatuh_tempo', 'terlambat', 'denda_tertunggak', 'anggota_pengajuan', 'anggota_pencairan', 'anggota_jatuh_tempo', 'anggota_terlambat', 'anggota_denda', 'anggota_jaminan', 'layanan', 'total'].forEach(function(key) {
+        ['pengajuan', 'persetujuan', 'pencairan', 'tunda_cair', 'pembatalan', 'hapus_denda', 'pelunasan_dini', 'jaminan_kembali', 'prioritas', 'laporan_macet', 'pembayaran_denda', 'pelunasan_disetujui', 'jaminan_disetujui', 'tc_ditolak', 'jatuh_tempo', 'terlambat', 'denda_tertunggak', 'anggota_pengajuan', 'anggota_pencairan', 'anggota_batal_cair', 'anggota_jatuh_tempo', 'anggota_terlambat', 'anggota_denda', 'anggota_jaminan', 'layanan', 'total'].forEach(function(key) {
             document.querySelectorAll('[data-notif-pinjaman="' + key + '"]').forEach(function(el) {
                 const nilai = Number(data[key] || 0);
                 const lama = Number(el.textContent || 0);

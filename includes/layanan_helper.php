@@ -92,11 +92,11 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
     $hasil = [
         'pengajuan'=>0, 'persetujuan'=>0, 'pencairan'=>0, 'pembatalan'=>0,
         'hapus_denda'=>0, 'pelunasan_dini'=>0, 'jaminan_kembali'=>0,
-        'prioritas'=>0, 'laporan_macet'=>0, 'pembayaran_denda'=>0, 'layanan'=>0, 'total'=>0,
+        'tunda_cair'=>0, 'tc_ditolak'=>0, 'prioritas'=>0, 'laporan_macet'=>0, 'pembayaran_denda'=>0, 'layanan'=>0, 'total'=>0,
         'pelunasan_disetujui'=>0, 'jaminan_disetujui'=>0,
         'pengajuan_menunggu'=>0, 'pengajuan_disetujui'=>0, 'pengajuan_ditolak'=>0, 'pengajuan_dicairkan'=>0, 'pengajuan_batal_cair'=>0,
         'jatuh_tempo'=>0, 'terlambat'=>0, 'denda_tertunggak'=>0,
-        'anggota_pengajuan'=>0, 'anggota_pencairan'=>0, 'anggota_jatuh_tempo'=>0,
+        'anggota_pengajuan'=>0, 'anggota_pencairan'=>0, 'anggota_batal_cair'=>0, 'anggota_jatuh_tempo'=>0,
         'anggota_terlambat'=>0, 'anggota_denda'=>0, 'anggota_jaminan'=>0,
     ];
     if ($role === 'anggota') {
@@ -106,6 +106,7 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
         $queries=[
             'anggota_pengajuan'=>"SELECT COUNT(*) FROM pengajuan_pinjaman WHERE anggota_id=? AND status='menunggu'",
             'anggota_pencairan'=>"SELECT COUNT(*) FROM pengajuan_pinjaman pp WHERE pp.anggota_id=? AND pp.status='disetujui' AND NOT EXISTS(SELECT 1 FROM pinjaman p WHERE p.pengajuan_id=pp.id)",
+            'anggota_batal_cair'=>"SELECT COUNT(*) FROM pengajuan_pinjaman WHERE anggota_id=? AND status='batal_cair'",
             'anggota_jatuh_tempo'=>"SELECT COUNT(*) FROM angsuran a JOIN pinjaman p ON p.id=a.pinjaman_id WHERE p.anggota_id=? AND p.status='aktif' AND a.status<>'lunas' AND a.tanggal_jatuh_tempo BETWEEN CURDATE() AND DATE_ADD(CURDATE(),INTERVAL 7 DAY)",
             'anggota_terlambat'=>"SELECT COUNT(*) FROM angsuran a JOIN pinjaman p ON p.id=a.pinjaman_id WHERE p.anggota_id=? AND p.status='aktif' AND a.status<>'lunas' AND a.tanggal_jatuh_tempo<CURDATE()",
             'anggota_denda'=>"SELECT COUNT(*) FROM angsuran a JOIN pinjaman p ON p.id=a.pinjaman_id WHERE p.anggota_id=? AND a.status<>'lunas' AND a.denda>COALESCE((SELECT SUM(b.jumlah) FROM layanan_bayar_denda b WHERE b.angsuran_id=a.id),0)",
@@ -115,6 +116,7 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
         $hasil['detail'] = [
             'anggota_pengajuan' => (int)$db->query("SELECT id FROM pengajuan_pinjaman WHERE anggota_id=".(int)$anggotaId." AND status='menunggu' ORDER BY id DESC LIMIT 1")->fetchColumn(),
             'anggota_pencairan' => (int)$db->query("SELECT pp.id FROM pengajuan_pinjaman pp WHERE pp.anggota_id=".(int)$anggotaId." AND pp.status='disetujui' AND NOT EXISTS(SELECT 1 FROM pinjaman p WHERE p.pengajuan_id=pp.id) ORDER BY pp.id DESC LIMIT 1")->fetchColumn(),
+            'anggota_batal_cair' => (int)$db->query("SELECT id FROM pengajuan_pinjaman WHERE anggota_id=".(int)$anggotaId." AND status='batal_cair' ORDER BY tanggal_persetujuan DESC, id DESC LIMIT 1")->fetchColumn(),
             'anggota_jaminan' => (int)$db->query("SELECT k.pinjaman_id FROM layanan_jaminan_kembali k JOIN pinjaman p ON p.id=k.pinjaman_id WHERE p.anggota_id=".(int)$anggotaId." AND k.status IN ('menunggu','pengecekan','disetujui','ditolak','diserahkan') ORDER BY COALESCE(k.diperiksa_at,k.created_at) DESC,k.id DESC LIMIT 1")->fetchColumn(),
         ];
         $hasil['total']=array_sum(array_intersect_key($hasil,$queries));
@@ -131,6 +133,7 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
         $hasil['pencairan']=0;$hasil['jatuh_tempo']=0;$hasil['terlambat']=0;$hasil['denda_tertunggak']=0;
         $hasil['pembatalan']=function_exists('jumlahPengajuanPembatalan') ? (int)jumlahPengajuanPembatalan($db) : 0;
         foreach ([
+            'tunda_cair'=>'layanan_tunda_cair',
             'hapus_denda'=>'layanan_pengajuan_hapus_denda',
             'pelunasan_dini'=>'layanan_pelunasan',
             'jaminan_kembali'=>'layanan_jaminan_kembali',
@@ -149,8 +152,9 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
             'pembatalan'=>(int)$db->query("SELECT x.pinjaman_id FROM pengajuan_pembatalan_angsuran pb JOIN angsuran x ON x.id=pb.angsuran_id WHERE pb.status='menunggu' ORDER BY pb.id DESC LIMIT 1")->fetchColumn(),
             'pembayaran_denda'=>(int)$db->query("SELECT pinjaman_id FROM layanan_bayar_denda WHERE approved_by IS NULL ORDER BY id DESC LIMIT 1")->fetchColumn(),
         ];
-        foreach (['hapus_denda'=>'layanan_pengajuan_hapus_denda','pelunasan_dini'=>'layanan_pelunasan','jaminan_kembali'=>'layanan_jaminan_kembali','prioritas'=>'layanan_prioritas','laporan_macet'=>'layanan_laporan_macet'] as $key=>$table) {
-            $hasil['detail'][$key]=(int)$db->query("SELECT pinjaman_id FROM $table WHERE status='menunggu' ORDER BY id DESC LIMIT 1")->fetchColumn();
+        foreach (['tunda_cair'=>'layanan_tunda_cair','hapus_denda'=>'layanan_pengajuan_hapus_denda','pelunasan_dini'=>'layanan_pelunasan','jaminan_kembali'=>'layanan_jaminan_kembali','prioritas'=>'layanan_prioritas','laporan_macet'=>'layanan_laporan_macet'] as $key=>$table) {
+            $col = $key === 'tunda_cair' ? 'id' : 'pinjaman_id';
+            $hasil['detail'][$key]=(int)$db->query("SELECT $col FROM $table WHERE status='menunggu' ORDER BY id DESC LIMIT 1")->fetchColumn();
         }
     } else {
         // Persetujuan pengajuan adalah tindakan Admin, bukan Teller.
@@ -165,8 +169,16 @@ function layananHitungNotifikasi($db, $role, $userId = 0) {
             $stmt->execute([(int)$userId,$statusPengajuan]);
             $hasil['pengajuan_'.$statusPengajuan]=(int)$stmt->fetchColumn();
         }
-        $hasil['total']=$hasil['pencairan']+$hasil['pembatalan']+$hasil['pelunasan_disetujui']+$hasil['jaminan_disetujui']+$hasil['jatuh_tempo']+$hasil['terlambat']+$hasil['denda_tertunggak']+$hasil['pengajuan_menunggu']+$hasil['pengajuan_disetujui']+$hasil['pengajuan_ditolak']+$hasil['pengajuan_dicairkan']+$hasil['pengajuan_batal_cair'];
-        $hasil['detail'] = ['pencairan'=>(int)$db->query("SELECT pp.id FROM pengajuan_pinjaman pp WHERE pp.status='disetujui' AND NOT EXISTS(SELECT 1 FROM pinjaman p WHERE p.pengajuan_id=pp.id) ORDER BY pp.id DESC LIMIT 1")->fetchColumn()];
+        $stmtTcDitolak = $db->prepare("SELECT COUNT(*) FROM layanan_tunda_cair tc JOIN pengajuan_pinjaman pp ON pp.id=tc.pengajuan_id WHERE tc.user_id=? AND tc.status='ditolak' AND pp.status='disetujui' AND NOT EXISTS (SELECT 1 FROM pinjaman p WHERE p.pengajuan_id=pp.id)");
+        $stmtTcDitolak->execute([(int)$userId]);
+        $hasil['tc_ditolak']=(int)$stmtTcDitolak->fetchColumn();
+        $hasil['total']=$hasil['pencairan']+$hasil['pembatalan']+$hasil['pelunasan_disetujui']+$hasil['jaminan_disetujui']+$hasil['tc_ditolak']+$hasil['jatuh_tempo']+$hasil['terlambat']+$hasil['denda_tertunggak']+$hasil['pengajuan_menunggu']+$hasil['pengajuan_disetujui']+$hasil['pengajuan_ditolak']+$hasil['pengajuan_dicairkan']+$hasil['pengajuan_batal_cair'];
+        $stmtTcDitolakDetail = $db->prepare("SELECT pp.id FROM layanan_tunda_cair tc JOIN pengajuan_pinjaman pp ON pp.id=tc.pengajuan_id WHERE tc.user_id=? AND tc.status='ditolak' AND pp.status='disetujui' AND NOT EXISTS (SELECT 1 FROM pinjaman p WHERE p.pengajuan_id=pp.id) ORDER BY tc.diputuskan_at DESC, tc.id DESC LIMIT 1");
+        $stmtTcDitolakDetail->execute([(int)$userId]);
+        $hasil['detail'] = [
+            'pencairan'=>(int)$db->query("SELECT pp.id FROM pengajuan_pinjaman pp WHERE pp.status='disetujui' AND NOT EXISTS(SELECT 1 FROM pinjaman p WHERE p.pengajuan_id=pp.id) ORDER BY pp.id DESC LIMIT 1")->fetchColumn(),
+            'tc_ditolak'=>(int)$stmtTcDitolakDetail->fetchColumn()
+        ];
         foreach (['menunggu','disetujui','ditolak','dicairkan','batal_cair'] as $statusPengajuan) {
             $stmt=$db->prepare('SELECT id FROM pengajuan_pinjaman WHERE user_id=? AND status=? ORDER BY tanggal_persetujuan DESC,id DESC LIMIT 1');
             $stmt->execute([(int)$userId,$statusPengajuan]);

@@ -6,7 +6,7 @@ session_save_path(sys_get_temp_dir());
 require __DIR__.'/../config/config.php';
 require __DIR__.'/../config/functions.php';
 $admin=layananHitungNotifikasi($db,'admin',0);
-$tables=['hapus_denda'=>'layanan_pengajuan_hapus_denda','pelunasan_dini'=>'layanan_pelunasan','jaminan_kembali'=>'layanan_jaminan_kembali','prioritas'=>'layanan_prioritas','laporan_macet'=>'layanan_laporan_macet'];
+$tables=['tunda_cair'=>'layanan_tunda_cair','hapus_denda'=>'layanan_pengajuan_hapus_denda','pelunasan_dini'=>'layanan_pelunasan','jaminan_kembali'=>'layanan_jaminan_kembali','prioritas'=>'layanan_prioritas','laporan_macet'=>'layanan_laporan_macet'];
 foreach($tables as $key=>$table){
     $expected=(int)$db->query("SELECT COUNT(*) FROM $table WHERE status='menunggu'")->fetchColumn();
     if($admin[$key]!==$expected)throw new Exception("Hitungan $key tidak sesuai.");

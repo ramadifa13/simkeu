@@ -12,6 +12,7 @@ $detailId = max(0, (int)($_GET['id'] ?? 0));
 $routes = [
     'admin' => [
         'persetujuan' => 'admin/persetujuan.php',
+        'tunda_cair' => 'admin/pencairan.php',
         'pembatalan' => 'admin/angsuran.php',
         // Semua notifikasi layanan Admin dibuka melalui laporan lunas Admin,
         // bukan halaman pinjaman/layanan milik Teller.
@@ -28,6 +29,7 @@ $routes = [
         'pengajuan_ditolak' => 'teller/pengajuan.php',
         'pengajuan_dicairkan' => 'teller/pengajuan.php',
         'pengajuan_batal_cair' => 'teller/pengajuan.php',
+        'tc_ditolak' => 'teller/pencairan.php',
         'pencairan' => 'teller/pencairan.php',
         'pembatalan' => 'teller/angsuran.php',
         'pelunasan_disetujui' => 'teller/laporan_lunas.php?tab=lunas#detail',
@@ -39,6 +41,7 @@ $routes = [
     'anggota' => [
         'anggota_pengajuan' => 'anggota/pinjaman.php',
         'anggota_pencairan' => 'anggota/pinjaman.php',
+        'anggota_batal_cair' => 'anggota/pinjaman.php',
         'anggota_jatuh_tempo' => 'anggota/pinjaman.php',
         'anggota_terlambat' => 'anggota/pinjaman.php',
         'anggota_denda' => 'anggota/pinjaman.php',
@@ -50,7 +53,7 @@ $destination = $routes[$role][$target] ?? ($role . '/dashboard.php');
 if ($detailId > 0) {
     $param = 'id';
     if ($target === 'pembatalan' || in_array($target, ['jatuh_tempo','terlambat','denda_tertunggak','pembayaran_denda','anggota_jaminan'], true)) $param = 'pinjaman_id';
-    if ($target === 'pencairan') $param = 'pengajuan_id';
+    if ($target === 'pencairan' || $target === 'tc_ditolak') $param = 'pengajuan_id';
     $destination .= (strpos($destination, '?') === false ? '?' : '&') . $param . '=' . $detailId;
 }
 header('Location: ' . $destination);
