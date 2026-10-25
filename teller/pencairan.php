@@ -1015,13 +1015,17 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
         var signaturePads = {};
         ['nasabah','teller','saksi_1','saksi_2'].forEach(function(key){
             var c=document.getElementById('canvas_'+key), ctx=c.getContext('2d'), drawing=false, dirty=false;
-            function resize(){var tinggi=c.clientHeight || 260;c.width=Math.max(1,Math.round(c.clientWidth*devicePixelRatio));c.height=Math.round(tinggi*devicePixelRatio);ctx=c.getContext('2d');ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.lineWidth=2.5;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#183f49'} resize();
-            function pos(e){var r=c.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
-            c.addEventListener('pointerdown',function(e){e.preventDefault();drawing=true;dirty=true;var p=pos(e);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(p[0]+0.01,p[1]+0.01);ctx.stroke();c.setPointerCapture(e.pointerId);setStatus(true)},{passive:false});
-            c.addEventListener('pointermove',function(e){if(!drawing)return;e.preventDefault();var p=pos(e);ctx.lineTo(p[0],p[1]);ctx.stroke()},{passive:false});
+            // Gunakan ukuran visual kanvas untuk mengubah sentuhan menjadi piksel
+            // kanvas. Ini menjaga posisi tinta tetap tepat di HP/tablet (DPI/zoom).
+            function resize(){var r=c.getBoundingClientRect(),ratio=window.devicePixelRatio||1,w=Math.max(1,Math.round(r.width*ratio)),h=Math.max(1,Math.round(r.height*ratio));if(c.width===w&&c.height===h)return;var before=dirty?c.toDataURL('image/png'):null;c.width=w;c.height=h;ctx=c.getContext('2d');ctx.lineWidth=2.5*ratio;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#183f49';if(before){var image=new Image();image.onload=function(){ctx.drawImage(image,0,0,c.width,c.height);};image.src=before;}}
+            function pos(e){var r=c.getBoundingClientRect();return [(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]}
+            resize();
+            c.addEventListener('pointerdown',function(e){if(!e.isPrimary)return;e.preventDefault();resize();drawing=true;dirty=true;var p=pos(e);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(p[0]+0.01,p[1]+0.01);ctx.stroke();c.setPointerCapture(e.pointerId);setStatus(true)},{passive:false});
+            c.addEventListener('pointermove',function(e){if(!drawing||!e.isPrimary)return;e.preventDefault();var p=pos(e);ctx.lineTo(p[0],p[1]);ctx.stroke()},{passive:false});
             function stopTtd(e){drawing=false;if(c.hasPointerCapture && c.hasPointerCapture(e.pointerId))c.releasePointerCapture(e.pointerId)}
             c.addEventListener('pointerup',stopTtd);c.addEventListener('pointercancel',stopTtd);c.addEventListener('lostpointercapture',stopTtd);
             function setStatus(ready){var s=document.getElementById('status_'+key),w=c.closest('.signature-canvas-wrap');if(!s)return;s.classList.toggle('is-ready',ready);s.innerHTML=ready?'<i class="fas fa-check-circle"></i> Siap disimpan':'<i class="fas fa-pen-nib"></i> Belum diisi';w.classList.toggle('has-signature',ready)}
+            if(window.ResizeObserver)new ResizeObserver(function(){if(!drawing)resize();}).observe(c);
             signaturePads[key]={canvas:c,ctx:ctx,resize:resize,isDirty:function(){return dirty},clear:function(){ctx.clearRect(0,0,c.width,c.height);dirty=false;document.getElementById('ttd_'+key).value='';setStatus(false)}};
         });
         document.querySelectorAll('.clear-signature').forEach(function(b){b.onclick=function(){signaturePads[this.dataset.key].clear()}});
