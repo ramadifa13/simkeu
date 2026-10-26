@@ -117,6 +117,13 @@ if (!function_exists('migrasiKolomKeAngka')) {
         foreach ($records['Angsuran_Historis'] ?? [] as $row) {
             if (empty($pinjaman[$row['ID Pinjaman Lama*'] ?? ''])) $errors[]="Angsuran baris {$row['_baris']} memakai ID pinjaman yang tidak ditemukan.";
         }
+        $seenPembayaran = [];
+        foreach ($records['Angsuran_Historis'] ?? [] as $row) {
+            $idPembayaran = trim((string)($row['ID Pembayaran'] ?? ''));
+            if ($idPembayaran === '') { $errors[] = "Angsuran baris {$row['_baris']} belum memiliki ID Pembayaran."; continue; }
+            if (isset($seenPembayaran[$idPembayaran])) $errors[] = "Duplikat ID Pembayaran '$idPembayaran' pada sheet Angsuran_Historis (baris {$seenPembayaran[$idPembayaran]} dan {$row['_baris']}).";
+            $seenPembayaran[$idPembayaran] = $row['_baris'];
+        }
         foreach ($records['Alokasi_Dapin'] ?? [] as $row) {
             if (empty($pinjaman[$row['ID Pinjaman Lama*'] ?? ''])) $errors[]="Alokasi Dapin baris {$row['_baris']} memakai ID pinjaman yang tidak ditemukan.";
             if (empty($dapin[$row['ID Dapin*'] ?? ''])) $errors[]="Alokasi Dapin baris {$row['_baris']} memakai ID Dapin yang tidak ditemukan.";
