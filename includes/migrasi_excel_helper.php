@@ -58,7 +58,9 @@ if (!function_exists('migrasiKolomKeAngka')) {
             $rows = $sheets[$name]; $count = 0;
             foreach ($rows as $number => $row) if ($number >= 3 && count(array_filter($row, fn($v) => trim((string)$v) !== '')) > 0) $count++;
             $counts[$name] = $count;
-            if ($count === 0) $errors[] = "Sheet '$name' belum berisi data.";
+            // Alokasi Dapin boleh kosong karena sebagian pinjaman memakai modal
+            // dari luar Dapin. Sheet tetap wajib ada, tetapi tidak wajib berisi baris.
+            if ($count === 0 && $name !== 'Alokasi_Dapin') $errors[] = "Sheet '$name' belum berisi data.";
         }
         foreach (['Nasabah'=>1,'Pinjaman'=>1,'Pendanaan_Dapin'=>1] as $sheet => $column) {
             if (!isset($sheets[$sheet])) continue;
@@ -96,8 +98,11 @@ if (!function_exists('migrasiKolomKeAngka')) {
             if (empty($produk[$row['Kode Produk*'] ?? ''])) $errors[]="Pinjaman baris $r memakai Kode Produk yang tidak ditemukan.";
             $p = $produk[$row['Kode Produk*'] ?? ''] ?? null;
             if ($p) {
-                if (($row['Frekuensi*'] ?? '') !== ($p['Frekuensi*'] ?? '')) $errors[]="Pinjaman baris $r: frekuensi tidak sesuai Master_Produk.";
-                if (($row['Skema Bunga*'] ?? '') !== ($p['Skema Bunga*'] ?? '')) $errors[]="Pinjaman baris $r: skema bunga tidak sesuai Master_Produk.";
+                // Pinjaman historis boleh memakai produk terdekat meskipun aturan
+                // lama (frekuensi/skema) berbeda. Jangan blokir migrasi; tandai
+                // agar user tetap dapat merekonsiliasi perhitungannya.
+                if (($row['Frekuensi*'] ?? '') !== ($p['Frekuensi*'] ?? '')) $warnings[]="Pinjaman baris $r: frekuensi historis berbeda dari Master_Produk; nilai Excel dipertahankan.";
+                if (($row['Skema Bunga*'] ?? '') !== ($p['Skema Bunga*'] ?? '')) $warnings[]="Pinjaman baris $r: skema bunga historis berbeda dari Master_Produk; nilai Excel dipertahankan.";
             }
         }
         foreach ($records['Angsuran_Historis'] ?? [] as $row) {
@@ -120,6 +125,10 @@ if (!function_exists('migrasiKolomKeAngka')) {
         $angsuran=0; foreach ($records['Angsuran_Historis'] ?? [] as $row) if (($row['Status*'] ?? '') === 'dibayar') $angsuran += $uang($row['Total Diterima (Rp)*'] ?? 0);
         $modalDapin=0; $wajibDapin=0; foreach ($records['Pendanaan_Dapin'] ?? [] as $row) { $modalDapin += $uang($row['Modal Diterima (Rp)*'] ?? 0); $wajibDapin += $uang($row['Total Wajib Kembali (Rp)*'] ?? 0); }
         $alokasiModal=0; $alokasiWajib=0; foreach ($records['Alokasi_Dapin'] ?? [] as $row) { $alokasiModal += $uang($row['Modal Dialokasikan (Rp)*'] ?? 0); $alokasiWajib += $uang($row['Kewajiban Dapin (Rp)*'] ?? 0); }
+        if (count($records['Alokasi_Dapin'] ?? []) === 0) $warnings[]='Tidak ada alokasi Dapin. Pinjaman tanpa alokasi dianggap memakai modal di luar Dapin.';
+        foreach ($records['Saldo_Awal_Kas'] ?? [] as $saldo) {
+            if ($uang($saldo['Saldo Kas Fisik (Rp)*'] ?? 0) <= 0) $warnings[]='Saldo awal kas masih Rp0. Isi sesuai uang kas fisik pada tanggal cut-off jika memang ada.';
+        }
         if ($alokasiModal > $modalDapin + 0.01) $errors[]='Total modal Dapin yang dialokasikan melebihi modal Dapin yang dicatat.';
         $bayarPinjaman = [];
         foreach ($records['Angsuran_Historis'] ?? [] as $row) if (($row['Status*'] ?? '') === 'dibayar') {
