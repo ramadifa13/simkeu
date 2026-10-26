@@ -191,7 +191,9 @@ if ($_POST && isset($_POST['reset_data'])) {
                 $db->exec($delete_query);
             }
             
-            // Reset anggota data but keep the structure
+            // Reset anggota data but keep the structure and all uploaded documents.
+            // File paths are intentionally preserved so photos/TTD can still be
+            // reused when the member is imported again with the same code.
             $reset_anggota_query = "UPDATE anggota SET 
                                    alamat = '', 
                                    telepon = '', 
@@ -200,7 +202,6 @@ if ($_POST && isset($_POST['reset_data'])) {
                                    tanggal_lahir = NULL, 
                                    pekerjaan = '', 
                                    ktp = '', 
-                                   foto_ktp = '', 
                                    rekening_bank = '',
                                    tanggal_daftar = CURDATE()";
             $db->exec($reset_anggota_query);
@@ -242,11 +243,18 @@ if ($_POST && isset($_POST['reset_total_migrasi'])) {
             $cekAdmin->execute([$adminId]);
             if (!$cekAdmin->fetchColumn()) throw new RuntimeException('Akun Admin aktif wajib tersedia untuk reset total.');
             $tables=$db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
-            $skip=['migrations','users'];
+            // Do not remove uploaded files.  They live under uploads/ and are
+            // deliberately outside this database reset.  The anggota table is
+            // also retained so existing document references (foto KTP/KK,
+            // pasangan) remain available and can be matched by kode_anggota
+            // during the next import.
+            $skip=['migrations','users','anggota'];
             $target=array_values(array_filter($tables,fn($table)=>!in_array($table,$skip,true)));
             $db->beginTransaction(); $db->exec('SET FOREIGN_KEY_CHECKS=0');
             foreach ($target as $table) $db->exec("DELETE FROM `".str_replace('`','``',$table)."`");
             $hapusUser=$db->prepare('DELETE FROM users WHERE id <> ?'); $hapusUser->execute([$adminId]);
+            // Remove stale login links without touching the member documents.
+            $db->exec("UPDATE anggota SET user_id = NULL, status = 'nonaktif'");
             $db->exec('SET FOREIGN_KEY_CHECKS=1'); $db->commit();
             foreach ($target as $table) $db->exec("ALTER TABLE `".str_replace('`','``',$table)."` AUTO_INCREMENT=1");
             $_SESSION['success']='Reset total selesai. Data, master, pengaturan, dan akun selain Admin aktif telah dihapus.';
@@ -438,7 +446,7 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
                                 </form>
                                 <hr class="my-4">
                                 <h6 class="text-danger">Reset Total untuk Migrasi</h6>
-                                <p class="small text-muted mb-2">Menghapus anggota, seluruh master, pengaturan, transaksi, file data database, serta semua akun selain akun Admin yang sedang dipakai.</p>
+                                <p class="small text-muted mb-2">Menghapus transaksi, master, pengaturan, dan akun selain Admin aktif. Data anggota serta file foto/TTD nasabah dipertahankan agar otomatis dapat dipakai kembali saat impor dengan kode anggota yang sama.</p>
                                 <form method="POST" id="resetTotalForm"><?php echo layananToken(); ?>
                                     <div class="mb-3"><label class="form-label text-danger">Ketik <strong>RESET TOTAL</strong></label>
                                         <input type="text" name="confirmation_total" class="form-control" placeholder="RESET TOTAL" required pattern="RESET TOTAL"></div>
@@ -507,7 +515,7 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
             return confirm('⚠️ PERINGATAN!\n\nTindakan ini akan menghapus SEMUA data transaksi, simpanan, pinjaman, riwayat, dan WASERDA.\n\nPastikan Anda sudah membuat backup sebelum melanjutkan!\n\nApakah Anda yakin ingin melanjutkan?');
         }
         function confirmResetTotal() {
-            return confirm('PERINGATAN KERAS!\n\nData anggota, seluruh master, pengaturan, transaksi, dan akun selain Admin aktif akan dihapus. Hanya akun Admin yang sedang dipakai yang dipertahankan.\n\nPastikan backup sudah dibuat. Lanjutkan?');
+            return confirm('PERINGATAN KERAS!\n\nTransaksi, master, pengaturan, dan akun selain Admin aktif akan dihapus. Data anggota serta file foto/TTD nasabah dipertahankan agar bisa dipakai kembali saat impor dengan kode anggota yang sama.\n\nPastikan backup sudah dibuat. Lanjutkan?');
         }
         
         function confirmDelete(filename) {
