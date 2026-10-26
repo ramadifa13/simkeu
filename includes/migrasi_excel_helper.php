@@ -8,7 +8,13 @@ if (!function_exists('migrasiKolomKeAngka')) {
     }
     function migrasiNilaiCell($cell, $shared) {
         $type = (string)$cell['t'];
-        if ($type === 'inlineStr') return trim((string)$cell->is->t);
+        if ($type === 'inlineStr') {
+            // XLSX yang dibuat Excel/OpenPyXL dapat menyimpan teks sebagai
+            // inline string. Gunakan local-name agar tetap terbaca meski XML
+            // memakai namespace berbeda.
+            $texts = $cell->xpath('./*[local-name()="is"]/*[local-name()="t"]');
+            return trim($texts ? implode('', array_map('strval', $texts)) : '');
+        }
         $value = (string)$cell->v;
         return $type === 's' ? ($shared[(int)$value] ?? '') : $value;
     }
@@ -19,7 +25,10 @@ if (!function_exists('migrasiKolomKeAngka')) {
         $shared = [];
         if (($xml = $zip->getFromName('xl/sharedStrings.xml')) !== false) {
             $sx = simplexml_load_string($xml);
-            foreach ($sx->si as $si) $shared[] = trim(implode('', $si->xpath('.//t')));
+            foreach ($sx->si as $si) {
+                $texts = $si->xpath('.//*[local-name()="t"]');
+                $shared[] = trim($texts ? implode('', array_map('strval', $texts)) : '');
+            }
         }
         $workbook = simplexml_load_string($zip->getFromName('xl/workbook.xml'));
         $rels = simplexml_load_string($zip->getFromName('xl/_rels/workbook.xml.rels'));
