@@ -249,7 +249,7 @@ if ($_POST && isset($_POST['reset_total_migrasi'])) {
             // pasangan) remain available and can be matched by kode_anggota
             // during the next import.
             $skip=['migrations','users','anggota'];
-            $target=array_values(array_filter($tables,fn($table)=>!in_array($table,$skip,true)));
+            $target=array_values(array_filter($tables,function($table) use ($skip) { return !in_array($table,$skip,true); }));
             $db->beginTransaction(); $db->exec('SET FOREIGN_KEY_CHECKS=0');
             foreach ($target as $table) $db->exec("DELETE FROM `".str_replace('`','``',$table)."`");
             $hapusUser=$db->prepare('DELETE FROM users WHERE id <> ?'); $hapusUser->execute([$adminId]);
