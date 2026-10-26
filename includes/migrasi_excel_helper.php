@@ -27,7 +27,7 @@ if (!function_exists('migrasiKolomKeAngka')) {
         $rels->registerXPathNamespace('p', 'http://schemas.openxmlformats.org/package/2006/relationships');
         foreach ($rels->xpath('//p:Relationship') as $rel) {
             $target = (string)$rel['Target'];
-            $map[(string)$rel['Id']] = str_starts_with($target, '/') ? ltrim($target, '/') : 'xl/' . $target;
+            $map[(string)$rel['Id']] = (substr($target, 0, 1) === '/') ? ltrim($target, '/') : 'xl/' . $target;
         }
         $ns = $workbook->getNamespaces(true);
         $sheets = [];
@@ -56,7 +56,7 @@ if (!function_exists('migrasiKolomKeAngka')) {
         foreach ($required as $name) {
             if (!isset($sheets[$name])) { $errors[] = "Sheet wajib '$name' tidak ditemukan."; continue; }
             $rows = $sheets[$name]; $count = 0;
-            foreach ($rows as $number => $row) if ($number >= 3 && count(array_filter($row, fn($v) => trim((string)$v) !== '')) > 0) $count++;
+            foreach ($rows as $number => $row) if ($number >= 3 && count(array_filter($row, function($v) { return trim((string)$v) !== ''; })) > 0) $count++;
             $counts[$name] = $count;
             // Alokasi Dapin boleh kosong karena sebagian pinjaman memakai modal
             // dari luar Dapin. Sheet tetap wajib ada, tetapi tidak wajib berisi baris.
@@ -75,10 +75,10 @@ if (!function_exists('migrasiKolomKeAngka')) {
         $records = [];
         foreach ($required as $name) {
             if (!isset($sheets[$name])) continue;
-            $headers = $sheets[$name][2] ?? []; $headers = array_map(fn($v) => trim((string)$v), $headers);
+            $headers = $sheets[$name][2] ?? []; $headers = array_map(function($v) { return trim((string)$v); }, $headers);
             $data = [];
             foreach ($sheets[$name] as $number => $row) {
-                if ($number < 3 || count(array_filter($row, fn($v) => trim((string)$v) !== '')) === 0) continue;
+                if ($number < 3 || count(array_filter($row, function($v) { return trim((string)$v) !== ''; })) === 0) continue;
                 $one = ['_baris'=>$number];
                 foreach ($headers as $column => $header) if ($header !== '') $one[$header] = trim((string)($row[$column] ?? ''));
                 $data[] = $one;
@@ -117,8 +117,8 @@ if (!function_exists('migrasiKolomKeAngka')) {
             $v = preg_replace('/[^0-9,.-]/', '', (string)$value);
             if (substr_count($v, '.') > 1) $v = str_replace('.', '', $v);
             if (substr_count($v, ',') > 1) $v = str_replace(',', '', $v);
-            if (str_contains($v, ',') && str_contains($v, '.')) $v = str_replace(',', '', $v);
-            elseif (str_contains($v, ',')) $v = str_replace(',', '.', $v);
+            if (strpos($v, ',') !== false && strpos($v, '.') !== false) $v = str_replace(',', '', $v);
+            elseif (strpos($v, ',') !== false) $v = str_replace(',', '.', $v);
             return is_numeric($v) ? (float)$v : 0.0;
         };
         $totalCair=0; $totalTagihan=0; foreach ($records['Pinjaman'] ?? [] as $row) { $totalCair += $uang($row['Plafon (Rp)*'] ?? 0); $totalTagihan += $uang($row['Total Tagihan (Rp)*'] ?? 0); }
