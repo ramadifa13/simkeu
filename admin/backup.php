@@ -175,34 +175,20 @@ if ($_POST && isset($_POST['reset_data'])) {
     $confirmation = $_POST['confirmation'] ?? '';
     
     if ($confirmation === 'RESET') {
+        $tables = [
+            'transaksi','simpanan','pinjaman','angsuran','pengajuan_pinjaman',
+            'pembelian_listrik','pembelian_indihome','kas','log_koreksi','waserda_transaksi'
+        ];
         try {
             $db->beginTransaction();
             
             // Disable foreign key checks
             $db->exec("SET FOREIGN_KEY_CHECKS = 0");
             
-            // List of tables to truncate (data transaksional)
-            $tables = [
-                'transaksi', 
-                'simpanan', 
-                'pinjaman', 
-                'angsuran', 
-                'pengajuan_pinjaman',
-                'pembelian_listrik', 
-                'pembelian_indihome', 
-                'kas', 
-                'log_koreksi',
-                'waserda_transaksi' // <-- DITAMBAHKAN! tabel waserda ikut direset
-            ];
-            
             foreach ($tables as $table) {
                 // Use DELETE instead of TRUNCATE to avoid foreign key constraints
                 $delete_query = "DELETE FROM {$table}";
                 $db->exec($delete_query);
-                
-                // Reset auto increment
-                $reset_ai_query = "ALTER TABLE {$table} AUTO_INCREMENT = 1";
-                $db->exec($reset_ai_query);
             }
             
             // Reset anggota data but keep the structure
@@ -219,24 +205,19 @@ if ($_POST && isset($_POST['reset_data'])) {
                                    tanggal_daftar = CURDATE()";
             $db->exec($reset_anggota_query);
             
-            // Reset kas auto increment (already done in loop, but just to be sure)
-            $reset_kas_ai = "ALTER TABLE kas AUTO_INCREMENT = 1";
-            $db->exec($reset_kas_ai);
-            
-            // Reset waserda auto increment (already done in loop)
-            $reset_waserda_ai = "ALTER TABLE waserda_transaksi AUTO_INCREMENT = 1";
-            $db->exec($reset_waserda_ai);
-            
             // Re-enable foreign key checks
             $db->exec("SET FOREIGN_KEY_CHECKS = 1");
             
             $db->commit();
+            // ALTER TABLE menyebabkan implicit commit di MySQL, sehingga harus dijalankan
+            // setelah transaksi selesai agar rollback tidak pernah gagal.
+            foreach ($tables as $table) $db->exec("ALTER TABLE {$table} AUTO_INCREMENT = 1");
             $_SESSION['success'] = "Data berhasil direset! Data waserda, transaksi, simpanan, pinjaman telah dihapus. Data master dan pengguna tetap tersimpan.";
             
-        } catch (Exception $e) {
-            $db->rollBack();
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) $db->rollBack();
             // Re-enable foreign key checks even if error
-            $db->exec("SET FOREIGN_KEY_CHECKS = 1");
+            try { $db->exec("SET FOREIGN_KEY_CHECKS = 1"); } catch (Throwable $ignored) {}
             $_SESSION['error'] = "Gagal mereset data: " . $e->getMessage();
         }
     } else {
@@ -245,6 +226,37 @@ if ($_POST && isset($_POST['reset_data'])) {
     
     header("Location: backup.php");
     exit();
+}
+
+// Reset total untuk migrasi: semua data/master/pengaturan dikosongkan,
+// kecuali akun Admin yang sedang dipakai agar aplikasi tidak terkunci.
+if ($_POST && isset($_POST['reset_total_migrasi'])) {
+    if (trim((string)($_POST['confirmation_total'] ?? '')) !== 'RESET TOTAL') {
+        $_SESSION['error'] = "Konfirmasi tidak valid! Ketik 'RESET TOTAL'.";
+    } else {
+        try {
+            layananValidasiToken();
+            $adminId = (int)($_SESSION['user_id'] ?? 0);
+            if ($adminId <= 0) throw new RuntimeException('Admin aktif tidak ditemukan.');
+            $cekAdmin=$db->prepare("SELECT id FROM users WHERE id=? AND role='admin' AND status='aktif'");
+            $cekAdmin->execute([$adminId]);
+            if (!$cekAdmin->fetchColumn()) throw new RuntimeException('Akun Admin aktif wajib tersedia untuk reset total.');
+            $tables=$db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+            $skip=['migrations','users'];
+            $target=array_values(array_filter($tables,fn($table)=>!in_array($table,$skip,true)));
+            $db->beginTransaction(); $db->exec('SET FOREIGN_KEY_CHECKS=0');
+            foreach ($target as $table) $db->exec("DELETE FROM `".str_replace('`','``',$table)."`");
+            $hapusUser=$db->prepare('DELETE FROM users WHERE id <> ?'); $hapusUser->execute([$adminId]);
+            $db->exec('SET FOREIGN_KEY_CHECKS=1'); $db->commit();
+            foreach ($target as $table) $db->exec("ALTER TABLE `".str_replace('`','``',$table)."` AUTO_INCREMENT=1");
+            $_SESSION['success']='Reset total selesai. Data, master, pengaturan, dan akun selain Admin aktif telah dihapus.';
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            try { $db->exec('SET FOREIGN_KEY_CHECKS=1'); } catch (Throwable $ignored) {}
+            $_SESSION['error']='Gagal melakukan reset total: '.$e->getMessage();
+        }
+    }
+    header('Location: backup.php'); exit();
 }
 
 // Get existing backups
@@ -424,6 +436,14 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
                                         <i class="fas fa-download me-2"></i>Buat Backup Sekarang
                                     </button>
                                 </form>
+                                <hr class="my-4">
+                                <h6 class="text-danger">Reset Total untuk Migrasi</h6>
+                                <p class="small text-muted mb-2">Menghapus anggota, seluruh master, pengaturan, transaksi, file data database, serta semua akun selain akun Admin yang sedang dipakai.</p>
+                                <form method="POST" id="resetTotalForm"><?php echo layananToken(); ?>
+                                    <div class="mb-3"><label class="form-label text-danger">Ketik <strong>RESET TOTAL</strong></label>
+                                        <input type="text" name="confirmation_total" class="form-control" placeholder="RESET TOTAL" required pattern="RESET TOTAL"></div>
+                                    <button type="submit" name="reset_total_migrasi" class="btn btn-outline-danger" onclick="return confirmResetTotal()"><i class="fas fa-skull-crossbones me-2"></i>Reset Total untuk Migrasi</button>
+                                </form>
                             </div>
                         </div>
 
@@ -475,45 +495,6 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
                             </div>
                         </div>
 
-                        <!-- Danger Zone - Reset Data (TERMASUK WASERDA) -->
-                        <div class="card backup-card danger-zone">
-                            <div class="card-header bg-danger text-white">
-                                <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Zona Berbahaya</h6>
-                            </div>
-                            <div class="card-body">
-                                <h6 class="text-danger">Reset Data Keseluruhan</h6>
-                                <p class="text-muted small">
-                                    Tindakan ini akan menghapus SEMUA data transaksi, simpanan, pinjaman, riwayat, dan <strong class="text-danger">WASERDA</strong>.
-                                    Data yang akan tetap tersimpan:
-                                </p>
-                                <ul class="small text-muted">
-                                    <li>Data master (jenis simpanan, jenis pinjaman)</li>
-                                    <li>Data anggota (struktur, tapi data pribadi direset)</li>
-                                    <li>Data pengguna (user accounts)</li>
-                                    <li>Pengaturan koperasi</li>
-                                </ul>
-                                
-                                <form method="POST" id="resetForm"><?php echo layananToken(); ?>
-                                    <div class="alert alert-danger">
-                                        <strong>PERINGATAN!</strong> Tindakan ini tidak dapat dibatalkan. 
-                                        Pastikan Anda sudah membuat backup sebelum melanjutkan.
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label text-danger">
-                                            Ketik <strong>RESET</strong> untuk mengonfirmasi
-                                        </label>
-                                        <input type="text" name="confirmation" class="form-control" 
-                                               placeholder="RESET" required pattern="RESET">
-                                    </div>
-                                    
-                                    <button type="submit" name="reset_data" class="btn btn-danger" 
-                                            onclick="return confirmReset()">
-                                        <i class="fas fa-exclamation-triangle me-2"></i>Reset Semua Data (Termasuk Waserda)
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </main>
@@ -524,6 +505,9 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
     <script>
         function confirmReset() {
             return confirm('⚠️ PERINGATAN!\n\nTindakan ini akan menghapus SEMUA data transaksi, simpanan, pinjaman, riwayat, dan WASERDA.\n\nPastikan Anda sudah membuat backup sebelum melanjutkan!\n\nApakah Anda yakin ingin melanjutkan?');
+        }
+        function confirmResetTotal() {
+            return confirm('PERINGATAN KERAS!\n\nData anggota, seluruh master, pengaturan, transaksi, dan akun selain Admin aktif akan dihapus. Hanya akun Admin yang sedang dipakai yang dipertahankan.\n\nPastikan backup sudah dibuat. Lanjutkan?');
         }
         
         function confirmDelete(filename) {

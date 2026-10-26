@@ -512,7 +512,7 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                     <i class="fas fa-cog me-2"></i> Pengaturan
                     <i class="fas fa-chevron-down float-end"></i>
                 </a>
-                <div class="collapse <?php echo in_array($current_page, ['pengaturan.php', 'backup.php', 'pengaturan_pinjaman.php']) ? 'show' : ''; ?>" id="menuPengaturan">
+                <div class="collapse <?php echo in_array($current_page, ['pengaturan.php', 'backup.php', 'pengaturan_pinjaman.php', 'import_migrasi.php']) ? 'show' : ''; ?>" id="menuPengaturan">
                     <ul class="nav flex-column ms-3 mt-1">
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'pengaturan.php' ? 'active text-white' : ''; ?>" 
@@ -530,6 +530,12 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'backup.php' ? 'active text-white' : ''; ?>" 
                                href="backup.php">
                                 <i class="fas fa-database me-2"></i> Backup
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'import_migrasi.php' ? 'active text-white' : ''; ?>"
+                               href="import_migrasi.php">
+                                <i class="fas fa-file-import me-2"></i> Import Migrasi
                             </a>
                         </li>
                     </ul>
