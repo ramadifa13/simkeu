@@ -138,7 +138,16 @@ if (!function_exists('migrasiKolomKeAngka')) {
             return is_numeric($v) ? (float)$v : 0.0;
         };
         $totalCair=0; $totalTagihan=0; foreach ($records['Pinjaman'] ?? [] as $row) { $totalCair += $uang($row['Plafon (Rp)*'] ?? 0); $totalTagihan += $uang($row['Total Tagihan (Rp)*'] ?? 0); }
-        $angsuran=0; foreach ($records['Angsuran_Historis'] ?? [] as $row) if (($row['Status*'] ?? '') === 'dibayar') $angsuran += $uang($row['Total Diterima (Rp)*'] ?? 0);
+        // Satu baris historis adalah satu penerimaan aktual. Toleransi status
+        // membantu file Excel yang memakai variasi kapital/spasi; nominal hanya
+        // dihitung bila ada total diterima dan tanggal bayar.
+        $pembayaranAktual = function($row) use ($uang) {
+            $status = strtolower(trim((string)($row['Status*'] ?? '')));
+            $total = $uang($row['Total Diterima (Rp)*'] ?? 0);
+            $tanggal = trim((string)($row['Tanggal Bayar*'] ?? ''));
+            return $total > 0 && $tanggal !== '' && ($status === '' || in_array($status, ['dibayar','lunas','pelunasan'], true));
+        };
+        $angsuran=0; foreach ($records['Angsuran_Historis'] ?? [] as $row) if ($pembayaranAktual($row)) $angsuran += $uang($row['Total Diterima (Rp)*'] ?? 0);
         $modalDapin=0; $wajibDapin=0; foreach ($records['Pendanaan_Dapin'] ?? [] as $row) { $modalDapin += $uang($row['Modal Diterima (Rp)*'] ?? 0); $wajibDapin += $uang($row['Total Wajib Kembali (Rp)*'] ?? 0); }
         $alokasiModal=0; $alokasiWajib=0; foreach ($records['Alokasi_Dapin'] ?? [] as $row) { $alokasiModal += $uang($row['Modal Dialokasikan (Rp)*'] ?? 0); $alokasiWajib += $uang($row['Kewajiban Dapin (Rp)*'] ?? 0); }
         if (count($records['Alokasi_Dapin'] ?? []) === 0) $warnings[]='Tidak ada alokasi Dapin. Pinjaman tanpa alokasi dianggap memakai modal di luar Dapin.';
@@ -147,7 +156,7 @@ if (!function_exists('migrasiKolomKeAngka')) {
         }
         if ($alokasiModal > $modalDapin + 0.01) $errors[]='Total modal Dapin yang dialokasikan melebihi modal Dapin yang dicatat.';
         $bayarPinjaman = [];
-        foreach ($records['Angsuran_Historis'] ?? [] as $row) if (($row['Status*'] ?? '') === 'dibayar') {
+        foreach ($records['Angsuran_Historis'] ?? [] as $row) if ($pembayaranAktual($row)) {
             $id=$row['ID Pinjaman Lama*'] ?? ''; $bayarPinjaman[$id]=($bayarPinjaman[$id] ?? 0)+$uang($row['Total Diterima (Rp)*'] ?? 0);
         }
         foreach ($pinjaman as $id=>$row) {
