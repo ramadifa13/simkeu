@@ -135,6 +135,7 @@ if (!function_exists('migrasiKolomKeAngka')) {
             if (substr_count($v, ',') > 1) $v = str_replace(',', '', $v);
             if (strpos($v, ',') !== false && strpos($v, '.') !== false) $v = str_replace(',', '', $v);
             elseif (strpos($v, ',') !== false) $v = str_replace(',', '.', $v);
+            elseif (preg_match('/\.\d{3}$/', $v)) $v = str_replace('.', '', $v);
             return is_numeric($v) ? (float)$v : 0.0;
         };
         $totalCair=0; $totalTagihan=0; foreach ($records['Pinjaman'] ?? [] as $row) { $totalCair += $uang($row['Plafon (Rp)*'] ?? 0); $totalTagihan += $uang($row['Total Tagihan (Rp)*'] ?? 0); }
