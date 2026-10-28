@@ -245,9 +245,9 @@ if (!function_exists('hitungDariPinjaman')) {
 }
 
 if (!defined('JADWAL_DARI_PENGAJUAN')) {
-    // false : jatuh tempo dihitung dari TANGGAL PENCAIRAN yang diisi Teller (jawaban klien, 13 Okt 2026)
-    // true  : dari tanggal pengajuan. Cukup ubah nilai ini.
-    define('JADWAL_DARI_PENGAJUAN', false);
+    // Jatuh tempo mengikuti tanggal pengajuan yang disetujui, meskipun dana
+    // baru dicairkan kemudian. Contoh: ajukan 20, mingguan pertama 27.
+    define('JADWAL_DARI_PENGAJUAN', true);
 }
 
 if (!function_exists('tanggalMulaiJadwal')) {

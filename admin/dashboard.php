@@ -124,7 +124,9 @@ try {
     
     // 6. Hitung total pemasukan dan pengeluaran
     $total_pemasukan = $total_setoran + $total_angsuran + $total_waserda;
-    $total_pengeluaran = $total_penarikan + $total_pencairan;
+    // Pencairan pinjaman sudah tercatat sebagai kas keluar. Menambah total
+    // pinjaman di sini akan mengurangi saldo dua kali.
+    $total_pengeluaran = $total_penarikan;
     
     // 7. Hitung saldo kas
     $saldo_kas = $total_pemasukan - $total_pengeluaran;

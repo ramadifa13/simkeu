@@ -380,4 +380,42 @@ CREATE TABLE IF NOT EXISTS shu_hak_audit (
  CONSTRAINT fk_shu_hak_audit FOREIGN KEY (hak_id) REFERENCES shu_hak_pinjaman(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Import migrasi historis: identitas sumber menjamin import dapat diulang.
+CREATE TABLE IF NOT EXISTS migrasi_import_item (
+ id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, jenis VARCHAR(32) NOT NULL, source_key VARCHAR(100) NOT NULL, target_id BIGINT UNSIGNED NOT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (id), UNIQUE KEY uniq_migrasi_source (jenis,source_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS pendanaan_dapin (
+ id INT NOT NULL AUTO_INCREMENT, kode_dapin VARCHAR(50) NOT NULL, nama_pendana VARCHAR(150) NOT NULL, tanggal_diterima DATE NOT NULL,
+ modal_diterima DECIMAL(15,2) NOT NULL, tenor INT NOT NULL, total_wajib_kembali DECIMAL(15,2) NOT NULL, tanggal_jatuh_tempo DATE NULL,
+ status ENUM('aktif','nonaktif') NOT NULL DEFAULT 'aktif', catatan TEXT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY (id), UNIQUE KEY uniq_kode_dapin (kode_dapin)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS alokasi_dapin (
+ id INT NOT NULL AUTO_INCREMENT, source_key VARCHAR(100) NOT NULL, dapin_id INT NOT NULL, pinjaman_id INT NOT NULL,
+ modal_dialokasikan DECIMAL(15,2) NOT NULL, kewajiban_dapin DECIMAL(15,2) NOT NULL, tanggal_alokasi DATE NULL, catatan TEXT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (id), UNIQUE KEY uniq_alokasi_source (source_key),
+ KEY idx_alokasi_dapin (dapin_id), KEY idx_alokasi_pinjaman (pinjaman_id),
+ CONSTRAINT fk_alokasi_dapin FOREIGN KEY (dapin_id) REFERENCES pendanaan_dapin(id),
+ CONSTRAINT fk_alokasi_pinjaman FOREIGN KEY (pinjaman_id) REFERENCES pinjaman(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS migrasi_pembayaran (
+ id INT NOT NULL AUTO_INCREMENT, source_key VARCHAR(100) NOT NULL, pinjaman_id INT NOT NULL, transaksi_id INT NOT NULL, tanggal_bayar DATE NOT NULL,
+ angsuran_ke INT NOT NULL, jenis_pembayaran ENUM('cicilan','pelunasan') NOT NULL DEFAULT 'cicilan', pokok DECIMAL(15,2) NOT NULL DEFAULT 0,
+ bunga DECIMAL(15,2) NOT NULL DEFAULT 0, denda DECIMAL(15,2) NOT NULL DEFAULT 0, total_diterima DECIMAL(15,2) NOT NULL, status VARCHAR(30) NULL,
+ keterangan TEXT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (id), UNIQUE KEY uniq_pembayaran_source (source_key),
+ KEY idx_migrasi_bayar_pinjaman (pinjaman_id), KEY idx_migrasi_bayar_transaksi (transaksi_id),
+ CONSTRAINT fk_migrasi_bayar_pinjaman FOREIGN KEY (pinjaman_id) REFERENCES pinjaman(id),
+ CONSTRAINT fk_migrasi_bayar_transaksi FOREIGN KEY (transaksi_id) REFERENCES transaksi(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS migrasi_anggota_dokumen (
+ anggota_id INT NOT NULL, foto VARCHAR(255) NULL, ttd MEDIUMTEXT NULL,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (anggota_id),
+ CONSTRAINT fk_migrasi_dokumen_anggota FOREIGN KEY (anggota_id) REFERENCES anggota(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SELECT 'Migrasi universal selesai dan aman dijalankan kembali.' AS hasil;

@@ -2,6 +2,7 @@
 require_once '../includes/auth.php';
 require_once '../config/config.php';
 require_once '../includes/migrasi_excel_helper.php';
+require_once '../includes/migrasi_import_service.php';
 if (!isAdmin()) { $_SESSION['error']='Hanya Admin yang dapat mengakses import migrasi.'; header('Location: dashboard.php'); exit(); }
 $page_title = 'Import Migrasi'; $hasil = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -14,8 +15,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $hasil = migrasiRingkasanXlsx($file['tmp_name']);
         if (isset($_POST['import_final'])) {
             if (!empty($hasil['errors'])) throw new RuntimeException('Import final dibatalkan karena masih ada error validasi.');
-            // Guard sementara: jangan menulis data sebelum pemetaan tabel final lengkap.
-            throw new RuntimeException('Validasi lolos, tetapi pemetaan import final ke tabel database belum diaktifkan. Data belum diubah.');
+            $import = migrasiImportFinal($db, $file['tmp_name'], $_SESSION['user_id'] ?? null);
+            $_SESSION['success'] = 'Import final berhasil. ' . (int)$import['anggota'] . ' nasabah, '
+                . (int)$import['pinjaman'] . ' pinjaman, dan ' . (int)$import['pembayaran'] . ' pembayaran diproses. '
+                . 'Import ulang file yang sama tidak akan menggandakan transaksi.';
+            header('Location: import_migrasi.php'); exit;
         }
     } catch (Throwable $e) { $_SESSION['error'] = $e->getMessage(); }
 }
@@ -25,8 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 .migrasi-shell{max-width:1240px}.migrasi-hero{background:linear-gradient(135deg,#17365d,#2376a4);color:#fff;border-radius:16px}.upload-zone{border:2px dashed #8bb5cf;border-radius:12px;background:#f5fbff}.stat-box{height:100%;border:1px solid #dce7ef;border-radius:10px;background:#fff}.stat-box .h4{color:#17365d}.summary-table th{width:62%;background:#f7fafc}.step{display:flex;gap:.75rem;align-items:flex-start}.step-number{background:#17365d;color:#fff;border-radius:50%;width:28px;height:28px;display:grid;place-items:center;font-weight:700;flex:none}
 </style></head>
 <body class="bg-light"><?php include '../includes/header.php'; ?><div class="container-fluid"><div class="row"><?php include '../includes/sidebar.php'; ?>
-<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4"><div class="migrasi-shell"><section class="migrasi-hero p-4 mb-4"><div class="d-flex justify-content-between align-items-start gap-3"><div><div class="text-uppercase small opacity-75 mb-1">Migrasi data historis</div><h2 class="h3 mb-2"><i class="fas fa-file-import me-2"></i>Import & Validasi</h2><p class="mb-0 opacity-75">Periksa kelengkapan data dan proyeksi kas sebelum data direset atau diimport.</p></div><span class="badge bg-light text-primary p-2">Mode aman: pratinjau</span></div></section>
-<div class="alert alert-info border-0 shadow-sm"><i class="fas fa-shield-alt me-2"></i><strong>Belum ada data yang diubah.</strong> Halaman ini hanya membaca file dan memberi hasil validasi.</div>
+<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4"><div class="migrasi-shell"><section class="migrasi-hero p-4 mb-4"><div class="d-flex justify-content-between align-items-start gap-3"><div><div class="text-uppercase small opacity-75 mb-1">Migrasi data historis</div><h2 class="h3 mb-2"><i class="fas fa-file-import me-2"></i>Import & Validasi</h2><p class="mb-0 opacity-75">Periksa kelengkapan data dan proyeksi kas sebelum data direset atau diimport.</p></div><span class="badge bg-light text-primary p-2">Validasi wajib</span></div></section>
+<div class="alert alert-info border-0 shadow-sm"><i class="fas fa-shield-alt me-2"></i><strong>Pratinjau tidak mengubah data.</strong> Tombol Import Final hanya tersedia saat seluruh validasi lolos.</div>
 <?php if (!empty($_SESSION['error'])): ?><div class="alert alert-danger"><?= htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?></div><?php endif; ?>
 <div class="card shadow-sm border-0"><div class="card-body p-4"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><div><h5 class="mb-1">Unggah file migrasi</h5><p class="text-muted small mb-3">Gunakan template migrasi atau file hasil revisi user. Maksimal 10 MB.</p></div><a class="btn btn-outline-success" href="download_template_migrasi.php"><i class="fas fa-download me-1"></i>Download Template Migrasi</a></div><form method="post" enctype="multipart/form-data"><?= layananToken() ?><div class="upload-zone p-3 mb-3"><label for="file_migrasi" class="form-label fw-semibold"><i class="fas fa-file-excel text-success me-1"></i>File Excel migrasi</label><input id="file_migrasi" class="form-control" type="file" name="file_migrasi" accept=".xlsx" required><div class="form-text">Upload file yang sudah direvisi untuk melihat hasil validasi.</div></div><button class="btn btn-primary px-4"><i class="fas fa-search me-1"></i>Pratinjau & Validasi</button></form></div></div>
 <?php if ($hasil): ?><div class="card shadow-sm border-0 mt-4"><div class="card-body p-4"><div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">Hasil Pratinjau</h5><span class="badge bg-primary"><?= array_sum($hasil['counts']) ?> baris dibaca</span></div><div class="row g-3"><?php foreach ($hasil['counts'] as $name=>$count): ?><div class="col-6 col-md-4 col-xl-3"><div class="stat-box p-3"><small class="text-muted d-block text-truncate"><?= htmlspecialchars($name) ?></small><div class="h4 mb-0 mt-1"><?= (int)$count ?></div></div></div><?php endforeach; ?></div>

@@ -145,7 +145,10 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
             $foto_barang_path = simpanFotoUpload($foto_barang, 'jaminan');
             $foto_nasabah_barang_path = simpanFotoUpload($foto_nasabah_barang, 'jaminan');
         }
-        $pinjaman_id = buatPinjamanDanJadwal($db, $pengajuan, $tgl_cair, $tgl_cair);
+        // Dana dapat dicairkan belakangan; tanggal tagihan tetap mengikuti
+        // tanggal pengajuan yang telah dipilih nasabah.
+        $tanggal_jadwal = tanggalMulaiJadwal($pengajuan);
+        $pinjaman_id = buatPinjamanDanJadwal($db, $pengajuan, $tanggal_jadwal, $tgl_cair);
         if (!$pinjaman_id) {
             throw new Exception("Pinjaman gagal dibuat");
         }
@@ -191,7 +194,7 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         $db->commit();
         $committed = true;
         $_SESSION['success'] = "Pinjaman berhasil dicairkan tanggal " . date('d/m/Y', strtotime($tgl_cair))
-            . ". Jadwal angsuran dibuat dari tanggal tersebut"
+            . ". Jadwal angsuran dibuat dari tanggal pengajuan"
             . ($sudah_dibayar > 0 ? ", cicilan 1-$sudah_dibayar ditandai sudah dibayar (tidak masuk kas)" : "")
             . ($mundur ? " (input mundur)" : "") . ".";
     } catch (Exception $e) {
@@ -923,7 +926,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                         <div class="alert alert-secondary"><small>TTD Admin diambil otomatis dari Pengaturan Admin. Seluruh data transaksi disimpan sebagai arsip tetap saat pencairan.</small></div>
                         <div class="alert alert-info mb-0" id="info_jadwal">
                             <i class="fas fa-info-circle me-1"></i>
-                            Jadwal angsuran dibuat otomatis dari tanggal pencairan. Cicilan lama yang ditandai sudah dibayar
+                            Jadwal angsuran dibuat otomatis dari tanggal pengajuan. Cicilan lama yang ditandai sudah dibayar
                             tidak masuk kas; cicilan lewat jatuh tempo yang belum dibayar langsung kena denda.
                         </div>
                     </div>
