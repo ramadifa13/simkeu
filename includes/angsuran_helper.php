@@ -60,6 +60,7 @@ if (!function_exists('batalkanPembayaranAngsuran')) {
             if (!$a || $a['status'] !== 'lunas') {
                 throw new Exception("Angsuran tidak ditemukan atau belum dibayar");
             }
+            pastikanBulanBelumTerkunci($db, $a['tanggal_bayar']);
             if (function_exists('layananSiap') && layananSiap($db)) {
                 $cek=$db->prepare('SELECT COUNT(*) FROM layanan_lelang WHERE pinjaman_id=?');$cek->execute([$a['pinjaman_id']]);
                 if($cek->fetchColumn())throw new Exception('Pinjaman dengan penjualan jaminan memerlukan rekonsiliasi menyeluruh; tidak dapat dibatalkan per cicilan.');

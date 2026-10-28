@@ -32,7 +32,9 @@ function pengaturanPerjanjian($db) {
 }
 
 function validasiTtdDataUrl($nilai, $label) {
-    $nilai = trim((string) $nilai);
+    // TTD dari browser tidak boleh gagal hanya karena terdapat baris baru/spasi
+    // saat disimpan oleh PHP atau dipindahkan dari pengaturan lama.
+    $nilai = preg_replace('/\s+/', '', trim((string) $nilai));
     if (!preg_match('#^data:image/png;base64,([A-Za-z0-9+/=]+)$#', $nilai, $m)) {
         throw new Exception("$label wajib ditandatangani langsung pada kotak tanda tangan");
     }

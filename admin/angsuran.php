@@ -114,6 +114,7 @@ if ($_POST) {
             if (!$angsuran_data) {
                 throw new Exception("Data angsuran tidak ditemukan");
             }
+            pastikanBulanBelumTerkunci($db, date('Y-m-d'));
             if ($angsuran_data['status'] === 'lunas') {
                 throw new Exception("Angsuran ini sudah dibayar");
             }

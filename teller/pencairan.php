@@ -193,6 +193,7 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         perbaruiDendaOtomatis($db, true, $pinjaman_id);
         $db->commit();
         $committed = true;
+        unset($_SESSION['error']);
         $_SESSION['success'] = "Pinjaman berhasil dicairkan tanggal " . date('d/m/Y', strtotime($tgl_cair))
             . ". Jadwal angsuran dibuat dari tanggal pengajuan"
             . ($sudah_dibayar > 0 ? ", cicilan 1-$sudah_dibayar ditandai sudah dibayar (tidak masuk kas)" : "")
@@ -205,6 +206,7 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
             hapusFotoUpload($foto_path); hapusFotoUpload($foto_barang_path); hapusFotoUpload($foto_nasabah_barang_path);
             foreach ($lampiran_paths as $path) hapusFotoUpload($path);
         }
+        unset($_SESSION['success']);
         $_SESSION['error'] = "Gagal memproses pencairan: " . htmlspecialchars($e->getMessage())
             . (migrasiRevisiBelumDijalankan($db) ? " (database belum di-update, jalankan file migrasi)" : "");
     }
@@ -336,6 +338,9 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             white-space: normal;
         }
         .action-menu .btn i { width: 1rem; text-align: center; }
+        /* Saat tabel perlu digeser, menu aksi tetap muncul di layar dan tidak
+           terpotong oleh area scroll tabel. Posisi dihitung ulang lewat JS. */
+        .action-menu.action-menu-viewport { position: fixed !important; z-index: 2100 !important; }
         @media (max-width: 576px) {
             .action-menu { min-width: min(255px, calc(100vw - 24px)); }
         }
@@ -617,7 +622,7 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                         <td>
                                             <small><?php echo $pengajuan['admin_name'] ?: '-'; ?></small>
                                         </td>
-                                        <td class="table-actions"><div class="dropdown"><button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-v me-1"></i>Aksi</button><div class="dropdown-menu dropdown-menu-end action-menu">
+                                        <td class="table-actions"><div class="dropdown"><button class="btn btn-sm btn-outline-primary dropdown-toggle action-dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false"><i class="fas fa-ellipsis-v me-1"></i>Aksi</button><div class="dropdown-menu dropdown-menu-end action-menu">
                                             <!-- View Details Button -->
                                             <button class="btn btn-sm btn-info btn-action" data-bs-toggle="modal" 
                                                     data-bs-target="#detailModal" 
@@ -1025,7 +1030,8 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
             resize();
             c.addEventListener('pointerdown',function(e){if(!e.isPrimary)return;e.preventDefault();resize();drawing=true;dirty=true;var p=pos(e);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(p[0]+0.01,p[1]+0.01);ctx.stroke();c.setPointerCapture(e.pointerId);setStatus(true)},{passive:false});
             c.addEventListener('pointermove',function(e){if(!drawing||!e.isPrimary)return;e.preventDefault();var p=pos(e);ctx.lineTo(p[0],p[1]);ctx.stroke()},{passive:false});
-            function stopTtd(e){drawing=false;if(c.hasPointerCapture && c.hasPointerCapture(e.pointerId))c.releasePointerCapture(e.pointerId)}
+            function simpanTtdKeForm(){document.getElementById('ttd_'+key).value=dirty?c.toDataURL('image/png'):'';}
+            function stopTtd(e){drawing=false;simpanTtdKeForm();if(c.hasPointerCapture && c.hasPointerCapture(e.pointerId))c.releasePointerCapture(e.pointerId)}
             c.addEventListener('pointerup',stopTtd);c.addEventListener('pointercancel',stopTtd);c.addEventListener('lostpointercapture',stopTtd);
             function setStatus(ready){var s=document.getElementById('status_'+key),w=c.closest('.signature-canvas-wrap');if(!s)return;s.classList.toggle('is-ready',ready);s.innerHTML=ready?'<i class="fas fa-check-circle"></i> Siap disimpan':'<i class="fas fa-pen-nib"></i> Belum diisi';w.classList.toggle('has-signature',ready)}
             if(window.ResizeObserver)new ResizeObserver(function(){if(!drawing)resize();}).observe(c);
@@ -1106,6 +1112,11 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                 await kompresFoto(document.getElementById('surat_tambahan'));
                 var ttdLengkap=Object.keys(signaturePads).every(function(k){return signaturePads[k].isDirty()});
                 if(!ttdLengkap) throw new Error('TTD nasabah, Teller, dan kedua saksi wajib dibuat langsung pada layar.');
+                // Isi hidden field lebih dulu. Ini menjadi cadangan yang valid bila
+                // unggahan Blob tidak diterima browser/server tertentu.
+                Object.keys(signaturePads).forEach(function(k){
+                    document.getElementById('ttd_' + k).value = signaturePads[k].canvas.toDataURL('image/png');
+                });
                 var data = new FormData(form);
                 for (var key of Object.keys(signaturePads)) {
                     data.delete('ttd_' + key);
@@ -1125,6 +1136,23 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                 tombol.disabled = false;
                 tombol.innerHTML = '<i class="fas fa-check-circle me-1"></i> Cairkan';
             }
+        });
+        document.querySelectorAll('.table-actions .dropdown').forEach(function(dropdown){
+            dropdown.addEventListener('shown.bs.dropdown', function(){
+                var button=this.querySelector('.action-dropdown-toggle'), menu=this.querySelector('.action-menu');
+                if(!button||!menu)return;
+                var rect=button.getBoundingClientRect();
+                menu.classList.add('action-menu-viewport');
+                var width=menu.offsetWidth, height=menu.offsetHeight;
+                menu.style.left=Math.max(12,Math.min(rect.right-width,window.innerWidth-width-12))+'px';
+                menu.style.top=Math.max(12,Math.min(rect.bottom+6,window.innerHeight-height-12))+'px';
+            });
+            dropdown.addEventListener('hidden.bs.dropdown', function(){
+                var menu=this.querySelector('.action-menu');
+                if(!menu)return;
+                menu.classList.remove('action-menu-viewport');
+                menu.style.left=''; menu.style.top='';
+            });
         });
     </script>
     <script>

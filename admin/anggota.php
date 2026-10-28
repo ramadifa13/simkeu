@@ -1217,7 +1217,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         <p class="fw-bold text-center p-3 bg-light rounded" id="delete_nama"></p>
                         <div class="alert alert-warning mb-0">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            Data yang dihapus tidak dapat dikembalikan. Anggota yang sudah memiliki transaksi, simpanan bersaldo, atau pinjaman tidak bisa dihapus &mdash; ubah statusnya menjadi Nonaktif.
+                            Data yang dihapus tidak dapat dikembalikan. Hanya anggota berstatus Nonaktif tanpa pinjaman aktif, macet, atau pengajuan berjalan yang dapat dihapus. Riwayat pinjaman lunas, angsuran, laporan, transaksi, dan kas anggota ini ikut dihapus.
                         </div>
                     </div>
                     <div class="modal-footer">

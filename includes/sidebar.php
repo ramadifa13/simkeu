@@ -237,7 +237,7 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                     <i class="fas fa-chart-bar me-2"></i> Laporan
                     <i class="fas fa-chevron-down float-end"></i>
                 </a>
-                <div class="collapse <?php echo in_array($current_page, ['laporan_harian.php', 'laporan_simpanan.php', 'laporan_lunas.php', 'laporan_denda.php']) ? 'show' : ''; ?>" id="menuLaporanTeller">
+                <div class="collapse <?php echo in_array($current_page, ['laporan_harian.php', 'laporan_simpanan.php', 'laporan_lunas.php', 'laporan_denda.php', 'closing_angsuran.php']) ? 'show' : ''; ?>" id="menuLaporanTeller">
                     <ul class="nav flex-column ms-3 mt-1">
                         <li class="nav-item"><a class="nav-link text-white-50 py-1 <?= $current_page==='laporan_lunas.php'?'active text-white':'' ?>" href="laporan_lunas.php"><i class="fas fa-check-circle me-2"></i>Laporan Lunas</a></li>
                         <li class="nav-item"><a class="nav-link text-white-50 py-1 <?= $current_page==='laporan_denda.php'?'active text-white':'' ?>" href="laporan_denda.php"><i class="fas fa-clock me-2"></i>Laporan Denda</a></li>
@@ -253,6 +253,7 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                                 <i class="fas fa-piggy-bank me-2"></i> Simpanan
                             </a>
                         </li>
+                        <li class="nav-item"><a class="nav-link text-white-50 py-1 <?php echo $current_page == 'closing_angsuran.php' ? 'active text-white' : ''; ?>" href="../admin/closing_angsuran.php"><i class="fas fa-lock me-2"></i> Closing Angsuran</a></li>
                     </ul>
                 </div>
             </li>
@@ -303,7 +304,7 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                     <i class="fas fa-chart-bar me-2"></i> Laporan
                     <i class="fas fa-chevron-down float-end"></i>
                 </a>
-                <div class="collapse <?php echo in_array($current_page, ['laporan_simpanan.php', 'laporan_transaksi.php', 'laporan_kas.php', 'laporan_pinjaman.php', 'laporan_angsuran.php', 'laporan_lunas.php', 'laporan_denda.php']) ? 'show' : ''; ?>" id="menuLaporanAdmin">
+                <div class="collapse <?php echo in_array($current_page, ['laporan_simpanan.php', 'laporan_transaksi.php', 'laporan_kas.php', 'laporan_pinjaman.php', 'laporan_angsuran.php', 'laporan_lunas.php', 'laporan_denda.php', 'closing_angsuran.php']) ? 'show' : ''; ?>" id="menuLaporanAdmin">
                     <ul class="nav flex-column ms-3 mt-1">
                         <li class="nav-item"><a class="nav-link text-white-50 py-1 <?= $current_page==='laporan_lunas.php'?'active text-white':'' ?>" href="laporan_lunas.php"><i class="fas fa-check-circle me-2"></i>Laporan Lunas</a></li>
                         <li class="nav-item"><a class="nav-link text-white-50 py-1 <?= $current_page==='laporan_denda.php'?'active text-white':'' ?>" href="laporan_denda.php"><i class="fas fa-clock me-2"></i>Laporan Denda</a></li>
@@ -325,6 +326,7 @@ $sidebar_pakai_avatar = in_array($current_role, ['anggota', 'teller'], true);
                                 <i class="fas fa-calendar-check me-2"></i> Angsuran
                             </a>
                         </li>
+                        <li class="nav-item"><a class="nav-link text-white-50 py-1 <?php echo $current_page == 'closing_angsuran.php' ? 'active text-white' : ''; ?>" href="<?php echo $current_role === 'teller' ? '../admin/closing_angsuran.php' : 'closing_angsuran.php'; ?>"><i class="fas fa-lock me-2"></i> Closing Angsuran</a></li>
                         <li class="nav-item">
                             <a class="nav-link text-white-50 py-1 <?php echo $current_page == 'laporan_transaksi.php' ? 'active text-white' : ''; ?>"
                                href="laporan_transaksi.php">

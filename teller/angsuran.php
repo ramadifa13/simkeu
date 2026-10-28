@@ -36,6 +36,7 @@ function checkoutItemAngsuran(PDO $db, int $id, string $denda_input, string $met
         FROM angsuran a JOIN pinjaman p ON a.pinjaman_id=p.id WHERE a.id=? FOR UPDATE");
     $stmt->execute([$id]); $a = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$a) throw new Exception('Data angsuran tidak ditemukan.');
+    pastikanBulanBelumTerkunci($db, date('Y-m-d'));
     if ($a['status'] === 'lunas') throw new Exception('Angsuran ke-'.$a['angsuran_ke'].' sudah dibayar.');
 
     $otomatis = hitungDendaAngsuran($db, $a, $a['jumlah_pinjaman']);

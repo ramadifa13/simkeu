@@ -419,3 +419,17 @@ CREATE TABLE IF NOT EXISTS migrasi_anggota_dokumen (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SELECT 'Migrasi universal selesai dan aman dijalankan kembali.' AS hasil;
+
+-- Closing angsuran bulanan: pembayaran bulan yang sudah ditutup tidak boleh diubah.
+CREATE TABLE IF NOT EXISTS `closing_angsuran_bulanan` (
+  `id` INT NOT NULL AUTO_INCREMENT, `bulan` CHAR(7) NOT NULL, `status` ENUM('terkunci','dibuka') NOT NULL DEFAULT 'terkunci',
+  `ditutup_at` DATETIME NOT NULL, `ditutup_oleh` INT NULL, `dibuka_at` DATETIME NULL, `dibuka_oleh` INT NULL,
+  `catatan` TEXT NULL, `total_pembayaran` DECIMAL(15,2) NOT NULL DEFAULT 0, `jumlah_pembayaran` INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uniq_closing_bulan` (`bulan`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS `closing_angsuran_detail` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT, `closing_id` INT NOT NULL, `angsuran_id` INT NOT NULL, `nominal` DECIMAL(15,2) NOT NULL, `tanggal_bayar` DATE NOT NULL,
+  PRIMARY KEY (`id`), UNIQUE KEY `uniq_closing_angsuran` (`angsuran_id`), KEY `idx_closing_detail` (`closing_id`),
+  CONSTRAINT `fk_closing_detail_header` FOREIGN KEY (`closing_id`) REFERENCES `closing_angsuran_bulanan` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_closing_detail_angsuran` FOREIGN KEY (`angsuran_id`) REFERENCES `angsuran` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

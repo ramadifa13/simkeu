@@ -110,8 +110,8 @@ if (!function_exists('riwayatAnggota')) {
 
 if (!function_exists('hapusAnggota')) {
     /**
-     * Hapus anggota beserta rekening simpanan (bersaldo 0), akun login anggota, dan
-     * file dokumennya. Ditolak bila anggota sudah punya riwayat keuangan.
+     * Hapus permanen anggota nonaktif tanpa kewajiban aktif, termasuk arsip pinjaman,
+     * angsuran, kas, pelunasan, dan transaksi miliknya.
      * @throws Exception
      */
     function hapusAnggota($db, $anggota_id) {
@@ -126,19 +126,71 @@ if (!function_exists('hapusAnggota')) {
                 throw new Exception("Data anggota tidak ditemukan");
             }
 
-            $riwayat = riwayatAnggota($db, $anggota_id);
-            if (!empty($riwayat)) {
-                $rincian = [];
-                foreach ($riwayat as $label => $jumlah) {
-                    $rincian[] = "$jumlah $label";
-                }
-                throw new Exception("Anggota " . htmlspecialchars($data['nama_lengkap'])
-                    . " tidak bisa dihapus karena sudah memiliki " . implode(', ', $rincian)
-                    . ". Ubah statusnya menjadi Nonaktif.");
+            if (($data['status'] ?? '') !== 'nonaktif') {
+                throw new Exception('Anggota harus berstatus Nonaktif sebelum dihapus permanen.');
             }
+            $aktif = $db->prepare("SELECT COUNT(*) FROM pinjaman WHERE anggota_id=? AND status<>'lunas'");
+            $aktif->execute([$anggota_id]);
+            if ((int) $aktif->fetchColumn() > 0) throw new Exception('Anggota masih memiliki pinjaman aktif atau macet. Lunaskan/selesaikan dahulu.');
+            $menunggu = $db->prepare("SELECT COUNT(*) FROM pengajuan_pinjaman WHERE anggota_id=? AND status IN ('menunggu','disetujui')");
+            $menunggu->execute([$anggota_id]);
+            if ((int) $menunggu->fetchColumn() > 0) throw new Exception('Anggota masih memiliki pengajuan yang belum selesai.');
 
             $db->beginTransaction();
-            $db->prepare("DELETE FROM simpanan WHERE anggota_id = ?")->execute([$anggota_id]);
+            $loanStmt = $db->prepare('SELECT id,kode_pinjaman FROM pinjaman WHERE anggota_id=?');
+            $loanStmt->execute([$anggota_id]);
+            $pinjaman = $loanStmt->fetchAll(PDO::FETCH_ASSOC);
+            $loanIds = array_map(function ($row) { return (int) $row['id']; }, $pinjaman);
+            $kodePinjaman = array_map(function ($row) { return $row['kode_pinjaman']; }, $pinjaman);
+            $pengajuanStmt = $db->prepare('SELECT id FROM pengajuan_pinjaman WHERE anggota_id=?');
+            $pengajuanStmt->execute([$anggota_id]);
+            $pengajuanIds = array_map('intval', $pengajuanStmt->fetchAll(PDO::FETCH_COLUMN));
+            $angsuranIds = hapusAnggotaAmbilId($db, 'angsuran', 'id', 'pinjaman_id', $loanIds);
+            $transaksiIds = hapusAnggotaAmbilId($db, 'transaksi', 'id', 'anggota_id', [$anggota_id]);
+            $perjanjianIds = hapusAnggotaAmbilId($db, 'perjanjian_pinjaman', 'id', 'pinjaman_id', $loanIds);
+            $lelangIds = hapusAnggotaAmbilId($db, 'layanan_lelang', 'id', 'pinjaman_id', $loanIds);
+            $hakIds = hapusAnggotaAmbilHakShu($db, $anggota_id, $loanIds);
+            $shuAnggotaIds = hapusAnggotaAmbilId($db, 'shu_anggota', 'id', 'anggota_id', [$anggota_id]);
+            $kasIds = hapusAnggotaAmbilId($db, 'kas', 'id', 'transaksi_id', $transaksiIds);
+
+            hapusAnggotaHapusBaris($db, 'lampiran_perjanjian', 'perjanjian_id', $perjanjianIds);
+            hapusAnggotaHapusBaris($db, 'layanan_alokasi_lelang', 'lelang_id', $lelangIds);
+            hapusAnggotaHapusBaris($db, 'layanan_alokasi_lelang', 'angsuran_id', $angsuranIds);
+            hapusAnggotaHapusBaris($db, 'layanan_bayar_denda', 'angsuran_id', $angsuranIds);
+            hapusAnggotaHapusBaris($db, 'pengajuan_pembatalan_angsuran', 'angsuran_id', $angsuranIds);
+            hapusAnggotaHapusBaris($db, 'layanan_pengajuan_hapus_denda', 'angsuran_id', $angsuranIds);
+            hapusAnggotaHapusBaris($db, 'wa_pengingat_log', 'angsuran_id', $angsuranIds);
+            hapusAnggotaHapusBaris($db, 'shu_hak_audit', 'hak_id', $hakIds);
+            hapusAnggotaHapusBaris($db, 'shu_pembayaran', 'shu_anggota_id', $shuAnggotaIds);
+            foreach (['layanan_audit','layanan_bayar_denda','layanan_bonus','layanan_jaminan_kembali','layanan_laporan_macet','layanan_lelang','layanan_pelunasan','layanan_pembayaran','layanan_prioritas','layanan_repeat_order','pelunasan_dini','perjanjian_pinjaman','alokasi_dapin','migrasi_pembayaran','shu_hak_pinjaman'] as $tabel) {
+                hapusAnggotaHapusBaris($db, $tabel, 'pinjaman_id', $loanIds);
+            }
+            foreach (['layanan_prioritas','layanan_bonus','shu_hak_pinjaman'] as $tabel) {
+                hapusAnggotaHapusBaris($db, $tabel, 'anggota_id', [$anggota_id]);
+            }
+            hapusAnggotaHapusBaris($db, 'shu_hak_pinjaman', 'sumber_anggota_id', [$anggota_id]);
+            hapusAnggotaHapusBaris($db, 'jaminan_pinjaman', 'pengajuan_id', $pengajuanIds);
+            hapusAnggotaHapusBaris($db, 'layanan_tunda_cair', 'pengajuan_id', $pengajuanIds);
+            hapusAnggotaHapusBaris($db, 'migrasi_pembayaran', 'transaksi_id', $transaksiIds);
+            hapusAnggotaHapusBaris($db, 'kas', 'transaksi_id', $transaksiIds);
+            foreach ($kodePinjaman as $kode) {
+                if (hapusAnggotaTabelAda($db, 'kas')) $db->prepare('DELETE FROM kas WHERE keterangan LIKE ?')->execute(['%' . $kode . '%']);
+            }
+            if (hapusAnggotaTabelAda($db, 'migrasi_import_item')) {
+                $hapusMap = $db->prepare('DELETE FROM migrasi_import_item WHERE (jenis=? AND target_id=?)');
+                $hapusMap->execute(['anggota', $anggota_id]);
+                foreach ($loanIds as $loanId) $hapusMap->execute(['pinjaman', $loanId]);
+                foreach ($transaksiIds as $transaksiId) $hapusMap->execute(['pembayaran', $transaksiId]);
+                foreach ($kasIds as $kasId) $hapusMap->execute(['kas', $kasId]);
+            }
+            hapusAnggotaHapusBaris($db, 'transaksi', 'anggota_id', [$anggota_id]);
+            hapusAnggotaHapusBaris($db, 'angsuran', 'pinjaman_id', $loanIds);
+            hapusAnggotaHapusBaris($db, 'pinjaman', 'anggota_id', [$anggota_id]);
+            hapusAnggotaHapusBaris($db, 'pengajuan_pinjaman', 'anggota_id', [$anggota_id]);
+            foreach (['waserda_transaksi','pembelian_listrik','pembelian_indihome','simpanan','migrasi_anggota_dokumen','shu_anggota'] as $tabel) {
+                hapusAnggotaHapusBaris($db, $tabel, 'anggota_id', [$anggota_id]);
+            }
+            hapusAnggotaHitungUlangKas($db);
             $db->prepare("DELETE FROM anggota WHERE id = ?")->execute([$anggota_id]);
             // Hanya hapus akun bila memang akun anggota (data lama bisa tertaut ke akun teller)
             if ($data['user_id'] && $data['user_role'] === 'anggota') {
@@ -158,6 +210,40 @@ if (!function_exists('hapusAnggota')) {
         foreach (array_keys(daftarDokumenAnggota()) as $field) {
             hapusFileDokumenAnggota($data[$field]);
         }
+    }
+}
+
+if (!function_exists('hapusAnggotaTabelAda')) {
+    function hapusAnggotaTabelAda($db, $tabel) {
+        static $cache = [];
+        if (isset($cache[$tabel])) return $cache[$tabel];
+        $stmt = $db->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?');
+        $stmt->execute([$tabel]);
+        return $cache[$tabel] = ((int) $stmt->fetchColumn() > 0);
+    }
+    function hapusAnggotaAmbilId($db, $tabel, $kolomId, $kolomRelasi, $ids) {
+        if (!$ids || !hapusAnggotaTabelAda($db, $tabel)) return [];
+        $sql = 'SELECT ' . $kolomId . ' FROM ' . $tabel . ' WHERE ' . $kolomRelasi . ' IN (' . implode(',', array_fill(0, count($ids), '?')) . ')';
+        $stmt = $db->prepare($sql); $stmt->execute($ids);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+    function hapusAnggotaHapusBaris($db, $tabel, $kolom, $ids) {
+        if (!$ids || !hapusAnggotaTabelAda($db, $tabel)) return;
+        $sql = 'DELETE FROM ' . $tabel . ' WHERE ' . $kolom . ' IN (' . implode(',', array_fill(0, count($ids), '?')) . ')';
+        $db->prepare($sql)->execute($ids);
+    }
+    function hapusAnggotaAmbilHakShu($db, $anggotaId, $loanIds) {
+        if (!hapusAnggotaTabelAda($db, 'shu_hak_pinjaman')) return [];
+        $sql = 'SELECT id FROM shu_hak_pinjaman WHERE anggota_id=? OR sumber_anggota_id=?'; $params = [$anggotaId, $anggotaId];
+        if ($loanIds) { $sql .= ' OR pinjaman_id IN (' . implode(',', array_fill(0, count($loanIds), '?')) . ')'; $params = array_merge($params, $loanIds); }
+        $stmt = $db->prepare($sql); $stmt->execute($params);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+    function hapusAnggotaHitungUlangKas($db) {
+        if (!hapusAnggotaTabelAda($db, 'kas')) return;
+        $saldo = 0; $rows = $db->query('SELECT id,jenis,jumlah FROM kas ORDER BY tanggal,id FOR UPDATE')->fetchAll(PDO::FETCH_ASSOC);
+        $stmt = $db->prepare('UPDATE kas SET saldo_sebelum=?,saldo_sesudah=? WHERE id=?');
+        foreach ($rows as $row) { $sebelum = $saldo; $saldo += $row['jenis'] === 'masuk' ? (float) $row['jumlah'] : -(float) $row['jumlah']; $stmt->execute([$sebelum, $saldo, $row['id']]); }
     }
 }
 
