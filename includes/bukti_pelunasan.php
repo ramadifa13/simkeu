@@ -128,10 +128,31 @@ $nama_teller = ($ttd && $ttd['teller_nama']) ? $ttd['teller_nama'] : (isTeller()
         </table>
 
         <div class="lunas">Pinjaman telah dinyatakan LUNAS</div>
-        <?php if (layananSiap($db)) {
-            $template=$db->query('SELECT surat_lunas FROM layanan_pengaturan WHERE id=1')->fetchColumn();
-            echo '<p>'.nl2br($e(strtr((string)$template,['{nama}'=>$b['nama_lengkap'],'{norek}'=>$b['kode_pinjaman'],'{tanggal}'=>$tanggal_lunas]))).'</p>';
-        } ?>
+        <?php
+        if (function_exists('layananPastikanPengaturan')) {
+            layananPastikanPengaturan($db);
+        }
+        $template = '';
+        if (function_exists('layananSiap') && layananSiap($db)) {
+            $template = (string) $db->query('SELECT surat_lunas FROM layanan_pengaturan WHERE id=1')->fetchColumn();
+        }
+        if (trim($template) === '') {
+            $template = function_exists('layananTemplateSuratLunasDefault')
+                ? layananTemplateSuratLunasDefault()
+                : 'Dengan ini dinyatakan bahwa pinjaman {norek} atas nama {nama} telah LUNAS pada {tanggal}.';
+        }
+        $tglSurat = $tanggal_lunas ? formatDateIndonesian($tanggal_lunas) : '-';
+        $jenisTutup = function_exists('layananJenisPenutupan')
+            ? layananJenisPenutupan($db, (int) $b['id'])[0]
+            : 'Lunas';
+        echo '<div class="section"><p><strong>Keterangan lunas</strong></p><p>'
+            . nl2br($e(strtr($template, [
+                '{nama}' => $b['nama_lengkap'],
+                '{norek}' => $b['kode_pinjaman'],
+                '{tanggal}' => $tglSurat,
+            ])))
+            . '</p><p>Jenis penutupan: <strong>' . $e($jenisTutup) . '</strong>.</p></div>';
+        ?>
 
         <div class="ttd-section">
             <div class="ttd-box">

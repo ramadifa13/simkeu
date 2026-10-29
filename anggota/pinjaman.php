@@ -44,6 +44,25 @@ $stmt_pinjaman = $db->prepare($query_pinjaman);
 $stmt_pinjaman->bindParam(':anggota_id', $anggota_data['id']);
 $stmt_pinjaman->execute();
 $pinjaman_list = $stmt_pinjaman->fetchAll(PDO::FETCH_ASSOC);
+$__ui = ui_query_params([]);
+$__q = $__ui['q'];
+$__all = $pinjaman_list;
+if ($__q !== '') {
+    $__fields = array (
+  0 => 'kode_pinjaman',
+  1 => 'nama_jenis',
+  2 => 'status',
+);
+    $__all = array_values(array_filter($__all, static function ($r) use ($__q, $__fields) {
+        $hay = '';
+        foreach ($__fields as $f) { $hay .= ' ' . ($r[$f] ?? ''); }
+        return stripos($hay, $__q) !== false;
+    }));
+}
+$pager = ui_paginate(count($__all), $__ui['page'], $__ui['per_page']);
+$pinjaman_list = array_slice($__all, $pager['offset'], $pager['per_page']);
+$q = $__q;
+
 // Label bunga/tenor dari data pinjaman itu sendiri (bukan tarif jenis saat ini)
 foreach ($pinjaman_list as &$pinjaman_row) {
     $pinjaman_row['label_bunga'] = labelBungaRow($pinjaman_row);
@@ -119,17 +138,6 @@ $status_options = [
     'telat' => 'Telat'
 ];
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    if ($angka == 0) {
-        return 'Rp 0';
-    }
-    if ($angka < 0) {
-        return '-Rp ' . number_format(abs($angka), 0, ',', '.');
-    }
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
-
 // Level Anggota hanya melihat riwayat; fitur cetak/unduh PDF dihapus (permintaan klien).
 
 /** Tabel riwayat angsuran (dipakai untuk tabel "belum lunas" dan "lunas"). */
@@ -139,7 +147,7 @@ function tabelAngsuranAnggota($rows, $pesan_kosong) {
         return;
     }
     $no = 1; $t_pokok = 0; $t_bunga = 0; $t_denda = 0; $t_jumlah = 0;
-    echo '<div class="table-responsive"><table class="table table-sm table-striped table-hover">';
+    echo '<div class="table-responsive ui-table-scroll"><table class="table table-sm table-striped table-hover">';
     echo '<thead><tr><th>No</th><th>Kode Pinjaman</th><th>Angsuran Ke</th><th>Jatuh Tempo</th><th>Pokok</th><th>Bunga</th><th>Denda</th><th>Total</th><th>Tanggal Bayar</th><th>Status</th></tr></thead><tbody>';
     foreach ($rows as $a) {
         $t_pokok += $a['pokok']; $t_bunga += $a['bunga']; $t_denda += $a['denda']; $t_jumlah += $a['jumlah_angsuran'];
@@ -150,12 +158,12 @@ function tabelAngsuranAnggota($rows, $pesan_kosong) {
         $warnaJenis = !empty($a['memerlukan_jaminan']) ? 'warning text-dark' : 'light text-secondary';
         echo '<td><code>' . htmlspecialchars($a['kode_pinjaman']) . '</code><br><span class="badge rounded-pill bg-' . $warnaJenis . '">' . $labelJenis . '</span></td>';
         echo '<td class="text-center">' . (int) $a['angsuran_ke'] . '</td>';
-        echo '<td>' . date('d/m/Y', strtotime($a['tanggal_jatuh_tempo'])) . '</td>';
+        echo '<td>' . formatTanggalUi($a['tanggal_jatuh_tempo']) . '</td>';
         echo '<td class="text-end">' . formatRupiah($a['pokok']) . '</td>';
         echo '<td class="text-end">' . formatRupiah($a['bunga']) . '</td>';
         echo '<td class="text-end text-danger">' . formatRupiah($a['denda']) . '</td>';
         echo '<td class="text-end fw-bold text-primary">' . formatRupiah($a['jumlah_angsuran']) . '</td>';
-        echo '<td>' . ($a['tanggal_bayar'] ? date('d/m/Y', strtotime($a['tanggal_bayar'])) : '-') . '</td>';
+        echo '<td>' . ($a['tanggal_bayar'] ? formatTanggalUi($a['tanggal_bayar']) : '-') . '</td>';
         echo '<td><span class="badge bg-' . $kelas . '">' . ucfirst(str_replace('_', ' ', $a['status'])) . '</span></td>';
         echo '</tr>';
     }
@@ -219,7 +227,7 @@ unset($daftar_lunas);
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         .main-content {
-            margin-left: 280px;
+            margin-left: 0; /* densify: shell owns sidebar */
             margin-top: 10px;
             padding: 15px;
         }
@@ -241,7 +249,7 @@ unset($daftar_lunas);
         }
         
         .pinjaman-card {
-            border-left: 4px solid #3498db;
+            border-left:3px solid #087f83;
         }
         
         .pinjaman-card.aktif { border-left-color: #27ae60; }
@@ -261,12 +269,12 @@ unset($daftar_lunas);
         }
         
         .btn-pdf {
-            background: linear-gradient(135deg, #dc3545, #c82333);
+            background:#c0392b;
             color: white;
             border: none;
         }
         .btn-pdf:hover {
-            background: linear-gradient(135deg, #c82333, #b21f2d);
+            background:#a93226;
             color: white;
         }
         
@@ -292,29 +300,26 @@ unset($daftar_lunas);
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center page-header border-bottom">
-                    <h1 class="h3">
-                        <i class="fas fa-hand-holding-usd me-2"></i>Pinjaman Saya
-                    </h1>
-                </div>
+                <?php ui_page_header([
+                    'title' => 'Pinjaman Saya',
+                    'icon' => 'fas fa-hand-holding-usd text-primary',
+                    'subtitle' => 'Status pinjaman dan jadwal angsuran Anda',
+                ]); ?>
+                <?php ui_flash(); ?>
 
-                <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success alert-dismissible fade show py-2" role="alert">
-                        <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-                
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger alert-dismissible fade show py-2" role="alert">
-                        <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
+                <?php
+                if (isset($pager)) {
+                    ui_table_toolbar([
+                        'action' => 'pinjaman.php',
+                        'q' => $q ?? '',
+                        'placeholder' => 'Cari kode/jenis/status…',
+                        'per_page' => $pager['per_page'],
+                        'reset_href' => 'pinjaman.php',
+                    ]);
+                }
+                ?>
 
-                <!-- Statistics Cards -->
-                <div class="row mb-3">
-                    <?php
+                <?php
                     $total_pinjaman = 0;
                     $total_pokok_dibayar = 0;
                     $total_bunga_dibayar = 0;
@@ -324,7 +329,7 @@ unset($daftar_lunas);
                     $pinjaman_aktif = 0;
                     $pinjaman_lunas = 0;
                     
-                    foreach ($pinjaman_list as $pinjaman) {
+                    foreach ($__all as $pinjaman) {
                         $total_pinjaman += $pinjaman['jumlah_pinjaman'];
                         
                         // Hitung total yang sudah dibayar
@@ -351,104 +356,15 @@ unset($daftar_lunas);
                     $total_pembayaran = $total_pokok_dibayar + $total_bunga_dibayar + $total_denda_dibayar;
                     $total_angsuran_data = count($angsuran_list);
                     $total_angsuran_lunas = count(array_filter($angsuran_list, function($a) { return $a['status'] == 'lunas'; }));
-                    ?>
-                    
-                    <div class="col-xl-2 col-md-4 col-6 mb-3">
-                        <div class="card stat-card bg-primary text-white">
-                            <div class="card-body py-3">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h5 class="mb-1"><?php echo count($pinjaman_list); ?></h5>
-                                        <small>Total Pinjaman</small>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-hand-holding-usd"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-xl-2 col-md-4 col-6 mb-3">
-                        <div class="card stat-card bg-success text-white">
-                            <div class="card-body py-3">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h5 class="mb-1"><?php echo $pinjaman_aktif; ?></h5>
-                                        <small>Pinjaman Aktif</small>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-play-circle"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-xl-2 col-md-4 col-6 mb-3">
-                        <div class="card stat-card bg-secondary text-white">
-                            <div class="card-body py-3">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h5 class="mb-1"><?php echo $pinjaman_lunas; ?></h5>
-                                        <small>Pinjaman Lunas</small>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-check-circle"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-xl-2 col-md-4 col-6 mb-3">
-                        <div class="card stat-card bg-warning text-white">
-                            <div class="card-body py-3">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h5 class="mb-1"><?php echo formatRupiah($total_pinjaman); ?></h5>
-                                        <small>Total Dipinjam</small>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-money-bill-wave"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-xl-2 col-md-4 col-6 mb-3">
-                        <div class="card stat-card bg-info text-white">
-                            <div class="card-body py-3">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h5 class="mb-1"><?php echo formatRupiah($total_tagihan_aktif); ?></h5>
-                                        <small>Sisa Tagihan Aktif</small>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-credit-card"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-xl-2 col-md-4 col-6 mb-3">
-                        <div class="card stat-card bg-danger text-white">
-                            <div class="card-body py-3">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h5 class="mb-1"><?php echo formatRupiah($total_pembayaran); ?></h5>
-                                        <small>Total Dibayar</small>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-arrow-up"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    ui_stat_grid([
+                        ['label' => 'Total pinjaman', 'value' => (int)($pager['total'] ?? count($pinjaman_list)), 'tone' => 'primary', 'icon' => 'fas fa-hand-holding-usd', 'hint' => 'Semua status'],
+                        ['label' => 'Aktif', 'value' => (int)$pinjaman_aktif, 'tone' => 'success', 'icon' => 'fas fa-play-circle', 'hint' => 'Berjalan'],
+                        ['label' => 'Lunas', 'value' => (int)$pinjaman_lunas, 'tone' => 'info', 'icon' => 'fas fa-check-circle', 'hint' => 'Selesai'],
+                        ['label' => 'Total dipinjam', 'value' => formatRupiah($total_pinjaman), 'tone' => 'warning', 'icon' => 'fas fa-money-bill-wave', 'hint' => 'Pokok cair'],
+                        ['label' => 'Sisa tagihan', 'value' => formatRupiah($total_tagihan_aktif), 'tone' => 'danger', 'icon' => 'fas fa-credit-card', 'hint' => 'Aktif'],
+                        ['label' => 'Total dibayar', 'value' => formatRupiah($total_pembayaran), 'tone' => 'success', 'icon' => 'fas fa-arrow-up', 'hint' => 'Akumulasi'],
+                    ]);
+                ?>
 
                 <div class="row">
                     <!-- Daftar pinjaman dipisah berdasarkan jenis jaminan -->
@@ -667,7 +583,7 @@ unset($daftar_lunas);
                             </div>
                             <div class="card-body p-3">
                                 <?php if (!empty($pengajuan_list)): ?>
-                                    <div class="table-responsive">
+                                    <div class="table-responsive ui-table-scroll">
                                         <table class="table table-sm table-striped mb-0">
                                             <thead>
                                                 <tr>
@@ -691,7 +607,7 @@ unset($daftar_lunas);
                                                             <?php echo $pengajuan['status'] === 'batal_cair' ? 'Batal Cair' : ucfirst($pengajuan['status']); ?>
                                                         </span>
                                                     </td>
-                                                    <td><small><?php echo date('d/m/Y H:i', strtotime($pengajuan['tanggal_pengajuan'])); ?></small></td>
+                                                    <td><small><?php echo formatTanggalUi($pengajuan['tanggal_pengajuan'], true); ?></small></td>
                                                 </tr>
                                                 <?php endforeach; ?>
                                             </tbody>
@@ -721,6 +637,7 @@ unset($daftar_lunas);
                         </div>
                     </div>
                 </div>
+                <?php if (isset($pager)) ui_pagination($pager, 'pinjaman.php'); ?>
             </main>
         </div>
     </div>

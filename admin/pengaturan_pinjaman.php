@@ -111,18 +111,12 @@ $db->exec("CREATE TABLE IF NOT EXISTS settings (
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-cog me-2"></i>Pengaturan Pinjaman & Tabungan
-                    </h1>
-                </div>
-
-                <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success"><?php echo $_SESSION['success']; unset($_SESSION['success']); ?></div>
-                <?php endif; ?>
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger"><?php echo $_SESSION['error']; unset($_SESSION['error']); ?></div>
-                <?php endif; ?>
+                <?php ui_page_header([
+                    'title' => 'Pengaturan Pinjaman & Tabungan',
+                    'icon' => 'fas fa-cog text-primary',
+                    'subtitle' => 'Bagi hasil tabungan dan parameter pinjaman',
+                ]); ?>
+                <?php ui_flash(); ?>
 
                 <div class="row">
                     <!-- Bagi Hasil Tabungan -->

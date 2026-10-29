@@ -48,12 +48,7 @@ if (!function_exists('redirect')) {
     }
 }
 
-if (!function_exists('formatRupiah')) {
-    function formatRupiah($angka) {
-        if ($angka == 0) return 'Rp 0';
-        return 'Rp ' . number_format($angka, 0, ',', '.');
-    }
-}
+// formatRupiah SSOT: config/functions.php (loaded via auth.php / explicit require)
 
 if (!function_exists('getInitials')) {
     function getInitials($name) {

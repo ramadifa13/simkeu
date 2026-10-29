@@ -41,6 +41,23 @@ $stmt_transaksi = $db->prepare($query_transaksi);
 $stmt_transaksi->bindParam(':anggota_id', $anggota_id);
 $stmt_transaksi->execute();
 $transaksi = $stmt_transaksi->fetchAll(PDO::FETCH_ASSOC);
+$__ui = ui_query_params([]);
+$__q = $__ui['q'];
+$__all = $transaksi;
+if ($__q !== '') {
+    $__fields = array (
+  0 => 'kode_transaksi',
+  1 => 'metode_bayar',
+);
+    $__all = array_values(array_filter($__all, static function ($r) use ($__q, $__fields) {
+        $hay = '';
+        foreach ($__fields as $f) { $hay .= ' ' . ($r[$f] ?? ''); }
+        return stripos($hay, $__q) !== false;
+    }));
+}
+$pager = ui_paginate(count($__all), $__ui['page'], $__ui['per_page']);
+$transaksi = array_slice($__all, $pager['offset'], $pager['per_page']);
+$q = $__q;
 
 // Hitung total pembelian
 $total_pembelian = 0;
@@ -48,10 +65,6 @@ foreach ($transaksi as $t) {
     $total_pembelian += $t['total_bayar'];
 }
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -82,7 +95,7 @@ function formatRupiah($angka) {
             margin-bottom: 20px;
         }
         .summary-value {
-            font-size: 2rem;
+            font-size: 1.15rem;
             font-weight: 700;
         }
         .table th {
@@ -92,15 +105,15 @@ function formatRupiah($angka) {
             background-color: #28a745;
             color: white;
             padding: 3px 8px;
-            border-radius: 20px;
+            border-radius: 10px;
             font-size: 0.7rem;
         }
         .empty-state {
             text-align: center;
-            padding: 40px 20px;
+            padding: 22px 20px;
         }
         .empty-state i {
-            font-size: 4rem;
+            font-size: 1.6rem;
             color: #ccc;
             margin-bottom: 15px;
         }
@@ -119,18 +132,13 @@ function formatRupiah($angka) {
         <div class="row">
             <?php include '../includes/sidebar.php'; ?>
             
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-                <!-- Page Header -->
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="h3">
-                        <i class="fas fa-store me-2 text-success"></i>Transaksi Waserda Saya
-                    </h1>
-                    <div>
-                        <span class="badge bg-success p-2">
-                            <i class="fas fa-shopping-cart me-1"></i> Total: <?php echo count($transaksi); ?> transaksi
-                        </span>
-                    </div>
-                </div>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <?php ui_page_header([
+                    'title' => 'Transaksi Waserda Saya',
+                    'icon' => 'fas fa-store text-success',
+                    'subtitle' => 'Riwayat pembelian di warung koperasi',
+                    'actions' => '<span class="badge bg-success"><i class="fas fa-shopping-cart me-1"></i>Total: ' . count($transaksi) . '</span>',
+                ]); ?>
 
                 <!-- Info -->
                 <div class="alert alert-info">
@@ -152,21 +160,7 @@ function formatRupiah($angka) {
                     </div>
                 </div>
 
-                <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <i class="fas fa-check-circle me-2"></i>
-                        <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-                
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
+                <?php ui_flash(); ?>
 
                 <!-- Tabel Transaksi -->
                 <div class="card">
@@ -182,7 +176,8 @@ function formatRupiah($angka) {
                                 <p class="text-muted">Anda belum melakukan pembelian di waserda.</p>
                             </div>
                         <?php else: ?>
-                            <div class="table-responsive">
+                            <?php if (isset($pager)) ui_table_toolbar(['action'=>'waserda.php','q'=>$q ?? '','placeholder'=>'Cari…','per_page'=>$pager['per_page'],'reset_href'=>'waserda.php']); ?>
+                        <div class="table-responsive ui-table-scroll">
                                 <table class="table table-striped table-hover mb-0">
                                     <thead>
                                         <tr>
@@ -202,7 +197,7 @@ function formatRupiah($angka) {
                                             $first_item = $items[0]['nama'] ?? 'Barang';
                                         ?>
                                         <tr>
-                                            <td><?php echo date('d/m/Y H:i', strtotime($t['created_at'])); ?></td>
+                                            <td><?php echo formatTanggalUi($t['created_at'], true); ?></td>
                                             <td><small><?php echo $t['kode_transaksi']; ?></small></td>
                                             <td>
                                                 <?php echo $first_item; ?>
@@ -239,7 +234,7 @@ function formatRupiah($angka) {
                             </div>
                             <div class="modal-body">
                                 <p class="fw-bold" id="modalKodeTransaksi"></p>
-                                <div class="table-responsive">
+                                <div class="table-responsive ui-table-scroll">
                                     <table class="table table-sm">
                                         <thead>
                                             <tr>
@@ -272,6 +267,8 @@ function formatRupiah($angka) {
                         Halaman ini hanya menampilkan riwayat transaksi Anda.
                     </small>
                 </div>
+                <?php if (isset($pager)) ui_pagination($pager, 'waserda.php'); ?>
+
             </main>
         </div>
     </div>

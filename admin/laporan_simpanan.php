@@ -9,11 +9,11 @@ if (!isAdmin()) {
     exit();
 }
 
-// Filter parameters - SET DEFAULT KE FEBRUARI 2026
+// Filter: default = bulan berjalan
 $filter_anggota = $_GET['anggota_id'] ?? '';
 $filter_jenis = $_GET['jenis_simpanan_id'] ?? '';
-$filter_tanggal_awal = $_GET['tanggal_awal'] ?? '2026-02-01'; // DEFAULT 1 FEB 2026
-$filter_tanggal_akhir = $_GET['tanggal_akhir'] ?? '2026-02-28'; // DEFAULT 28 FEB 2026
+$filter_tanggal_awal = $_GET['tanggal_awal'] ?? date('Y-m-01');
+$filter_tanggal_akhir = $_GET['tanggal_akhir'] ?? date('Y-m-t');
 
 // Handle export PDF
 if (isset($_GET['export_pdf']) && $_GET['export_pdf'] == 1) {
@@ -100,6 +100,26 @@ foreach ($params as $key => $value) {
 }
 $stmt->execute();
 $simpanan = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$__ui = ui_query_params([]);
+$__q = $__ui['q'];
+$__all = $simpanan;
+if ($__q !== '') {
+    $__fields = array (
+  0 => 'nama_lengkap',
+  1 => 'kode_anggota',
+  2 => 'nama_jenis',
+  3 => 'kode_jenis',
+);
+    $__all = array_values(array_filter($__all, static function ($r) use ($__q, $__fields) {
+        $hay = '';
+        foreach ($__fields as $f) { $hay .= ' ' . ($r[$f] ?? ''); }
+        return stripos($hay, $__q) !== false;
+    }));
+}
+$pager = ui_paginate(count($__all), $__ui['page'], $__ui['per_page']);
+$simpanan = array_slice($__all, $pager['offset'], $pager['per_page']);
+$q = $__q;
+
 
 // Hitung total per jenis dari transaksi - EXCLUDE JENIS ANG
 $query_summary = "SELECT 
@@ -124,10 +144,6 @@ $summary_per_jenis = $stmt_summary->fetchAll(PDO::FETCH_ASSOC);
 // Hitung total keseluruhan
 $total_semua = array_sum(array_column($summary_per_jenis, 'total_saldo'));
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -139,8 +155,8 @@ function formatRupiah($angka) {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --primary: #2c3e50;
-            --secondary: #3498db;
+            --primary:#087f83;
+            --secondary:#12666e;
             --success: #27ae60;
             --info: #17a2b8;
             --warning: #f39c12;
@@ -168,7 +184,7 @@ function formatRupiah($angka) {
         
         @media (min-width: 992px) {
             main {
-                margin-left: 280px !important;
+                margin-left: 0 !important; /* densify: shell owns sidebar */
                 padding: 20px !important;
             }
         }
@@ -238,7 +254,7 @@ function formatRupiah($angka) {
         .badge-wajib { background-color: #3498db; color: white; }
         .badge-sukarela { background-color: #27ae60; color: white; }
         .badge-deposito { background-color: #f39c12; color: white; }
-        .badge-haji { background-color: #9b59b6; color: white; }
+        .badge-haji { background-color: #087f83; color: white; }
         .badge-umroh { background-color: #1abc9c; color: white; }
         
         .info-periode {
@@ -246,7 +262,7 @@ function formatRupiah($angka) {
             border-radius: 5px;
             padding: 10px 15px;
             margin-bottom: 20px;
-            border-left: 4px solid #3498db;
+            border-left:3px solid #087f83;
         }
         
         .info-simpanan {
@@ -266,56 +282,32 @@ function formatRupiah($angka) {
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <!-- Page Header -->
-                <div class="page-header">
-                    <h1 class="h3 mb-0">
-                        <i class="fas fa-piggy-bank text-success me-2"></i>Laporan Simpanan
-                        <small class="text-muted fs-6 ms-2">(Tidak termasuk Angsuran)</small>
-                    </h1>
-                    <div class="btn-group">
-                        <a href="?export_pdf=1&<?php echo http_build_query($_GET); ?>" class="btn btn-sm btn-danger" target="_blank">
-                            <i class="fas fa-file-pdf"></i> <span class="d-none d-sm-inline">PDF</span>
-                        </a>
-                        <a href="?export_excel=1&<?php echo http_build_query($_GET); ?>" class="btn btn-sm btn-success">
-                            <i class="fas fa-file-excel"></i> <span class="d-none d-sm-inline">Excel</span>
-                        </a>
-                        <a href="laporan_simpanan.php" class="btn btn-sm btn-primary ms-2">
-                            <i class="fas fa-sync"></i> <span class="d-none d-sm-inline">Reset</span>
-                        </a>
-                    </div>
-                </div>
+                <?php ui_page_header([
+                    'title' => 'Laporan Simpanan',
+                    'icon' => 'fas fa-piggy-bank text-success',
+                    'subtitle' => 'Simpanan real (tidak termasuk angsuran)',
+                    'actions' => '<div class="btn-group">'
+                        . '<a href="?export_pdf=1&' . http_build_query($_GET) . '" class="btn btn-sm btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> <span class="d-none d-sm-inline">PDF</span></a>'
+                        . '<a href="?export_excel=1&' . http_build_query($_GET) . '" class="btn btn-sm btn-success"><i class="fas fa-file-excel"></i> <span class="d-none d-sm-inline">Excel</span></a>'
+                        . '<a href="laporan_simpanan.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-sync"></i> <span class="d-none d-sm-inline">Reset</span></a>'
+                        . '</div>',
+                ]); ?>
 
                 <!-- Info Periode -->
                 <div class="info-periode">
                     <i class="fas fa-calendar-alt me-2 text-primary"></i>
-                    <strong>Periode:</strong> <?php echo date('d/m/Y', strtotime($filter_tanggal_awal)); ?> s/d <?php echo date('d/m/Y', strtotime($filter_tanggal_akhir)); ?>
+                    <strong>Periode:</strong> <?php echo formatTanggalUi($filter_tanggal_awal); ?> s/d <?php echo formatTanggalUi($filter_tanggal_akhir); ?>
                     <?php if (empty($filter_anggota) && empty($filter_jenis)): ?>
                         <span class="badge bg-info ms-2">Semua Anggota & Jenis Simpanan</span>
                     <?php endif; ?>
                     <span class="badge bg-success ms-2">Simpanan Real (Non-Angsuran)</span>
                 </div>
 
-                <!-- Statistics Cards -->
-                <div class="row mb-4">
-                    <div class="col-md-4">
-                        <div class="stat-card success">
-                            <div class="stat-value text-success"><?php echo formatRupiah($total_semua); ?></div>
-                            <div class="stat-label">Total Simpanan Periode Ini</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="stat-card">
-                            <div class="stat-value text-primary"><?php echo count($simpanan); ?></div>
-                            <div class="stat-label">Jumlah Record Simpanan</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="stat-card info">
-                            <div class="stat-value text-info"><?php echo count($summary_per_jenis); ?></div>
-                            <div class="stat-label">Jenis Simpanan Aktif</div>
-                        </div>
-                    </div>
-                </div>
+                <?php ui_stat_grid([
+                    ['label' => 'Total simpanan', 'value' => formatRupiah($total_semua), 'tone' => 'success', 'icon' => 'fas fa-piggy-bank', 'hint' => 'Periode filter'],
+                    ['label' => 'Record', 'value' => count($simpanan), 'tone' => 'primary', 'icon' => 'fas fa-receipt', 'hint' => 'Baris data'],
+                    ['label' => 'Jenis aktif', 'value' => count($summary_per_jenis), 'tone' => 'info', 'icon' => 'fas fa-layer-group', 'hint' => 'Jenis terpakai'],
+                ]); ?>
 
                 <!-- Filter Form -->
                 <div class="filter-card">
@@ -409,10 +401,11 @@ function formatRupiah($angka) {
                             <div class="text-center py-5">
                                 <i class="fas fa-piggy-bank fa-4x text-muted mb-3"></i>
                                 <h5 class="text-muted">Tidak ada data simpanan</h5>
-                                <p class="text-muted mb-3">Untuk periode <?php echo date('d/m/Y', strtotime($filter_tanggal_awal)); ?> - <?php echo date('d/m/Y', strtotime($filter_tanggal_akhir)); ?></p>
+                                <p class="text-muted mb-3">Untuk periode <?php echo formatTanggalUi($filter_tanggal_awal); ?> - <?php echo formatTanggalUi($filter_tanggal_akhir); ?></p>
                             </div>
                         <?php else: ?>
-                        <div class="table-responsive">
+                        <?php if (isset($pager)) ui_table_toolbar(['action'=>'laporan_simpanan.php','q'=>$q ?? '','placeholder'=>'Cari…','per_page'=>$pager['per_page'],'reset_href'=>'laporan_simpanan.php']); ?>
+                        <div class="table-responsive ui-table-scroll">
                             <table class="table table-striped table-hover mb-0">
                                 <thead>
                                     <tr>
@@ -468,6 +461,7 @@ function formatRupiah($angka) {
                         <?php endif; ?>
                     </div>
                 </div>
+                <?php if (isset($pager)) ui_pagination($pager, 'laporan_simpanan.php'); ?>
             </main>
         </div>
     </div>

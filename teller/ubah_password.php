@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             justify-content: center;
             margin: 0 auto 1.5rem;
             color: white;
-            font-size: 2rem;
+            font-size: 1.15rem;
         }
     </style>
 </head>
@@ -92,19 +92,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <div class="row">
             <?php include '../includes/sidebar.php'; ?>
             
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-                <!-- Page Header -->
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <h1 class="h2 mb-1"><i class="fas fa-lock me-2 text-primary"></i><?php echo $page_title; ?></h1>
-                        <p class="text-muted mb-0">Kelola keamanan akun Anda dengan mengubah password secara berkala</p>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <a href="profil.php" class="btn btn-outline-primary">
-                            <i class="fas fa-user me-2"></i>Kembali ke Profil
-                        </a>
-                    </div>
-                </div>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <?php ui_page_header([
+                    'title' => $page_title,
+                    'icon' => 'fas fa-lock text-primary',
+                    'subtitle' => 'Perbarui kata sandi akun secara berkala',
+                    'actions' => '<a href="profil.php" class="btn btn-outline-secondary"><i class="fas fa-user me-1"></i>Kembali ke Profil</a>',
+                ]); ?>
 
                 <div class="row justify-content-center">
                     <div class="col-lg-8">

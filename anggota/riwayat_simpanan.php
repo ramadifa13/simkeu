@@ -11,8 +11,9 @@ $stmt_anggota->bindParam(':user_id', $anggota_id);
 $stmt_anggota->execute();
 $anggota_data = $stmt_anggota->fetch(PDO::FETCH_ASSOC);
 
-// Get filter parameters (opsional)
-$filter_jenis = $_GET['jenis_simpanan'] ?? '';
+$ui = ui_query_params(['jenis_simpanan']);
+$filter_jenis = $ui['filters']['jenis_simpanan'] ?? '';
+$filter_q = $ui['q'];
 
 // Get earliest and latest transaction dates for info
 $query_tanggal = "SELECT MIN(DATE(tanggal_transaksi)) as earliest, MAX(DATE(tanggal_transaksi)) as latest
@@ -53,26 +54,44 @@ foreach ($saldo_saat_ini as $s) {
     }
 }
 
-// Build query untuk SEMUA TRANSAKSI (tanpa filter tanggal)
+// Build query untuk SEMUA TRANSAKSI (tanpa filter tanggal) + search/pagination standar
+$whereRiwayat = " WHERE t.anggota_id = :anggota_id AND js.kode_jenis NOT IN ('ANG','BONUS','SHU')";
+$paramsRiwayat = [':anggota_id' => $anggota_data['id']];
+if ($filter_jenis !== '') {
+    $whereRiwayat .= ' AND t.jenis_simpanan_id = :jenis_simpanan';
+    $paramsRiwayat[':jenis_simpanan'] = $filter_jenis;
+}
+if ($filter_q !== '') {
+    $whereRiwayat .= ' AND (t.kode_transaksi LIKE :q1 OR js.nama_jenis LIKE :q2 OR t.keterangan LIKE :q3)';
+    $paramsRiwayat[':q1'] = $paramsRiwayat[':q2'] = $paramsRiwayat[':q3'] = '%' . $filter_q . '%';
+}
+
+$countRiwayat = $db->prepare("SELECT COUNT(*) FROM transaksi t JOIN jenis_simpanan js ON t.jenis_simpanan_id = js.id" . $whereRiwayat);
+foreach ($paramsRiwayat as $k => $v) {
+    $countRiwayat->bindValue($k, $v);
+}
+$countRiwayat->execute();
+$pager = ui_paginate((int)$countRiwayat->fetchColumn(), $ui['page'], $ui['per_page']);
+
+// Total agregat (seluruh hasil filter, bukan hanya halaman)
+$sumStmt = $db->prepare("SELECT t.jenis_transaksi, t.jumlah, js.kode_jenis FROM transaksi t JOIN jenis_simpanan js ON t.jenis_simpanan_id = js.id" . $whereRiwayat);
+foreach ($paramsRiwayat as $k => $v) {
+    $sumStmt->bindValue($k, $v);
+}
+$sumStmt->execute();
+$riwayat_all_for_totals = $sumStmt->fetchAll(PDO::FETCH_ASSOC);
+
 $query = "SELECT t.*, js.nama_jenis, js.kode_jenis
           FROM transaksi t 
           JOIN jenis_simpanan js ON t.jenis_simpanan_id = js.id 
-          WHERE t.anggota_id = :anggota_id 
-            AND js.kode_jenis NOT IN ('ANG','BONUS','SHU')";
-
-if (!empty($filter_jenis)) {
-    $query .= " AND t.jenis_simpanan_id = :jenis_simpanan";
-}
-
-$query .= " ORDER BY t.tanggal_transaksi DESC";
+          $whereRiwayat
+          ORDER BY t.tanggal_transaksi DESC
+          LIMIT {$pager['per_page']} OFFSET {$pager['offset']}";
 
 $stmt = $db->prepare($query);
-$stmt->bindParam(':anggota_id', $anggota_data['id']);
-
-if (!empty($filter_jenis)) {
-    $stmt->bindParam(':jenis_simpanan', $filter_jenis);
+foreach ($paramsRiwayat as $k => $v) {
+    $stmt->bindValue($k, $v);
 }
-
 $stmt->execute();
 $riwayat = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -103,7 +122,7 @@ $total_transaksi_deposito = 0;
 $total_transaksi_haji = 0;
 $saldo_terakhir = 0; // Untuk menyimpan saldo terakhir (setelah semua transaksi)
 
-foreach ($riwayat as $transaksi) {
+foreach ($riwayat_all_for_totals as $transaksi) {
     if ($transaksi['jenis_transaksi'] == 'setoran') {
         $total_setoran += $transaksi['jumlah'];
         if ($transaksi['kode_jenis'] == 'DEPOSITO') {
@@ -117,24 +136,15 @@ foreach ($riwayat as $transaksi) {
         $total_penarikan += $transaksi['jumlah'];
     }
     
-    // Saldo terakhir adalah saldo_sesudah dari transaksi terbaru (pertama dalam loop)
-    if (!isset($saldo_terakhir) && $transaksi === reset($riwayat)) {
-        $saldo_terakhir = $transaksi['saldo_sesudah'];
-    }
 }
 
-// Jika tidak ada transaksi, gunakan total saldo keseluruhan
-if (empty($riwayat)) {
-    $saldo_terakhir = $total_saldo_keseluruhan;
+// Saldo terakhir dari baris terbaru di halaman (atau total simpanan bila kosong)
+$saldo_terakhir = $total_saldo_keseluruhan;
+if (!empty($riwayat) && isset($riwayat[0]['saldo_sesudah'])) {
+    $saldo_terakhir = $riwayat[0]['saldo_sesudah'];
 }
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    if ($angka == 0) {
-        return 'Rp 0';
-    }
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
+// formatRupiah disediakan config/functions.php
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -146,7 +156,7 @@ function formatRupiah($angka) {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         .main-content {
-            margin-left: 280px;
+            margin-left: 0; /* densify: shell owns sidebar */
             margin-top: 10px;
             padding: 15px;
         }
@@ -161,12 +171,12 @@ function formatRupiah($angka) {
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .btn-pdf {
-            background: linear-gradient(135deg, #dc3545, #c82333);
+            background:#c0392b;
             color: white;
             border: none;
         }
         .btn-pdf:hover {
-            background: linear-gradient(135deg, #c82333, #b21f2d);
+            background:#a93226;
             color: white;
         }
         .summary-card {
@@ -176,10 +186,10 @@ function formatRupiah($angka) {
             padding: 10px;
         }
         .badge-deposito { background-color: #f39c12; color: white; }
-        .badge-haji { background-color: #9b59b6; color: white; }
+        .badge-haji { background-color: #087f83; color: white; }
         .badge-umroh { background-color: #1abc9c; color: white; }
         .saldo-card {
-            background: linear-gradient(135deg, #2c3e50, #3498db);
+            background: linear-gradient(135deg,#123d47,#087f83);
             color: white;
             border-radius: 10px;
             padding: 15px;
@@ -222,20 +232,17 @@ function formatRupiah($angka) {
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center page-header border-bottom">
-                    <h1 class="h3">
-                        <i class="fas fa-history me-2"></i>Riwayat Simpanan
-                    </h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-
-                    </div>
-                </div>
+                <?php ui_page_header([
+                    'title' => 'Riwayat Simpanan',
+                    'icon' => 'fas fa-history text-primary',
+                    'subtitle' => 'Mutasi setoran dan penarikan tabungan',
+                ]); ?>
 
                 <!-- Informasi Rentang Transaksi -->
                 <div class="periode-info">
                     <i class="fas fa-calendar-alt me-2 text-primary"></i>
                     <strong>Rentang Transaksi:</strong> 
-                    <?php echo date('d/m/Y', strtotime($earliest_date)); ?> - <?php echo date('d/m/Y', strtotime($latest_date)); ?>
+                    <?php echo formatTanggalUi($earliest_date); ?> - <?php echo formatTanggalUi($latest_date); ?>
                     <?php if (!empty($filter_jenis)): ?>
                         <?php 
                         $selected_jenis = array_filter($jenis_list, function($j) use ($filter_jenis) {
@@ -256,7 +263,7 @@ function formatRupiah($angka) {
                         <div class="col-md-8">
                             <h5 class="mb-3">
                                 <i class="fas fa-piggy-bank me-2"></i>Saldo Simpanan Saat Ini
-                                <span class="badge bg-light text-dark ms-2"><?php echo date('d/m/Y'); ?></span>
+                                <span class="badge bg-light text-dark ms-2"><?php echo formatTanggalUi('now'); ?></span>
                             </h5>
                             <div class="row">
                                 <?php 
@@ -290,42 +297,37 @@ function formatRupiah($angka) {
                     </div>
                 </div>
 
-                <!-- Filter Form (Hanya filter jenis) -->
                 <div class="card filter-card mb-3">
                     <div class="card-header py-2">
                         <h6 class="card-title mb-0">
-                            <i class="fas fa-filter me-2"></i>Filter Berdasarkan Jenis Simpanan
+                            <i class="fas fa-filter me-2"></i>Cari &amp; Filter Riwayat
                         </h6>
                     </div>
                     <div class="card-body p-3">
-                        <form method="GET" class="row g-2">
-                            <div class="col-md-4">
-                                <select name="jenis_simpanan" class="form-select form-select-sm">
-                                    <option value="">Semua Jenis Simpanan</option>
-                                    <?php foreach ($jenis_list as $jenis): 
-                                        $badgeClass = '';
-                                        if ($jenis['kode_jenis'] == 'DEPOSITO') $badgeClass = 'badge-deposito';
-                                        elseif ($jenis['kode_jenis'] == 'HAJI') $badgeClass = 'badge-haji';
-                                        elseif ($jenis['kode_jenis'] == 'UMROH') $badgeClass = 'badge-umroh';
-                                    ?>
-                                    <option value="<?php echo $jenis['id']; ?>" <?php echo $filter_jenis == $jenis['id'] ? 'selected' : ''; ?>>
-                                        <?php echo $jenis['nama_jenis']; ?>
-                                    </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <button type="submit" class="btn btn-sm btn-primary w-100">
-                                    <i class="fas fa-search me-1"></i> Filter
-                                </button>
-                            </div>
-                            <div class="col-md-6 text-end">
-                                <small class="text-muted">
-                                    <i class="fas fa-info-circle me-1"></i>
-                                    Menampilkan <?php echo count($riwayat); ?> dari <?php echo count($riwayat); ?> transaksi
-                                </small>
-                            </div>
-                        </form>
+                        <?php
+                        $jenisOptions = ['' => 'Semua Jenis Simpanan'];
+                        foreach ($jenis_list as $jenis) {
+                            $jenisOptions[(string)$jenis['id']] = $jenis['nama_jenis'];
+                        }
+                        ui_table_toolbar([
+                            'action' => 'riwayat_simpanan.php',
+                            'q' => $filter_q,
+                            'placeholder' => 'Cari kode transaksi, jenis, keterangan…',
+                            'per_page' => $pager['per_page'],
+                            'reset_href' => 'riwayat_simpanan.php',
+                            'filters' => [[
+                                'name' => 'jenis_simpanan',
+                                'label' => 'Jenis',
+                                'type' => 'select',
+                                'value' => $filter_jenis,
+                                'options' => $jenisOptions,
+                            ]],
+                        ]);
+                        ?>
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Menampilkan halaman <?= (int)$pager['page'] ?> — total <?= (int)$pager['total'] ?> transaksi
+                        </small>
                     </div>
                 </div>
 
@@ -456,7 +458,7 @@ function formatRupiah($angka) {
                     </div>
                     <div class="card-body p-0">
                         <?php if (!empty($riwayat)): ?>
-                            <div class="table-responsive">
+                            <div class="table-responsive ui-table-scroll">
                                 <table class="table table-sm table-striped table-hover mb-0">
                                     <thead class="bg-light">
                                         <tr>
@@ -481,7 +483,7 @@ function formatRupiah($angka) {
                                         ?>
                                         <tr>
                                             <td class="text-center"><?php echo $no++; ?></td>
-                                            <td><small><?php echo date('d/m/Y H:i', strtotime($transaksi['tanggal_transaksi'])); ?></small></td>
+                                            <td><small><?php echo formatTanggalUi($transaksi['tanggal_transaksi'], true); ?></small></td>
                                             <td><small><code><?php echo $transaksi['kode_transaksi']; ?></code></small></td>
                                             <td>
                                                 <span class="badge <?php echo $badgeClass; ?>">
@@ -511,6 +513,7 @@ function formatRupiah($angka) {
                                     </tfoot>
                                 </table>
                             </div>
+                            <?php ui_pagination($pager, 'riwayat_simpanan.php'); ?>
                         <?php else: ?>
                             <div class="text-center py-5">
                                 <i class="fas fa-search fa-3x text-muted mb-3"></i>

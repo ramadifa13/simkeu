@@ -109,11 +109,26 @@ $stmt_transactions->bindParam(':start_date', $start_date);
 $stmt_transactions->bindParam(':end_date', $end_date);
 $stmt_transactions->execute();
 $transactions = $stmt_transactions->fetchAll(PDO::FETCH_ASSOC);
-
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
+$__ui = ui_query_params([]);
+$__q = $__ui['q'];
+$__all = $transactions;
+if ($__q !== '') {
+    $__fields = array (
+  0 => 'nama_lengkap',
+  1 => 'kode_anggota',
+  2 => 'nama_jenis',
+  3 => 'kode_transaksi',
+);
+    $__all = array_values(array_filter($__all, static function ($r) use ($__q, $__fields) {
+        $hay = '';
+        foreach ($__fields as $f) { $hay .= ' ' . ($r[$f] ?? ''); }
+        return stripos($hay, $__q) !== false;
+    }));
 }
+$pager = ui_paginate(count($__all), $__ui['page'], $__ui['per_page']);
+$transactions = array_slice($__all, $pager['offset'], $pager['per_page']);
+$q = $__q;
+
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -125,8 +140,8 @@ function formatRupiah($angka) {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --primary: #2c3e50;
-            --secondary: #3498db;
+            --primary:#087f83;
+            --secondary:#12666e;
             --success: #27ae60;
             --info: #17a2b8;
             --warning: #f39c12;
@@ -142,7 +157,7 @@ function formatRupiah($angka) {
         
         @media (min-width: 992px) {
             main {
-                margin-left: 280px !important;
+                margin-left: 0 !important; /* densify: shell owns sidebar */
                 padding: 20px !important;
             }
         }
@@ -173,10 +188,10 @@ function formatRupiah($angka) {
         }
         
         .date-filter {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-radius: 16px;
+            background: linear-gradient(135deg,#123d47,#087f83);
+            border-radius: 10px;
             color: white;
-            padding: 1.5rem;
+            padding: 14px;
             margin-bottom: 25px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
@@ -190,7 +205,7 @@ function formatRupiah($angka) {
         
         .card {
             border: none;
-            border-radius: 16px;
+            border-radius: 10px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             margin-bottom: 20px;
         }
@@ -219,19 +234,19 @@ function formatRupiah($angka) {
         .savings-card.wajib { border-left-color: #3498db; }
         .savings-card.sukarela { border-left-color: #27ae60; }
         .savings-card.deposito { border-left-color: #f39c12; }
-        .savings-card.haji { border-left-color: #9b59b6; }
+        .savings-card.haji { border-left-color: #087f83; }
         .savings-card.umroh { border-left-color: #1abc9c; }
         
         .badge-pokok { background-color: #2c3e50; color: white; }
         .badge-wajib { background-color: #3498db; color: white; }
         .badge-sukarela { background-color: #27ae60; color: white; }
         .badge-deposito { background-color: #f39c12; color: white; }
-        .badge-haji { background-color: #9b59b6; color: white; }
+        .badge-haji { background-color: #087f83; color: white; }
         .badge-umroh { background-color: #1abc9c; color: white; }
         
         .badge-transaction {
             padding: 0.4rem 0.8rem;
-            border-radius: 20px;
+            border-radius: 10px;
             font-weight: 500;
             font-size: 0.75rem;
         }
@@ -271,24 +286,24 @@ function formatRupiah($angka) {
         }
         
         .btn-pdf {
-            background: linear-gradient(135deg, #dc3545, #c82333);
+            background:#c0392b;
             color: white;
             border: none;
         }
         
         .btn-pdf:hover {
-            background: linear-gradient(135deg, #c82333, #b21f2d);
+            background:#a93226;
             color: white;
         }
         
         .btn-excel {
-            background: linear-gradient(135deg, #28a745, #218838);
+            background:#1f8a5b;
             color: white;
             border: none;
         }
         
         .btn-excel:hover {
-            background: linear-gradient(135deg, #218838, #1e7e34);
+            background:#196f4a;
             color: white;
         }
     </style>
@@ -301,23 +316,16 @@ function formatRupiah($angka) {
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <!-- Page Header -->
-                <div class="page-header">
-                    <h1 class="h3 mb-0">
-                        <i class="fas fa-piggy-bank text-primary me-2"></i><?php echo $page_title; ?>
-                    </h1>
-                    <div class="btn-group">
-                        <a href="?export_pdf=1&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>" class="btn btn-sm btn-pdf" target="_blank">
-                            <i class="fas fa-file-pdf me-1"></i> <span class="d-none d-sm-inline">PDF</span>
-                        </a>
-                        <a href="?export_excel=1&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>" class="btn btn-sm btn-excel">
-                            <i class="fas fa-file-excel me-1"></i> <span class="d-none d-sm-inline">Excel</span>
-                        </a>
-                        <a href="laporan_simpanan.php" class="btn btn-sm btn-outline-primary ms-2">
-                            <i class="fas fa-sync"></i> <span class="d-none d-sm-inline">Reset</span>
-                        </a>
-                    </div>
-                </div>
+                <?php ui_page_header([
+                    'title' => $page_title,
+                    'icon' => 'fas fa-piggy-bank text-primary',
+                    'subtitle' => 'Laporan simpanan periode terpilih',
+                    'actions' => '<div class="btn-group">'
+                        . '<a href="?export_pdf=1&start_date=' . urlencode((string)$start_date) . '&end_date=' . urlencode((string)$end_date) . '" class="btn btn-sm btn-danger" target="_blank"><i class="fas fa-file-pdf me-1"></i><span class="d-none d-sm-inline">PDF</span></a>'
+                        . '<a href="?export_excel=1&start_date=' . urlencode((string)$start_date) . '&end_date=' . urlencode((string)$end_date) . '" class="btn btn-sm btn-success"><i class="fas fa-file-excel me-1"></i><span class="d-none d-sm-inline">Excel</span></a>'
+                        . '<a href="laporan_simpanan.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-sync me-1"></i><span class="d-none d-sm-inline">Reset</span></a>'
+                        . '</div>',
+                ]); ?>
 
                 <!-- Date Filter -->
                 <div class="date-filter">
@@ -332,11 +340,11 @@ function formatRupiah($angka) {
                         <div class="col-md-6">
                             <form method="GET" class="row g-2">
                                 <div class="col-md-5">
-                                    <label class="form-label text-white">Dari Tanggal</label>
+                                    <label class="form-label">Dari Tanggal</label>
                                     <input type="date" class="form-control form-control-sm" name="start_date" value="<?php echo $start_date; ?>">
                                 </div>
                                 <div class="col-md-5">
-                                    <label class="form-label text-white">Sampai Tanggal</label>
+                                    <label class="form-label">Sampai Tanggal</label>
                                     <input type="date" class="form-control form-control-sm" name="end_date" value="<?php echo $end_date; ?>">
                                 </div>
                                 <div class="col-md-2 d-flex align-items-end">
@@ -349,44 +357,11 @@ function formatRupiah($angka) {
                     </div>
                 </div>
 
-                <!-- Total Statistics -->
-                <div class="row mb-4">
-                    <div class="col-xl-4 col-md-4 mb-4">
-                        <div class="stat-card bg-primary text-white p-3">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-white-50 mb-2">TOTAL TRANSAKSI</h6>
-                                    <h3 class="fw-bold"><?php echo number_format($total_stats['total_transaksi']); ?></h3>
-                                </div>
-                                <i class="fas fa-exchange-alt fa-3x opacity-50"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-xl-4 col-md-4 mb-4">
-                        <div class="stat-card bg-success text-white p-3">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-white-50 mb-2">TOTAL SETORAN</h6>
-                                    <h3 class="fw-bold"><?php echo formatRupiah($total_stats['total_setoran']); ?></h3>
-                                </div>
-                                <i class="fas fa-arrow-down fa-3x opacity-50"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-xl-4 col-md-4 mb-4">
-                        <div class="stat-card bg-warning text-white p-3">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-white-50 mb-2">TOTAL PENARIKAN</h6>
-                                    <h3 class="fw-bold"><?php echo formatRupiah($total_stats['total_penarikan']); ?></h3>
-                                </div>
-                                <i class="fas fa-arrow-up fa-3x opacity-50"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <?php ui_stat_grid([
+                    ['label' => 'Total transaksi', 'value' => (int)$total_stats['total_transaksi'], 'tone' => 'primary', 'icon' => 'fas fa-exchange-alt', 'hint' => 'Periode filter'],
+                    ['label' => 'Total setoran', 'value' => formatRupiah($total_stats['total_setoran']), 'tone' => 'success', 'icon' => 'fas fa-arrow-down', 'hint' => 'Masuk kas'],
+                    ['label' => 'Total penarikan', 'value' => formatRupiah($total_stats['total_penarikan']), 'tone' => 'warning', 'icon' => 'fas fa-arrow-up', 'hint' => 'Keluar kas'],
+                ]); ?>
 
                 <!-- Rekap per Jenis Simpanan -->
                 <div class="row mb-4">
@@ -416,7 +391,7 @@ function formatRupiah($angka) {
                                         'WAJIB' => '#3498db',
                                         'SUKARELA' => '#27ae60',
                                         'DEPOSITO' => '#f39c12',
-                                        'HAJI' => '#9b59b6',
+                                        'HAJI' => '#087f83',
                                         'UMROH' => '#1abc9c'
                                     ];
                                     
@@ -527,7 +502,8 @@ function formatRupiah($angka) {
                     </div>
                     <div class="card-body">
                         <?php if (!empty($transactions)): ?>
-                        <div class="table-responsive">
+                        <?php if (isset($pager)) ui_table_toolbar(['action'=>'laporan_simpanan.php','q'=>$q ?? '','placeholder'=>'Cari…','per_page'=>$pager['per_page'],'reset_href'=>'laporan_simpanan.php']); ?>
+                        <div class="table-responsive ui-table-scroll">
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
@@ -546,9 +522,7 @@ function formatRupiah($angka) {
                                     ?>
                                     <tr>
                                         <td>
-                                            <?php echo date('d/m/Y', strtotime($transaksi['tanggal_transaksi'])); ?>
-                                            <br>
-                                            <small class="text-muted"><?php echo date('H:i', strtotime($transaksi['tanggal_transaksi'])); ?></small>
+                                            <?php echo formatTanggalUi($transaksi['tanggal_transaksi'], true); ?>
                                         </td>
                                         <td>
                                             <strong><?php echo $transaksi['kode_transaksi']; ?></strong>
@@ -588,6 +562,8 @@ function formatRupiah($angka) {
                         <?php endif; ?>
                     </div>
                 </div>
+                <?php if (isset($pager)) ui_pagination($pager, 'laporan_simpanan.php'); ?>
+
             </main>
         </div>
     </div>

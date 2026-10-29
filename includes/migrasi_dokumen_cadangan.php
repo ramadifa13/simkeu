@@ -183,8 +183,13 @@ function migrasiPulihkanDokumenAnggota(PDO $db, $anggotaId, $kodeAnggota) {
     if (!$cad) {
         return 0;
     }
+    if (!function_exists('dokumenAnggotaAdaDiDisk')) {
+        require_once __DIR__ . '/dokumen_anggota.php';
+    }
     $set = [];
     $params = [];
+    $pulih = 0;
+    $hilang = 0;
     foreach (['foto_ktp' => 'foto_ktp', 'foto_kk' => 'foto_kk', 'foto_ktp_pasangan' => 'foto_ktp_pasangan'] as $col => $cadCol) {
         if (!kolomAda($db, 'anggota', $col)) {
             continue;
@@ -193,8 +198,13 @@ function migrasiPulihkanDokumenAnggota(PDO $db, $anggotaId, $kodeAnggota) {
         if ($val === '') {
             continue;
         }
+        if (function_exists('dokumenAnggotaAdaDiDisk') && !dokumenAnggotaAdaDiDisk($val)) {
+            $hilang++;
+            continue;
+        }
         $set[] = "$col=COALESCE(NULLIF($col,''), ?)";
         $params[] = $val;
+        $pulih++;
     }
     if ($set) {
         $params[] = (int) $anggotaId;
@@ -202,6 +212,9 @@ function migrasiPulihkanDokumenAnggota(PDO $db, $anggotaId, $kodeAnggota) {
     }
     $ttd = (string) ($cad['ttd_anggota'] ?? '');
     $foto = trim((string) ($cad['foto_ktp'] ?? ''));
+    if ($foto !== '' && function_exists('dokumenAnggotaAdaDiDisk') && !dokumenAnggotaAdaDiDisk($foto)) {
+        $foto = '';
+    }
     try {
         $db->prepare(
             'INSERT INTO migrasi_anggota_dokumen(anggota_id,foto,ttd) VALUES(?,?,?)
@@ -212,7 +225,7 @@ function migrasiPulihkanDokumenAnggota(PDO $db, $anggotaId, $kodeAnggota) {
     } catch (Throwable $e) {
         // ignore bila tabel belum ada
     }
-    return 1;
+    return $pulih > 0 ? 1 : ($hilang > 0 ? 0 : 0);
 }
 
 /** Pulihkan foto pencairan, jaminan, dan perjanjian pinjaman dari cadangan. */

@@ -2,14 +2,25 @@
 require_once '../includes/auth.php';
 require_once '../config/config.php';
 
+if (!isAdmin() || !can('koreksi.mutate')) {
+    http_response_code(403);
+    exit('Akses ditolak. Koreksi khusus Admin.');
+}
+
+schemaPastikanLogKoreksi($db);
+
 // Handle form actions
 if ($_POST) {
     if (isset($_POST['koreksi'])) {
+        require_can('koreksi.mutate');
         $transaksi_id = $_POST['transaksi_id'];
         $jumlah_baru = $_POST['jumlah_baru'];
         $keterangan_koreksi = $_POST['keterangan_koreksi'];
         
         try {
+            if (!is_scalar($jumlah_baru) || !preg_match('/^\d+(?:\.\d{1,2})?$/D', (string)$jumlah_baru) || !is_finite((float)$jumlah_baru) || (float)$jumlah_baru < 0 || (float)$jumlah_baru > 999999999999) {
+                throw new Exception('Nominal koreksi tidak valid.');
+            }
             $db->beginTransaction();
             
             // Get original transaction data
@@ -80,32 +91,36 @@ if ($_POST) {
     }
 }
 
-// Get transactions for correction
+// Get transactions for correction (search + pagination)
+$ui = ui_query_params([]);
+$q = $ui['q'];
+$from = " FROM transaksi t
+          JOIN anggota a ON t.anggota_id = a.id
+          JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
+          JOIN users u ON t.user_id = u.id
+          WHERE j.kode_jenis <> 'SHU'";
+$params = [];
+if ($q !== '') {
+    $from .= ' AND (a.nama_lengkap LIKE :q1 OR a.kode_anggota LIKE :q2 OR t.kode_transaksi LIKE :q3 OR t.keterangan LIKE :q4)';
+    $params[':q1'] = $params[':q2'] = $params[':q3'] = $params[':q4'] = '%' . $q . '%';
+}
+$countStmt = $db->prepare('SELECT COUNT(*)' . $from);
+foreach ($params as $k => $v) {
+    $countStmt->bindValue($k, $v);
+}
+$countStmt->execute();
+$pager = ui_paginate((int)$countStmt->fetchColumn(), $ui['page'], $ui['per_page']);
 $query_transaksi = "SELECT t.*, a.nama_lengkap, j.nama_jenis, u.nama_lengkap as teller
-                   FROM transaksi t 
-                   JOIN anggota a ON t.anggota_id = a.id 
-                   JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
-                   JOIN users u ON t.user_id = u.id
-                   WHERE j.kode_jenis <> 'SHU'
-                   ORDER BY t.tanggal_transaksi DESC 
-                   LIMIT 50";
+                   $from
+                   ORDER BY t.tanggal_transaksi DESC
+                   LIMIT {$pager['per_page']} OFFSET {$pager['offset']}";
 $stmt_transaksi = $db->prepare($query_transaksi);
+foreach ($params as $k => $v) {
+    $stmt_transaksi->bindValue($k, $v);
+}
 $stmt_transaksi->execute();
 $transaksi_list = $stmt_transaksi->fetchAll(PDO::FETCH_ASSOC);
 
-// Create log_koreksi table if not exists
-$db->exec("CREATE TABLE IF NOT EXISTS log_koreksi (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    transaksi_id INT NOT NULL,
-    jumlah_lama DECIMAL(15,2) NOT NULL,
-    jumlah_baru DECIMAL(15,2) NOT NULL,
-    selisih DECIMAL(15,2) NOT NULL,
-    keterangan TEXT,
-    user_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (transaksi_id) REFERENCES transaksi(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-)");
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -115,6 +130,7 @@ $db->exec("CREATE TABLE IF NOT EXISTS log_koreksi (
     <title>Koreksi Transaksi - <?php echo APP_NAME; ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
 </head>
 <body>
     <?php include '../includes/header.php'; ?>
@@ -124,19 +140,12 @@ $db->exec("CREATE TABLE IF NOT EXISTS log_koreksi (
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-edit me-2"></i>Koreksi Transaksi
-                    </h1>
-                </div>
-
-                <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success"><?php echo $_SESSION['success']; unset($_SESSION['success']); ?></div>
-                <?php endif; ?>
-                
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger"><?php echo $_SESSION['error']; unset($_SESSION['error']); ?></div>
-                <?php endif; ?>
+                <?php ui_page_header([
+                    'title' => 'Koreksi Transaksi',
+                    'icon' => 'ti ti-edit',
+                    'subtitle' => 'Perbaiki transaksi yang mempengaruhi saldo dan kas',
+                ]); ?>
+                <?php ui_flash(); ?>
 
                 <div class="alert alert-warning">
                     <i class="fas fa-exclamation-triangle me-2"></i>
@@ -152,8 +161,17 @@ $db->exec("CREATE TABLE IF NOT EXISTS log_koreksi (
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
+                        <?php
+                        ui_table_toolbar([
+                            'action' => 'koreksi.php',
+                            'q' => $q,
+                            'placeholder' => 'Cari kode, nama, keterangan…',
+                            'per_page' => $pager['per_page'],
+                            'reset_href' => 'koreksi.php',
+                        ]);
+                        ?>
+                        <div class="table-responsive ui-table-scroll">
+                            <table class="table table-striped align-middle mb-0">
                                 <thead>
                                     <tr>
                                         <th>Kode</th>
@@ -163,49 +181,52 @@ $db->exec("CREATE TABLE IF NOT EXISTS log_koreksi (
                                         <th>Tipe</th>
                                         <th>Jumlah</th>
                                         <th>Keterangan</th>
-                                        <th>Aksi</th>
+                                        <th class="text-end">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($transaksi_list as $transaksi): ?>
+                                    <?php if (!$transaksi_list): ?>
+                                    <tr><td colspan="8" class="text-center text-muted py-4">Tidak ada data</td></tr>
+                                    <?php else: foreach ($transaksi_list as $transaksi): ?>
                                     <tr>
                                         <td>
-                                            <small class="fw-bold"><?php echo $transaksi['kode_transaksi']; ?></small>
+                                            <small class="fw-bold"><?php echo htmlspecialchars($transaksi['kode_transaksi']); ?></small>
                                         </td>
                                         <td>
-                                            <small><?php echo date('d/m/Y', strtotime($transaksi['tanggal_transaksi'])); ?></small>
+                                            <small><?php echo formatTanggalUi($transaksi['tanggal_transaksi']); ?></small>
                                             <br>
                                             <small class="text-muted"><?php echo date('H:i', strtotime($transaksi['tanggal_transaksi'])); ?></small>
                                         </td>
-                                        <td><?php echo $transaksi['nama_lengkap']; ?></td>
-                                        <td><?php echo $transaksi['nama_jenis']; ?></td>
+                                        <td><?php echo ui_cell_ellipsis($transaksi['nama_lengkap'], 28); ?></td>
+                                        <td><?php echo ui_cell_ellipsis($transaksi['nama_jenis'], 20); ?></td>
                                         <td>
-                                            <span class="badge bg-<?php echo $transaksi['jenis_transaksi'] == 'setoran' ? 'success' : 'warning'; ?>">
+                                            <span class="badge bg-<?php echo $transaksi['jenis_transaksi'] == 'setoran' ? 'success' : 'warning'; ?><?php echo $transaksi['jenis_transaksi'] == 'setoran' ? '' : ' text-dark'; ?>">
                                                 <?php echo ucfirst($transaksi['jenis_transaksi']); ?>
                                             </span>
                                         </td>
                                         <td><?php echo formatRupiah($transaksi['jumlah']); ?></td>
                                         <td>
-                                            <small><?php echo $transaksi['keterangan']; ?></small>
+                                            <small><?php echo ui_cell_ellipsis($transaksi['keterangan'], 32); ?></small>
                                             <br>
-                                            <small class="text-muted">Oleh: <?php echo $transaksi['teller']; ?></small>
+                                            <small class="text-muted">Oleh: <?php echo htmlspecialchars($transaksi['teller']); ?></small>
                                         </td>
-                                        <td>
+                                        <td class="table-actions text-end">
                                             <button class="btn btn-sm btn-warning" data-bs-toggle="modal" 
                                                     data-bs-target="#koreksiModal" 
-                                                    data-id="<?php echo $transaksi['id']; ?>"
-                                                    data-kode="<?php echo $transaksi['kode_transaksi']; ?>"
-                                                    data-jumlah="<?php echo $transaksi['jumlah']; ?>"
-                                                    data-jenis="<?php echo $transaksi['jenis_transaksi']; ?>"
-                                                    data-anggota="<?php echo $transaksi['nama_lengkap']; ?>">
+                                                    data-id="<?php echo (int)$transaksi['id']; ?>"
+                                                    data-kode="<?php echo htmlspecialchars($transaksi['kode_transaksi'], ENT_QUOTES, 'UTF-8'); ?>"
+                                                    data-jumlah="<?php echo htmlspecialchars((string)$transaksi['jumlah'], ENT_QUOTES, 'UTF-8'); ?>"
+                                                    data-jenis="<?php echo htmlspecialchars($transaksi['jenis_transaksi'], ENT_QUOTES, 'UTF-8'); ?>"
+                                                    data-anggota="<?php echo htmlspecialchars($transaksi['nama_lengkap'], ENT_QUOTES, 'UTF-8'); ?>">
                                                 <i class="fas fa-edit"></i> Koreksi
                                             </button>
                                         </td>
                                     </tr>
-                                    <?php endforeach; ?>
+                                    <?php endforeach; endif; ?>
                                 </tbody>
                             </table>
                         </div>
+                        <?php ui_pagination($pager, 'koreksi.php'); ?>
                     </div>
                 </div>
             </main>

@@ -125,11 +125,6 @@ foreach ($pinjaman as $p) {
     $total_denda_dibayar += $p['total_denda_dibayar'];
 }
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
-
 // ============================================
 // BUAT PDF
 // ============================================

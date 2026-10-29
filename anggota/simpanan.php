@@ -29,6 +29,24 @@ $stmt_simpanan = $db->prepare($query_simpanan);
 $stmt_simpanan->bindParam(':anggota_id', $anggota_data['id']);
 $stmt_simpanan->execute();
 $simpanan_list = $stmt_simpanan->fetchAll(PDO::FETCH_ASSOC);
+$__ui = ui_query_params([]);
+$__q = $__ui['q'];
+$__all = $simpanan_list;
+if ($__q !== '') {
+    $__fields = array (
+  0 => 'nama_jenis',
+  1 => 'kode_jenis',
+);
+    $__all = array_values(array_filter($__all, static function ($r) use ($__q, $__fields) {
+        $hay = '';
+        foreach ($__fields as $f) { $hay .= ' ' . ($r[$f] ?? ''); }
+        return stripos($hay, $__q) !== false;
+    }));
+}
+$pager = ui_paginate(count($__all), $__ui['page'], $__ui['per_page']);
+$simpanan_list = array_slice($__all, $pager['offset'], $pager['per_page']);
+$q = $__q;
+
 
 // Get total simpanan (HANYA SIMPANAN REAL, EXCLUDE ANG)
 $query_total = "SELECT COALESCE(SUM(s.saldo), 0) as total_simpanan 
@@ -40,16 +58,6 @@ $stmt_total->bindParam(':anggota_id', $anggota_data['id']);
 $stmt_total->execute();
 $total_simpanan = $stmt_total->fetch(PDO::FETCH_ASSOC)['total_simpanan'];
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    if ($angka == 0) {
-        return 'Rp 0';
-    }
-    if ($angka < 0) {
-        return '-Rp ' . number_format(abs($angka), 0, ',', '.');
-    }
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -61,7 +69,7 @@ function formatRupiah($angka) {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         .main-content {
-            margin-left: 280px;
+            margin-left: 0; /* densify: shell owns sidebar */
             margin-top: 10px;
             padding: 15px;
         }
@@ -115,39 +123,16 @@ function formatRupiah($angka) {
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center page-header border-bottom">
-                    <h1 class="h3">
-                        <i class="fas fa-piggy-bank me-2"></i>Simpanan Saya
-                    </h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <div class="btn-group me-2">
-                            <a href="riwayat_simpanan.php" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-history me-1"></i> Riwayat
-                            </a>
+                <?php ui_page_header([
+                    'title' => 'Simpanan Saya',
+                    'icon' => 'fas fa-piggy-bank text-success',
+                    'subtitle' => 'Saldo simpanan per jenis tabungan',
+                    'actions' => '<a href="riwayat_simpanan.php" class="btn btn-sm btn-outline-primary"><i class="fas fa-history me-1"></i>Riwayat</a>',
+                ]); ?>
 
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Total Simpanan Card -->
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card total-card bg-success text-white">
-                            <div class="card-body py-3">
-                                <div class="row align-items-center">
-                                    <div class="col-md-8">
-                                        <h4 class="card-title mb-1">Total Simpanan</h4>
-                                        <h2 class="fw-bold mb-1"><?php echo formatRupiah($total_simpanan); ?></h2>
-                                        <p class="card-text mb-0">Saldo total seluruh jenis simpanan</p>
-                                    </div>
-                                    <div class="col-md-4 text-end">
-                                        <i class="fas fa-piggy-bank fa-4x opacity-50"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <?php ui_stat_grid([
+                    ['label' => 'Total simpanan', 'value' => formatRupiah($total_simpanan), 'tone' => 'success', 'icon' => 'fas fa-piggy-bank', 'hint' => 'Saldo seluruh jenis'],
+                ]); ?>
 
                 <!-- Informasi Simpanan -->
                 <div class="alert alert-info py-2 mb-3">
@@ -158,6 +143,14 @@ function formatRupiah($angka) {
                         Total simpanan Anda saat ini adalah <?php echo formatRupiah($total_simpanan); ?>.
                     </small>
                 </div>
+
+                <?php if (isset($pager)) ui_table_toolbar([
+                    'action' => 'simpanan.php',
+                    'q' => $q ?? '',
+                    'placeholder' => 'Cari jenis / kode simpanan…',
+                    'per_page' => $pager['per_page'],
+                    'reset_href' => 'simpanan.php',
+                ]); ?>
 
                 <!-- Jenis Simpanan -->
                 <div class="row">
@@ -214,7 +207,7 @@ function formatRupiah($angka) {
                                 </div>
                                 <div class="card-footer bg-light py-2">
                                     <small class="text-muted">
-                                        <i class="fas fa-clock me-1"></i> Update: <?php echo date('d/m/Y H:i', strtotime($simpanan['updated_at'])); ?>
+                                        <i class="fas fa-clock me-1"></i> Update: <?php echo formatTanggalUi($simpanan['updated_at'], true); ?>
                                     </small>
                                 </div>
                             </div>
@@ -255,6 +248,7 @@ function formatRupiah($angka) {
                     </div>
                 </div>
                 <?php endif; ?>
+                <?php if (isset($pager)) ui_pagination($pager, 'simpanan.php'); ?>
             </main>
         </div>
     </div>

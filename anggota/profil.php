@@ -34,13 +34,13 @@ $foto_nasabah = $anggota_data['id'] ? fotoNasabahAnggota($db, $anggota_data['id'
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .main-content { margin-left: 280px; margin-top: 10px; padding: 15px; }
+        .main-content { margin-left: 0; /* densify: shell owns sidebar */ margin-top: 10px; padding: 15px; }
         .page-header { padding-top: 5px; padding-bottom: 10px; margin-bottom: 15px; }
         .profile-card { border: none; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .foto-profil { width: 160px; height: 160px; object-fit: cover; border-radius: 50%; border: 4px solid #e9ecef; }
         .avatar-inisial { width: 160px; height: 160px; border-radius: 50%; display: inline-flex; align-items: center;
-                          justify-content: center; font-size: 3.5rem; font-weight: 600; color: #fff;
-                          background: linear-gradient(135deg, #2c3e50, #3498db); }
+                          justify-content: center; font-size: 1.5rem; font-weight: 600; color: #fff;
+                          background: linear-gradient(135deg,#123d47,#087f83); }
     </style>
 </head>
 <body>
@@ -51,16 +51,12 @@ $foto_nasabah = $anggota_data['id'] ? fotoNasabahAnggota($db, $anggota_data['id'
             <?php include '../includes/sidebar.php'; ?>
 
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center page-header border-bottom">
-                    <h1 class="h3"><i class="fas fa-user me-2"></i>Profil Saya</h1>
-                </div>
-
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger alert-dismissible fade show py-2" role="alert">
-                        <i class="fas fa-exclamation-circle me-2"></i><?php echo htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
+                <?php ui_page_header([
+                    'title' => 'Profil Saya',
+                    'icon' => 'fas fa-user text-primary',
+                    'subtitle' => 'Data diri dan status keanggotaan',
+                ]); ?>
+                <?php ui_flash(); ?>
 
                 <div class="row justify-content-center">
                     <div class="col-lg-6">
@@ -85,7 +81,7 @@ $foto_nasabah = $anggota_data['id'] ? fotoNasabahAnggota($db, $anggota_data['id'
                                     </tr>
                                     <tr>
                                         <td class="text-muted">Tanggal Daftar</td>
-                                        <td class="fw-semibold"><?php echo $anggota_data['tanggal_daftar'] ? htmlspecialchars(formatDateIndonesian($anggota_data['tanggal_daftar'])) : '-'; ?></td>
+                                        <td class="fw-semibold"><?php echo $anggota_data['tanggal_daftar'] ? htmlspecialchars(formatTanggalUi($anggota_data['tanggal_daftar'])) : '-'; ?></td>
                                     </tr>
                                     <tr>
                                         <td class="text-muted">Status</td>

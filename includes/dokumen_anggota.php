@@ -48,14 +48,68 @@ if (!function_exists('dirUploadAnggota')) {
     }
 }
 
+if (!function_exists('normalisasiPathDokumenAnggota')) {
+    /**
+     * Normalisasi nilai kolom foto ke path relatif konsisten.
+     * Baru: "anggota/{id}/{file}" ; legacy basename → assets/uploads/ktp/{file}.
+     */
+    function normalisasiPathDokumenAnggota($nilai) {
+        $nilai = str_replace('\\', '/', trim((string) $nilai));
+        if ($nilai === '' || preg_match('#^(https?:)?//#i', $nilai) || preg_match('#^[a-zA-Z]:/#', $nilai)) {
+            return '';
+        }
+        if (strpos($nilai, 'uploads/') === 0) {
+            $nilai = substr($nilai, 8);
+        }
+        $nilai = ltrim($nilai, '/');
+        if ($nilai === '' || strpos($nilai, '..') !== false) {
+            return '';
+        }
+        return $nilai;
+    }
+}
+
+if (!function_exists('pathAbsDokumenAnggota')) {
+    /** Path absolut di disk untuk nilai kolom dokumen; '' bila tidak bisa di-resolve. */
+    function pathAbsDokumenAnggota($nilai) {
+        $nilai = normalisasiPathDokumenAnggota($nilai);
+        if ($nilai === '') {
+            return '';
+        }
+        $root = realpath(__DIR__ . '/..');
+        if ($root === false) {
+            return '';
+        }
+        if (strpos($nilai, 'assets/uploads/ktp/') === 0) {
+            return $root . '/' . $nilai;
+        }
+        if (strpos($nilai, '/') === false) {
+            return $root . '/assets/uploads/ktp/' . $nilai;
+        }
+        return $root . '/uploads/' . $nilai;
+    }
+}
+
+if (!function_exists('dokumenAnggotaAdaDiDisk')) {
+    function dokumenAnggotaAdaDiDisk($nilai) {
+        $abs = pathAbsDokumenAnggota($nilai);
+        return $abs !== '' && is_file($abs);
+    }
+}
+
 if (!function_exists('urlDokumenAnggota')) {
     /**
      * URL relatif (dari folder admin/ atau teller/) untuk nilai kolom dokumen.
      * Nilai baru: "anggota/{id}/{file}" ; nilai lama (hanya nama file): assets/uploads/ktp/.
      */
     function urlDokumenAnggota($nilai) {
-        if (empty($nilai)) {
+        $nilai = normalisasiPathDokumenAnggota($nilai);
+        if ($nilai === '') {
             return '';
+        }
+        if (strpos($nilai, 'assets/uploads/ktp/') === 0) {
+            $base = substr($nilai, strlen('assets/uploads/ktp/'));
+            return '../assets/uploads/ktp/' . rawurlencode(basename($base));
         }
         if (strpos($nilai, '/') !== false) {
             return '../uploads/' . $nilai;

@@ -1,4 +1,55 @@
 document.addEventListener('DOMContentLoaded', function () {
+    if (window.__simkeuAppUiReady) return;
+    window.__simkeuAppUiReady = true;
+
+    // Calm toast feedback from flash sources / legacy alerts
+    (function initToasts(){
+        let stack=document.querySelector('.ui-toast-stack');
+        if(!stack){stack=document.createElement('div');stack.className='ui-toast-stack';stack.setAttribute('aria-live','polite');stack.setAttribute('aria-relevant','additions');document.body.appendChild(stack);}
+        function iconFor(type){return type==='danger'?'fa-exclamation-circle':(type==='warning'?'fa-exclamation-triangle':'fa-check-circle');}
+        function showToast(type,message,opts){
+            if(!message)return;
+            const toast=document.createElement('div');
+            toast.className='ui-toast ui-toast-'+(type||'success');
+            toast.setAttribute('role','status');
+            const link=opts&&opts.href?('<div class="mt-1"><a href="'+opts.href+'">'+(opts.linkLabel||'Lihat detail')+'</a></div>'):'';
+            toast.innerHTML='<span class="ui-toast-icon" aria-hidden="true"><i class="fas '+iconFor(type)+'"></i></span><div class="ui-toast-body"><div>'+message+'</div>'+link+'</div><button type="button" class="ui-toast-close" aria-label="Tutup"><i class="fas fa-times" aria-hidden="true"></i></button>';
+            const close=()=>{toast.classList.add('is-leaving');setTimeout(()=>toast.remove(),180);};
+            toast.querySelector('.ui-toast-close').addEventListener('click',close);
+            stack.appendChild(toast);
+            setTimeout(close, type==='danger'?7000:4500);
+        }
+        const seen=new Set();
+        const pushOnce=(type,message,opts)=>{
+            const key=(type||'success')+'|'+String(message||'').slice(0,160);
+            if(!message||seen.has(key))return;
+            seen.add(key);
+            showToast(type,message,opts);
+        };
+        const sources=document.querySelectorAll('.ui-toast-source[data-ui-toast]');
+        sources.forEach(el=>{
+            pushOnce(el.getAttribute('data-ui-toast')||'success', el.getAttribute('data-ui-toast-message')||'', {
+                href: el.getAttribute('data-ui-toast-href')||'',
+                linkLabel: el.getAttribute('data-ui-toast-link')||'Lihat bukti'
+            });
+            el.remove();
+        });
+        // Legacy Bootstrap alerts → toast hanya jika belum ada ui-toast-source (hindari double)
+        if(!sources.length){
+            document.querySelectorAll('main > .alert.alert-dismissible, main > .alert[role="alert"]').forEach((alert,i)=>{
+                if(i>1)return;
+                // Instruksi halaman / info tetap di tempat (jangan diubah jadi toast)
+                if(alert.classList.contains('alert-info')||alert.classList.contains('alert-secondary')||alert.classList.contains('info-alert')||alert.hasAttribute('data-ui-toast-skip'))return;
+                const type=alert.classList.contains('alert-danger')?'danger':(alert.classList.contains('alert-warning')?'warning':'success');
+                const clone=alert.cloneNode(true);
+                clone.querySelectorAll('.btn-close,button').forEach(b=>b.remove());
+                const text=(clone.textContent||'').replace(/\s+/g,' ').trim();
+                if(text){pushOnce(type,text);alert.remove();}
+            });
+        }
+        window.uiToast=showToast;
+    })();
+
     function initAutocompleteSelect(select) {
         if(select.dataset.uiAutocompleteReady==='1'||select.multiple||select.closest('.ui-combobox'))return;
         const entity=/^(anggota_id|pinjaman_id|ketua_kelompok_id|jenis_pinjaman_id|jenis_simpanan_id)$/i.test(select.name||'');
@@ -87,6 +138,146 @@ document.addEventListener('DOMContentLoaded', function () {
     const main=document.querySelector('main');
     if(main){main.id=main.id || 'konten-utama';main.setAttribute('tabindex','-1');document.querySelector('.ui-skip')?.setAttribute('href','#'+main.id);}
     document.querySelectorAll('main .row').forEach(row=>{if(Array.from(row.children).some(col=>Array.from(col.children).some(card=>card.classList.contains('stat-card')))){row.classList.add('ui-stat-grid');row.dataset.count=row.children.length;}});
+    // Standar tabel: bungkus aksi baris (2+ tombol) jadi menu ⋮ SEBELUM
+    // normalisasi .ui-table-actions — kalau dibalik, anak jadi 1 div dan ⋮ dilewati.
+    // Setiap item menu wajib ikon + teks (bukan tombol ikon berwarna).
+    const actionIconLabels = [
+        ['fa-trash', 'Hapus'], ['fa-times', 'Hapus'], ['fa-ban', 'Tolak'],
+        ['fa-edit', 'Ubah'], ['fa-pen', 'Ubah'],
+        ['fa-eye', 'Detail'], ['fa-search', 'Detail'],
+        ['fa-check', 'Setujui'], ['fa-thumbs-up', 'Setujui'],
+        ['fa-print', 'Cetak'], ['fa-file-pdf', 'PDF'], ['fa-file-excel', 'Excel'],
+        ['fa-key', 'Reset password'], ['fa-flag-checkered', 'Lunaskan'],
+        ['fa-whatsapp', 'WhatsApp'], ['fa-download', 'Unduh'],
+        ['fa-sync', 'Muat ulang'], ['fa-file-lines', 'Surat'], ['fa-file-alt', 'Surat']
+    ];
+    function collectActionables(root) {
+        return Array.from(root.children).filter(function (el) {
+            if (el.nodeType !== 1) return false;
+            if (el.classList.contains('modal') || el.classList.contains('dropdown-menu')) return false;
+            if (el.classList.contains('ui-action-menu') || el.classList.contains('dropdown')) return false;
+            return el.matches('a,button,form') || !!el.querySelector('a,button');
+        });
+    }
+    function resolveActionLabel(ctrl) {
+        const raw = ((ctrl.getAttribute('aria-label') || '') + ' ' + (ctrl.title || '') + ' ' + (ctrl.textContent || ''))
+            .replace(/\s+/g, ' ').trim();
+        if (raw) return raw;
+        const icon = ctrl.querySelector('i');
+        if (icon) {
+            for (let i = 0; i < actionIconLabels.length; i++) {
+                if (icon.classList.contains(actionIconLabels[i][0])) return actionIconLabels[i][1];
+            }
+        }
+        return 'Aksi';
+    }
+    function normalizeActionControl(ctrl, label) {
+        const keep = {};
+        Array.from(ctrl.attributes).forEach(function (attr) {
+            if (/^(data-|href$|target$|rel$|type$|name$|value$|onclick$|id$|form$)/i.test(attr.name)) {
+                keep[attr.name] = attr.value;
+            }
+        });
+        const icon = ctrl.querySelector('i');
+        const iconClass = icon ? icon.className.replace(/\s+/g, ' ').trim() : 'fas fa-circle';
+        // Rapikan kelas tombol berwarna → item menu teks seragam
+        ctrl.className = 'dropdown-item ui-action-item';
+        if (/(hapus|delete|tolak|batal)/i.test(label)) ctrl.classList.add('text-danger');
+        else if (/(setujui|approve|lunaskan|cairkan|bayar)/i.test(label)) ctrl.classList.add('text-success');
+        Object.keys(keep).forEach(function (k) { ctrl.setAttribute(k, keep[k]); });
+        if (!ctrl.getAttribute('type') && ctrl.tagName === 'BUTTON') ctrl.type = 'button';
+        ctrl.setAttribute('title', label);
+        ctrl.setAttribute('aria-label', label);
+        ctrl.innerHTML = '<i class="' + iconClass + '" aria-hidden="true"></i><span>' + label + '</span>';
+        return ctrl;
+    }
+    function convertCellToActionMenu(cell) {
+        if (!cell || cell.dataset.uiActionReady === '1') return false;
+        if (cell.querySelector(':scope > .ui-action-menu, :scope > .dropdown .action-menu, :scope > .dropdown .dropdown-menu')) {
+            // Sudah dropdown custom — pastikan item di dalamnya ikon+teks
+            cell.querySelectorAll('.dropdown-menu .dropdown-item, .action-menu .dropdown-item, .action-menu a, .action-menu button').forEach(function (item) {
+                if (item.dataset.uiLabelReady === '1') return;
+                item.dataset.uiLabelReady = '1';
+                const label = resolveActionLabel(item);
+                if (!item.querySelector('span') && item.querySelector('i') && !(item.textContent || '').replace(/\s+/g, '').replace(item.querySelector('i').textContent || '', '')) {
+                    normalizeActionControl(item, label);
+                } else if (item.querySelector('i') && !(item.textContent || '').trim().replace(item.querySelector('i').textContent || '', '').trim()) {
+                    normalizeActionControl(item, label);
+                } else {
+                    item.classList.add('ui-action-item');
+                }
+            });
+            cell.dataset.uiActionReady = '1';
+            return false;
+        }
+        const nested = cell.querySelector(':scope > .ui-table-actions, :scope > .service-row-actions');
+        const root = nested || cell;
+        const actionable = collectActionables(root);
+        if (actionable.length < 2) return false;
+        cell.dataset.uiActionReady = '1';
+        const wrap = document.createElement('div');
+        wrap.className = 'dropdown ui-action-menu';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-outline-secondary ui-action-toggle';
+        btn.setAttribute('data-bs-toggle', 'dropdown');
+        btn.setAttribute('data-bs-boundary', 'viewport');
+        btn.setAttribute('data-bs-popper-config', '{"strategy":"fixed"}');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.setAttribute('aria-label', 'Aksi baris');
+        btn.innerHTML = '<i class="fas fa-ellipsis-v" aria-hidden="true"></i><span class="visually-hidden">Aksi</span>';
+        const menu = document.createElement('ul');
+        menu.className = 'dropdown-menu dropdown-menu-end shadow';
+        actionable.forEach(function (el) {
+            const li = document.createElement('li');
+            let ctrl = el.matches('a,button') ? el : el.querySelector('a.btn,button.btn,a,button');
+            if (!ctrl) {
+                li.appendChild(el);
+                menu.appendChild(li);
+                return;
+            }
+            const label = resolveActionLabel(ctrl);
+            if (el.matches('form')) {
+                // Form (mis. reset password): tampilkan tombol submit sebagai item menu
+                normalizeActionControl(ctrl, label);
+                el.classList.add('ui-action-form');
+                li.appendChild(el);
+            } else {
+                normalizeActionControl(ctrl, label);
+                li.appendChild(ctrl);
+            }
+            menu.appendChild(li);
+        });
+        wrap.appendChild(btn);
+        wrap.appendChild(menu);
+        cell.innerHTML = '';
+        cell.classList.add('table-actions', 'text-end', 'ui-actions-cell');
+        cell.appendChild(wrap);
+        if (window.bootstrap && bootstrap.Dropdown) {
+            btn.dataset.uiPopperFixed = '1';
+            new bootstrap.Dropdown(btn, {
+                boundary: 'viewport',
+                autoClose: true,
+                popperConfig: function (defaultConfig) {
+                    return Object.assign({}, defaultConfig, {
+                        strategy: 'fixed',
+                        modifiers: (defaultConfig.modifiers || []).concat([
+                            { name: 'preventOverflow', options: { boundary: 'viewport', padding: 8 } },
+                            { name: 'flip', options: { boundary: 'viewport', padding: 8 } }
+                        ])
+                    });
+                }
+            });
+        }
+        return true;
+    }
+    function convertAllActionMenus(scope) {
+        (scope || document).querySelectorAll(
+            'td.table-actions, td.ui-actions-cell, .table-actions, .service-row-actions, td.no-print:has(.service-row-actions), main table td:has(> .btn + .btn), main table td:has(> a.btn + a.btn), main table td:has(> .btn + form), main table td:has(> form + .btn)'
+        ).forEach(convertCellToActionMenu);
+    }
+    convertAllActionMenus();
+
     // Keep primary values intact; allow only descriptive columns to wrap.
     document.querySelectorAll('main table.table').forEach(table=>{
         table.classList.add('ui-data-table');
@@ -109,9 +300,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 cell.querySelectorAll('.badge br').forEach(br=>br.replaceWith(document.createTextNode(' ')));
                 if(!info.action && !cell.classList.contains('table-actions') && !cell.classList.contains('ui-actions-cell'))return;
                 cell.classList.add('ui-actions-cell');
+                // Sudah menu ⋮ — jangan bungkus lagi ke .ui-table-actions
+                if(cell.querySelector('.ui-action-menu, :scope > .dropdown')){
+                    cell.dataset.uiActionReady='1';
+                    return;
+                }
+                // Coba konversi ⋮ dulu (tombol masih sejajar)
+                if(convertCellToActionMenu(cell))return;
                 if(cell.querySelector(':scope > .ui-table-actions'))return;
                 const group=document.createElement('div');group.className='ui-table-actions';
                 Array.from(cell.childNodes).filter(node=>!(node.nodeType===1 && node.classList.contains('modal'))).forEach(node=>group.appendChild(node));cell.appendChild(group);
+                // Setelah grouping, coba lagi (2+ di dalam group)
+                if(convertCellToActionMenu(cell))return;
                 group.querySelectorAll('a.btn,button.btn').forEach(button=>{classifyButton(button);const label=button.getAttribute('aria-label') || button.title || button.textContent.trim();if(label && !button.title)button.title=label;});
             });
         }
@@ -138,7 +338,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if(!wrapper){wrapper=document.createElement('div');wrapper.className='ui-table-scroll';table.parentNode.insertBefore(wrapper,table);wrapper.appendChild(table);}
         wrapper.classList.add('ui-table-scroll');
         if(scrollers.some(s=>s.wrapper===wrapper))return;
-        const hint=document.createElement('div');hint.className='ui-scroll-hint';hint.textContent='Geser tabel ke samping untuk melihat kolom lainnya.';wrapper.insertAdjacentElement('afterend',hint);
+        // Satu hint per wrapper; jangan dobel jika skrip/HTML sudah memasang hint.
+        let hint=wrapper.nextElementSibling;
+        if(!(hint&&hint.classList&&hint.classList.contains('ui-scroll-hint'))){
+            hint=document.createElement('div');
+            hint.className='ui-scroll-hint';
+            hint.textContent='Geser tabel ke samping untuk melihat kolom lainnya.';
+            wrapper.insertAdjacentElement('afterend',hint);
+        }
         const tbody=table.tBodies[0];
         if(tbody && !tbody.rows.length){
             const row=tbody.insertRow();row.className='ui-empty-row';
@@ -232,4 +439,75 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     window.addEventListener('pageshow',scrollToCurrentHash);
     window.addEventListener('hashchange',scrollToCurrentHash);
+
+    // Pastikan semua dropdown aksi ⋮ memakai fixed positioning (tidak ketiban overflow tabel).
+    function hardenActionDropdowns(root) {
+        (root || document).querySelectorAll('.ui-action-menu [data-bs-toggle="dropdown"], .action-dropdown-toggle').forEach(function (btn) {
+            if (btn.dataset.uiPopperFixed === '1') return;
+            btn.dataset.uiPopperFixed = '1';
+            btn.setAttribute('data-bs-boundary', 'viewport');
+            if (!btn.getAttribute('data-bs-popper-config')) {
+                btn.setAttribute('data-bs-popper-config', '{"strategy":"fixed"}');
+            }
+            if (window.bootstrap && bootstrap.Dropdown) {
+                const existing = bootstrap.Dropdown.getInstance(btn);
+                if (existing) existing.dispose();
+                new bootstrap.Dropdown(btn, {
+                    boundary: 'viewport',
+                    autoClose: true,
+                    popperConfig: function (defaultConfig) {
+                        return Object.assign({}, defaultConfig, {
+                            strategy: 'fixed',
+                            modifiers: (defaultConfig.modifiers || []).concat([
+                                { name: 'preventOverflow', options: { boundary: 'viewport', padding: 8 } },
+                                { name: 'flip', options: { boundary: 'viewport', padding: 8 } }
+                            ])
+                        });
+                    }
+                });
+            }
+        });
+    }
+    hardenActionDropdowns();
+
+    // Portal menu ke <body> saat dibuka — anti-clip dari .table-responsive / main overflow-x
+    document.addEventListener('show.bs.dropdown', function (e) {
+        const toggle = e.target;
+        if (!toggle || !toggle.closest) return;
+        const wrap = toggle.closest('.ui-action-menu, .dropdown');
+        if (!wrap || (!wrap.classList.contains('ui-action-menu') && !toggle.classList.contains('ui-action-toggle') && !toggle.classList.contains('action-dropdown-toggle'))) return;
+        const menu = wrap.querySelector(':scope > .dropdown-menu');
+        if (!menu) return;
+        if (!menu.dataset.uiMenuHome) {
+            menu.dataset.uiMenuHome = '1';
+            menu._uiHomeParent = wrap;
+            menu._uiHomeNext = menu.nextSibling;
+        }
+        if (menu.parentElement !== document.body) {
+            document.body.appendChild(menu);
+        }
+        menu.classList.add('ui-action-menu-open');
+        menu.style.zIndex = '2000';
+    });
+    document.addEventListener('hidden.bs.dropdown', function (e) {
+        const toggle = e.target;
+        if (!toggle || !toggle.closest) return;
+        const wrap = toggle.closest('.ui-action-menu, .dropdown');
+        // Menu mungkin sudah di body; cari via class + relasi home
+        let menu = wrap && wrap.querySelector(':scope > .dropdown-menu');
+        if (!menu) {
+            menu = Array.from(document.body.querySelectorAll('.dropdown-menu.ui-action-menu-open')).find(function (m) {
+                return m._uiHomeParent === wrap;
+            });
+        }
+        if (!menu || !menu._uiHomeParent) return;
+        menu.classList.remove('ui-action-menu-open', 'show');
+        menu.style.removeProperty('z-index');
+        const home = menu._uiHomeParent;
+        if (menu._uiHomeNext && menu._uiHomeNext.parentNode === home) {
+            home.insertBefore(menu, menu._uiHomeNext);
+        } else {
+            home.appendChild(menu);
+        }
+    });
 });

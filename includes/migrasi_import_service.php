@@ -3,6 +3,7 @@
 require_once __DIR__ . '/migrasi_excel_helper.php';
 require_once __DIR__ . '/pinjaman_helper.php';
 require_once __DIR__ . '/migrasi_dokumen_cadangan.php';
+require_once __DIR__ . '/anggota_helper.php';
 
 function migrasiImportDalamTransaksi(PDO $db, callable $mapper) {
     if ($db->inTransaction()) throw new RuntimeException('Import migrasi tidak dapat dimulai karena masih ada transaksi aktif.');
@@ -48,6 +49,10 @@ function migrasiPathUpload($path){
     if(strpos($path,'uploads/')===0)$path=substr($path,8);
     $path=ltrim($path,'/');
     if($path===''||strpos($path,'..')!==false)return '';
+    // Legacy bare / assets path: simpan konsisten (basename atau assets/uploads/ktp/...)
+    if(strpos($path,'assets/uploads/ktp/')===0){
+        return $path;
+    }
     return $path;
 }
 function migrasiImportKoperasi(PDO $db,array $data){
@@ -112,10 +117,24 @@ function migrasiImportFinal(PDO $db,$path,$userId=null){
                 ->execute([$id,$fotoSimpan,($ttd!==''?$ttd:null)]);
             // Pulihkan foto/TTD dari cadangan reset bila Excel tidak mengisi path.
             $n['dokumen'] += migrasiPulihkanDokumenAnggota($db, $id, $old);
+            // Pastikan akun login tersedia (kecuali status anggota nonaktif).
+            pastikanAkunLoginAnggota($db, (int) $id);
             migrasiSaveItem($db,'anggota',$old,$id); $n['anggota']++;
         }
         foreach($data['Pendanaan_Dapin']??[] as $r){$code=trim((string)$r['ID Dapin*']);if(!$code)continue;$q=$db->prepare('INSERT INTO pendanaan_dapin(kode_dapin,nama_pendana,tanggal_diterima,modal_diterima,tenor,total_wajib_kembali,tanggal_jatuh_tempo,status,catatan) VALUES(?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE nama_pendana=VALUES(nama_pendana),tanggal_diterima=VALUES(tanggal_diterima),modal_diterima=VALUES(modal_diterima),tenor=VALUES(tenor),total_wajib_kembali=VALUES(total_wajib_kembali),tanggal_jatuh_tempo=VALUES(tanggal_jatuh_tempo),status=VALUES(status),catatan=VALUES(catatan)');$q->execute([$code,$r['Nama/Lembaga Dapin*'],migrasiTanggal($r['Tanggal Dana Diterima*'],'tanggal Dapin'),migrasiUang($r['Modal Diterima (Rp)*']),max(1,(int)$r['Tenor (Bulan)*']),migrasiUang($r['Total Wajib Kembali (Rp)*']),migrasiTanggal($r['Tanggal Jatuh Tempo']??''),migrasiStatus($r['Status*']),$r['Catatan']??null]);$q=$db->prepare('SELECT id FROM pendanaan_dapin WHERE kode_dapin=?');$q->execute([$code]);migrasiSaveItem($db,'dapin',$code,$q->fetchColumn());$n['dapin']++;}
-        foreach($data['Pinjaman']??[] as $r){$code=trim((string)$r['ID Pinjaman Lama*']);if(!$code)continue;$member=migrasiItem($db,'anggota',trim((string)$r['ID Nasabah Lama*']));$q=$db->prepare('SELECT id FROM jenis_pinjaman WHERE kode_jenis=?');$q->execute([trim((string)$r['Kode Produk*'])]);$product=$q->fetchColumn();if(!$member||!$product)throw new RuntimeException("Relasi untuk pinjaman $code tidak ditemukan.");$date=migrasiTanggal($r['Tanggal Cair Asli*'],'tanggal cair');$pokok=migrasiUang($r['Plafon (Rp)*']);$tenor=max(1,(int)$r['Tenor (Bulan)*']);$freq=migrasiFreq($r['Frekuensi*']);$bunga=migrasiUang(preg_replace('/[^0-9,.]/','',(string)$r['Bunga (%)*']));$skema=migrasiNorm($r['Skema Bunga*'])==='tahunan'?'tahunan':'flat';$hitung=hitungPinjaman($pokok,$bunga,$tenor,$freq,$skema);$q=$db->prepare('SELECT id FROM pinjaman WHERE kode_pinjaman=?');$q->execute([$code]);$id=$q->fetchColumn();if(!$id){$q=$db->prepare("INSERT INTO pengajuan_pinjaman(kode_pengajuan,anggota_id,jenis_pinjaman_id,jumlah_pinjaman,tenor,bunga,skema_bunga,frekuensi,tujuan_pinjaman,status,admin_id,user_id,tanggal_pengajuan,tanggal_persetujuan) VALUES(?,?,?,?,?,?,?,?,?,'dicairkan',?,?,?,?)");$q->execute([migrasiKey('MIG',$code),$member,$product,$pokok,$tenor,$bunga,$skema,$freq,'Migrasi '.$code,$userId,$userId,$date.' 12:00:00',$date.' 12:00:00']);$pengajuan=$db->lastInsertId();$total=migrasiUang($r['Total Tagihan (Rp)*'])?:$hitung['total'];$q=$db->prepare('INSERT INTO pinjaman(pengajuan_id,kode_pinjaman,anggota_id,jenis_pinjaman_id,jumlah_pinjaman,sisa_pokok,tenor,bunga,skema_bunga,frekuensi,jumlah_cicilan,total_pinjaman,angsuran_per_bulan,tanggal_pencairan,jatuh_tempo,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,\'aktif\')');$q->execute([$pengajuan,$code,$member,$product,$pokok,$pokok,$tenor,$bunga,$skema,$freq,$hitung['jumlah_cicilan'],$total,migrasiUang($r['Angsuran Normal (Rp)*'])?:$hitung['angsuran'],$date,hitungJatuhTempo($date,$hitung['jumlah_cicilan'],$freq)]);$id=$db->lastInsertId();foreach($hitung['rincian'] as $a){$q=$db->prepare("INSERT INTO angsuran(pinjaman_id,angsuran_ke,jumlah_angsuran,pokok,bunga,tanggal_jatuh_tempo,status) VALUES(?,?,?,?,?,?, 'belum_bayar')");$q->execute([$id,$a['ke'],$a['jumlah'],$a['pokok'],$a['bunga'],hitungJatuhTempo($date,$a['ke'],$freq)]);$n['jadwal']++;}migrasiKas($db,'cair-'.$code,'keluar',$pokok,$date,'Pencairan migrasi '.$code);}$id=(int)$id;$fotoCair=migrasiPathUpload($r['Foto Pencairan']??$r['Foto Pencairan (opsional)']??'');if($fotoCair!==''&&kolomAda($db,'pinjaman','foto_pencairan')){$db->prepare('UPDATE pinjaman SET foto_pencairan=COALESCE(NULLIF(?,\'\'),foto_pencairan) WHERE id=?')->execute([$fotoCair,$id]);}$n['dokumen']+=migrasiPulihkanDokumenPinjaman($db,$id,$code);migrasiSaveItem($db,'pinjaman',$code,$id);$n['pinjaman']++;}
+        foreach($data['Pinjaman']??[] as $r){$code=trim((string)$r['ID Pinjaman Lama*']);if(!$code)continue;$member=migrasiItem($db,'anggota',trim((string)$r['ID Nasabah Lama*']));$q=$db->prepare('SELECT id FROM jenis_pinjaman WHERE kode_jenis=?');$q->execute([trim((string)$r['Kode Produk*'])]);$product=$q->fetchColumn();if(!$member||!$product)throw new RuntimeException("Relasi untuk pinjaman $code tidak ditemukan.");$date=migrasiTanggal($r['Tanggal Cair Asli*'],'tanggal cair');$pokok=migrasiUang($r['Plafon (Rp)*']);$tenor=max(1,(int)$r['Tenor (Bulan)*']);$freq=migrasiFreq($r['Frekuensi*']);$bunga=migrasiUang(preg_replace('/[^0-9,.]/','',(string)$r['Bunga (%)*']));$skema=migrasiNorm($r['Skema Bunga*'])==='tahunan'?'tahunan':'flat';$hitung=hitungPinjaman($pokok,$bunga,$tenor,$freq,$skema);$q=$db->prepare('SELECT id FROM pinjaman WHERE kode_pinjaman=?');$q->execute([$code]);$id=$q->fetchColumn();if(!$id){$q=$db->prepare("INSERT INTO pengajuan_pinjaman(kode_pengajuan,anggota_id,jenis_pinjaman_id,jumlah_pinjaman,tenor,bunga,skema_bunga,frekuensi,tujuan_pinjaman,status,admin_id,user_id,tanggal_pengajuan,tanggal_persetujuan) VALUES(?,?,?,?,?,?,?,?,?,'dicairkan',?,?,?,?)");$q->execute([migrasiKey('MIG',$code),$member,$product,$pokok,$tenor,$bunga,$skema,$freq,'Migrasi '.$code,$userId,$userId,$date.' 12:00:00',$date.' 12:00:00']);$pengajuan=$db->lastInsertId();$total=migrasiUang($r['Total Tagihan (Rp)*'])?:$hitung['total'];$q=$db->prepare('INSERT INTO pinjaman(pengajuan_id,kode_pinjaman,anggota_id,jenis_pinjaman_id,jumlah_pinjaman,sisa_pokok,tenor,bunga,skema_bunga,frekuensi,jumlah_cicilan,total_pinjaman,angsuran_per_bulan,tanggal_pencairan,jatuh_tempo,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,\'aktif\')');$q->execute([$pengajuan,$code,$member,$product,$pokok,$pokok,$tenor,$bunga,$skema,$freq,$hitung['jumlah_cicilan'],$total,migrasiUang($r['Angsuran Normal (Rp)*'])?:$hitung['angsuran'],$date,hitungJatuhTempo($date,$hitung['jumlah_cicilan'],$freq)]);$id=$db->lastInsertId();foreach($hitung['rincian'] as $a){$q=$db->prepare("INSERT INTO angsuran(pinjaman_id,angsuran_ke,jumlah_angsuran,pokok,bunga,tanggal_jatuh_tempo,status) VALUES(?,?,?,?,?,?, 'belum_bayar')");$q->execute([$id,$a['ke'],$a['jumlah'],$a['pokok'],$a['bunga'],hitungJatuhTempo($date,$a['ke'],$freq)]);$n['jadwal']++;}migrasiKas($db,'cair-'.$code,'keluar',$pokok,$date,'Pencairan migrasi '.$code);}
+            $id=(int)$id;
+            // Re-import / data lama: pastikan jadwal cicilan ada supaya bisa diproses di Angsuran.
+            $cntAng=$db->prepare('SELECT COUNT(*) FROM angsuran WHERE pinjaman_id=?');
+            $cntAng->execute([$id]);
+            if ((int)$cntAng->fetchColumn() === 0) {
+                foreach ($hitung['rincian'] as $a) {
+                    $q=$db->prepare("INSERT INTO angsuran(pinjaman_id,angsuran_ke,jumlah_angsuran,pokok,bunga,tanggal_jatuh_tempo,status) VALUES(?,?,?,?,?,?, 'belum_bayar')");
+                    $q->execute([$id,$a['ke'],$a['jumlah'],$a['pokok'],$a['bunga'],hitungJatuhTempo($date,$a['ke'],$freq)]);
+                    $n['jadwal']++;
+                }
+            }
+            $fotoCair=migrasiPathUpload($r['Foto Pencairan']??$r['Foto Pencairan (opsional)']??'');if($fotoCair!==''&&kolomAda($db,'pinjaman','foto_pencairan')){$db->prepare('UPDATE pinjaman SET foto_pencairan=COALESCE(NULLIF(?,\'\'),foto_pencairan) WHERE id=?')->execute([$fotoCair,$id]);}$n['dokumen']+=migrasiPulihkanDokumenPinjaman($db,$id,$code);migrasiSaveItem($db,'pinjaman',$code,$id);$n['pinjaman']++;}
         $ang=$db->query("SELECT id FROM jenis_simpanan WHERE kode_jenis='ANG' LIMIT 1")->fetchColumn();if(!$ang)throw new RuntimeException('Jenis simpanan ANG wajib tersedia.');
         foreach($data['Angsuran_Historis']??[] as $r){
             $key=trim((string)$r['ID Pembayaran']); if($key==='') continue;
@@ -139,14 +158,63 @@ function migrasiImportFinal(PDO $db,$path,$userId=null){
             $q=$db->prepare('INSERT INTO migrasi_pembayaran(source_key,pinjaman_id,transaksi_id,tanggal_bayar,angsuran_ke,jenis_pembayaran,pokok,bunga,denda,total_diterima,status,keterangan) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');
             $q->execute([$key,$loan,$trans,$date,$ke,$jenis,migrasiUang($r['Pokok (Rp)']??0),migrasiUang($r['Bunga (Rp)']??0),$denda,$total,migrasiNorm($r['Status*']),$r['Keterangan']??null]);
             migrasiSaveItem($db,'pembayaran',$key,$trans);
-            $q=$db->prepare("UPDATE angsuran SET status='lunas',tanggal_bayar=?,denda=CASE WHEN angsuran_ke=? THEN ? ELSE denda END,cara_bayar=? WHERE pinjaman_id=? AND angsuran_ke<=? AND status<>'lunas'");
-            $q->execute([$date,$ke,$denda,$jenis,$loan,$ke]);
+            $q=$db->prepare("UPDATE angsuran SET status='lunas',tanggal_bayar=?,denda=CASE WHEN angsuran_ke=? THEN ? ELSE denda END,denda_dibayar=CASE WHEN angsuran_ke=? THEN GREATEST(COALESCE(denda_dibayar,0),?) ELSE denda_dibayar END,cara_bayar=? WHERE pinjaman_id=? AND angsuran_ke<=? AND status<>'lunas'");
+            $q->execute([$date,$ke,$denda,$ke,$denda,$jenis,$loan,$ke]);
+            // Laporan Denda membaca layanan_bayar_denda — isi saat historis punya kolom Denda.
+            if ($denda > 0.005) {
+                try {
+                    $angQ = $db->prepare('SELECT id, denda FROM angsuran WHERE pinjaman_id=? AND angsuran_ke=? LIMIT 1');
+                    $angQ->execute([$loan, $ke]);
+                    $angRow = $angQ->fetch(PDO::FETCH_ASSOC);
+                    if ($angRow) {
+                        $cekDenda = $db->prepare('SELECT id FROM layanan_bayar_denda WHERE angsuran_id=? AND transaksi_id=? LIMIT 1');
+                        $cekDenda->execute([(int) $angRow['id'], (int) $trans]);
+                        if (!$cekDenda->fetchColumn()) {
+                            $insDenda = $db->prepare(
+                                'INSERT INTO layanan_bayar_denda
+                                 (angsuran_id,pinjaman_id,user_id,jumlah,metode,bukti,transaksi_id,approved_by,created_at,hari_telat,tarif,denda_awal,denda_akhir)
+                                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                            );
+                            $insDenda->execute([
+                                (int) $angRow['id'],
+                                (int) $loan,
+                                (int) $userId,
+                                $denda,
+                                'tunai',
+                                'migrasi',
+                                (int) $trans,
+                                (int) $userId,
+                                $date . ' 12:00:00',
+                                0,
+                                0,
+                                $denda,
+                                $denda,
+                            ]);
+                        }
+                    }
+                } catch (Throwable $e) {
+                    // Skema lama tanpa kolom snapshot — jangan gagalkan seluruh import.
+                }
+            }
             migrasiKas($db,'bayar-'.$key,'masuk',$total,$date,'Pembayaran migrasi '.$key.' - '.$p['kode_pinjaman'].($denda?' (denda)':''),$trans);
             $n['pembayaran']++;
         }
         foreach($data['Alokasi_Dapin']??[] as $r){$key=trim((string)($r['ID Alokasi']??''))?:trim((string)$r['ID Dapin*']).'|'.trim((string)$r['ID Pinjaman Lama*']);$loan=migrasiItem($db,'pinjaman',trim((string)$r['ID Pinjaman Lama*']));$dapin=migrasiItem($db,'dapin',trim((string)$r['ID Dapin*']));if(!$loan||!$dapin)throw new RuntimeException("Alokasi Dapin $key tidak valid.");$tglAlokasi=$r['Tanggal Alokasi*']??$r['Tanggal Alokasi (opsional)']??'';$q=$db->prepare('INSERT INTO alokasi_dapin(source_key,dapin_id,pinjaman_id,modal_dialokasikan,kewajiban_dapin,tanggal_alokasi,catatan) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE modal_dialokasikan=VALUES(modal_dialokasikan),kewajiban_dapin=VALUES(kewajiban_dapin),tanggal_alokasi=VALUES(tanggal_alokasi),catatan=VALUES(catatan)');$q->execute([$key,$dapin,$loan,migrasiUang($r['Modal Dialokasikan (Rp)*']),migrasiUang($r['Kewajiban Dapin (Rp)*']),$tglAlokasi!==''?migrasiTanggal($tglAlokasi,'tanggal alokasi'):null,$r['Catatan']??null]);$n['alokasi']++;}
         foreach($data['Saldo_Awal_Kas']??[] as $r){$date=migrasiTanggal($r['Tanggal Cut-off*'],'tanggal cut-off');$amount=migrasiUang($r['Saldo Kas Fisik (Rp)*']);if($amount)migrasiKas($db,'saldo-awal-'.$date,'masuk',$amount,$date,'Saldo awal kas migrasi: '.($r['Dasar/Perhitungan Saldo*']??''));$n['kas']++;}
-        foreach($data['Pinjaman']??[] as $r){$id=migrasiItem($db,'pinjaman',trim((string)$r['ID Pinjaman Lama*']));if(!$id)continue;$q=$db->prepare("SELECT COUNT(*),COALESCE(SUM(pokok),0) FROM angsuran WHERE pinjaman_id=? AND status<>'lunas'");$q->execute([$id]);$hasilSisa=$q->fetch(PDO::FETCH_NUM);$left=$hasilSisa[0];$sisa=$hasilSisa[1];$lunas=(int)$left===0||migrasiNorm($r['Status Saat Ini*'])==='lunas';$date=$lunas?migrasiTanggal(isset($r['Tanggal Lunas'])?$r['Tanggal Lunas']:''):null;$db->prepare('UPDATE pinjaman SET sisa_pokok=?,status=?,tanggal_lunas=? WHERE id=?')->execute([$sisa,$lunas?'lunas':'aktif',$date,$id]);}
+        foreach($data['Pinjaman']??[] as $r){
+            $id=migrasiItem($db,'pinjaman',trim((string)$r['ID Pinjaman Lama*']));
+            if(!$id)continue;
+            $q=$db->prepare("SELECT COUNT(*),COALESCE(SUM(pokok),0) FROM angsuran WHERE pinjaman_id=? AND status<>'lunas'");
+            $q->execute([$id]);
+            $hasilSisa=$q->fetch(PDO::FETCH_NUM);
+            $left=$hasilSisa[0];
+            $sisa=$hasilSisa[1];
+            $lunas=(int)$left===0||migrasiNorm($r['Status Saat Ini*'])==='lunas';
+            $date=$lunas?migrasiTanggal(isset($r['Tanggal Lunas'])?$r['Tanggal Lunas']:''):null;
+            // Pinjaman dengan sisa cicilan harus aktif agar tampil & bisa diproses di Angsuran.
+            $statusPinjaman=$lunas?'lunas':'aktif';
+            $db->prepare('UPDATE pinjaman SET sisa_pokok=?,status=?,tanggal_lunas=? WHERE id=?')->execute([$sisa,$statusPinjaman,$date,$id]);
+        }
         foreach($data['Pendanaan_Dapin']??[] as $r){$code=trim((string)$r['ID Dapin*']);if($code==='')continue;migrasiKas($db,'dapin-'.$code,'masuk',migrasiUang($r['Modal Diterima (Rp)*']),migrasiTanggal($r['Tanggal Dana Diterima*'],'tanggal Dapin'),'Modal pendanaan Dapin '.$code);}
         // Status nasabah mengikuti sheet Nasabah (jangan timpa nonaktif yang disengaja).
         // Setelah Reset Total, isi Status=aktif di Excel untuk nasabah yang masih beroperasi.

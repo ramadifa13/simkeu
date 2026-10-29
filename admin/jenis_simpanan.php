@@ -147,21 +147,32 @@ if ($_POST) {
     }
 }
 
-// Get all jenis simpanan
-$query = "SELECT * FROM jenis_simpanan ORDER BY 
-          CASE WHEN status = 'aktif' THEN 1 ELSE 2 END, 
-          nama_jenis";
+$ui = ui_query_params(['status']);
+$q = $ui['q'];
+$status_f = $ui['filters']['status'] ?? '';
+$query = "SELECT * FROM jenis_simpanan WHERE 1=1";
+$params = [];
+if ($q !== '') {
+    $query .= " AND (nama_jenis LIKE :q1 OR kode_jenis LIKE :q2 OR COALESCE(deskripsi,'') LIKE :q3)";
+    $params[':q1'] = $params[':q2'] = $params[':q3'] = '%' . $q . '%';
+}
+if ($status_f !== '') {
+    $query .= " AND status = :status";
+    $params[':status'] = $status_f;
+}
+$query .= " ORDER BY CASE WHEN status = 'aktif' THEN 1 ELSE 2 END, nama_jenis";
 $stmt = $db->prepare($query);
+ui_bind_params($stmt, $params);
 $stmt->execute();
-$jenis_simpanan = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// PERBAIKAN: Hitung statistik dengan cara yang kompatibel
-$total_jenis = count($jenis_simpanan);
+$jenis_all = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$total_jenis = count($jenis_all);
+$pager = ui_paginate($total_jenis, $ui['page'], $ui['per_page']);
+$jenis_simpanan = array_slice($jenis_all, $pager['offset'], $pager['per_page']);
 $aktif_count = 0;
 $nonaktif_count = 0;
 $minimum_count = 0;
 
-foreach ($jenis_simpanan as $jenis) {
+foreach ($jenis_all as $jenis) {
     if ($jenis['status'] == 'aktif') {
         $aktif_count++;
     } else {
@@ -180,24 +191,6 @@ foreach ($jenis_simpanan as $jenis) {
     <title>Jenis Simpanan - <?php echo APP_NAME; ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .table-actions {
-            white-space: nowrap;
-        }
-        .stat-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .btn-delete {
-            color: #dc3545;
-            border-color: #dc3545;
-        }
-        .btn-delete:hover {
-            background-color: #dc3545;
-            color: white;
-        }
-    </style>
 </head>
 <body>
     <?php include '../includes/header.php'; ?>
@@ -207,94 +200,20 @@ foreach ($jenis_simpanan as $jenis) {
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-list me-2"></i>Jenis Simpanan
-                    </h1>
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
-                        <i class="fas fa-plus"></i> Tambah Jenis
-                    </button>
-                </div>
+                <?php ui_page_header([
+                    'title' => 'Jenis Simpanan',
+                    'icon' => 'fas fa-list text-primary',
+                    'subtitle' => 'Master jenis tabungan anggota',
+                    'actions' => '<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal"><i class="fas fa-plus me-1"></i>Tambah Jenis</button>',
+                ]); ?>
+                <?php ui_flash(); ?>
 
-                <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <i class="fas fa-check-circle me-2"></i>
-                        <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-                
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-
-                <!-- Statistics -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-primary text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h4 class="mb-0"><?php echo $total_jenis; ?></h4>
-                                        <p class="mb-0">Total Jenis</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-list fa-2x opacity-50"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-success text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h4 class="mb-0"><?php echo $aktif_count; ?></h4>
-                                        <p class="mb-0">Aktif</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-check-circle fa-2x opacity-50"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-warning text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h4 class="mb-0"><?php echo $nonaktif_count; ?></h4>
-                                        <p class="mb-0">Nonaktif</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-times-circle fa-2x opacity-50"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-info text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h4 class="mb-0"><?php echo $minimum_count; ?></h4>
-                                        <p class="mb-0">Ada Minimum</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-coins fa-2x opacity-50"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <?php ui_stat_grid([
+                    ['label' => 'Total jenis', 'value' => (int)$total_jenis, 'tone' => 'primary', 'icon' => 'fas fa-list', 'hint' => 'Semua produk'],
+                    ['label' => 'Aktif', 'value' => (int)$aktif_count, 'tone' => 'success', 'icon' => 'fas fa-check-circle', 'hint' => 'Dapat dipakai'],
+                    ['label' => 'Nonaktif', 'value' => (int)$nonaktif_count, 'tone' => 'warning', 'icon' => 'fas fa-times-circle', 'hint' => 'Ditangguhkan'],
+                    ['label' => 'Ada minimum', 'value' => (int)$minimum_count, 'tone' => 'info', 'icon' => 'fas fa-coins', 'hint' => 'Setoran awal'],
+                ]); ?>
 
                 <div class="card">
                     <div class="card-header bg-white">
@@ -303,7 +222,8 @@ foreach ($jenis_simpanan as $jenis) {
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div class="table-responsive">
+                        <?php ui_table_toolbar(['action'=>'jenis_simpanan.php','q'=>$q,'placeholder'=>'Cari jenis/kode…','per_page'=>$pager['per_page'],'reset_href'=>'jenis_simpanan.php','filters'=>[['name'=>'status','label'=>'Status','type'=>'select','value'=>$status_f,'options'=>[''=>'Semua','aktif'=>'Aktif','nonaktif'=>'Nonaktif']]]]); ?>
+                        <div class="table-responsive ui-table-scroll">
                             <table class="table table-striped table-hover">
                                 <thead>
                                     <tr>
@@ -382,6 +302,7 @@ foreach ($jenis_simpanan as $jenis) {
                         </div>
                     </div>
                 </div>
+                <?php ui_pagination($pager, 'jenis_simpanan.php'); ?>
             </main>
         </div>
     </div>

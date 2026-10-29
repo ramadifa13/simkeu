@@ -203,7 +203,16 @@ $query = "SELECT * FROM jenis_pinjaman ORDER BY
           created_at DESC";
 $stmt = $db->prepare($query);
 $stmt->execute();
-$jenis_pinjaman = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$jenis_all = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$ui = ui_query_params([]);
+$q = $ui['q'];
+if ($q !== '') {
+    $jenis_all = array_values(array_filter($jenis_all, static function ($r) use ($q) {
+        return stripos(($r['nama_jenis'] ?? '') . ' ' . ($r['kode_jenis'] ?? ''), $q) !== false;
+    }));
+}
+$pager = ui_paginate(count($jenis_all), $ui['page'], $ui['per_page']);
+$jenis_pinjaman = array_slice($jenis_all, $pager['offset'], $pager['per_page']);
 foreach ($jenis_pinjaman as &$jp) {
     $jp['tarif'] = getTarifJenisPinjaman($db, $jp['id']);
 }
@@ -227,27 +236,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <title>Jenis Pinjaman - <?php echo APP_NAME; ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .stat-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .feature-badge {
-            font-size: 0.75rem;
-        }
-        .btn-delete {
-            color: #dc3545;
-            border-color: #dc3545;
-        }
-        .btn-delete:hover {
-            background-color: #dc3545;
-            color: white;
-        }
-        .table-actions {
-            white-space: nowrap;
-        }
-    </style>
+    <style>.feature-badge{font-size:.75rem}.table-actions{white-space:nowrap}</style>
 </head>
 <body>
     <?php include '../includes/header.php'; ?>
@@ -257,79 +246,19 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-hand-holding-usd me-2"></i>Jenis Pinjaman
-                    </h1>
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
-                        <i class="fas fa-plus"></i> Tambah Jenis
-                    </button>
-                </div>
+                <?php ui_page_header([
+                    'title' => 'Jenis Pinjaman',
+                    'icon' => 'fas fa-hand-holding-usd text-primary',
+                    'subtitle' => 'Master produk pinjaman dan suku bunga',
+                    'actions' => '<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal"><i class="fas fa-plus me-1"></i>Tambah Jenis</button>',
+                ]); ?>
+                <?php ui_flash(); ?>
 
-                <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <i class="fas fa-check-circle me-2"></i>
-                        <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-                
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-
-                <!-- Statistics Cards -->
-                <div class="row mb-4">
-                    <div class="col-md-4">
-                        <div class="card stat-card bg-primary text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h4 class="mb-0"><?php echo $stats['total_jenis']; ?></h4>
-                                        <p class="mb-0">Total Jenis</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-list fa-2x opacity-50"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card stat-card bg-success text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h4 class="mb-0"><?php echo $stats['aktif']; ?></h4>
-                                        <p class="mb-0">Jenis Aktif</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-check-circle fa-2x opacity-50"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card stat-card bg-warning text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h4 class="mb-0"><?php echo $stats['nonaktif']; ?></h4>
-                                        <p class="mb-0">Jenis Nonaktif</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-times-circle fa-2x opacity-50"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <?php ui_stat_grid([
+                    ['label' => 'Total jenis', 'value' => (int)$stats['total_jenis'], 'tone' => 'primary', 'icon' => 'fas fa-list', 'hint' => 'Produk pinjaman'],
+                    ['label' => 'Aktif', 'value' => (int)$stats['aktif'], 'tone' => 'success', 'icon' => 'fas fa-check-circle', 'hint' => 'Dapat diajukan'],
+                    ['label' => 'Nonaktif', 'value' => (int)$stats['nonaktif'], 'tone' => 'warning', 'icon' => 'fas fa-times-circle', 'hint' => 'Ditangguhkan'],
+                ]); ?>
 
                 <!-- Jenis Pinjaman Table -->
                 <div class="card">
@@ -339,7 +268,8 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div class="table-responsive">
+                        <?php ui_table_toolbar(['action'=>'jenis_pinjaman.php','q'=>$q,'placeholder'=>'Cari jenis pinjaman…','per_page'=>$pager['per_page'],'reset_href'=>'jenis_pinjaman.php']); ?>
+                        <div class="table-responsive ui-table-scroll">
                             <table class="table table-striped table-hover">
                                 <thead>
                                     <tr>
@@ -427,6 +357,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         </div>
                     </div>
                 </div>
+                <?php ui_pagination($pager, 'jenis_pinjaman.php'); ?>
             </main>
         </div>
     </div>
@@ -572,7 +503,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             tr.innerHTML =
                 '<td><div class="input-group input-group-sm"><input type="number" name="tarif_tenor[]" class="form-control" required min="1" max="36" step="1"><span class="input-group-text">bulan</span></div></td>' +
                 '<td><div class="input-group input-group-sm"><input type="number" name="tarif_bunga[]" class="form-control" required min="0" max="' + BUNGA_MAKS + '" step="0.01"><span class="input-group-text">%</span></div></td>' +
-                '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" onclick="hapusBarisTarif(this)" title="Hapus"><i class="fas fa-times"></i></button></td>';
+                '<td class="table-actions text-end"><button type="button" class="btn btn-sm btn-outline-danger" onclick="hapusBarisTarif(this)" title="Hapus"><i class="fas fa-times"></i></button></td>';
             tr.querySelector('input[name="tarif_tenor[]"]').value = tenor || '';
             tr.querySelector('input[name="tarif_bunga[]"]').value = (bunga !== undefined) ? bunga : '';
             tbody.appendChild(tr);

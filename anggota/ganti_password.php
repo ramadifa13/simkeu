@@ -60,7 +60,7 @@ if ($_POST && isset($_POST['ganti_password'])) {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         .main-content {
-            margin-left: 280px;
+            margin-left:0;
             margin-top: 10px; /* DIKURANGI DARI 70px MENJADI 10px */
             padding: 15px;
         }
@@ -100,16 +100,12 @@ if ($_POST && isset($_POST['ganti_password'])) {
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center page-header border-bottom">
-                    <h1 class="h3">
-                        <i class="fas fa-key me-2"></i>Ganti Password
-                    </h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <a href="profil.php" class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-arrow-left me-1"></i> Kembali ke Profil
-                        </a>
-                    </div>
-                </div>
+                <?php ui_page_header([
+                    'title' => 'Ganti Password',
+                    'icon' => 'fas fa-key text-primary',
+                    'subtitle' => 'Perbarui kata sandi akun Anda',
+                    'actions' => '<a href="profil.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Kembali</a>',
+                ]); ?>
 
                 <?php if ($success): ?>
                     <div class="alert alert-success alert-dismissible fade show py-2" role="alert">

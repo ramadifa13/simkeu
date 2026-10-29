@@ -54,10 +54,6 @@ foreach ($transaksi as $t) {
     }
 }
 
-// Function format Rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
 ?>
 <!DOCTYPE html>
 <html lang="id">

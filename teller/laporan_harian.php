@@ -122,6 +122,25 @@ $stmt_transactions = $db->prepare($query_transactions);
 $stmt_transactions->bindParam(':tanggal', $selected_date);
 $stmt_transactions->execute();
 $transactions = $stmt_transactions->fetchAll(PDO::FETCH_ASSOC);
+$__ui = ui_query_params([]);
+$__q = $__ui['q'];
+$__all = $transactions;
+if ($__q !== '') {
+    $__fields = array (
+  0 => 'nama_lengkap',
+  1 => 'kode_anggota',
+  2 => 'kode_transaksi',
+  3 => 'keterangan',
+);
+    $__all = array_values(array_filter($__all, static function ($r) use ($__q, $__fields) {
+        $hay = '';
+        foreach ($__fields as $f) { $hay .= ' ' . ($r[$f] ?? ''); }
+        return stripos($hay, $__q) !== false;
+    }));
+}
+$pager = ui_paginate(count($__all), $__ui['page'], $__ui['per_page']);
+$transactions = array_slice($__all, $pager['offset'], $pager['per_page']);
+$q = $__q;
 
 // ============================================
 // DETAIL PEMBAYARAN ANGSURAN
@@ -159,11 +178,6 @@ $stmt_kas->bindParam(':tanggal', $selected_date);
 $stmt_kas->execute();
 $kas_transactions = $stmt_kas->fetchAll(PDO::FETCH_ASSOC);
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
-
 // Fungsi untuk mendapatkan badge class
 function getBadgeClass($kode_jenis) {
     switch($kode_jenis) {
@@ -195,8 +209,8 @@ function getBadgeClass($kode_jenis) {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --primary: #2c3e50;
-            --secondary: #3498db;
+            --primary:#087f83;
+            --secondary:#12666e;
             --success: #27ae60;
             --info: #17a2b8;
             --warning: #f39c12;
@@ -249,7 +263,7 @@ function getBadgeClass($kode_jenis) {
         
         @media (min-width: 992px) {
             main {
-                margin-left: 280px !important;
+                margin-left: 0 !important; /* densify: shell owns sidebar */
                 padding: 20px !important;
             }
         }
@@ -271,10 +285,10 @@ function getBadgeClass($kode_jenis) {
         }
         
         .date-navigation {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-radius: 16px;
+            background: linear-gradient(135deg,#123d47,#087f83);
+            border-radius: 10px;
             color: white;
-            padding: 1.5rem;
+            padding: 14px;
             margin-bottom: 25px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
@@ -312,7 +326,7 @@ function getBadgeClass($kode_jenis) {
         
         .recent-activity {
             background: white;
-            border-radius: 16px;
+            border-radius: 10px;
             padding: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             height: 100%;
@@ -358,7 +372,7 @@ function getBadgeClass($kode_jenis) {
         
         .badge-transaction {
             padding: 0.3rem 0.8rem;
-            border-radius: 20px;
+            border-radius: 10px;
             font-weight: 500;
             font-size: 0.75rem;
         }
@@ -381,7 +395,7 @@ function getBadgeClass($kode_jenis) {
         }
         
         .empty-state i {
-            font-size: 3rem;
+            font-size: 1.4rem;
             color: #ccc;
             margin-bottom: 15px;
         }
@@ -407,24 +421,24 @@ function getBadgeClass($kode_jenis) {
         }
         
         .btn-pdf {
-            background: linear-gradient(135deg, #dc3545, #c82333);
+            background:#c0392b;
             color: white;
             border: none;
         }
         
         .btn-pdf:hover {
-            background: linear-gradient(135deg, #c82333, #b21f2d);
+            background:#a93226;
             color: white;
         }
         
         .btn-excel {
-            background: linear-gradient(135deg, #28a745, #218838);
+            background:#1f8a5b;
             color: white;
             border: none;
         }
         
         .btn-excel:hover {
-            background: linear-gradient(135deg, #218838, #1e7e34);
+            background:#196f4a;
             color: white;
         }
     </style>
@@ -437,23 +451,16 @@ function getBadgeClass($kode_jenis) {
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <!-- Page Header -->
-                <div class="page-header">
-                    <h1 class="h3 mb-0">
-                        <i class="fas fa-chart-line text-primary me-2"></i>Laporan Harian
-                    </h1>
-                    <div class="btn-group">
-                        <a href="?export_pdf=1&tanggal=<?php echo $selected_date; ?>" class="btn btn-sm btn-pdf" target="_blank">
-                            <i class="fas fa-file-pdf me-1"></i> <span class="d-none d-sm-inline">PDF</span>
-                        </a>
-                        <a href="?export_excel=1&tanggal=<?php echo $selected_date; ?>" class="btn btn-sm btn-excel">
-                            <i class="fas fa-file-excel me-1"></i> <span class="d-none d-sm-inline">Excel</span>
-                        </a>
-                        <a href="laporan_harian.php" class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-sync me-1"></i> <span class="d-none d-sm-inline">Reset</span>
-                        </a>
-                    </div>
-                </div>
+                <?php ui_page_header([
+                    'title' => 'Laporan Harian',
+                    'icon' => 'fas fa-chart-line text-primary',
+                    'subtitle' => 'Ringkasan transaksi teller per tanggal',
+                    'actions' => '<div class="btn-group">'
+                        . '<a href="?export_pdf=1&tanggal=' . urlencode((string)$selected_date) . '" class="btn btn-sm btn-danger" target="_blank"><i class="fas fa-file-pdf me-1"></i><span class="d-none d-sm-inline">PDF</span></a>'
+                        . '<a href="?export_excel=1&tanggal=' . urlencode((string)$selected_date) . '" class="btn btn-sm btn-success"><i class="fas fa-file-excel me-1"></i><span class="d-none d-sm-inline">Excel</span></a>'
+                        . '<a href="laporan_harian.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-sync me-1"></i><span class="d-none d-sm-inline">Reset</span></a>'
+                        . '</div>',
+                ]); ?>
 
                 <!-- Date Navigation -->
                 <div class="date-navigation">
@@ -461,7 +468,7 @@ function getBadgeClass($kode_jenis) {
                         <div class="col-md-8 mb-3 mb-md-0">
                             <h4 class="mb-2">
                                 <i class="fas fa-calendar-alt me-2"></i>
-                                Laporan Tanggal: <strong><?php echo date('d F Y', strtotime($selected_date)); ?></strong>
+                                Laporan Tanggal: <strong><?php echo formatTanggalUi($selected_date); ?></strong>
                             </h4>
                             <p class="mb-0 opacity-75">Ringkasan transaksi simpanan dan pembayaran angsuran</p>
                         </div>
@@ -485,83 +492,12 @@ function getBadgeClass($kode_jenis) {
                     </div>
                 </div>
 
-                <!-- Summary Statistics -->
-                <div class="row mb-4">
-                    <!-- Total Transaksi Simpanan -->
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="stat-card transaction h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">TRANSAKSI SIMPANAN</h6>
-                                        <h3 class="fw-bold text-primary mb-1"><?php echo number_format($summary['total_transaksi']); ?></h3>
-                                        <small class="text-muted">
-                                            Setoran: <?php echo $summary['jumlah_setoran']; ?> | 
-                                            Penarikan: <?php echo $summary['jumlah_penarikan']; ?>
-                                        </small>
-                                    </div>
-                                    <div class="stat-icon bg-primary text-white">
-                                        <i class="fas fa-exchange-alt"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Total Setoran -->
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="stat-card income h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">TOTAL SETORAN</h6>
-                                        <h4 class="fw-bold text-success mb-1"><?php echo formatRupiah($summary['total_setoran']); ?></h4>
-                                        <small class="text-muted"><?php echo number_format($summary['jumlah_setoran']); ?> transaksi</small>
-                                    </div>
-                                    <div class="stat-icon bg-success text-white">
-                                        <i class="fas fa-arrow-down"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Total Penarikan -->
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="stat-card outcome h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">TOTAL PENARIKAN</h6>
-                                        <h4 class="fw-bold text-danger mb-1"><?php echo formatRupiah($summary['total_penarikan']); ?></h4>
-                                        <small class="text-muted"><?php echo number_format($summary['jumlah_penarikan']); ?> transaksi</small>
-                                    </div>
-                                    <div class="stat-icon bg-danger text-white">
-                                        <i class="fas fa-arrow-up"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Total Pembayaran Angsuran -->
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="stat-card angsuran h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">PEMBAYARAN ANGSURAN</h6>
-                                        <h4 class="fw-bold text-warning mb-1"><?php echo formatRupiah($angsuran_summary['total_pembayaran_angsuran']); ?></h4>
-                                        <small class="text-muted"><?php echo number_format($angsuran_summary['total_angsuran']); ?> transaksi</small>
-                                    </div>
-                                    <div class="stat-icon bg-warning text-white">
-                                        <i class="fas fa-credit-card"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <?php ui_stat_grid([
+                    ['label' => 'Transaksi simpanan', 'value' => (int)$summary['total_transaksi'], 'tone' => 'primary', 'icon' => 'fas fa-exchange-alt', 'hint' => 'Setoran: ' . (int)$summary['jumlah_setoran'] . ' · Penarikan: ' . (int)$summary['jumlah_penarikan']],
+                    ['label' => 'Total setoran', 'value' => formatRupiah($summary['total_setoran']), 'tone' => 'success', 'icon' => 'fas fa-arrow-down', 'hint' => number_format((int)$summary['jumlah_setoran']) . ' transaksi'],
+                    ['label' => 'Total penarikan', 'value' => formatRupiah($summary['total_penarikan']), 'tone' => 'danger', 'icon' => 'fas fa-arrow-up', 'hint' => number_format((int)$summary['jumlah_penarikan']) . ' transaksi'],
+                    ['label' => 'Pembayaran angsuran', 'value' => formatRupiah($angsuran_summary['total_pembayaran_angsuran']), 'tone' => 'warning', 'icon' => 'fas fa-credit-card', 'hint' => number_format((int)$angsuran_summary['total_angsuran']) . ' transaksi'],
+                ]); ?>
 
                 <!-- Ringkasan Kas Harian -->
                 <div class="row mb-4">
@@ -614,7 +550,8 @@ function getBadgeClass($kode_jenis) {
                             </div>
                             <div class="card-body p-0">
                                 <?php if (!empty($transactions)): ?>
-                                <div class="table-responsive">
+                                <?php if (isset($pager)) ui_table_toolbar(['action'=>'laporan_harian.php','q'=>$q ?? '','placeholder'=>'Cari…','per_page'=>$pager['per_page'],'reset_href'=>'laporan_harian.php']); ?>
+                        <div class="table-responsive ui-table-scroll">
                                     <table class="table table-hover mb-0">
                                         <thead>
                                             <tr>
@@ -673,7 +610,7 @@ function getBadgeClass($kode_jenis) {
                             </div>
                             <div class="card-body p-0">
                                 <?php if (!empty($angsuran)): ?>
-                                <div class="table-responsive">
+                                <div class="table-responsive ui-table-scroll">
                                     <table class="table table-hover mb-0">
                                         <thead>
                                             <tr>
@@ -691,8 +628,8 @@ function getBadgeClass($kode_jenis) {
                                                 <td>
                                                     <small><?php echo $a['waktu_bayar'] ? date('H:i', strtotime($a['waktu_bayar'])) : '-'; ?></small>
                                                 </td>
-                                                <td><small><?php echo $a['tanggal_bayar'] ? date('d/m/Y', strtotime($a['tanggal_bayar'])) : '-'; ?></small></td>
-                                                <td><small><?php echo date('d/m/Y', strtotime($a['tanggal_jatuh_tempo'])); ?></small></td>
+                                                <td><small><?php echo $a['tanggal_bayar'] ? formatTanggalUi($a['tanggal_bayar']) : '-'; ?></small></td>
+                                                <td><small><?php echo formatTanggalUi($a['tanggal_jatuh_tempo']); ?></small></td>
                                                 <td>
                                                     <div class="fw-semibold"><?php echo htmlspecialchars($a['nama_lengkap']); ?></div>
                                                     <small class="text-muted"><?php echo $a['kode_anggota']; ?></small>
@@ -732,7 +669,7 @@ function getBadgeClass($kode_jenis) {
                             </div>
                             <div class="card-body p-0">
                                 <?php if (!empty($kas_transactions)): ?>
-                                <div class="table-responsive">
+                                <div class="table-responsive ui-table-scroll">
                                     <table class="table table-hover mb-0">
                                         <thead>
                                             <tr>
@@ -811,6 +748,8 @@ function getBadgeClass($kode_jenis) {
                         </div>
                     </div>
                 </div>
+                <?php if (isset($pager)) ui_pagination($pager, 'laporan_harian.php'); ?>
+
             </main>
         </div>
     </div>

@@ -211,10 +211,6 @@ foreach ($filtered_transaksi as $t) {
     }
 }
 
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
-
 // Extend TCPDF class
 class MYPDF extends TCPDF {
     protected $koperasi;

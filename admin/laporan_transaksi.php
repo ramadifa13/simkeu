@@ -208,6 +208,17 @@ foreach ($all_transaksi as $t) {
     $filtered_transaksi[] = $t;
 }
 
+$__ui = ui_query_params([]);
+$q = $__ui['q'];
+if ($q !== '') {
+    $filtered_transaksi = array_values(array_filter($filtered_transaksi, static function ($t) use ($q) {
+        return stripos(($t['nama_lengkap'] ?? '') . ' ' . ($t['kode_anggota'] ?? '') . ' ' . ($t['kode'] ?? '') . ' ' . ($t['sumber_label'] ?? ''), $q) !== false;
+    }));
+}
+$filtered_all = $filtered_transaksi;
+$pager = ui_paginate(count($filtered_all), $__ui['page'], $__ui['per_page']);
+$filtered_transaksi = array_slice($filtered_all, $pager['offset'], $pager['per_page']);
+
 // ============================================
 // HITUNG STATISTIK
 // ============================================
@@ -286,7 +297,7 @@ $jenis_list = array(
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body { background: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .main-content { margin-left: 280px; margin-top: 70px; padding: 20px; }
+        .main-content { margin-left:0; margin-top: 70px; padding: 20px; }
         @media (max-width: 768px) { .main-content { margin-left: 0; padding: 15px; } }
         
         .card { 
@@ -311,7 +322,7 @@ $jenis_list = array(
             padding: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             height: 100%;
-            border-left: 4px solid #3498db;
+            border-left:3px solid #087f83;
         }
         
         .stat-card.success { border-left-color: #28a745; }
@@ -374,7 +385,7 @@ $jenis_list = array(
         
         .info-box {
             background: #e8f4fd;
-            border-left: 4px solid #3498db;
+            border-left:3px solid #087f83;
             padding: 15px;
             border-radius: 5px;
             margin-bottom: 20px;
@@ -390,64 +401,31 @@ $jenis_list = array(
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
                 
-                <!-- Page Header -->
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h3 class="mb-0">
-                        <i class="fas fa-file-alt text-primary me-2"></i>Laporan Semua Transaksi
-                    </h3>
-                    <div>
-                        <a href="laporan_transaksi.php" class="btn btn-sm btn-outline-primary me-2">
-                            <i class="fas fa-sync"></i> Refresh
-                        </a>
-                        <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
-                            <i class="fas fa-print"></i> Cetak
-                        </button>
-                    </div>
-                </div>
+                <?php ui_page_header([
+                    'title' => 'Laporan Semua Transaksi',
+                    'icon' => 'fas fa-file-alt text-primary',
+                    'subtitle' => 'Gabungan tabungan, pinjaman, dan waserda',
+                    'actions' => '<a href="laporan_transaksi.php" class="btn btn-sm btn-outline-primary"><i class="fas fa-sync me-1"></i>Refresh</a>'
+                        . '<button type="button" onclick="window.print()" class="btn btn-sm btn-outline-secondary"><i class="fas fa-print me-1"></i>Cetak</button>',
+                ]); ?>
 
                 <!-- Info Periode -->
                 <div class="info-box">
                     <i class="fas fa-calendar me-2"></i>
                     <strong>Periode:</strong> 
-                    <?php echo date('d/m/Y', strtotime($start_date)); ?> - <?php echo date('d/m/Y', strtotime($end_date)); ?>
+                    <?php echo formatTanggalUi($start_date); ?> - <?php echo formatTanggalUi($end_date); ?>
                     <span class="badge bg-primary ms-2"><?php echo count($all_transaksi); ?> transaksi</span>
                     <span class="badge bg-secondary ms-2">Tabungan: <?php echo count($tabungan); ?></span>
                     <span class="badge bg-secondary ms-2">Pinjaman: <?php echo count($pinjaman); ?></span>
                     <span class="badge bg-secondary ms-2">Waserda: <?php echo count($waserda); ?></span>
                 </div>
 
-                <!-- Statistics Cards -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <div class="stat-value text-primary"><?php echo count($all_transaksi); ?></div>
-                            <div class="stat-label">Total Transaksi</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card success">
-                            <div class="stat-value text-success"><?php echo rp($total_pemasukan); ?></div>
-                            <div class="stat-label">Total Pemasukan</div>
-                            <small>Setoran: <?php echo rp($total_setoran); ?> (<?php echo $jumlah_setoran; ?>x), Waserda: <?php echo rp($total_waserda); ?> (<?php echo $jumlah_waserda; ?>x)</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card danger">
-                            <div class="stat-value text-danger"><?php echo rp($total_pengeluaran); ?></div>
-                            <div class="stat-label">Total Pengeluaran</div>
-                            <small>Penarikan: <?php echo rp($total_penarikan); ?> (<?php echo $jumlah_penarikan; ?>x), Pencairan: <?php echo rp($total_pencairan); ?> (<?php echo $jumlah_pencairan; ?>x)</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card warning">
-                            <div class="stat-value <?php echo $selisih >= 0 ? 'text-success' : 'text-danger'; ?>">
-                                <?php echo rp($selisih); ?>
-                            </div>
-                            <div class="stat-label">Selisih Kas</div>
-                            <small>Saldo akhir: <?php echo rp($saldo_akhir); ?></small>
-                        </div>
-                    </div>
-                </div>
+                <?php ui_stat_grid([
+                    ['label' => 'Total transaksi', 'value' => count($all_transaksi), 'tone' => 'primary', 'icon' => 'fas fa-exchange-alt', 'hint' => 'Semua sumber'],
+                    ['label' => 'Pemasukan', 'value' => rp($total_pemasukan), 'tone' => 'success', 'icon' => 'fas fa-arrow-down', 'hint' => 'Setoran + waserda'],
+                    ['label' => 'Pengeluaran', 'value' => rp($total_pengeluaran), 'tone' => 'danger', 'icon' => 'fas fa-arrow-up', 'hint' => 'Penarikan + pencairan'],
+                    ['label' => 'Selisih kas', 'value' => rp($selisih), 'tone' => ($selisih >= 0 ? 'success' : 'danger'), 'icon' => 'fas fa-balance-scale', 'hint' => 'Saldo akhir: ' . rp($saldo_akhir)],
+                ]); ?>
 
                 <!-- Detail Statistics -->
                 <div class="row mb-4">
@@ -546,10 +524,26 @@ $jenis_list = array(
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <span><i class="fas fa-list me-2"></i>Detail Semua Transaksi</span>
-                        <span class="badge bg-primary"><?php echo count($filtered_transaksi); ?> data</span>
+                        <span class="badge bg-primary"><?php echo (int)$pager['total']; ?> data</span>
                     </div>
                     <div class="card-body p-0">
-                        <div class="table-responsive">
+                        <?php
+                        ui_table_toolbar([
+                            'action' => 'laporan_transaksi.php',
+                            'q' => $q,
+                            'placeholder' => 'Cari nama/kode…',
+                            'per_page' => $pager['per_page'],
+                            'reset_href' => 'laporan_transaksi.php',
+                            'hidden' => array_filter([
+                                'start_date' => $start_date ?? '',
+                                'end_date' => $end_date ?? '',
+                                'jenis_transaksi' => $filter_jenis ?? '',
+                                'sumber' => $filter_sumber ?? '',
+                                'anggota_id' => $filter_anggota ?? '',
+                            ]),
+                        ]);
+                        ?>
+                        <div class="table-responsive ui-table-scroll">
                             <table class="table table-striped table-hover mb-0">
                                 <thead>
                                     <tr>
@@ -581,7 +575,7 @@ $jenis_list = array(
                                         elseif ($t['tipe'] == 'kas_lainnya') $badge_class = 'badge-kas';
                                     ?>
                                     <tr class="<?php echo $row_class; ?>">
-                                        <td><?php echo date('d/m/Y H:i', strtotime($t['tanggal'])); ?></td>
+                                        <td><?php echo formatTanggalUi($t['tanggal'], true); ?></td>
                                         <td>
                                             <span class="sumber-badge sumber-<?php echo $t['sumber']; ?>">
                                                 <?php echo $t['sumber_label']; ?>
@@ -644,6 +638,7 @@ $jenis_list = array(
                     </a>
                 </div>
 
+                <?php ui_pagination($pager, 'laporan_transaksi.php'); ?>
             </main>
         </div>
     </div>

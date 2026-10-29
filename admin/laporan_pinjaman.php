@@ -82,6 +82,26 @@ foreach ($params as $key => $value) {
 }
 $stmt->execute();
 $pinjaman = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$__ui = ui_query_params([]);
+$__q = $__ui['q'];
+$__all = $pinjaman;
+if ($__q !== '') {
+    $__fields = array (
+  0 => 'nama_lengkap',
+  1 => 'kode_anggota',
+  2 => 'kode_pinjaman',
+  3 => 'nama_jenis',
+);
+    $__all = array_values(array_filter($__all, static function ($r) use ($__q, $__fields) {
+        $hay = '';
+        foreach ($__fields as $f) { $hay .= ' ' . ($r[$f] ?? ''); }
+        return stripos($hay, $__q) !== false;
+    }));
+}
+$pager = ui_paginate(count($__all), $__ui['page'], $__ui['per_page']);
+$pinjaman = array_slice($__all, $pager['offset'], $pager['per_page']);
+$q = $__q;
+
 
 // Get data for filters
 $query_anggota = "SELECT * FROM anggota WHERE status = 'aktif' ORDER BY nama_lengkap";
@@ -114,11 +134,6 @@ foreach ($pinjaman as $p) {
     $total_dibayar += $p['total_pokok_dibayar'];
 }
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
-
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -129,11 +144,7 @@ function formatRupiah($angka) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .stat-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
+        /* stat-card via app-ui */
         .progress {
             height: 6px;
         }
@@ -147,86 +158,23 @@ function formatRupiah($angka) {
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-chart-bar me-2"></i>Laporan Pinjaman
-                    </h1>
-                    <div class="btn-group">
-                        <a href="?export_pdf=1&<?php echo http_build_query($_GET); ?>" class="btn btn-sm btn-danger" target="_blank">
-                            <i class="fas fa-file-pdf"></i> <span class="d-none d-sm-inline">PDF</span>
-                        </a>
-                        <a href="?export_excel=1&<?php echo http_build_query($_GET); ?>" class="btn btn-sm btn-success">
-                            <i class="fas fa-file-excel"></i> <span class="d-none d-sm-inline">Excel</span>
-                        </a>
-                        <a href="laporan_pinjaman.php" class="btn btn-sm btn-primary ms-2">
-                            <i class="fas fa-sync"></i> <span class="d-none d-sm-inline">Reset</span>
-                        </a>
-                    </div>
-                </div>
+                <?php ui_page_header([
+                    'title' => 'Laporan Pinjaman',
+                    'icon' => 'fas fa-chart-bar text-primary',
+                    'subtitle' => 'Rekap pinjaman aktif, lunas, dan outstanding',
+                    'actions' => '<div class="btn-group">'
+                        . '<a href="?export_pdf=1&' . http_build_query($_GET) . '" class="btn btn-sm btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> <span class="d-none d-sm-inline">PDF</span></a>'
+                        . '<a href="?export_excel=1&' . http_build_query($_GET) . '" class="btn btn-sm btn-success"><i class="fas fa-file-excel"></i> <span class="d-none d-sm-inline">Excel</span></a>'
+                        . '<a href="laporan_pinjaman.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-sync"></i> <span class="d-none d-sm-inline">Reset</span></a>'
+                        . '</div>',
+                ]); ?>
 
-                <!-- Statistics Cards -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-primary text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo count($pinjaman); ?></h4>
-                                        <p>Total Pinjaman</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-hand-holding-usd fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-success text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo $total_pinjaman_aktif; ?></h4>
-                                        <p>Pinjaman Aktif</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-play-circle fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-info text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo $total_pinjaman_lunas; ?></h4>
-                                        <p>Pinjaman Lunas</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-flag-checkered fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-warning text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo formatRupiah($total_dibayar); ?></h4>
-                                        <p>Total Dibayar</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-money-bill-wave fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <?php ui_stat_grid([
+                    ['label' => 'Total pinjaman', 'value' => count($pinjaman), 'tone' => 'primary', 'icon' => 'fas fa-hand-holding-usd', 'hint' => 'Hasil filter'],
+                    ['label' => 'Aktif', 'value' => (int)$total_pinjaman_aktif, 'tone' => 'success', 'icon' => 'fas fa-play-circle', 'hint' => 'Belum lunas'],
+                    ['label' => 'Lunas', 'value' => (int)$total_pinjaman_lunas, 'tone' => 'info', 'icon' => 'fas fa-flag-checkered', 'hint' => 'Selesai'],
+                    ['label' => 'Total dibayar', 'value' => formatRupiah($total_dibayar), 'tone' => 'warning', 'icon' => 'fas fa-money-bill-wave', 'hint' => 'Akumulasi'],
+                ]); ?>
 
                 <!-- Filter Form -->
                 <div class="card mb-4">
@@ -311,7 +259,8 @@ function formatRupiah($angka) {
                             <p class="text-muted">Tidak ada data pinjaman yang sesuai dengan filter yang dipilih.</p>
                         </div>
                         <?php else: ?>
-                        <div class="table-responsive">
+                        <?php if (isset($pager)) ui_table_toolbar(['action'=>'laporan_pinjaman.php','q'=>$q ?? '','placeholder'=>'Cari…','per_page'=>$pager['per_page'],'reset_href'=>'laporan_pinjaman.php']); ?>
+                        <div class="table-responsive ui-table-scroll">
                             <table class="table table-striped table-hover">
                                 <thead class="table-light">
                                     <tr>
@@ -400,7 +349,7 @@ function formatRupiah($angka) {
                                             <span class="badge bg-secondary"><?php echo labelBungaRow($p); ?></span>
                                         </td>
                                         <td>
-                                            <small><?php echo date('d/m/Y', strtotime($p['tanggal_pencairan'])); ?></small>
+                                            <small><?php echo formatTanggalUi($p['tanggal_pencairan']); ?></small>
                                         </td>
                                         <td>
                                             <span class="badge <?php echo $status_class; ?>">
@@ -435,6 +384,7 @@ function formatRupiah($angka) {
                         <?php endif; ?>
                     </div>
                 </div>
+                <?php if (isset($pager)) ui_pagination($pager, 'laporan_pinjaman.php'); ?>
             </main>
         </div>
     </div>

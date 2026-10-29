@@ -117,12 +117,6 @@ $stmt_koperasi = $db->prepare($query_koperasi);
 $stmt_koperasi->execute();
 $koperasi_data = $stmt_koperasi->fetch(PDO::FETCH_ASSOC);
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    if ($angka == 0) return 'Rp 0';
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
-
 // Handle PDF download
 if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
     require_once '../tcpdf/tcpdf.php';
@@ -248,7 +242,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         .main-content {
-            margin-left: 280px;
+            margin-left:0;
             margin-top: 10px;
             padding: 15px;
         }
@@ -264,14 +258,14 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
             text-align: center;
         }
         .info-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #087f83;
             color: white;
             border-radius: 10px;
             padding: 15px;
             margin-bottom: 20px;
         }
         .badge-deposito { background-color: #f39c12; color: white; }
-        .badge-haji { background-color: #9b59b6; color: white; }
+        .badge-haji { background-color: #087f83; color: white; }
         .badge-umroh { background-color: #1abc9c; color: white; }
         .stat-card {
             background: white;
@@ -290,12 +284,12 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
             font-weight: bold;
         }
         .btn-pdf {
-            background: linear-gradient(135deg, #dc3545, #c82333);
+            background:#c0392b;
             color: white;
             border: none;
         }
         .btn-pdf:hover {
-            background: linear-gradient(135deg, #c82333, #b21f2d);
+            background:#a93226;
             color: white;
         }
         .table-responsive {
@@ -340,20 +334,13 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
                 
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center page-header border-bottom">
-                    <h1 class="h3">
-                        <i class="fas fa-book me-2"></i>Buku Tabungan
-                    </h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <a href="?action=pdf&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>&jenis_simpanan=<?php echo $jenis_simpanan; ?>" 
-                           class="btn btn-sm btn-pdf me-2" target="_blank">
-                            <i class="fas fa-file-pdf me-1"></i> Download PDF
-                        </a>
-                        <a href="riwayat_simpanan.php" class="btn btn-sm btn-secondary">
-                            <i class="fas fa-arrow-left me-1"></i> Kembali
-                        </a>
-                    </div>
-                </div>
+                <?php ui_page_header([
+                    'title' => 'Buku Tabungan',
+                    'icon' => 'fas fa-book text-primary',
+                    'subtitle' => 'Cetak dan unduh buku tabungan',
+                    'actions' => '<a href="?action=pdf&start_date=' . urlencode((string)$start_date) . '&end_date=' . urlencode((string)$end_date) . '&jenis_simpanan=' . urlencode((string)$jenis_simpanan) . '" class="btn btn-sm btn-danger" target="_blank"><i class="fas fa-file-pdf me-1"></i>Download PDF</a>'
+                        . '<a href="riwayat_simpanan.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Kembali</a>',
+                ]); ?>
 
                 <!-- Info Card -->
                 <div class="info-card">

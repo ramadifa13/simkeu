@@ -126,7 +126,7 @@ $activities = $stmt_activities->fetchAll(PDO::FETCH_ASSOC);
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         .profile-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #123d47 0%, #087f83 100%);
             color: white;
             border-radius: 15px 15px 0 0;
             padding: 2rem;
@@ -156,10 +156,10 @@ $activities = $stmt_activities->fetchAll(PDO::FETCH_ASSOC);
             margin-bottom: 5px;
         }
         .nav-pills .nav-link.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #123d47 0%, #087f83 100%);
         }
         .activity-item {
-            border-left: 3px solid #667eea;
+            border-left: 3px solid #087f83;
             padding-left: 15px;
             margin-bottom: 15px;
         }
@@ -182,25 +182,12 @@ $activities = $stmt_activities->fetchAll(PDO::FETCH_ASSOC);
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-user-circle me-2"></i>Profil Teller
-                    </h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <span class="text-muted">
-                            <i class="fas fa-calendar me-1"></i>
-                            <?php echo date('d F Y'); ?>
-                        </span>
-                    </div>
-                </div>
-
-                <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success"><?php echo $_SESSION['success']; unset($_SESSION['success']); ?></div>
-                <?php endif; ?>
-                
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger"><?php echo $_SESSION['error']; unset($_SESSION['error']); ?></div>
-                <?php endif; ?>
+                <?php ui_page_header([
+                    'title' => 'Profil Teller',
+                    'icon' => 'fas fa-user-circle text-primary',
+                    'subtitle' => date('d F Y'),
+                ]); ?>
+                <?php ui_flash(); ?>
 
                 <div class="row">
                     <div class="col-lg-4">
@@ -212,7 +199,7 @@ $activities = $stmt_activities->fetchAll(PDO::FETCH_ASSOC);
                                         <img src="<?php echo htmlspecialchars(urlFoto($user['foto_profil'])); ?>" alt="Foto profil"
                                              style="width:100%;height:100%;object-fit:cover;border-radius:50%">
                                     <?php else: ?>
-                                        <span class="fw-bold" style="font-size:2rem"><?php echo htmlspecialchars(getInitials($user['nama_lengkap'])); ?></span>
+                                        <span class="fw-bold" style="font-size: 1.15rem"><?php echo htmlspecialchars(getInitials($user['nama_lengkap'])); ?></span>
                                     <?php endif; ?>
                                 </div>
                                 <h4><?php echo htmlspecialchars($user['nama_lengkap']); ?></h4>
@@ -305,7 +292,7 @@ $activities = $stmt_activities->fetchAll(PDO::FETCH_ASSOC);
                                         </small>
                                         <br>
                                         <small class="text-muted">
-                                            <?php echo date('d/m/Y', strtotime($activity['tanggal_transaksi'])); ?>
+                                            <?php echo formatTanggalUi($activity['tanggal_transaksi']); ?>
                                         </small>
                                     </div>
                                     <?php endforeach; ?>

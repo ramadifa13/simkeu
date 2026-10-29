@@ -151,6 +151,24 @@ foreach ($params as $key => $value) {
 }
 $stmt->execute();
 $kas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$__ui = ui_query_params([]);
+$__q = $__ui['q'];
+$__all = $kas;
+if ($__q !== '') {
+    $__fields = array (
+  0 => 'keterangan',
+  1 => 'jenis',
+);
+    $__all = array_values(array_filter($__all, static function ($r) use ($__q, $__fields) {
+        $hay = '';
+        foreach ($__fields as $f) { $hay .= ' ' . ($r[$f] ?? ''); }
+        return stripos($hay, $__q) !== false;
+    }));
+}
+$pager = ui_paginate(count($__all), $__ui['page'], $__ui['per_page']);
+$kas = array_slice($__all, $pager['offset'], $pager['per_page']);
+$q = $__q;
+
 
 // ============================================
 // HITUNG SALDO KAS YANG SEBENARNYA
@@ -199,18 +217,13 @@ $chart_labels = [];
 $saldo_chart = $saldo_awal;
 
 foreach ($kas as $k) {
-    $chart_labels[] = date('d/m H:i', strtotime($k['tanggal']));
+    $chart_labels[] = formatTanggalUi($k['tanggal'], true);
     if ($k['jenis'] == 'masuk') {
         $saldo_chart += $k['jumlah'];
     } else {
         $saldo_chart -= $k['jumlah'];
     }
     $chart_data[] = $saldo_chart;
-}
-
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
 }
 
 // Jenis filter options (TAMBAHKAN WASERDA)
@@ -255,8 +268,8 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --primary: #2c3e50;
-            --secondary: #3498db;
+            --primary:#087f83;
+            --secondary:#12666e;
             --success: #27ae60;
             --warning: #f39c12;
             --danger: #e74c3c;
@@ -353,7 +366,7 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
         
         @media (min-width: 992px) {
             main {
-                margin-left: 280px !important;
+                margin-left: 0 !important; /* densify: shell owns sidebar */
                 padding: 20px !important;
             }
         }
@@ -397,7 +410,7 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
         }
         
         .summary-card.bg-primary { 
-            background: linear-gradient(135deg, #2c3e50, #3498db) !important;
+            background: linear-gradient(135deg,#123d47,#087f83) !important;
         }
         
         .summary-card.bg-info { 
@@ -410,8 +423,8 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
         
         .filter-card {
             background: white;
-            border-radius: 16px;
-            padding: 1.5rem;
+            border-radius: 10px;
+            padding: 14px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             border: 1px solid rgba(0,0,0,0.03);
             margin-bottom: 20px;
@@ -425,7 +438,7 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
         
         .card {
             border: none;
-            border-radius: 16px;
+            border-radius: 10px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             overflow: hidden;
             margin-bottom: 20px;
@@ -484,7 +497,7 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            background: linear-gradient(135deg,#123d47,#087f83);
             border: none;
         }
         
@@ -496,7 +509,7 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
             padding: 0.4rem 0.6rem;
             font-weight: 500;
             font-size: 0.7rem;
-            border-radius: 20px;
+            border-radius: 10px;
         }
         
         .badge.bg-success { background: linear-gradient(135deg, #27ae60, #2ecc71) !important; }
@@ -532,12 +545,12 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
         
         .empty-state {
             text-align: center;
-            padding: 40px 20px;
+            padding: 22px 20px;
             color: #95a5a6;
         }
         
         .empty-state i {
-            font-size: 4rem;
+            font-size: 1.6rem;
             margin-bottom: 1rem;
             color: #bdc3c7;
         }
@@ -548,7 +561,7 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
             }
             
             .empty-state i {
-                font-size: 3rem;
+                font-size: 1.4rem;
             }
         }
         
@@ -566,7 +579,7 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
         
         .info-card {
             background-color: #e8f4fd;
-            border-left: 4px solid #3498db;
+            border-left:3px solid #087f83;
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 20px;
@@ -605,33 +618,17 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="page-header pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-wallet me-2"></i>Laporan Kas + Waserda
-                    </h1>
-                    <div class="btn-group">
-                        <button onclick="window.print()" class="btn btn-secondary">
-                            <i class="fas fa-print me-1"></i> 
-                            <span class="d-none d-sm-inline">Cetak</span>
-                        </button>
-                        <a href="export_kas.php?start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>&jenis=<?php echo $filter_jenis; ?>&anggota_id=<?php echo $filter_anggota; ?>" class="btn btn-success">
-                            <i class="fas fa-file-excel me-1"></i> 
-                            <span class="d-none d-sm-inline">Excel</span>
-                        </a>
-                        <a href="cetak_laporan_kas.php?start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>&jenis=<?php echo $filter_jenis; ?>&anggota_id=<?php echo $filter_anggota; ?>" class="btn btn-danger" target="_blank">
-                            <i class="fas fa-file-pdf me-1"></i> 
-                            <span class="d-none d-sm-inline">PDF</span>
-                        </a>
-                    </div>
-                </div>
-
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
+                <?php ui_page_header([
+                    'title' => 'Laporan Kas + Waserda',
+                    'icon' => 'fas fa-wallet text-primary',
+                    'subtitle' => 'Arus kas, pencairan pinjaman, dan waserda',
+                    'actions' => '<div class="btn-group">'
+                        . '<button type="button" onclick="window.print()" class="btn btn-sm btn-outline-secondary"><i class="fas fa-print me-1"></i><span class="d-none d-sm-inline">Cetak</span></button>'
+                        . '<a href="export_kas.php?start_date=' . urlencode((string)$start_date) . '&end_date=' . urlencode((string)$end_date) . '&jenis=' . urlencode((string)$filter_jenis) . '&anggota_id=' . urlencode((string)$filter_anggota) . '" class="btn btn-sm btn-success"><i class="fas fa-file-excel me-1"></i><span class="d-none d-sm-inline">Excel</span></a>'
+                        . '<a href="cetak_laporan_kas.php?start_date=' . urlencode((string)$start_date) . '&end_date=' . urlencode((string)$end_date) . '&jenis=' . urlencode((string)$filter_jenis) . '&anggota_id=' . urlencode((string)$filter_anggota) . '" class="btn btn-sm btn-danger" target="_blank"><i class="fas fa-file-pdf me-1"></i><span class="d-none d-sm-inline">PDF</span></a>'
+                        . '</div>',
+                ]); ?>
+                <?php ui_flash(); ?>
 
                 <!-- Info Data Kas -->
                 <div class="info-card">
@@ -643,7 +640,7 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
                                 Total transaksi: <strong><?php echo count($kas); ?></strong> 
                                 (Kas: <?php echo $jumlah_kas; ?>, Pinjaman: <?php echo $jumlah_pinjaman; ?>, Waserda: <?php echo $jumlah_waserda; ?>)
                                 <?php if (!empty($min_date) && !empty($max_date)): ?>
-                                | Rentang: <strong><?php echo date('d/m/Y', strtotime($min_date)); ?></strong> s/d <strong><?php echo date('d/m/Y', strtotime($max_date)); ?></strong>
+                                | Rentang: <strong><?php echo formatTanggalUi($min_date); ?></strong> s/d <strong><?php echo formatTanggalUi($max_date); ?></strong>
                                 <?php endif; ?>
                             </p>
                         </div>
@@ -708,82 +705,20 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
                         <?php if (empty($start_date) && empty($end_date)): ?>
                             <strong>Menampilkan semua transaksi</strong> (kas + pencairan pinjaman + waserda)
                         <?php else: ?>
-                            <strong>Periode filter:</strong> <?php echo date('d/m/Y', strtotime($start_date)); ?> - <?php echo date('d/m/Y', strtotime($end_date)); ?>
+                            <strong>Periode filter:</strong> <?php echo formatTanggalUi($start_date); ?> - <?php echo formatTanggalUi($end_date); ?>
                         <?php endif; ?>
                     </div>
                 </div>
 
-                <!-- Summary Cards -->
-                <div class="row stats-row">
-                    <div class="col-md-4 mb-2 mb-md-0">
-                        <div class="summary-card bg-success text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="card-title opacity-75 mb-1">
-                                            <i class="fas fa-arrow-down me-1"></i>Total Pemasukan
-                                        </h6>
-                                        <h4 class="mb-0"><?php echo formatRupiah($total_masuk); ?></h4>
-                                        <small class="opacity-75">
-                                            <?php 
-                                            $count_masuk = count(array_filter($kas, function($k) { return $k['jenis'] == 'masuk'; }));
-                                            echo $count_masuk . ' transaksi';
-                                            ?>
-                                        </small>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-arrow-circle-down fa-3x opacity-50"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-4 mb-2 mb-md-0">
-                        <div class="summary-card bg-danger text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="card-title opacity-75 mb-1">
-                                            <i class="fas fa-arrow-up me-1"></i>Total Pengeluaran
-                                        </h6>
-                                        <h4 class="mb-0"><?php echo formatRupiah($total_keluar); ?></h4>
-                                        <small class="opacity-75">
-                                            <?php 
-                                            $count_keluar = count(array_filter($kas, function($k) { return $k['jenis'] == 'keluar'; }));
-                                            echo $count_keluar . ' transaksi';
-                                            ?>
-                                        </small>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-arrow-circle-up fa-3x opacity-50"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-4">
-                        <div class="summary-card bg-primary text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="card-title opacity-75 mb-1">
-                                            <i class="fas fa-calculator me-1"></i>Saldo Akhir
-                                        </h6>
-                                        <h4 class="mb-0"><?php echo formatRupiah($saldo_akhir); ?></h4>
-                                        <small class="opacity-75">
-                                            Saldo awal: <?php echo formatRupiah($saldo_awal); ?>
-                                        </small>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-coins fa-3x opacity-50"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <?php
+                $count_masuk = count(array_filter($kas, static function ($k) { return ($k['jenis'] ?? '') === 'masuk'; }));
+                $count_keluar = count(array_filter($kas, static function ($k) { return ($k['jenis'] ?? '') === 'keluar'; }));
+                ui_stat_grid([
+                    ['label' => 'Pemasukan', 'value' => formatRupiah($total_masuk), 'tone' => 'success', 'icon' => 'fas fa-arrow-down', 'hint' => $count_masuk . ' transaksi'],
+                    ['label' => 'Pengeluaran', 'value' => formatRupiah($total_keluar), 'tone' => 'danger', 'icon' => 'fas fa-arrow-up', 'hint' => $count_keluar . ' transaksi'],
+                    ['label' => 'Saldo akhir', 'value' => formatRupiah($saldo_akhir), 'tone' => 'primary', 'icon' => 'fas fa-coins', 'hint' => 'Saldo awal: ' . formatRupiah($saldo_awal)],
+                ]);
+                ?>
 
                 <!-- Detail per Jenis (SEKARANG 5 KOLOM) -->
                 <div class="row stats-row">
@@ -897,7 +832,8 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
                                 <a href="laporan_kas.php" class="btn btn-primary">Tampilkan Semua</a>
                             </div>
                         <?php else: ?>
-                            <div class="table-responsive">
+                            <?php if (isset($pager)) ui_table_toolbar(['action'=>'laporan_kas.php','q'=>$q ?? '','placeholder'=>'Cari…','per_page'=>$pager['per_page'],'reset_href'=>'laporan_kas.php']); ?>
+                        <div class="table-responsive ui-table-scroll">
                                 <table class="table table-hover align-middle mb-0">
                                     <thead>
                                         <tr>
@@ -921,7 +857,7 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
                                         <tr class="<?php echo $row_class; ?>">
                                             <td><?php echo $no++; ?></td>
                                             <td>
-                                                <?php echo date('d/m/Y H:i', strtotime($k['tanggal'])); ?>
+                                                <?php echo formatTanggalUi($k['tanggal'], true); ?>
                                             </td>
                                             <td>
                                                 <div class="fw-semibold"><?php echo htmlspecialchars($k['keterangan_lengkap']); ?></div>
@@ -1007,22 +943,10 @@ echo "<!-- DEBUG: total_setoran=$total_setoran, total_waserda=$total_waserda -->
                                 </div>
                             </div>
                             
-                            <!-- Info untuk Mobile -->
-                            <div class="row mt-3 d-md-none">
-                                <div class="col-12">
-                                    <div class="card bg-light">
-                                        <div class="card-body py-2">
-                                            <small class="text-muted">
-                                                <i class="fas fa-info-circle me-1"></i>
-                                                Geser tabel ke kanan untuk melihat kolom lengkap
-                                            </small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         <?php endif; ?>
                     </div>
                 </div>
+                <?php if (isset($pager)) ui_pagination($pager, 'laporan_kas.php'); ?>
             </main>
         </div>
     </div>

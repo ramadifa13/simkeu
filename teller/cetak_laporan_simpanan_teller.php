@@ -111,11 +111,6 @@ $stmt_transactions->bindParam(':end_date', $end_date);
 $stmt_transactions->execute();
 $transactions = $stmt_transactions->fetchAll(PDO::FETCH_ASSOC);
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
-
 // ============================================
 // BUAT PDF
 // ============================================

@@ -150,11 +150,6 @@ $stmt_kas->bindParam(':tanggal', $selected_date);
 $stmt_kas->execute();
 $kas_transactions = $stmt_kas->fetchAll(PDO::FETCH_ASSOC);
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
-
 // ============================================
 // BUAT PDF
 // ============================================

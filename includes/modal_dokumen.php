@@ -57,6 +57,10 @@
                 img.alt = label;
                 img.className = 'img-thumbnail w-100';
                 img.style.cssText = 'height:180px;object-fit:cover;cursor:zoom-in';
+                img.onerror = function () {
+                    col.innerHTML = '<div class="border rounded d-flex align-items-center justify-content-center text-muted px-2 text-center" style="height:180px"><span class="small">File tidak ditemukan di server<br><span class="text-secondary">Unggah ulang atau pastikan uploads/ utuh setelah reset</span></span></div><div class="small mt-1 fw-semibold"></div>';
+                    col.lastChild.textContent = label;
+                };
                 img.onclick = function () {
                     bootstrap.Modal.getInstance(document.getElementById('modalDokumenAnggota')).hide();
                     lihatDokumen(docs[field], label + ' - ' + nama);

@@ -373,15 +373,7 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .backup-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .danger-zone {
-            border: 2px solid #dc3545;
-            border-left: 6px solid #dc3545;
-        }
+        .danger-zone{border:1px solid #e8b4b4;border-left:3px solid #c0392b;border-radius:10px}
     </style>
 </head>
 <body>
@@ -391,34 +383,19 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
         <div class="row">
             <?php include '../includes/sidebar.php'; ?>
             
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-database me-2"></i>Backup & Reset Data
-                    </h1>
-                </div>
-
-                <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <i class="fas fa-check-circle me-2"></i>
-                        <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-                
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <?php ui_page_header([
+                    'title' => 'Backup & Reset Data',
+                    'icon' => 'fas fa-database text-primary',
+                    'subtitle' => 'Cadangkan database dan kelola reset data',
+                ]); ?>
+                <?php ui_flash(); ?>
 
                 <div class="row">
                     <!-- Database Information -->
                     <div class="col-lg-4 mb-4">
                         <div class="card backup-card">
-                            <div class="card-header bg-info text-white">
+                            <div class="card-header bg-white">
                                 <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informasi Database</h6>
                             </div>
                             <div class="card-body">
@@ -453,7 +430,7 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
 
                         <!-- Info Backup -->
                         <div class="card backup-card mt-4">
-                            <div class="card-header bg-warning text-dark">
+                            <div class="card-header bg-white">
                                 <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informasi Backup</h6>
                             </div>
                             <div class="card-body">
@@ -476,7 +453,7 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
                     <!-- Backup Database -->
                     <div class="col-lg-8">
                         <div class="card backup-card mb-4">
-                            <div class="card-header bg-success text-white">
+                            <div class="card-header bg-white">
                                 <h6 class="mb-0"><i class="fas fa-download me-2"></i>Backup Database</h6>
                             </div>
                             <div class="card-body">
@@ -527,7 +504,7 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
 
                         <!-- Existing Backups -->
                         <div class="card backup-card mb-4">
-                            <div class="card-header bg-primary text-white">
+                            <div class="card-header bg-white">
                                 <h6 class="mb-0"><i class="fas fa-history me-2"></i>Backup Tersimpan</h6>
                             </div>
                             <div class="card-body">

@@ -187,10 +187,6 @@ $admin_stmt->bindParam(':id', $_SESSION['user_id']);
 $admin_stmt->execute();
 $admin = $admin_stmt->fetch(PDO::FETCH_ASSOC);
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -201,14 +197,7 @@ function formatRupiah($angka) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .settings-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .stats-card {
-            border-left: 4px solid #007bff;
-        }
+        .stats-card{border-left:3px solid #087f83}
     </style>
 </head>
 <body>
@@ -218,41 +207,20 @@ function formatRupiah($angka) {
         <div class="row">
             <?php include '../includes/sidebar.php'; ?>
             
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-cog me-2"></i>Pengaturan Sistem
-                    </h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <div class="btn-group me-2">
-                            <span class="badge bg-primary p-2">
-                                <i class="fas fa-user-shield me-1"></i> <?php echo htmlspecialchars($admin['nama_lengkap']); ?>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success alert-dismissible fade show">
-                        <i class="fas fa-check-circle me-2"></i>
-                        <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-                
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger alert-dismissible fade show">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <?php ui_page_header([
+                    'title' => 'Pengaturan Sistem',
+                    'icon' => 'fas fa-cog text-primary',
+                    'subtitle' => 'Konfigurasi aplikasi dan akun admin',
+                    'actions' => '<span class="badge bg-primary"><i class="fas fa-user-shield me-1"></i>' . htmlspecialchars($admin['nama_lengkap']) . '</span>',
+                ]); ?>
+                <?php ui_flash(); ?>
 
                 <div class="row">
                     <!-- System Statistics -->
                     <div class="col-lg-3 mb-4">
                         <div class="card settings-card stats-card">
-                            <div class="card-header bg-primary text-white">
+                            <div class="card-header bg-white">
                                 <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Statistik Sistem</h6>
                             </div>
                             <div class="card-body">
@@ -281,7 +249,7 @@ function formatRupiah($angka) {
                         
                         <!-- Change Password -->
                         <div class="card settings-card mt-4">
-                            <div class="card-header bg-warning text-white">
+                            <div class="card-header bg-white">
                                 <h6 class="mb-0"><i class="fas fa-key me-2"></i>Ubah Password</h6>
                             </div>
                             <div class="card-body">
@@ -313,7 +281,7 @@ function formatRupiah($angka) {
                     <!-- Koperasi Profile Settings -->
                     <div class="col-lg-9">
                         <div class="card settings-card mb-4">
-                            <div class="card-header bg-success text-white">
+                            <div class="card-header bg-white">
                                 <h6 class="mb-0"><i class="fas fa-building me-2"></i>Profil Koperasi</h6>
                             </div>
                             <div class="card-body">
@@ -365,7 +333,7 @@ function formatRupiah($angka) {
                         </div>
 
                         <div class="card settings-card mb-4">
-                            <div class="card-header bg-primary text-white"><h6 class="mb-0"><i class="fas fa-file-signature me-2"></i>Surat Perjanjian & TTD Admin</h6></div>
+                            <div class="card-header bg-white"><h6 class="mb-0"><i class="fas fa-file-signature me-2"></i>Surat Perjanjian & TTD Admin</h6></div>
                             <div class="card-body">
                                 <div class="alert alert-info">Pengaturan ini berlaku untuk surat baru. Surat yang sudah ditandatangani tetap memakai data saat transaksi.</div>
                                 <form method="POST" enctype="multipart/form-data" id="formPerjanjian"><?php echo layananToken(); ?>
@@ -378,16 +346,16 @@ function formatRupiah($angka) {
                                         <div class="col-md-6 mb-3"><label class="form-label">Versi Surat</label><input class="form-control" value="Lengkap" readonly><input type="hidden" name="template_default" value="lengkap"></div>
                                     </div>
                                     <div class="mb-3"><label class="form-label">Isi Surat Perjanjian Lengkap</label><textarea class="form-control" rows="14" name="isi_lengkap" required><?php echo htmlspecialchars($pengaturan_perjanjian['isi_lengkap']); ?></textarea></div>
-                                    <div class="signature-field"><div class="signature-field-head"><div><label class="signature-field-title mb-0">TTD Admin</label><small class="signature-field-help">Gambar langsung menggunakan mouse atau layar sentuh.</small></div><span class="signature-status" id="ttdAdminStatus"><i class="fas fa-pen-nib"></i> Belum diisi</span></div><div class="signature-canvas-wrap"><canvas id="ttdAdminCanvas" class="signature" width="700" height="180"></canvas></div>
-                                    <input type="hidden" name="ttd_admin" id="ttd_admin">
-                                    <div class="signature-field-foot"><span class="signature-field-note">Tanda tangan tersimpan bersama pengaturan surat.</span><button type="button" class="signature-clear btn btn-outline-danger btn-sm" id="hapusTtdAdmin"><i class="fas fa-eraser me-1"></i>Hapus / gambar ulang</button></div></div><div class="mt-2"><button type="submit" name="update_perjanjian" class="btn btn-primary"><i class="fas fa-save me-1"></i>Simpan Pengaturan</button></div>
+                                    <div class="signature-field"><div class="signature-field-head"><div><label class="signature-field-title mb-0">TTD Admin</label><small class="signature-field-help">Gambar langsung menggunakan mouse atau layar sentuh.</small></div><span class="signature-status" id="ttdAdminStatus"><i class="fas fa-pen-nib"></i> Belum diisi</span></div><div class="signature-canvas-wrap"><canvas id="ttdAdminCanvas" class="signature" data-target="ttd_admin" width="700" height="220"></canvas></div>
+                                    <input type="hidden" name="ttd_admin" id="ttd_admin" value="<?php echo htmlspecialchars((string)($pengaturan_perjanjian['ttd_admin'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+                                    <div class="signature-field-foot"><span class="signature-field-note">Tanda tangan tersimpan bersama pengaturan surat.</span><button type="button" class="signature-clear clear-sign btn btn-outline-danger btn-sm" id="hapusTtdAdmin"><i class="fas fa-eraser me-1"></i>Hapus / gambar ulang</button></div></div><div class="mt-2"><button type="submit" name="update_perjanjian" class="btn btn-primary"><i class="fas fa-save me-1"></i>Simpan Pengaturan</button></div>
                                 </form>
                             </div>
                         </div>
 
                         <!-- Logo Upload -->
                         <div class="card settings-card">
-                            <div class="card-header bg-info text-white">
+                            <div class="card-header bg-white">
                                 <h6 class="mb-0"><i class="fas fa-image me-2"></i>Logo Koperasi</h6>
                             </div>
                             <div class="card-body">
@@ -431,31 +399,29 @@ function formatRupiah($angka) {
         </div>
     </div>
 
+    <link rel="stylesheet" href="../assets/css/tanda-tangan.css?v=20261029-2">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/js/tanda-tangan-layanan.js?v=20261029-2"></script>
     <script>
     (function(){
-      var c=document.getElementById('ttdAdminCanvas'); if(!c)return; var x=c.getContext('2d'), drawing=false, dirty=false;
-      function size(){var old=dirty?c.toDataURL():null;c.width=c.clientWidth*devicePixelRatio;c.height=180*devicePixelRatio;x.scale(devicePixelRatio,devicePixelRatio);x.lineWidth=2;x.lineCap='round';if(old){var i=new Image;i.onload=function(){x.drawImage(i,0,0,c.clientWidth,180)};i.src=old;}}
-      function p(e){var r=c.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
-      function setStatus(ready){var s=document.getElementById('ttdAdminStatus'),w=c.closest('.signature-canvas-wrap');s.classList.toggle('is-ready',ready);s.innerHTML=ready?'<i class="fas fa-check-circle"></i> Siap disimpan':'<i class="fas fa-pen-nib"></i> Belum diisi';w.classList.toggle('has-signature',ready)}
-      c.addEventListener('pointerdown',function(e){e.preventDefault();drawing=true;dirty=true;setStatus(true);var a=p(e);x.beginPath();x.moveTo(a[0],a[1]);c.setPointerCapture(e.pointerId)},{passive:false});
-      c.addEventListener('pointermove',function(e){if(!drawing)return;e.preventDefault();var a=p(e);x.lineTo(a[0],a[1]);x.stroke()},{passive:false});
-      function stopTtd(e){drawing=false;if(c.hasPointerCapture && c.hasPointerCapture(e.pointerId))c.releasePointerCapture(e.pointerId)}
-      c.addEventListener('pointerup',stopTtd);c.addEventListener('pointercancel',stopTtd);c.addEventListener('lostpointercapture',stopTtd);
-      size(); var existing=<?php echo json_encode((string)($pengaturan_perjanjian['ttd_admin'] ?? '')); ?>;if(existing){var i=new Image;i.onload=function(){x.drawImage(i,0,0,c.clientWidth,180);dirty=true;setStatus(true)};i.src=existing}
-      document.getElementById('hapusTtdAdmin').onclick=function(){x.clearRect(0,0,c.width,c.height);dirty=false;setStatus(false);document.getElementById('ttd_admin').value=''};
+      var c=document.getElementById('ttdAdminCanvas'); if(!c)return;
+      var existing=<?php echo json_encode((string)($pengaturan_perjanjian['ttd_admin'] ?? '')); ?>;
+      if(window.SimkeuSignaturePad){ SimkeuSignaturePad.bind(c); SimkeuSignaturePad.resize(document); }
       var saving=false;
       document.getElementById('formPerjanjian').addEventListener('submit',async function(e){
         e.preventDefault();
         if(saving)return;
-        if(!dirty&&!existing){alert('TTD Admin wajib dibuat.');return;}
+        var field=document.getElementById('ttd_admin');
+        var hasTtd=(field&&field.value)||existing;
+        if(!hasTtd){alert('TTD Admin wajib dibuat.');return;}
         var form=this, button=form.querySelector('button[type="submit"]');
         saving=true;button.disabled=true;
         try {
           var data=new FormData(form);
           data.delete('ttd_admin');
           data.set('update_perjanjian','1');
-          if(dirty){
+          var dirty=window.SimkeuSignaturePad ? SimkeuSignaturePad.isDirty(c) : !!field.value;
+          if(dirty || (field && field.value && field.value !== existing)){
             var blob=await new Promise(function(resolve){c.toBlob(resolve,'image/png')});
             if(!blob)throw new Error('Tanda tangan gagal dibuat. Silakan coba lagi.');
             if(blob.size>1024*1024)throw new Error('Tanda tangan melebihi 1 MB.');

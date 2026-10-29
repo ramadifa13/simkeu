@@ -28,6 +28,7 @@ require_once getConfigPath();
 
 // Include functions
 require_once __DIR__ . '/../config/functions.php';
+require_once __DIR__ . '/permissions.php';
 
 /**
  * Check if user is logged in
@@ -120,7 +121,7 @@ function checkAnggota() {
         if ($stmt->fetchColumn() !== 'aktif') {
             session_unset();
             $_SESSION['error'] = 'Akun anggota nonaktif karena pinjaman telah lunas. Ajukan pinjaman baru melalui Teller untuk mengaktifkan kembali akun.';
-            header('Location: ../login.php?role=anggota');
+            header('Location: ../login.php');
             exit();
         }
     }

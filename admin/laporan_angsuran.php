@@ -96,6 +96,25 @@ foreach ($params as $key => $value) {
 }
 $stmt->execute();
 $angsuran = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$__ui = ui_query_params([]);
+$__q = $__ui['q'];
+$__all = $angsuran;
+if ($__q !== '') {
+    $__fields = array (
+  0 => 'nama_lengkap',
+  1 => 'kode_anggota',
+  2 => 'kode_pinjaman',
+);
+    $__all = array_values(array_filter($__all, static function ($r) use ($__q, $__fields) {
+        $hay = '';
+        foreach ($__fields as $f) { $hay .= ' ' . ($r[$f] ?? ''); }
+        return stripos($hay, $__q) !== false;
+    }));
+}
+$pager = ui_paginate(count($__all), $__ui['page'], $__ui['per_page']);
+$angsuran = array_slice($__all, $pager['offset'], $pager['per_page']);
+$q = $__q;
+
 
 // Get anggota list for filter
 $query_anggota = "SELECT id, kode_anggota, nama_lengkap FROM anggota WHERE status = 'aktif' ORDER BY nama_lengkap";
@@ -141,10 +160,6 @@ foreach ($angsuran as $a) {
     if ($a['status'] == 'telat') $total_telat++;
 }
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -188,22 +203,16 @@ function formatRupiah($angka) {
             <?php include '../includes/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-chart-bar me-2"></i>Laporan Angsuran
-                    </h1>
-                    <div class="btn-group">
-                        <a href="?export_pdf=1&<?php echo http_build_query($_GET); ?>" class="btn btn-sm btn-danger" target="_blank">
-                            <i class="fas fa-file-pdf"></i> <span class="d-none d-sm-inline">PDF</span>
-                        </a>
-                        <a href="?export_excel=1&<?php echo http_build_query($_GET); ?>" class="btn btn-sm btn-success">
-                            <i class="fas fa-file-excel"></i> <span class="d-none d-sm-inline">Excel</span>
-                        </a>
-                        <a href="laporan_angsuran.php" class="btn btn-sm btn-primary ms-2">
-                            <i class="fas fa-sync"></i> <span class="d-none d-sm-inline">Reset</span>
-                        </a>
-                    </div>
-                </div>
+                <?php ui_page_header([
+                    'title' => 'Laporan Angsuran',
+                    'icon' => 'fas fa-chart-bar text-primary',
+                    'subtitle' => 'Rekap jadwal dan status angsuran pinjaman',
+                    'actions' => '<div class="btn-group">'
+                        . '<a href="?export_pdf=1&' . http_build_query($_GET) . '" class="btn btn-sm btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> <span class="d-none d-sm-inline">PDF</span></a>'
+                        . '<a href="?export_excel=1&' . http_build_query($_GET) . '" class="btn btn-sm btn-success"><i class="fas fa-file-excel"></i> <span class="d-none d-sm-inline">Excel</span></a>'
+                        . '<a href="laporan_angsuran.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-sync"></i> <span class="d-none d-sm-inline">Reset</span></a>'
+                        . '</div>',
+                ]); ?>
                 <div class="alert alert-info no-print">
                     <i class="fas fa-info-circle me-1"></i>
                     Halaman ini hanya laporan (tidak bisa mengedit denda). Denda otomatis muncul pada cicilan belum lunas yang lewat jatuh tempo.
@@ -211,69 +220,12 @@ function formatRupiah($angka) {
                     bayar/ubah denda di <a href="angsuran.php">Angsuran</a>, atau kelola di <a href="denda.php">Denda</a>.
                 </div>
 
-                <!-- Statistics Cards -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-primary text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo count($angsuran); ?></h4>
-                                        <p>Total Angsuran</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-list fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-success text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo $total_lunas; ?></h4>
-                                        <p>Lunas</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-check-circle fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-warning text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo $total_belum_bayar; ?></h4>
-                                        <p>Belum Bayar</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-clock fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-danger text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo $total_telat; ?></h4>
-                                        <p>Telat Bayar</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-exclamation-triangle fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <?php ui_stat_grid([
+                    ['label' => 'Total angsuran', 'value' => count($angsuran), 'tone' => 'primary', 'icon' => 'fas fa-list', 'hint' => 'Hasil filter'],
+                    ['label' => 'Lunas', 'value' => (int)$total_lunas, 'tone' => 'success', 'icon' => 'fas fa-check-circle', 'hint' => 'Sudah dibayar'],
+                    ['label' => 'Belum bayar', 'value' => (int)$total_belum_bayar, 'tone' => 'warning', 'icon' => 'fas fa-clock', 'hint' => 'Menunggu'],
+                    ['label' => 'Telat', 'value' => (int)$total_telat, 'tone' => 'danger', 'icon' => 'fas fa-exclamation-triangle', 'hint' => 'Lewat jatuh tempo'],
+                ]); ?>
 
                 <!-- Ringkasan Nilai -->
                 <div class="row mb-4">
@@ -400,11 +352,25 @@ function formatRupiah($angka) {
                         <h5 class="card-title mb-0">
                             <i class="fas fa-table me-2"></i>Data Angsuran
                             <small class="text-muted">
-                                (<?php echo date('d/m/Y', strtotime($start_date)) . ' - ' . date('d/m/Y', strtotime($end_date)); ?>)
+                                (<?php echo formatTanggalUi($start_date) . ' - ' . formatTanggalUi($end_date); ?>)
                             </small>
                         </h5>
                     </div>
                     <div class="card-body">
+                        <?php if (isset($pager)) ui_table_toolbar([
+                            'action' => 'laporan_angsuran.php',
+                            'q' => $q ?? '',
+                            'placeholder' => 'Cari nama, kode anggota, kode pinjaman…',
+                            'per_page' => $pager['per_page'],
+                            'reset_href' => 'laporan_angsuran.php',
+                            'hidden' => array_filter([
+                                'start_date' => $start_date ?? '',
+                                'end_date' => $end_date ?? '',
+                                'status' => $filter_status ?? '',
+                                'anggota_id' => $filter_anggota ?? '',
+                                'pinjaman_id' => $filter_pinjaman ?? '',
+                            ], static fn($v) => $v !== '' && $v !== null),
+                        ]); ?>
                         <?php if (empty($angsuran)): ?>
                             <div class="text-center py-5">
                                 <i class="fas fa-info-circle fa-3x text-muted mb-3"></i>
@@ -446,7 +412,7 @@ function formatRupiah($angka) {
                             </p>
                         </div>
                         
-                        <div class="table-responsive mb-4">
+                        <div class="table-responsive ui-table-scroll mb-4">
                             <table class="table table-striped table-bordered table-sm">
                                 <thead class="table-light">
                                     <tr>
@@ -474,7 +440,7 @@ function formatRupiah($angka) {
                                             <span class="badge bg-primary"><?php echo $a['angsuran_ke']; ?></span>
                                         </td>
                                         <td>
-                                            <?php echo date('d/m/Y', strtotime($a['tanggal_jatuh_tempo'])); ?>
+                                            <?php echo formatTanggalUi($a['tanggal_jatuh_tempo']); ?>
                                         </td>
                                         <td class="text-end"><?php echo formatRupiah($a['pokok']); ?></td>
                                         <td class="text-end"><?php echo formatRupiah($a['bunga']); ?></td>
@@ -483,7 +449,7 @@ function formatRupiah($angka) {
                                         <td>
                                             <?php if ($a['tanggal_bayar']): ?>
                                                 <span class="text-success">
-                                                    <?php echo date('d/m/Y', strtotime($a['tanggal_bayar'])); ?>
+                                                    <?php echo formatTanggalUi($a['tanggal_bayar']); ?>
                                                 </span>
                                             <?php else: ?>
                                                 <span class="text-muted">-</span>
@@ -523,7 +489,7 @@ function formatRupiah($angka) {
                                             <tr>
                                                 <td>Periode Laporan:</td>
                                                 <td class="fw-bold">
-                                                    <?php echo date('d/m/Y', strtotime($start_date)) . ' - ' . date('d/m/Y', strtotime($end_date)); ?>
+                                                    <?php echo formatTanggalUi($start_date) . ' - ' . formatTanggalUi($end_date); ?>
                                                 </td>
                                             </tr>
                                             <tr>
@@ -550,6 +516,7 @@ function formatRupiah($angka) {
                         <?php endif; ?>
                     </div>
                 </div>
+                <?php if (isset($pager)) ui_pagination($pager, 'laporan_angsuran.php'); ?>
             </main>
         </div>
     </div>
