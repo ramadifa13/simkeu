@@ -61,20 +61,96 @@ document.addEventListener('DOMContentLoaded', function () {
         const toggle=document.createElement('button');toggle.type='button';toggle.className='ui-combobox-toggle';toggle.tabIndex=-1;toggle.setAttribute('aria-label','Tampilkan pilihan');toggle.innerHTML='<i class="fas fa-chevron-down" aria-hidden="true"></i>';
         const list=document.createElement('div');list.className='ui-combobox-list';list.setAttribute('role','listbox');list.hidden=true;
         const listId='ui-combobox-'+Math.random().toString(36).slice(2);list.id=listId;input.setAttribute('aria-controls',listId);
-        const wasRequired=select.required;select.required=false;input.required=wasRequired;
+        // Select native disembunyikan: required dipindah ke input pencarian.
+        let mustPick=!!select.required;select.required=false;input.required=mustPick;
         select.parentNode.insertBefore(box,select);box.append(input,toggle,list,select);select.classList.add('ui-combobox-native');select.setAttribute('aria-hidden','true');select.tabIndex=-1;let active=-1;
         function options(){return Array.from(select.options).filter(o=>!o.disabled);}
         function selectedLabel(){const o=select.selectedOptions[0];return o&&o.value?o.textContent.trim():'';}
-        function close(){list.hidden=true;input.setAttribute('aria-expanded','false');active=-1;}
-        function validate(){input.setCustomValidity(select.required&&!select.value?'Pilih salah satu data dari daftar.':'');}
+        function placeList(){
+            const rect=box.getBoundingClientRect();
+            const gap=6;const maxH=Math.min(270,window.innerHeight*0.42);
+            const spaceBelow=window.innerHeight-rect.bottom-gap;
+            const spaceAbove=rect.top-gap;
+            const openUp=spaceBelow<Math.min(180,maxH) && spaceAbove>spaceBelow;
+            list.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-rect.width-8))+'px';
+            list.style.width=Math.max(160,rect.width)+'px';
+            list.style.right='auto';
+            list.style.maxHeight=Math.max(120,Math.min(maxH,openUp?spaceAbove:spaceBelow))+'px';
+            if(openUp){list.style.top='auto';list.style.bottom=(window.innerHeight-rect.top+gap)+'px';}
+            else{list.style.bottom='auto';list.style.top=(rect.bottom+gap)+'px';}
+        }
+        let listPinned=false;
+        function unpinList(){
+            if(!listPinned)return;
+            listPinned=false;
+            window.removeEventListener('resize',placeList);
+            window.removeEventListener('scroll',placeList,true);
+        }
+        function pinList(){
+            if(listPinned){placeList();return;}
+            listPinned=true;
+            window.addEventListener('resize',placeList);
+            window.addEventListener('scroll',placeList,true);
+            placeList();
+        }
+        function close(){
+            list.hidden=true;list.classList.remove('ui-combobox-list-open');
+            input.setAttribute('aria-expanded','false');active=-1;
+            list.style.removeProperty('left');list.style.removeProperty('top');list.style.removeProperty('bottom');list.style.removeProperty('width');list.style.removeProperty('right');list.style.removeProperty('max-height');
+            unpinList();
+            if(list.parentElement!==box)box.appendChild(list);
+        }
+        function validate(){input.setCustomValidity(mustPick&&!select.value?'Pilih salah satu data dari daftar.':'');}
         function choose(value){select.value=value;input.value=selectedLabel();validate();select.dispatchEvent(new Event('change',{bubbles:true}));close();}
-        function render(term){const q=(term||'').trim().toLocaleLowerCase('id');const seen=new Set();const matches=options().filter(o=>(o.value||!q)&&o.textContent.toLocaleLowerCase('id').includes(q)).filter(o=>{if(seen.has(o.value))return false;seen.add(o.value);return true;}).slice(0,100);list.replaceChildren();active=-1;if(!matches.length){const empty=document.createElement('div');empty.className='ui-combobox-empty';empty.textContent='Data tidak ditemukan';list.append(empty);}matches.forEach(o=>{const item=document.createElement('button');item.type='button';item.className='ui-combobox-option';item.setAttribute('role','option');item.dataset.value=o.value;item.textContent=o.textContent.trim()||(o.value?'Pilihan':'Kosongkan pilihan');if(o.selected)item.setAttribute('aria-selected','true');item.addEventListener('mousedown',e=>e.preventDefault());item.addEventListener('click',()=>choose(o.value));list.append(item);});list.hidden=false;input.setAttribute('aria-expanded','true');}
+        function render(term){
+            const q=(term||'').trim().toLocaleLowerCase('id');const seen=new Set();
+            const matches=options().filter(o=>(o.value||!q)&&o.textContent.toLocaleLowerCase('id').includes(q)).filter(o=>{if(seen.has(o.value))return false;seen.add(o.value);return true;}).slice(0,100);
+            list.replaceChildren();active=-1;
+            if(!matches.length){const empty=document.createElement('div');empty.className='ui-combobox-empty';empty.textContent='Data tidak ditemukan';list.append(empty);}
+            matches.forEach(o=>{
+                const item=document.createElement('button');item.type='button';item.className='ui-combobox-option';item.setAttribute('role','option');item.dataset.value=o.value;
+                item.textContent=o.textContent.trim()||(o.value?'Pilihan':'Kosongkan pilihan');
+                if(o.selected)item.setAttribute('aria-selected','true');
+                item.addEventListener('mousedown',e=>e.preventDefault());
+                item.addEventListener('click',()=>choose(o.value));
+                list.append(item);
+            });
+            if(list.parentElement!==document.body)document.body.appendChild(list);
+            list.classList.add('ui-combobox-list-open');list.hidden=false;
+            input.setAttribute('aria-expanded','true');pinList();
+        }
         function move(step){const items=Array.from(list.querySelectorAll('.ui-combobox-option'));if(!items.length)return;active=(active+step+items.length)%items.length;items.forEach((el,i)=>el.classList.toggle('is-active',i===active));items[active].scrollIntoView({block:'nearest'});}
-        input.value=selectedLabel();input.addEventListener('focus',()=>render(''));input.addEventListener('input',()=>{if(input.value!==selectedLabel())select.value='';validate();render(input.value);});input.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();if(list.hidden)render(input.value);move(1);}else if(e.key==='ArrowUp'){e.preventDefault();move(-1);}else if(e.key==='Enter'&&!list.hidden){const items=list.querySelectorAll('.ui-combobox-option');if(active>=0&&items[active]){e.preventDefault();choose(items[active].dataset.value);}}else if(e.key==='Escape'){close();input.value=selectedLabel();validate();}});
-        input.addEventListener('blur',e=>{if(e.relatedTarget===toggle)return;setTimeout(()=>{if(document.activeElement!==toggle){close();input.value=selectedLabel();validate();}},120);});toggle.addEventListener('mousedown',e=>{e.preventDefault();if(list.hidden){input.focus();render('');}else close();});select.addEventListener('change',()=>{input.value=selectedLabel();validate();});
-        const sync=()=>{input.disabled=select.disabled;input.required=select.required;box.classList.toggle('is-disabled',select.disabled);input.value=selectedLabel();validate();};new MutationObserver(sync).observe(select,{childList:true,subtree:true,attributes:true});sync();
+        input.value=selectedLabel();
+        input.addEventListener('focus',()=>render(''));
+        input.addEventListener('input',()=>{if(input.value!==selectedLabel())select.value='';validate();render(input.value);});
+        input.addEventListener('keydown',e=>{
+            if(e.key==='ArrowDown'){e.preventDefault();if(list.hidden)render(input.value);move(1);}
+            else if(e.key==='ArrowUp'){e.preventDefault();if(list.hidden)render(input.value);move(-1);}
+            else if(e.key==='Enter'&&!list.hidden){const items=list.querySelectorAll('.ui-combobox-option');if(active>=0&&items[active]){e.preventDefault();choose(items[active].dataset.value);}else if(items.length===1){e.preventDefault();choose(items[0].dataset.value);}}
+            else if(e.key==='Escape'){close();input.value=selectedLabel();validate();}
+        });
+        input.addEventListener('blur',e=>{
+            if(e.relatedTarget===toggle||(e.relatedTarget&&list.contains(e.relatedTarget)))return;
+            setTimeout(()=>{if(document.activeElement!==toggle&&!list.contains(document.activeElement)){close();input.value=selectedLabel();validate();}},120);
+        });
+        toggle.addEventListener('mousedown',e=>{e.preventDefault();if(list.hidden){input.focus();render('');}else close();});
+        select.addEventListener('change',()=>{input.value=selectedLabel();validate();});
+        const sync=()=>{
+            if(select.required){mustPick=true;select.required=false;}
+            input.disabled=select.disabled;input.required=mustPick;
+            box.classList.toggle('is-disabled',select.disabled);
+            if(document.activeElement!==input)input.value=selectedLabel();
+            else if(!list.hidden)render(input.value);
+            validate();
+        };
+        new MutationObserver(sync).observe(select,{childList:true,subtree:true,attributes:true});sync();
     }
     document.querySelectorAll('main select,.modal select').forEach(initAutocompleteSelect);
+    window.uiInitAutocompleteSelect=initAutocompleteSelect;
+    // Select yang muncul belakangan (modal dinamis / partial reload) ikut diinisialisasi.
+    document.addEventListener('shown.bs.modal',function(e){
+        (e.target||document).querySelectorAll('select').forEach(initAutocompleteSelect);
+    });
 
     // Native validation pada input autocomplete sering hanya menampilkan tooltip
     // kecil yang tidak terlihat. Tampilkan alasan yang jelas dan fokus ke fieldnya.
@@ -85,9 +161,9 @@ document.addEventListener('DOMContentLoaded', function () {
             form.dataset.uiInvalidShown='1';
             field.dataset.uiInvalidShown='1';
             setTimeout(()=>{delete field.dataset.uiInvalidShown;form.dataset.uiInvalidShown='';},400);
-            const label=field.closest('.mb-3,.col-md-6,.col-md-4,.col-12')?.querySelector('label')?.textContent?.trim() || field.getAttribute('name') || 'Field';
+            const label=field.closest('.mb-3,.col-md-6,.col-md-4,.col-12,.form-group')?.querySelector('label')?.textContent?.trim() || field.getAttribute('name') || 'Field';
             const message=field.validity.valueMissing?' wajib diisi.':' belum valid.';
-            alert(label.replace(/\\s+/g,' ')+message);
+            alert(label.replace(/\s+/g,' ')+message);
             field.focus();
         },true);
     });

@@ -1389,11 +1389,29 @@ body.ui-shell {
 @media print{.ui-shell main table.ui-data-table{width:100%!important;min-width:0!important}.ui-shell main table.ui-data-table td.ui-cell-prose{max-width:none}.ui-shell main .ui-table-scroll{overflow:visible!important}}
 
 /* Searchable select: select asli tetap menyimpan nilai formulir. */
-.ui-shell .ui-combobox{position:relative;min-width:0}.ui-shell .ui-combobox-input{padding-right:44px;background:#fff;cursor:text}.ui-shell .ui-combobox-input::-webkit-search-cancel-button{cursor:pointer}.ui-shell .ui-combobox-input:focus{border-color:#168f93!important;box-shadow:0 0 0 3px rgba(8,127,131,.12)!important}.ui-shell .ui-combobox-toggle{position:absolute;right:1px;top:1px;width:40px;height:40px;border:0;border-left:1px solid #e0e8ec;border-radius:0 9px 9px 0;background:#fff;color:#607985;display:grid;place-items:center;z-index:2}.ui-shell .ui-combobox-toggle:hover{background:#eaf4f4;color:#087f83}.ui-shell .ui-combobox-list{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:1085;max-height:270px;overflow:auto;padding:6px;background:#fff;border:1px solid #cbdce1;border-radius:10px;box-shadow:0 16px 36px rgba(20,58,72,.18)}.ui-shell .ui-combobox-option{display:block;width:100%;padding:11px 12px;border:0;border-radius:6px;background:transparent;color:#254753;text-align:left;font-size:13px;line-height:1.4}.ui-shell .ui-combobox-option:hover,.ui-shell .ui-combobox-option.is-active{background:#e8f5f4;color:#076f73}.ui-shell .ui-combobox-option[aria-selected="true"]{font-weight:700;background:#f0f7f7}.ui-shell .ui-combobox-empty{padding:16px;text-align:center;color:#758991;font-size:12px}.ui-shell .ui-combobox-native{display:none!important}.ui-shell .ui-combobox.is-disabled .ui-combobox-input{background:#eef2f4;color:#7b8c93}
+.ui-shell .ui-combobox{position:relative;min-width:0}
+.ui-shell .ui-combobox-input{padding-right:40px;background:#fff;cursor:text}
+.ui-shell .ui-combobox-input::-webkit-search-cancel-button{cursor:pointer}
+.ui-shell .ui-combobox-input:focus{border-color:#168f93!important;box-shadow:0 0 0 3px rgba(8,127,131,.12)!important}
+/* Tinggi toggle mengikuti input padat (min-height 34px), bukan fixed 40px. */
+.ui-shell .ui-combobox-toggle{position:absolute;right:1px;top:1px;bottom:1px;width:34px;height:auto;border:0;border-left:1px solid #e0e8ec;border-radius:0 7px 7px 0;background:#fff;color:#607985;display:grid;place-items:center;z-index:2;padding:0;font-size:11px;line-height:1}
+.ui-shell .ui-combobox-toggle:hover{background:#eaf4f4;color:#087f83}
+.ui-shell .ui-combobox-toggle:focus-visible{outline:2px solid #168f93;outline-offset:-2px}
+.ui-shell .ui-combobox-list,.ui-combobox-list.ui-combobox-list-open{z-index:2000;max-height:min(270px,42vh);overflow:auto;padding:6px;background:#fff;border:1px solid #cbdce1;border-radius:10px;box-shadow:0 16px 36px rgba(20,58,72,.18);box-sizing:border-box}
+.ui-shell .ui-combobox-list{position:absolute;left:0;right:0;top:calc(100% + 6px)}
+/* List di-portal ke body agar tidak terpotong overflow main/card/modal. */
+body > .ui-combobox-list.ui-combobox-list-open{position:fixed;margin:0}
+.ui-shell .ui-combobox-option,.ui-combobox-list .ui-combobox-option{display:block;width:100%;padding:9px 11px;border:0;border-radius:6px;background:transparent;color:#254753;text-align:left;font-size:13px;line-height:1.4}
+.ui-shell .ui-combobox-option:hover,.ui-shell .ui-combobox-option.is-active,.ui-combobox-list .ui-combobox-option:hover,.ui-combobox-list .ui-combobox-option.is-active{background:#e8f5f4;color:#076f73}
+.ui-shell .ui-combobox-option[aria-selected="true"],.ui-combobox-list .ui-combobox-option[aria-selected="true"]{font-weight:700;background:#f0f7f7}
+.ui-shell .ui-combobox-empty,.ui-combobox-list .ui-combobox-empty{padding:14px;text-align:center;color:#758991;font-size:12px}
+.ui-shell .ui-combobox-native{display:none!important}
+.ui-shell .ui-combobox.is-disabled .ui-combobox-input{background:#eef2f4;color:#7b8c93}
+.ui-shell .ui-combobox.is-disabled .ui-combobox-toggle{background:#eef2f4;color:#9aabb3;pointer-events:none}
 
 /* Tombol menggunakan warna fungsi; status tetap berupa badge datar. */
 .ui-shell .btn.ui-action{border-width:1px!important;border-style:solid!important;border-radius:9px!important;box-shadow:0 2px 5px rgba(25,55,66,.09)!important;text-decoration:none;gap:6px}.ui-shell .btn.ui-action:hover{transform:translateY(-1px);box-shadow:0 5px 12px rgba(25,55,66,.14)!important}.ui-shell .btn.ui-action:active{transform:translateY(0);box-shadow:none!important}.ui-shell .ui-action-primary,.ui-shell .ui-action-pay{background:#087f83!important;border-color:#087f83!important;color:#fff!important}.ui-shell .ui-action-pay{background:#12815d!important;border-color:#12815d!important}.ui-shell .ui-action-view{background:#eef3ff!important;border-color:#adc0ed!important;color:#345aa5!important}.ui-shell .ui-action-edit{background:#fff7df!important;border-color:#edca67!important;color:#775713!important}.ui-shell .ui-action-print{background:#f1f4f6!important;border-color:#aebcc4!important;color:#334f5c!important}.ui-shell .ui-action-export{background:#e7f7ee!important;border-color:#7fc69d!important;color:#167344!important}.ui-shell .ui-action-whatsapp{background:#e8f8ed!important;border-color:#76ce92!important;color:#14753a!important}.ui-shell .ui-action-danger{background:#fff0f2!important;border-color:#e49aa5!important;color:#b12e42!important}.ui-shell .ui-action-muted{background:#fff!important;border-color:#cbd5da!important;color:#5d7079!important}.ui-shell .badge{border-radius:999px!important;box-shadow:none!important;font-weight:700!important;letter-spacing:.01em}.ui-shell .ui-table-actions .ui-action{min-width:34px}.ui-shell .ui-table-actions .ui-action i:only-child{font-size:12px}
-@media(max-width:575px){.ui-shell .ui-combobox-list{max-height:220px}.ui-shell .ui-combobox-option{padding:11px}.ui-shell .btn.ui-action{min-height:38px}}
+@media(max-width:575px){.ui-shell .ui-combobox-list,body>.ui-combobox-list{max-height:min(220px,40vh)}.ui-shell .ui-combobox-option,.ui-combobox-list .ui-combobox-option{padding:10px}.ui-shell .btn.ui-action{min-height:38px}}
 
 
 /* Keep dialogs inside the visible viewport, including the mobile keyboard. */
