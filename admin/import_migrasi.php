@@ -5,11 +5,23 @@ require_once '../includes/migrasi_excel_helper.php';
 require_once '../includes/migrasi_import_service.php';
 if (!isAdmin()) { $_SESSION['error']='Hanya Admin yang dapat mengakses import migrasi.'; header('Location: dashboard.php'); exit(); }
 $page_title = 'Import Migrasi'; $hasil = null;
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Upload > post_max_size mengosongkan $_POST/$_FILES → token gagal ("formulir kedaluwarsa")
+if (cekPostMelebihiBatas()) {
+    $ukuranMb = round(((int)($_SERVER['CONTENT_LENGTH'] ?? 0)) / 1048576, 1);
+    $_SESSION['error'] = 'File migrasi terlalu besar (~' . $ukuranMb . ' MB). '
+        . 'Batas upload server: ' . ini_get('post_max_size') . ', batas aplikasi: 10 MB. '
+        . 'Unggah file Excel template migrasi (.xlsx) saja — jangan ZIP backup atau file yang berisi foto.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         layananValidasiToken();
         $file = $_FILES['file_migrasi'] ?? null;
-        if (!$file || $file['error'] !== UPLOAD_ERR_OK) throw new RuntimeException('Pilih file XLSX template migrasi terlebih dahulu.');
+        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            throw new RuntimeException('Pilih file XLSX template migrasi terlebih dahulu.');
+        }
+        if (($file['error'] ?? 0) === UPLOAD_ERR_INI_SIZE || ($file['error'] ?? 0) === UPLOAD_ERR_FORM_SIZE) {
+            throw new RuntimeException('Ukuran file melebihi batas PHP (upload_max_filesize = ' . ini_get('upload_max_filesize') . '). Maksimal 10 MB.');
+        }
+        if ($file['error'] !== UPLOAD_ERR_OK) throw new RuntimeException('Gagal mengunggah file. Kode error: ' . (int)$file['error']);
         if ($file['size'] > 10 * 1024 * 1024) throw new RuntimeException('Ukuran file maksimal 10 MB.');
         if (strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) !== 'xlsx') throw new RuntimeException('File harus berformat XLSX.');
         $hasil = migrasiRingkasanXlsx($file['tmp_name']);
