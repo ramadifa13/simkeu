@@ -418,6 +418,26 @@ CREATE TABLE IF NOT EXISTS migrasi_anggota_dokumen (
  CONSTRAINT fk_migrasi_dokumen_anggota FOREIGN KEY (anggota_id) REFERENCES anggota(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Cadangan foto/TTD agar Reset Total + Import tidak menghilangkan dokumen.
+CREATE TABLE IF NOT EXISTS migrasi_dokumen_cadangan (
+ id INT NOT NULL AUTO_INCREMENT,
+ jenis ENUM('anggota','pinjaman') NOT NULL,
+ source_key VARCHAR(100) NOT NULL,
+ kode_anggota VARCHAR(50) NULL,
+ foto_ktp VARCHAR(255) NULL,
+ foto_kk VARCHAR(255) NULL,
+ foto_ktp_pasangan VARCHAR(255) NULL,
+ ttd_anggota MEDIUMTEXT NULL,
+ foto_pencairan VARCHAR(255) NULL,
+ foto_barang VARCHAR(255) NULL,
+ foto_nasabah_barang VARCHAR(255) NULL,
+ perjanjian_json MEDIUMTEXT NULL,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ PRIMARY KEY (id),
+ UNIQUE KEY uniq_migrasi_cadangan (jenis, source_key),
+ KEY idx_migrasi_cadangan_anggota (kode_anggota)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SELECT 'Migrasi universal selesai dan aman dijalankan kembali.' AS hasil;
 
 -- Closing angsuran bulanan: pembayaran bulan yang sudah ditutup tidak boleh diubah.

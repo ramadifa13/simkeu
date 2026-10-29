@@ -215,6 +215,20 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
     exit();
 }
 
+// Lengkapi foto pencairan untuk pinjaman migrasi / tanpa dokumen.
+if ($_POST && isset($_POST['lengkapi_foto_pencairan'])) {
+    require_once __DIR__ . '/../includes/lengkapi_foto_pencairan.php';
+    try {
+        layananValidasiToken();
+        prosesLengkapiFotoPencairan($db, (int)($_POST['pinjaman_id'] ?? 0), (int)($_SESSION['user_id'] ?? 0));
+        $_SESSION['success'] = 'Foto pencairan berhasil dilengkapi.';
+    } catch (Throwable $e) {
+        $_SESSION['error'] = 'Gagal melengkapi foto: ' . $e->getMessage();
+    }
+    header('Location: pencairan.php');
+    exit();
+}
+
 $filter_cari = trim(isset($_GET['q']) ? $_GET['q'] : '');
 $filter_tanggal_mulai = trim(isset($_GET['tanggal_mulai']) ? $_GET['tanggal_mulai'] : '');
 $filter_tanggal_selesai = trim(isset($_GET['tanggal_selesai']) ? $_GET['tanggal_selesai'] : '');
@@ -673,6 +687,17 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
                                                     title="Foto nasabah saat pencairan">
                                                 <i class="fas fa-camera"></i><span>Foto nasabah</span>
                                             </button>
+                                            <?php elseif (!empty($pengajuan['pinjaman_id'])): ?>
+                                            <button class="btn btn-sm btn-outline-primary btn-action" type="button"
+                                                    data-bs-toggle="modal" data-bs-target="#lengkapiFotoModal"
+                                                    data-lengkapi-foto="1"
+                                                    data-id="<?php echo (int)$pengajuan['pinjaman_id']; ?>"
+                                                    data-kode="<?php echo htmlspecialchars($pengajuan['kode_pinjaman'] ?: $pengajuan['kode_pengajuan'], ENT_QUOTES); ?>"
+                                                    data-nama="<?php echo htmlspecialchars($pengajuan['nama_lengkap'], ENT_QUOTES); ?>"
+                                                    data-gadai="<?php echo !empty($pengajuan['memerlukan_jaminan']) ? '1' : '0'; ?>"
+                                                    title="Lengkapi foto pencairan">
+                                                <i class="fas fa-camera"></i><span>Lengkapi foto</span>
+                                            </button>
                                             <?php endif; ?>
                                             <?php if (!empty($pengajuan['foto_barang'])): ?>
                                             <button class="btn btn-sm btn-outline-warning btn-action" type="button"
@@ -947,7 +972,11 @@ $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchCo
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <?php include __DIR__ . '/../includes/modal_dokumen.php'; ?>
+    <?php
+    require_once __DIR__ . '/../includes/lengkapi_foto_pencairan.php';
+    renderModalLengkapiFotoPencairan();
+    include __DIR__ . '/../includes/modal_dokumen.php';
+    ?>
     <script>
         var pencairanModal = document.getElementById('pencairanModal');
         var tcModal=document.getElementById('tcModal');

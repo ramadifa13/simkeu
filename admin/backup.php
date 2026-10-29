@@ -1,6 +1,8 @@
 <?php
 require_once '../includes/auth.php';
 require_once '../config/config.php';
+require_once '../includes/migrasi_export_service.php';
+require_once '../includes/migrasi_dokumen_cadangan.php';
 
 // Only admin can access this page
 if (!isAdmin()) {
@@ -129,12 +131,45 @@ if ($_POST && isset($_POST['backup_database'])) {
     exit();
 }
 
+// Backup Excel format template migrasi (bisa di-import ulang)
+if ($_POST && isset($_POST['backup_excel_migrasi'])) {
+    try {
+        layananValidasiToken();
+        migrasiSimpanCadanganDokumen($db);
+        $hasil = migrasiExportBackupExcel($db, dirname(__DIR__) . DIRECTORY_SEPARATOR . 'backups');
+        $_SESSION['success'] = 'Backup Excel migrasi berhasil: ' . $hasil['name']
+            . ' (' . (int)$hasil['counts']['nasabah'] . ' nasabah, '
+            . (int)$hasil['counts']['pinjaman'] . ' pinjaman, '
+            . (int)$hasil['counts']['angsuran'] . ' angsuran). Cadangan foto/TTD juga diperbarui.';
+    } catch (Throwable $e) {
+        $_SESSION['error'] = 'Gagal membuat backup Excel: ' . $e->getMessage();
+    }
+    header('Location: backup.php');
+    exit();
+}
+
+// Backup ZIP lengkap: Excel migrasi + folder uploads/
+if ($_POST && isset($_POST['backup_zip_lengkap'])) {
+    try {
+        layananValidasiToken();
+        $hasil = migrasiExportBackupZip($db, dirname(__DIR__) . DIRECTORY_SEPARATOR . 'backups');
+        $_SESSION['success'] = 'Backup ZIP lengkap berhasil: ' . $hasil['name']
+            . ' (Excel + ' . (int)$hasil['files'] . ' file uploads). '
+            . 'Di hosting: ekstrak uploads/, lalu import Excel dari folder migrasi/.';
+    } catch (Throwable $e) {
+        $_SESSION['error'] = 'Gagal membuat backup ZIP: ' . $e->getMessage();
+    }
+    header('Location: backup.php');
+    exit();
+}
+
 // Handle delete backup
 if ($_POST && isset($_POST['delete'])) {
     $file = basename((string)$_POST['delete']); // Prevent directory traversal
     $file_path = '../backups/' . $file;
+    $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
     
-    if (pathinfo($file_path, PATHINFO_EXTENSION) === 'sql' && is_file($file_path)) {
+    if (in_array($ext, ['sql', 'xlsx', 'zip'], true) && is_file($file_path)) {
         if (unlink($file_path)) {
             $_SESSION['success'] = "Backup berhasil dihapus";
         } else {
@@ -152,10 +187,16 @@ if ($_POST && isset($_POST['delete'])) {
 if ($_GET && isset($_GET['download'])) {
     $file = basename($_GET['download']);
     $file_path = '../backups/' . $file;
+    $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+    $mime = [
+        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'zip' => 'application/zip',
+        'sql' => 'application/sql',
+    ];
     
-    if (pathinfo($file_path, PATHINFO_EXTENSION) === 'sql' && is_file($file_path)) {
+    if (isset($mime[$ext]) && is_file($file_path)) {
         header('Content-Description: File Transfer');
-        header('Content-Type: application/sql');
+        header('Content-Type: ' . $mime[$ext]);
         header('Content-Disposition: attachment; filename="' . $file . '"');
         header('Expires: 0');
         header('Cache-Control: must-revalidate');
@@ -242,13 +283,17 @@ if ($_POST && isset($_POST['reset_total_migrasi'])) {
             $cekAdmin=$db->prepare("SELECT id FROM users WHERE id=? AND role='admin' AND status='aktif'");
             $cekAdmin->execute([$adminId]);
             if (!$cekAdmin->fetchColumn()) throw new RuntimeException('Akun Admin aktif wajib tersedia untuk reset total.');
+            // Cadangkan SEMUA foto/TTD dulu (termasuk foto pencairan + perjanjian)
+            // agar setelah import dengan kode yang sama dokumen otomatis balik.
+            $cadangan = migrasiSimpanCadanganDokumen($db);
             $tables=$db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
             // Do not remove uploaded files.  They live under uploads/ and are
             // deliberately outside this database reset.  The anggota table is
             // also retained so existing document references (foto KTP/KK,
             // pasangan) remain available and can be matched by kode_anggota
             // during the next import.
-            $skip=['migrations','users','anggota'];
+            // Pertahankan identitas koperasi, TTD Admin, meta dokumen, dan cadangan foto/TTD.
+            $skip=['migrations','users','anggota','koperasi','pengaturan_perjanjian','migrasi_anggota_dokumen','migrasi_dokumen_cadangan'];
             $target=array_values(array_filter($tables,function($table) use ($skip) { return !in_array($table,$skip,true); }));
             $db->beginTransaction(); $db->exec('SET FOREIGN_KEY_CHECKS=0');
             foreach ($target as $table) $db->exec("DELETE FROM `".str_replace('`','``',$table)."`");
@@ -257,7 +302,7 @@ if ($_POST && isset($_POST['reset_total_migrasi'])) {
             $db->exec("UPDATE anggota SET user_id = NULL, status = 'nonaktif'");
             $db->exec('SET FOREIGN_KEY_CHECKS=1'); $db->commit();
             foreach ($target as $table) $db->exec("ALTER TABLE `".str_replace('`','``',$table)."` AUTO_INCREMENT=1");
-            $_SESSION['success']='Reset total selesai. Data, master, pengaturan, dan akun selain Admin aktif telah dihapus.';
+            $_SESSION['success']='Reset total selesai. Cadangan dokumen: '.(int)$cadangan['anggota'].' nasabah, '.(int)$cadangan['pinjaman'].' pinjaman. Setelah import (kode sama), foto KTP/KK/pencairan dan TTD perjanjian dipulihkan otomatis. File uploads/ tidak dihapus.';
         } catch (Throwable $e) {
             if ($db->inTransaction()) $db->rollBack();
             try { $db->exec('SET FOREIGN_KEY_CHECKS=1'); } catch (Throwable $ignored) {}
@@ -273,12 +318,14 @@ $backup_dir = '../backups/';
 if (is_dir($backup_dir)) {
     $files = scandir($backup_dir);
     foreach ($files as $file) {
-        if ($file !== '.' && $file !== '..' && pathinfo($file, PATHINFO_EXTENSION) === 'sql') {
+        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+        if ($file !== '.' && $file !== '..' && in_array($ext, ['sql', 'xlsx', 'zip'], true)) {
             $file_path = $backup_dir . $file;
             $backups[] = [
                 'name' => $file,
                 'size' => filesize($file_path),
-                'modified' => filemtime($file_path)
+                'modified' => filemtime($file_path),
+                'type' => $ext,
             ];
         }
     }
@@ -427,8 +474,8 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
                             </div>
                             <div class="card-body">
                                 <p class="text-muted">
-                                    Buat backup database untuk keamanan data. Backup akan disimpan dalam format SQL 
-                                    dan dapat digunakan untuk restore data jika diperlukan.
+                                    Buat backup database untuk keamanan data. Tersedia format SQL (restore penuh)
+                                    dan Excel format migrasi (bisa diedit lalu di-import ulang lewat Import Migrasi).
                                 </p>
                                 
                                 <form method="POST"><?php echo layananToken(); ?>
@@ -441,12 +488,28 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
                                     </div>
                                     
                                     <button type="submit" name="backup_database" class="btn btn-success">
-                                        <i class="fas fa-download me-2"></i>Buat Backup Sekarang
+                                        <i class="fas fa-download me-2"></i>Backup SQL
                                     </button>
+                                </form>
+                                <form method="POST" class="mt-3"><?php echo layananToken(); ?>
+                                    <div class="alert alert-success mb-2">
+                                        <small>
+                                            <i class="fas fa-file-excel me-2"></i>
+                                            Excel berisi Nasabah (foto KTP/KK/pasangan), Pinjaman (foto pencairan), Angsuran_Historis, master, Dapin, kas, dan konfigurasi.
+                                            ZIP lengkap = Excel + seluruh folder <code>uploads/</code> (disarankan untuk pindah hosting).
+                                        </small>
+                                    </div>
+                                    <button type="submit" name="backup_excel_migrasi" class="btn btn-outline-success">
+                                        <i class="fas fa-file-excel me-2"></i>Backup Excel (format migrasi)
+                                    </button>
+                                    <button type="submit" name="backup_zip_lengkap" class="btn btn-success">
+                                        <i class="fas fa-file-archive me-2"></i>Backup ZIP lengkap (Excel + uploads)
+                                    </button>
+                                    <a href="import_migrasi.php" class="btn btn-link">Buka Import Migrasi</a>
                                 </form>
                                 <hr class="my-4">
                                 <h6 class="text-danger">Reset Total untuk Migrasi</h6>
-                                <p class="small text-muted mb-2">Menghapus transaksi, master, pengaturan, dan akun selain Admin aktif. Data anggota serta file foto/TTD nasabah dipertahankan agar otomatis dapat dipakai kembali saat impor dengan kode anggota yang sama.</p>
+                                <p class="small text-muted mb-2">Menghapus transaksi &amp; master. Sebelum hapus, sistem <strong>mencadangkan semua foto &amp; TTD</strong>. Setelah import dengan kode sama, foto nasabah, foto pencairan, dan TTD perjanjian otomatis kembali. Folder uploads/ tidak dihapus.</p>
                                 <form method="POST" id="resetTotalForm"><?php echo layananToken(); ?>
                                     <div class="mb-3"><label class="form-label text-danger">Ketik <strong>RESET TOTAL</strong></label>
                                         <input type="text" name="confirmation_total" class="form-control" placeholder="RESET TOTAL" required pattern="RESET TOTAL"></div>
@@ -476,8 +539,9 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
                                                 <?php foreach ($backups as $backup): ?>
                                                 <tr>
                                                     <td>
-                                                        <i class="fas fa-file-alt me-2 text-muted"></i>
+                                                        <i class="fas <?php echo (($backup['type'] ?? '') === 'xlsx') ? 'fa-file-excel text-success' : 'fa-file-alt text-muted'; ?> me-2"></i>
                                                         <?php echo htmlspecialchars($backup['name']); ?>
+                                                        <small class="text-muted">(<?php echo strtoupper($backup['type'] ?? 'sql'); ?>)</small>
                                                     </td>
                                                     <td><?php echo round($backup['size'] / 1024, 2); ?> KB</td>
                                                     <td><?php echo date('d/m/Y H:i', $backup['modified']); ?></td>
@@ -515,7 +579,7 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
             return confirm('⚠️ PERINGATAN!\n\nTindakan ini akan menghapus SEMUA data transaksi, simpanan, pinjaman, riwayat, dan WASERDA.\n\nPastikan Anda sudah membuat backup sebelum melanjutkan!\n\nApakah Anda yakin ingin melanjutkan?');
         }
         function confirmResetTotal() {
-            return confirm('PERINGATAN KERAS!\n\nTransaksi, master, pengaturan, dan akun selain Admin aktif akan dihapus. Data anggota serta file foto/TTD nasabah dipertahankan agar bisa dipakai kembali saat impor dengan kode anggota yang sama.\n\nPastikan backup sudah dibuat. Lanjutkan?');
+            return confirm('PERINGATAN KERAS!\n\nTransaksi dan master akan dihapus. Dipertahankan: Admin aktif, anggota+foto, uploads/, koperasi, TTD Admin.\n\nBuat Backup ZIP lengkap dulu. Lanjutkan?');
         }
         
         function confirmDelete(filename) {

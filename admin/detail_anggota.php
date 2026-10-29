@@ -53,11 +53,12 @@ foreach ($savings_data as $saving) {
         // Update saldo di tabel simpanan
         $update_query = "INSERT INTO simpanan (anggota_id, jenis_simpanan_id, saldo, updated_at) 
                         VALUES (:anggota_id, :jenis_id, :saldo, NOW())
-                        ON DUPLICATE KEY UPDATE saldo = :saldo, updated_at = NOW()";
+                        ON DUPLICATE KEY UPDATE saldo = :saldo_update, updated_at = NOW()";
         $stmt_update = $db->prepare($update_query);
-        $stmt_update->bindParam(':anggota_id', $id);
-        $stmt_update->bindParam(':jenis_id', $saving['id']);
-        $stmt_update->bindParam(':saldo', $saving['saldo_transaksi']);
+        $stmt_update->bindValue(':anggota_id', $id, PDO::PARAM_INT);
+        $stmt_update->bindValue(':jenis_id', $saving['id'], PDO::PARAM_INT);
+        $stmt_update->bindValue(':saldo', $saving['saldo_transaksi']);
+        $stmt_update->bindValue(':saldo_update', $saving['saldo_transaksi']);
         $stmt_update->execute();
     }
 }

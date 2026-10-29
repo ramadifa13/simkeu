@@ -67,9 +67,20 @@ if (!function_exists('migrasiKolomKeAngka')) {
             $rows = $sheets[$name]; $count = 0;
             foreach ($rows as $number => $row) if ($number >= 3 && count(array_filter($row, function($v) { return trim((string)$v) !== ''; })) > 0) $count++;
             $counts[$name] = $count;
-            // Alokasi Dapin boleh kosong karena sebagian pinjaman memakai modal
-            // dari luar Dapin. Sheet tetap wajib ada, tetapi tidak wajib berisi baris.
-            if ($count === 0 && $name !== 'Alokasi_Dapin') $errors[] = "Sheet '$name' belum berisi data.";
+            // Sheet wajib ada; beberapa boleh kosong (backup pinjaman belum bayar, tanpa Dapin, dll).
+            $bolehKosong = ['Alokasi_Dapin', 'Pendanaan_Dapin', 'Angsuran_Historis', 'Master_Denda'];
+            if ($count === 0 && !in_array($name, $bolehKosong, true)) {
+                $errors[] = "Sheet '$name' belum berisi data.";
+            }
+            if ($count === 0 && $name === 'Pendanaan_Dapin') {
+                $warnings[] = "Sheet Pendanaan_Dapin kosong. Pinjaman dianggap memakai modal di luar Dapin.";
+            }
+            if ($count === 0 && $name === 'Angsuran_Historis') {
+                $warnings[] = "Sheet Angsuran_Historis kosong. Semua cicilan akan berstatus belum bayar setelah import.";
+            }
+            if ($count === 0 && $name === 'Master_Denda') {
+                $warnings[] = "Sheet Master_Denda kosong. Tarif denda tidak diubah/diisi otomatis saat import.";
+            }
         }
         foreach (['Nasabah'=>1,'Pinjaman'=>1,'Pendanaan_Dapin'=>1] as $sheet => $column) {
             if (!isset($sheets[$sheet])) continue;
@@ -153,7 +164,10 @@ if (!function_exists('migrasiKolomKeAngka')) {
         $alokasiModal=0; $alokasiWajib=0; foreach ($records['Alokasi_Dapin'] ?? [] as $row) { $alokasiModal += $uang($row['Modal Dialokasikan (Rp)*'] ?? 0); $alokasiWajib += $uang($row['Kewajiban Dapin (Rp)*'] ?? 0); }
         if (count($records['Alokasi_Dapin'] ?? []) === 0) $warnings[]='Tidak ada alokasi Dapin. Pinjaman tanpa alokasi dianggap memakai modal di luar Dapin.';
         foreach ($records['Saldo_Awal_Kas'] ?? [] as $saldo) {
-            if ($uang($saldo['Saldo Kas Fisik (Rp)*'] ?? 0) <= 0) $warnings[]='Saldo awal kas masih Rp0. Isi sesuai uang kas fisik pada tanggal cut-off jika memang ada.';
+            $mutasiLengkap = in_array(strtolower(trim((string)($saldo['Mutasi Historis Sudah Diinput?*'] ?? ''))), ['ya','yes','1'], true);
+            if ($uang($saldo['Saldo Kas Fisik (Rp)*'] ?? 0) <= 0 && !$mutasiLengkap) {
+                $warnings[]='Saldo awal kas masih Rp0. Isi sesuai uang kas fisik pada tanggal cut-off jika memang ada.';
+            }
         }
         if ($alokasiModal > $modalDapin + 0.01) $errors[]='Total modal Dapin yang dialokasikan melebihi modal Dapin yang dicatat.';
         $bayarPinjaman = [];

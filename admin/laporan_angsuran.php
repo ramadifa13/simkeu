@@ -204,6 +204,12 @@ function formatRupiah($angka) {
                         </a>
                     </div>
                 </div>
+                <div class="alert alert-info no-print">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Halaman ini hanya laporan (tidak bisa mengedit denda). Denda otomatis muncul pada cicilan belum lunas yang lewat jatuh tempo.
+                    Untuk koreksi: perbaiki riwayat di <a href="import_migrasi.php">Import Migrasi</a> (sheet Angsuran_Historis),
+                    bayar/ubah denda di <a href="angsuran.php">Angsuran</a>, atau kelola di <a href="denda.php">Denda</a>.
+                </div>
 
                 <!-- Statistics Cards -->
                 <div class="row mb-4">

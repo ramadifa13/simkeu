@@ -89,29 +89,29 @@ for row, (label, text) in enumerate(instructions, 3):
 
 # Sheet Nasabah
 ws = wb.create_sheet("Nasabah")
-nasabah_headers = ["ID Nasabah Lama*", "NIK*", "Nama Lengkap*", "Alamat*", "No. HP", "Status", "Catatan"]
+nasabah_headers = ["ID Nasabah Lama*", "NIK*", "Nama Lengkap*", "Alamat*", "No. HP", "Status", "Catatan", "Foto KTP (opsional)", "Foto KK (opsional)", "Foto KTP Pasangan (opsional)", "TTD (opsional)"]
 title(ws, "DATA NASABAH", len(nasabah_headers)); table_header(ws, 2, nasabah_headers)
 data_grid(ws, 3, len(nasabah_headers))
-for col, width in zip("ABCDEFG", [20, 22, 30, 45, 18, 15, 35]): ws.column_dimensions[col].width = width
+for col, width in zip("ABCDEFGHIJK", [20, 22, 30, 45, 18, 15, 28, 28, 28, 32, 28]): ws.column_dimensions[col].width = width
 for col in (1, 2, 3, 4):
     for row in range(3, MAX_ROWS + 1): ws.cell(row, col).fill = PatternFill("solid", fgColor=yellow)
 dropdown(ws, "F", '"aktif,nonaktif"')
 # Contoh lengkap: sengaja memakai ID CONTOH agar tidak dianggap data produksi.
-isi_contoh(ws, 3, ["NSB-CONTOH-001", "3516070000000001", "CONTOH - Sobiroh", "Karangdiyeng, Kutorejo, Mojokerto", "081234567890", "aktif", "CONTOH PENGISIAN — ganti dengan data identitas asli."])
+isi_contoh(ws, 3, ["NSB-CONTOH-001", "3516070000000001", "CONTOH - Sobiroh", "Karangdiyeng, Kutorejo, Mojokerto", "081234567890", "aktif", "CONTOH PENGISIAN — ganti dengan data identitas asli.", "anggota/ktp-contoh.jpg", "", "", ""])
 
 # Sheet Pinjaman
 ws = wb.create_sheet("Pinjaman")
 loan_headers = ["ID Pinjaman Lama*", "ID Nasabah Lama*", "Tanggal Cair Asli*", "Plafon (Rp)*", "Tenor (Bulan)*", "Frekuensi*", "Bunga (%)*", "Skema Bunga*", "Angsuran Normal (Rp)*", "Total Tagihan (Rp)*", "Status Saat Ini*", "Tanggal Lunas", "Catatan"]
-loan_headers = ["ID Pinjaman Lama*", "ID Nasabah Lama*", "Kode Produk*", "Tanggal Cair Asli*", "Plafon (Rp)*", "Tenor (Bulan)*", "Frekuensi*", "Bunga (%)*", "Skema Bunga*", "Angsuran Normal (Rp)*", "Total Tagihan (Rp)*", "Status Saat Ini*", "Tanggal Lunas", "Catatan"]
+loan_headers = ["ID Pinjaman Lama*", "ID Nasabah Lama*", "Kode Produk*", "Tanggal Cair Asli*", "Plafon (Rp)*", "Tenor (Bulan)*", "Frekuensi*", "Bunga (%)*", "Skema Bunga*", "Angsuran Normal (Rp)*", "Total Tagihan (Rp)*", "Status Saat Ini*", "Tanggal Lunas", "Foto Pencairan (opsional)", "Catatan"]
 title(ws, "DATA PENCAIRAN / PINJAMAN", len(loan_headers)); table_header(ws, 2, loan_headers)
 data_grid(ws, 3, len(loan_headers), date_columns=(4, 13), currency_columns=(5, 10, 11))
-for col, width in zip("ABCDEFGHIJKLMN", [20, 20, 18, 18, 18, 14, 16, 14, 16, 22, 20, 18, 18, 35]): ws.column_dimensions[col].width = width
+for col, width in zip("ABCDEFGHIJKLMNO", [20, 20, 18, 18, 18, 14, 16, 14, 16, 22, 20, 18, 18, 28, 35]): ws.column_dimensions[col].width = width
 for col in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12):
     for row in range(3, MAX_ROWS + 1): ws.cell(row, col).fill = PatternFill("solid", fgColor=yellow)
 dropdown(ws, "G", '"mingguan,dua_mingguan,bulanan"')
 dropdown(ws, "I", '"flat,tahunan"')
 dropdown(ws, "L", '"aktif,lunas,macet"')
-isi_contoh(ws, 3, ["PJN-CONTOH-001", "NSB-CONTOH-001", "P1-2B", date(2026, 9, 12), 1000000, 2, "mingguan", 25, "flat", 156250, 1250000, "lunas", date(2026, 10, 17), "CONTOH: tanggal cair dan nilai pelunasan harus divalidasi dari catatan asli."])
+isi_contoh(ws, 3, ["PJN-CONTOH-001", "NSB-CONTOH-001", "P1-2B", date(2026, 9, 12), 1000000, 2, "mingguan", 25, "flat", 156250, 1250000, "lunas", date(2026, 10, 17), "pencairan/foto-contoh.jpg", "CONTOH: tanggal cair dan nilai pelunasan harus divalidasi dari catatan asli."])
 
 # Sheet Angsuran historis
 ws = wb.create_sheet("Angsuran_Historis")

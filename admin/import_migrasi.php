@@ -16,8 +16,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_POST['import_final'])) {
             if (!empty($hasil['errors'])) throw new RuntimeException('Import final dibatalkan karena masih ada error validasi.');
             $import = migrasiImportFinal($db, $file['tmp_name'], $_SESSION['user_id'] ?? null);
-            $_SESSION['success'] = 'Import final berhasil. ' . (int)$import['anggota'] . ' nasabah, '
-                . (int)$import['pinjaman'] . ' pinjaman, dan ' . (int)$import['pembayaran'] . ' pembayaran diproses. '
+            $_SESSION['success'] = 'Import final berhasil. '
+                . (int)($import['koperasi'] ?? 0) . ' konfigurasi, '
+                . (int)$import['anggota'] . ' nasabah, '
+                . (int)$import['pinjaman'] . ' pinjaman, dan '
+                . (int)$import['pembayaran'] . ' pembayaran diproses. '
+                . 'Dokumen dipulihkan: ' . (int)($import['dokumen'] ?? 0) . ' (foto/TTD dari cadangan + Excel). '
                 . 'Import ulang file yang sama tidak akan menggandakan transaksi.';
             header('Location: import_migrasi.php'); exit;
         }
@@ -31,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="bg-light"><?php include '../includes/header.php'; ?><div class="container-fluid"><div class="row"><?php include '../includes/sidebar.php'; ?>
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4"><div class="migrasi-shell"><section class="migrasi-hero p-4 mb-4"><div class="d-flex justify-content-between align-items-start gap-3"><div><div class="text-uppercase small opacity-75 mb-1">Migrasi data historis</div><h2 class="h3 mb-2"><i class="fas fa-file-import me-2"></i>Import & Validasi</h2><p class="mb-0 opacity-75">Periksa kelengkapan data dan proyeksi kas sebelum data direset atau diimport.</p></div><span class="badge bg-light text-primary p-2">Validasi wajib</span></div></section>
 <div class="alert alert-info border-0 shadow-sm"><i class="fas fa-shield-alt me-2"></i><strong>Pratinjau tidak mengubah data.</strong> Tombol Import Final hanya tersedia saat seluruh validasi lolos.</div>
+<div class="alert alert-secondary border-0 shadow-sm"><i class="fas fa-camera me-2"></i><strong>Foto &amp; TTD tidak hilang:</strong> sebelum Reset Total sistem mencadangkan foto KTP/KK/pasangan, foto pencairan, foto jaminan, dan TTD perjanjian. Saat Import Final dengan <em>kode anggota/pinjaman yang sama</em>, dokumen dipulihkan otomatis (meski kolom Excel kosong). File fisik tetap di <code>uploads/</code>. Untuk pindah hosting: pakai Backup ZIP lengkap lalu ekstrak uploads. TTD Admin juga dipertahankan.</div>
 <?php if (!empty($_SESSION['error'])): ?><div class="alert alert-danger"><?= htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?></div><?php endif; ?>
 <div class="card shadow-sm border-0"><div class="card-body p-4"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><div><h5 class="mb-1">Unggah file migrasi</h5><p class="text-muted small mb-3">Gunakan template migrasi atau file hasil revisi user. Maksimal 10 MB.</p></div><a class="btn btn-outline-success" href="download_template_migrasi.php"><i class="fas fa-download me-1"></i>Download Template Migrasi</a></div><form method="post" enctype="multipart/form-data"><?= layananToken() ?><div class="upload-zone p-3 mb-3"><label for="file_migrasi" class="form-label fw-semibold"><i class="fas fa-file-excel text-success me-1"></i>File Excel migrasi</label><input id="file_migrasi" class="form-control" type="file" name="file_migrasi" accept=".xlsx" required><div class="form-text">Upload file yang sudah direvisi untuk melihat hasil validasi.</div></div><button class="btn btn-primary px-4"><i class="fas fa-search me-1"></i>Pratinjau & Validasi</button></form></div></div>
 <?php if ($hasil): ?><div class="card shadow-sm border-0 mt-4"><div class="card-body p-4"><div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">Hasil Pratinjau</h5><span class="badge bg-primary"><?= array_sum($hasil['counts']) ?> baris dibaca</span></div><div class="row g-3"><?php foreach ($hasil['counts'] as $name=>$count): ?><div class="col-6 col-md-4 col-xl-3"><div class="stat-box p-3"><small class="text-muted d-block text-truncate"><?= htmlspecialchars($name) ?></small><div class="h4 mb-0 mt-1"><?= (int)$count ?></div></div></div><?php endforeach; ?></div>
