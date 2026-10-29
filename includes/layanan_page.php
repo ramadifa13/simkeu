@@ -88,8 +88,16 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 }
 $rows=[];$settings=[];$selected=null;$list=[];
 if ($siap) {
+    layananPastikanPengaturan($db);
+    // Paksa hitung ulang bila diminta dari tab Denda (uji setelah import / koreksi tarif).
+    if ($tab === 'denda' && isset($_GET['hitung_ulang'])) {
+        $nDenda = perbaruiDendaOtomatis($db, true);
+        $_SESSION['success'] = 'Denda otomatis dihitung ulang: ' . (int) $nDenda . ' cicilan diperbarui.';
+        header('Location: layanan.php?tab=denda' . ($id ? '&id=' . $id : '') . (isset($_GET['q']) && $_GET['q'] !== '' ? '&q=' . rawurlencode((string)$_GET['q']) : ''));
+        exit;
+    }
     perbaruiDendaOtomatis($db,true);
-    $settings=$db->query('SELECT * FROM layanan_pengaturan WHERE id=1')->fetch(PDO::FETCH_ASSOC);
+    $settings=$db->query('SELECT * FROM layanan_pengaturan WHERE id=1')->fetch(PDO::FETCH_ASSOC) ?: [];
     $rows=layananDaftar($db);
     foreach ($rows as $r) if ((int)$r['id']===$id) $selected=$r;
     // Sisa tagihan mengurangi denda yang sudah dibayar terpisah.
@@ -144,8 +152,14 @@ if (isset($_GET['export']) && $siap) {
         fputcsv($out,['Nama','Pinjaman','Telat hari','Denda awal','Diskon','Denda akhir','Bayar','Status','Metode','Teller','Tanggal','Approval'],';');
         $riwayat=$db->query('SELECT b.*,ag.nama_lengkap,p.kode_pinjaman,u.nama_lengkap teller,a.status angsuran_status,a.denda denda_sekarang,(SELECT COALESCE(SUM(x.jumlah),0) FROM layanan_bayar_denda x WHERE x.angsuran_id=a.id) total_bayar FROM layanan_bayar_denda b JOIN angsuran a ON a.id=b.angsuran_id JOIN pinjaman p ON p.id=b.pinjaman_id JOIN anggota ag ON ag.id=p.anggota_id JOIN users u ON u.id=b.user_id ORDER BY b.id DESC')->fetchAll(PDO::FETCH_ASSOC);
         foreach($riwayat as $r){$data=[$r['nama_lengkap'],$r['kode_pinjaman'],$r['hari_telat'],$r['denda_awal'],max(0,$r['denda_awal']-$r['denda_akhir']),$r['denda_akhir'],$r['jumlah'],($r['angsuran_status']==='lunas' || $r['total_bayar']+0.005>=$r['denda_sekarang'])?'Lunas':'Belum',$r['metode'],$r['teller'],$r['created_at'],$r['approved_by']?'Disetujui':'Menunggu'];foreach($data as &$v)if(preg_match('/^[=+@\-\t\r]/',(string)$v))$v="'".$v;unset($v);fputcsv($out,$data,';');}
-        $belum=$db->query("SELECT a.*,p.jumlah_pinjaman,p.kode_pinjaman,ag.nama_lengkap,jp.memerlukan_jaminan FROM angsuran a JOIN pinjaman p ON p.id=a.pinjaman_id JOIN anggota ag ON ag.id=p.anggota_id JOIN jenis_pinjaman jp ON jp.id=p.jenis_pinjaman_id WHERE a.status<>'lunas' AND (a.denda>0 OR a.denda_manual=1) AND NOT EXISTS(SELECT 1 FROM layanan_bayar_denda b WHERE b.angsuran_id=a.id) ORDER BY a.tanggal_jatuh_tempo")->fetchAll(PDO::FETCH_ASSOC);
-        foreach($belum as $r){$d=hitungDendaAngsuran($db,$r,$r['jumlah_pinjaman']);$data=[$r['nama_lengkap'],$r['kode_pinjaman'],$d['hari_telat'],$d['denda'],max(0,$d['denda']-$r['denda']),$r['denda'],0,$r['denda']>0?'Belum':'Lunas (pemutihan)','','','','Belum dibayar'];foreach($data as &$v)if(preg_match('/^[=+@\-\t\r]/',(string)$v))$v="'".$v;unset($v);fputcsv($out,$data,';');}
+        $belum=$db->query("SELECT a.*,p.jumlah_pinjaman,p.kode_pinjaman,ag.nama_lengkap,jp.memerlukan_jaminan,
+            COALESCE((SELECT SUM(b.jumlah) FROM layanan_bayar_denda b WHERE b.angsuran_id=a.id),0) sudah_bayar
+            FROM angsuran a JOIN pinjaman p ON p.id=a.pinjaman_id JOIN anggota ag ON ag.id=p.anggota_id
+            JOIN jenis_pinjaman jp ON jp.id=p.jenis_pinjaman_id
+            WHERE a.status<>'lunas' AND (a.denda>0 OR a.denda_manual=1)
+              AND a.denda > COALESCE((SELECT SUM(b.jumlah) FROM layanan_bayar_denda b WHERE b.angsuran_id=a.id),0)
+            ORDER BY a.tanggal_jatuh_tempo")->fetchAll(PDO::FETCH_ASSOC);
+        foreach($belum as $r){$d=hitungDendaAngsuran($db,$r,$r['jumlah_pinjaman']);$sisa=max(0,(float)$r['denda']-(float)$r['sudah_bayar']);$data=[$r['nama_lengkap'],$r['kode_pinjaman'],$d['hari_telat'],$d['denda'],max(0,$d['denda']-$r['denda']),$r['denda'],$r['sudah_bayar'],$sisa>0?'Belum (sisa '.number_format($sisa,0,',','.').')':'Lunas (pemutihan)','','','','Belum lunas'];foreach($data as &$v)if(preg_match('/^[=+@\-\t\r]/',(string)$v))$v="'".$v;unset($v);fputcsv($out,$data,';');}
         fclose($out);exit;
     }
     fputcsv($out,['Nama','NIK','Pinjaman','Jumlah pinjam','Sisa tagihan','Jatuh tempo','Telat hari','Denda tersisa','Nilai jaminan','Status'],';');
@@ -175,7 +189,8 @@ $metodeField='<label class="form-label">Metode</label><select name="metode" clas
 <?php include __DIR__.'/header.php'; ?><div class="container-fluid"><div class="row"><?php include __DIR__.'/sidebar.php'; ?><main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3">
 <header class="service-page-heading"><div><span class="service-eyebrow"><?= $tab==='lunas'?'LAPORAN PINJAMAN':'PINJAMAN ANGGOTA' ?></span><h1 class="h3"><?= $tab==='lunas'?'Laporan pelunasan':'Layanan pinjaman' ?></h1><p class="text-muted mb-0"><?= $tab==='lunas'?'Tinjau pinjaman yang telah selesai, dokumen pelunasan, dan pengembalian jaminan.':'Pantau tagihan, tindak lanjuti keterlambatan, dan proses pelunasan.' ?></p></div><a class="btn btn-primary" href="angsuran.php"><i class="fas fa-plus me-1" aria-hidden="true"></i> Input pembayaran</a></header>
 <nav class="nav nav-pills gap-2 my-3 no-print service-tabs" aria-label="Bagian layanan pinjaman"><?php foreach(['macet'=>['Nasabah & Macet','fa-users'],'denda'=>['Denda','fa-clock'],'lunas'=>['Laporan Lunas','fa-check-circle']] as $key=>$info): ?><a class="nav-link <?= $tab===$key?'active':'' ?>" <?= $tab===$key?'aria-current="page"':'' ?> href="<?= $key==='lunas'?'laporan_lunas.php':'layanan.php?tab='.$key ?>"><i class="fas <?= $info[1] ?> me-1" aria-hidden="true"></i><?= $info[0] ?></a><?php endforeach; ?><?php if(isAdmin()): ?><a class="nav-link <?= $tab==='pengaturan'?'active':'' ?>" <?= $tab==='pengaturan'?'aria-current="page"':'' ?> href="?tab=pengaturan"><i class="fas fa-sliders-h me-1" aria-hidden="true"></i>Pengaturan</a><?php endif; ?></nav>
-<?php if(in_array($tab, ['macet', 'denda'], true)): ?><div class="alert alert-warning d-flex align-items-center gap-2" role="status"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><strong>Dalam Pengembangan</strong><span>Fitur <?= $tab === 'denda' ? 'denda' : 'macet dan layanan' ?> masih dalam tahap penyempurnaan.</span></div><?php endif; ?>
+<?php if($tab === 'macet'): ?><div class="alert alert-warning d-flex align-items-center gap-2" role="status"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><strong>Dalam Pengembangan</strong><span>Fitur macet dan layanan masih dalam tahap penyempurnaan.</span></div><?php endif; ?>
+<?php if($tab === 'denda'): ?><div class="alert alert-info d-flex align-items-start gap-2" role="status"><i class="fas fa-info-circle mt-1" aria-hidden="true"></i><div><strong>Cara uji fitur denda:</strong> buka pinjaman yang cicilannya lewat jatuh tempo → cek kolom sisa denda → <em>Detail / Bayar</em> untuk bayar denda terpisah (bukti wajib). Admin bisa Diskon/Pemutihan. Setelah import migrasi, denda dihitung otomatis; tombol <em>Hitung ulang denda</em> memaksa refresh tarif.</div></div><?php endif; ?>
 <?php foreach(['success'=>'success','error'=>'danger'] as $key=>$color) if(isset($_SESSION[$key])): ?><div class="alert alert-<?= $color ?>"><?= layananEscape($_SESSION[$key]) ?></div><?php unset($_SESSION[$key]);endif; ?>
 <?php if(!$siap): ?><div class="alert alert-warning">Database perlu diperbarui. Jalankan database/migrations/MIGRASI_UNIVERSAL.sql.</div>
 <?php else: ?>

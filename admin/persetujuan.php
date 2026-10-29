@@ -56,6 +56,12 @@ if ($_POST) {
         $stmt->bindParam(':admin_id', $_SESSION['user_id']);
         
         if ($stmt->execute() && $stmt->rowCount() === 1) {
+            $anggotaTolak = $db->prepare("SELECT anggota_id FROM pengajuan_pinjaman WHERE id = ?");
+            $anggotaTolak->execute([$id]);
+            $anggotaTolakId = (int) $anggotaTolak->fetchColumn();
+            if ($anggotaTolakId > 0) {
+                bersihkanKodeAnggotaJaminanJikaTidakCair($db, $anggotaTolakId);
+            }
             $_SESSION['success'] = "Pengajuan pinjaman berhasil ditolak";
         } else {
             $_SESSION['error'] = "Gagal menolak pengajuan";
@@ -64,12 +70,18 @@ if ($_POST) {
     
     if (isset($_POST['delete'])) {
         $id = $_POST['id'];
-        
+        $anggotaHapus = $db->prepare("SELECT anggota_id FROM pengajuan_pinjaman WHERE id = ?");
+        $anggotaHapus->execute([$id]);
+        $anggotaHapusId = (int) $anggotaHapus->fetchColumn();
+
         $query = "DELETE FROM pengajuan_pinjaman WHERE id = :id AND status IN ('menunggu','ditolak') AND NOT EXISTS (SELECT 1 FROM pinjaman WHERE pengajuan_id = pengajuan_pinjaman.id)";
         $stmt = $db->prepare($query);
         $stmt->bindParam(':id', $id);
         
         if ($stmt->execute() && $stmt->rowCount() === 1) {
+            if ($anggotaHapusId > 0) {
+                bersihkanKodeAnggotaJaminanJikaTidakCair($db, $anggotaHapusId);
+            }
             $_SESSION['success'] = "Pengajuan pinjaman berhasil dihapus";
         } else {
             $_SESSION['error'] = "Gagal menghapus pengajuan";

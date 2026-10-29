@@ -83,6 +83,50 @@ if (!function_exists('lepasKodeAnggota')) {
     }
 }
 
+if (!function_exists('bersihkanKodeAnggotaJaminanJikaTidakCair')) {
+    /**
+     * Hapus badge/kode gadai (kode_anggota_jaminan) bila pengajuan gadai tidak sampai cair
+     * (ditolak / batal_cair) dan anggota tidak punya pinjaman gadai aktif maupun pengajuan gadai berjalan.
+     */
+    function bersihkanKodeAnggotaJaminanJikaTidakCair($db, $anggota_id) {
+        $anggota_id = (int) $anggota_id;
+        if ($anggota_id <= 0) {
+            return false;
+        }
+        $cek = $db->prepare("SELECT kode_anggota_jaminan FROM anggota WHERE id = ?");
+        $cek->execute([$anggota_id]);
+        $kode = $cek->fetchColumn();
+        if ($kode === false || $kode === null || $kode === '') {
+            return false;
+        }
+
+        $pinjamanGadai = $db->prepare(
+            "SELECT COUNT(*) FROM pinjaman p
+             JOIN jenis_pinjaman jp ON jp.id = p.jenis_pinjaman_id
+             WHERE p.anggota_id = ? AND jp.memerlukan_jaminan = 1"
+        );
+        $pinjamanGadai->execute([$anggota_id]);
+        if ((int) $pinjamanGadai->fetchColumn() > 0) {
+            return false;
+        }
+
+        $pengajuanGadaiAktif = $db->prepare(
+            "SELECT COUNT(*) FROM pengajuan_pinjaman pp
+             JOIN jenis_pinjaman jp ON jp.id = pp.jenis_pinjaman_id
+             WHERE pp.anggota_id = ? AND jp.memerlukan_jaminan = 1
+               AND pp.status IN ('menunggu','disetujui')"
+        );
+        $pengajuanGadaiAktif->execute([$anggota_id]);
+        if ((int) $pengajuanGadaiAktif->fetchColumn() > 0) {
+            return false;
+        }
+
+        $upd = $db->prepare("UPDATE anggota SET kode_anggota_jaminan = NULL WHERE id = ? AND kode_anggota_jaminan IS NOT NULL");
+        $upd->execute([$anggota_id]);
+        return $upd->rowCount() > 0;
+    }
+}
+
 if (!function_exists('riwayatAnggota')) {
     /** @return array label => jumlah baris terkait yang mencegah penghapusan */
     function riwayatAnggota($db, $anggota_id) {

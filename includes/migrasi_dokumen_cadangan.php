@@ -6,8 +6,28 @@
 require_once __DIR__ . '/pinjaman_helper.php';
 
 function migrasiPastikanCadanganDokumen(PDO $db) {
+    // MySQL: CREATE TABLE (meski IF NOT EXISTS) = DDL = implicit commit.
+    // Jangan jalankan DDL di dalam transaksi import, atau commit akhir gagal
+    // dengan "There is no active transaction".
+    static $siap = false;
+    if ($siap) {
+        return;
+    }
+    $cek = $db->query(
+        "SELECT COUNT(*) FROM information_schema.TABLES
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'migrasi_dokumen_cadangan'"
+    );
+    if ($cek && (int) $cek->fetchColumn() > 0) {
+        $siap = true;
+        return;
+    }
+    if ($db->inTransaction()) {
+        throw new RuntimeException(
+            'Tabel migrasi_dokumen_cadangan belum ada. Muat ulang halaman Import (setup di luar transaksi) atau jalankan MIGRASI_UNIVERSAL.sql.'
+        );
+    }
     $db->exec(
-        "CREATE TABLE IF NOT EXISTS migrasi_dokumen_cadangan (
+        "CREATE TABLE migrasi_dokumen_cadangan (
             id INT NOT NULL AUTO_INCREMENT,
             jenis ENUM('anggota','pinjaman') NOT NULL,
             source_key VARCHAR(100) NOT NULL,
@@ -26,6 +46,7 @@ function migrasiPastikanCadanganDokumen(PDO $db) {
             KEY idx_migrasi_cadangan_anggota (kode_anggota)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );
+    $siap = true;
 }
 
 function migrasiCadanganUpsert(PDO $db, $jenis, $sourceKey, array $fields) {

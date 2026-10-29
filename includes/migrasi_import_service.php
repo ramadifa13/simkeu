@@ -7,8 +7,19 @@ require_once __DIR__ . '/migrasi_dokumen_cadangan.php';
 function migrasiImportDalamTransaksi(PDO $db, callable $mapper) {
     if ($db->inTransaction()) throw new RuntimeException('Import migrasi tidak dapat dimulai karena masih ada transaksi aktif.');
     $db->beginTransaction();
-    try { $hasil=$mapper($db); $db->commit(); return $hasil; }
-    catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }
+    try {
+        $hasil = $mapper($db);
+        // Hindari "There is no active transaction" bila DDL sempat memicu implicit commit.
+        if ($db->inTransaction()) {
+            $db->commit();
+        }
+        return $hasil;
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        throw $e;
+    }
 }
 function migrasiUang($v) { /* Label bunga gadai lama, mis. "15% + 10 + 10", tidak boleh dibaca sebagai 151010%. */ if((string)$v==='151010')return 15.66666667;if((string)$v==='15120')return 21; if(is_numeric($v)) return round((float)$v,2); $v=preg_replace('/[^0-9,.-]/','',(string)$v); if($v==='151010')return 15.66666667;if($v==='15120')return 21; if(substr_count($v,'.')>1)$v=str_replace('.','',$v); if(strpos($v,',')!==false&&strpos($v,'.')!==false)$v=str_replace(',','',$v); elseif(strpos($v,',')!==false)$v=str_replace(',','.',$v); elseif(preg_match('/\.\d{3}$/',$v))$v=str_replace('.','',$v); return is_numeric($v)?round((float)$v,2):0; }
 function migrasiTanggal($v,$name='tanggal') { if(is_numeric($v)&&(float)$v>1000)return gmdate('Y-m-d',((int)$v-25569)*86400); $v=trim((string)$v); if($v==='')return null; $v=preg_replace('/^(Senin|Selasa|Rabu|Kamis|Jumat|Sabtu|Minggu),?\s*/iu','',$v); foreach(['Y-m-d','d/m/Y','d-m-Y'] as $f){$d=DateTime::createFromFormat('!'.$f,$v);if($d&&$d->format($f)===$v)return$d->format('Y-m-d');}throw new RuntimeException("Format $name tidak valid: $v"); }
@@ -133,7 +144,7 @@ function migrasiImportFinal(PDO $db,$path,$userId=null){
             migrasiKas($db,'bayar-'.$key,'masuk',$total,$date,'Pembayaran migrasi '.$key.' - '.$p['kode_pinjaman'].($denda?' (denda)':''),$trans);
             $n['pembayaran']++;
         }
-        foreach($data['Alokasi_Dapin']??[] as $r){$key=trim((string)($r['ID Alokasi']??''))?:trim((string)$r['ID Dapin*']).'|'.trim((string)$r['ID Pinjaman Lama*']);$loan=migrasiItem($db,'pinjaman',trim((string)$r['ID Pinjaman Lama*']));$dapin=migrasiItem($db,'dapin',trim((string)$r['ID Dapin*']));if(!$loan||!$dapin)throw new RuntimeException("Alokasi Dapin $key tidak valid.");$q=$db->prepare('INSERT INTO alokasi_dapin(source_key,dapin_id,pinjaman_id,modal_dialokasikan,kewajiban_dapin,tanggal_alokasi,catatan) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE modal_dialokasikan=VALUES(modal_dialokasikan),kewajiban_dapin=VALUES(kewajiban_dapin),tanggal_alokasi=VALUES(tanggal_alokasi),catatan=VALUES(catatan)');$q->execute([$key,$dapin,$loan,migrasiUang($r['Modal Dialokasikan (Rp)*']),migrasiUang($r['Kewajiban Dapin (Rp)*']),migrasiTanggal($r['Tanggal Alokasi*'],'tanggal alokasi'),$r['Catatan']??null]);$n['alokasi']++;}
+        foreach($data['Alokasi_Dapin']??[] as $r){$key=trim((string)($r['ID Alokasi']??''))?:trim((string)$r['ID Dapin*']).'|'.trim((string)$r['ID Pinjaman Lama*']);$loan=migrasiItem($db,'pinjaman',trim((string)$r['ID Pinjaman Lama*']));$dapin=migrasiItem($db,'dapin',trim((string)$r['ID Dapin*']));if(!$loan||!$dapin)throw new RuntimeException("Alokasi Dapin $key tidak valid.");$tglAlokasi=$r['Tanggal Alokasi*']??$r['Tanggal Alokasi (opsional)']??'';$q=$db->prepare('INSERT INTO alokasi_dapin(source_key,dapin_id,pinjaman_id,modal_dialokasikan,kewajiban_dapin,tanggal_alokasi,catatan) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE modal_dialokasikan=VALUES(modal_dialokasikan),kewajiban_dapin=VALUES(kewajiban_dapin),tanggal_alokasi=VALUES(tanggal_alokasi),catatan=VALUES(catatan)');$q->execute([$key,$dapin,$loan,migrasiUang($r['Modal Dialokasikan (Rp)*']),migrasiUang($r['Kewajiban Dapin (Rp)*']),$tglAlokasi!==''?migrasiTanggal($tglAlokasi,'tanggal alokasi'):null,$r['Catatan']??null]);$n['alokasi']++;}
         foreach($data['Saldo_Awal_Kas']??[] as $r){$date=migrasiTanggal($r['Tanggal Cut-off*'],'tanggal cut-off');$amount=migrasiUang($r['Saldo Kas Fisik (Rp)*']);if($amount)migrasiKas($db,'saldo-awal-'.$date,'masuk',$amount,$date,'Saldo awal kas migrasi: '.($r['Dasar/Perhitungan Saldo*']??''));$n['kas']++;}
         foreach($data['Pinjaman']??[] as $r){$id=migrasiItem($db,'pinjaman',trim((string)$r['ID Pinjaman Lama*']));if(!$id)continue;$q=$db->prepare("SELECT COUNT(*),COALESCE(SUM(pokok),0) FROM angsuran WHERE pinjaman_id=? AND status<>'lunas'");$q->execute([$id]);$hasilSisa=$q->fetch(PDO::FETCH_NUM);$left=$hasilSisa[0];$sisa=$hasilSisa[1];$lunas=(int)$left===0||migrasiNorm($r['Status Saat Ini*'])==='lunas';$date=$lunas?migrasiTanggal(isset($r['Tanggal Lunas'])?$r['Tanggal Lunas']:''):null;$db->prepare('UPDATE pinjaman SET sisa_pokok=?,status=?,tanggal_lunas=? WHERE id=?')->execute([$sisa,$lunas?'lunas':'aktif',$date,$id]);}
         foreach($data['Pendanaan_Dapin']??[] as $r){$code=trim((string)$r['ID Dapin*']);if($code==='')continue;migrasiKas($db,'dapin-'.$code,'masuk',migrasiUang($r['Modal Diterima (Rp)*']),migrasiTanggal($r['Tanggal Dana Diterima*'],'tanggal Dapin'),'Modal pendanaan Dapin '.$code);}

@@ -63,6 +63,30 @@ function layananSiap($db) {
         && kolomAda($db,'layanan_pengajuan_hapus_denda','aktif');
     return $cache[$key];
 }
+
+/**
+ * Setelah Reset Total, baris layanan_pengaturan id=1 hilang.
+ * Pastikan selalu ada default agar tab denda/WA tidak error.
+ */
+function layananPastikanPengaturan($db) {
+    if (!layananSiap($db)) {
+        return false;
+    }
+    $ada = $db->query('SELECT id FROM layanan_pengaturan WHERE id=1')->fetchColumn();
+    if ($ada) {
+        return true;
+    }
+    $waDenda = 'Yth {nama}, Anda telat {hari} hari, denda Rp {denda}. Mohon segera dibayar.';
+    $waLunas = 'Yth {nama}, Selamat pinjaman {norek} LUNAS. Silakan hubungi kantor untuk pengambilan jaminan.';
+    $surat = 'Dengan ini dinyatakan bahwa pinjaman {norek} atas nama {nama} telah LUNAS pada {tanggal}.';
+    $bast = 'Jaminan pinjaman {norek} telah diperiksa fisiknya dan diserahkan kepada {nama} pada {tanggal}.';
+    $db->prepare(
+        'INSERT INTO layanan_pengaturan
+         (id, diskon_pelunasan, pemutihan, wa_denda, wa_lunas, denda_jaminan_per_juta, surat_lunas, bast_jaminan, bonus_persen)
+         VALUES (1, 10, 1, ?, ?, 5000, ?, ?, 0)'
+    )->execute([$waDenda, $waLunas, $surat, $bast]);
+    return true;
+}
 function layananSimpanFoto($foto, $folder) {
     if (!in_array($folder,['pembayaran','jaminan_kembali'],true)) throw new Exception('Folder bukti tidak valid.');
     $dir=__DIR__.'/../uploads/'.$folder;

@@ -37,12 +37,17 @@ if (cekPostMelebihiBatas()) {
         if (isset($_POST['import_final'])) {
             if (!empty($hasil['errors'])) throw new RuntimeException('Import final dibatalkan karena masih ada error validasi.');
             $import = migrasiImportFinal($db, $file['tmp_name'], $_SESSION['user_id'] ?? null);
+            $dendaDihitung = 0;
+            if (function_exists('perbaruiDendaOtomatis')) {
+                $dendaDihitung = (int) perbaruiDendaOtomatis($db, true);
+            }
             $_SESSION['success'] = 'Import final berhasil. '
                 . (int)($import['koperasi'] ?? 0) . ' konfigurasi, '
                 . (int)$import['anggota'] . ' nasabah, '
                 . (int)$import['pinjaman'] . ' pinjaman, dan '
                 . (int)$import['pembayaran'] . ' pembayaran diproses. '
                 . 'Dokumen dipulihkan: ' . (int)($import['dokumen'] ?? 0) . ' (foto/TTD dari cadangan + Excel). '
+                . 'Denda otomatis dihitung ulang: ' . $dendaDihitung . ' cicilan. '
                 . 'Import ulang file yang sama tidak akan menggandakan transaksi.';
             header('Location: import_migrasi.php'); exit;
         }

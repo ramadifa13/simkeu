@@ -36,6 +36,12 @@ if ($_POST && isset($_POST['keputusan_tc'])) {
             $batal=$db->prepare("UPDATE pengajuan_pinjaman pp JOIN layanan_tunda_cair tc ON tc.pengajuan_id=pp.id SET pp.status='batal_cair', pp.catatan_admin=CONCAT(COALESCE(pp.catatan_admin,''), '\nBatal cair: ', tc.catatan_admin), pp.admin_id=?, pp.tanggal_persetujuan=NOW() WHERE tc.id=? AND NOT EXISTS (SELECT 1 FROM pinjaman p WHERE p.pengajuan_id=pp.id)");
             $batal->execute([$_SESSION['user_id'],$tcId]);
             if (!$batal->rowCount()) throw new Exception('Pengajuan tidak dapat dibatalkan karena sudah dicairkan.');
+            $anggotaTc=$db->prepare("SELECT pp.anggota_id FROM pengajuan_pinjaman pp JOIN layanan_tunda_cair tc ON tc.pengajuan_id=pp.id WHERE tc.id=?");
+            $anggotaTc->execute([$tcId]);
+            $anggotaTcId=(int)$anggotaTc->fetchColumn();
+            if ($anggotaTcId > 0) {
+                bersihkanKodeAnggotaJaminanJikaTidakCair($db, $anggotaTcId);
+            }
             $_SESSION['success']='TC disetujui. Pengajuan ditandai Batal Cair dan nasabah dapat mengajukan kembali.';
         } else {
             $_SESSION['success']='TC ditolak. Pengajuan lama kembali dapat diproses untuk pencairan.';

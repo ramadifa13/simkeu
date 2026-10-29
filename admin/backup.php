@@ -297,12 +297,19 @@ if ($_POST && isset($_POST['reset_total_migrasi'])) {
             $target=array_values(array_filter($tables,function($table) use ($skip) { return !in_array($table,$skip,true); }));
             $db->beginTransaction(); $db->exec('SET FOREIGN_KEY_CHECKS=0');
             foreach ($target as $table) $db->exec("DELETE FROM `".str_replace('`','``',$table)."`");
-            $hapusUser=$db->prepare('DELETE FROM users WHERE id <> ?'); $hapusUser->execute([$adminId]);
+            // Pertahankan Admin yang login + seluruh akun Teller (staf operasional).
+            // Akun anggota dihapus; login anggota dibuat ulang bila diperlukan.
+            $hapusUser=$db->prepare("DELETE FROM users WHERE role='anggota' OR (role='admin' AND id<>?)");
+            $hapusUser->execute([$adminId]);
             // Remove stale login links without touching the member documents.
             $db->exec("UPDATE anggota SET user_id = NULL, status = 'nonaktif'");
             $db->exec('SET FOREIGN_KEY_CHECKS=1'); $db->commit();
             foreach ($target as $table) $db->exec("ALTER TABLE `".str_replace('`','``',$table)."` AUTO_INCREMENT=1");
-            $_SESSION['success']='Reset total selesai. Cadangan dokumen: '.(int)$cadangan['anggota'].' nasabah, '.(int)$cadangan['pinjaman'].' pinjaman. Setelah import (kode sama), foto KTP/KK/pencairan dan TTD perjanjian dipulihkan otomatis. File uploads/ tidak dihapus.';
+            // Seed ulang pengaturan layanan (WA denda/lunas) agar tab Denda tidak error.
+            if (function_exists('layananPastikanPengaturan')) {
+                layananPastikanPengaturan($db);
+            }
+            $_SESSION['success']='Reset total selesai. Akun Admin & Teller tetap ada. Cadangan dokumen: '.(int)$cadangan['anggota'].' nasabah, '.(int)$cadangan['pinjaman'].' pinjaman. Setelah import (kode sama), foto KTP/KK/pencairan dan TTD perjanjian dipulihkan otomatis. File uploads/ tidak dihapus.';
         } catch (Throwable $e) {
             if ($db->inTransaction()) $db->rollBack();
             try { $db->exec('SET FOREIGN_KEY_CHECKS=1'); } catch (Throwable $ignored) {}
@@ -509,7 +516,7 @@ $db_user = defined('DB_USER') ? DB_USER : 'root';
                                 </form>
                                 <hr class="my-4">
                                 <h6 class="text-danger">Reset Total untuk Migrasi</h6>
-                                <p class="small text-muted mb-2">Menghapus transaksi &amp; master. Sebelum hapus, sistem <strong>mencadangkan semua foto &amp; TTD</strong>. Setelah import dengan kode sama, foto nasabah, foto pencairan, dan TTD perjanjian otomatis kembali. Folder uploads/ tidak dihapus.</p>
+                                <p class="small text-muted mb-2">Menghapus transaksi &amp; master. <strong>Akun Admin &amp; Teller tetap dipertahankan</strong>. Sebelum hapus, sistem <strong>mencadangkan semua foto &amp; TTD</strong>. Setelah import dengan kode sama, foto nasabah, foto pencairan, dan TTD perjanjian otomatis kembali. Folder uploads/ tidak dihapus.</p>
                                 <form method="POST" id="resetTotalForm"><?php echo layananToken(); ?>
                                     <div class="mb-3"><label class="form-label text-danger">Ketik <strong>RESET TOTAL</strong></label>
                                         <input type="text" name="confirmation_total" class="form-control" placeholder="RESET TOTAL" required pattern="RESET TOTAL"></div>
