@@ -107,10 +107,10 @@ function prosesLayanan($db, $aksi, $id, &$files) {
         $ambilJaminanLangsung = $aksi==='pelunasan_langsung' && $p['memerlukan_jaminan'] && !empty($_POST['ambil_jaminan_langsung']);
         if ($ambilJaminanLangsung) {
             if (empty($_POST['cek_jaminan_nasabah'])) throw new Exception('Nasabah wajib mencentang konfirmasi pemeriksaan barang jaminan.');
-            $ttdJaminan=trim((string)($_POST['ttd_jaminan_nasabah'] ?? ''));
-            if ($ttdJaminan==='' || strpos($ttdJaminan,'data:image/')!==0) throw new Exception('TTD nasabah untuk pemeriksaan jaminan wajib diisi.');
-            $ttdJaminanTeller=trim((string)($_POST['ttd_jaminan_teller'] ?? ''));
-            if ($ttdJaminanTeller==='' || strpos($ttdJaminanTeller,'data:image/')!==0) throw new Exception('TTD Teller untuk serah terima jaminan wajib diisi.');
+            $ttdJaminan=validasiTtdDataUrl((string)($_POST['ttd_jaminan_nasabah'] ?? ''), 'TTD nasabah pemeriksaan jaminan');
+            if ($ttdJaminan==='') throw new Exception('TTD nasabah untuk pemeriksaan jaminan wajib diisi.');
+            $ttdJaminanTeller=validasiTtdDataUrl((string)($_POST['ttd_jaminan_teller'] ?? ''), 'TTD Teller serah terima jaminan');
+            if ($ttdJaminanTeller==='') throw new Exception('TTD Teller untuk serah terima jaminan wajib diisi.');
             $fotoSerahTerima=validasiFotoUpload('foto_serah_terima_jaminan','Foto penyerahan barang jaminan',5*1024*1024,true);
             $fotoSerahTerimaPath=layananSimpanFoto($fotoSerahTerima,'jaminan_kembali');$files[]=$fotoSerahTerimaPath;
         } else {$ttdJaminan=null;$ttdJaminanTeller=null;$fotoSerahTerimaPath=null;}
@@ -167,13 +167,9 @@ function prosesLayanan($db, $aksi, $id, &$files) {
         $stmt=$db->prepare("SELECT * FROM layanan_jaminan_kembali WHERE pinjaman_id=? AND status='disetujui' FOR UPDATE");$stmt->execute([$id]);
         if (!$stmt->fetch()) throw new Exception('Pengembalian wajib mendapat persetujuan Admin.');
         $foto=validasiFotoUpload('bukti','Foto serah terima jaminan',5*1024*1024,true);
-        $ttd=$_POST['ttd'] ?? ''; $ttdTeller=$_POST['ttd_teller'] ?? '';
-        if (strlen($ttd)>300000 || !preg_match('#^data:image/png;base64,([A-Za-z0-9+/=]+)$#D',$ttd,$matches)) throw new Exception('Tanda tangan nasabah wajib diisi.');
-        $raw=base64_decode($matches[1],true);$info=$raw!==false?@getimagesizefromstring($raw):false;
-        if (!$info || $info['mime']!=='image/png') throw new Exception('Tanda tangan tidak valid.');
-        if (strlen($ttdTeller)>300000 || !preg_match('#^data:image/png;base64,([A-Za-z0-9+/=]+)$#D',$ttdTeller,$tellerMatches)) throw new Exception('Tanda tangan Teller wajib diisi.');
-        $rawTeller=base64_decode($tellerMatches[1],true);$infoTeller=$rawTeller!==false?@getimagesizefromstring($rawTeller):false;
-        if (!$infoTeller || $infoTeller['mime']!=='image/png') throw new Exception('Tanda tangan Teller tidak valid.');
+        $ttd=validasiTtdDataUrl((string)($_POST['ttd'] ?? ''), 'Tanda tangan nasabah');
+        $ttdTeller=validasiTtdDataUrl((string)($_POST['ttd_teller'] ?? ''), 'Tanda tangan Teller');
+        if ($ttd==='' || $ttdTeller==='') throw new Exception('Tanda tangan nasabah dan Teller wajib diisi.');
         $path=layananSimpanFoto($foto,'jaminan_kembali');$files[]=$path;
         $db->prepare("UPDATE layanan_jaminan_kembali SET status='diserahkan',foto=?,ttd=?,ttd_teller=?,diserahkan_at=NOW(),user_id=? WHERE pinjaman_id=?")->execute([$path,$ttd,$ttdTeller,$uid,$id]);
         $stmt=$db->prepare("UPDATE jaminan_pinjaman SET status_jaminan='dikembalikan',tanggal_dikembalikan=CURDATE() WHERE pinjaman_id=? AND status_jaminan='dititipkan'");$stmt->execute([$id]);

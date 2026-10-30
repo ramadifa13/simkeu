@@ -31,23 +31,89 @@ function pengaturanPerjanjian($db) {
     return $row;
 }
 
+/**
+ * Kompres TTD ke JPEG data-URL (max 1 MB) agar kolom MEDIUMTEXT tidak membengkak.
+ * PNG/WebP lama ikut dikonversi saat disimpan ulang.
+ */
+function kompresTtdKeJpegDataUrl(string $bin, string $label = 'TTD'): string {
+    if (strlen($bin) < 100) {
+        throw new Exception("$label tidak valid");
+    }
+    if (!function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) {
+        if (strlen($bin) > 1024 * 1024) {
+            throw new Exception("$label melebihi 1 MB");
+        }
+        return 'data:image/jpeg;base64,' . base64_encode($bin);
+    }
+    $img = @imagecreatefromstring($bin);
+    if ($img === false) {
+        throw new Exception("$label tidak valid");
+    }
+    $w = imagesx($img);
+    $h = imagesy($img);
+    $maxW = 700;
+    if ($w > $maxW) {
+        $nw = $maxW;
+        $nh = max(1, (int) round($h * ($maxW / $w)));
+        $dst = imagecreatetruecolor($nw, $nh);
+        $white = imagecolorallocate($dst, 255, 255, 255);
+        imagefilledrectangle($dst, 0, 0, $nw, $nh, $white);
+        imagecopyresampled($dst, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+        imagedestroy($img);
+        $img = $dst;
+    } else {
+        // Pastikan latar tidak transparan saat ke JPEG.
+        $dst = imagecreatetruecolor($w, $h);
+        $white = imagecolorallocate($dst, 255, 255, 255);
+        imagefilledrectangle($dst, 0, 0, $w, $h, $white);
+        imagecopy($dst, $img, 0, 0, 0, 0, $w, $h);
+        imagedestroy($img);
+        $img = $dst;
+    }
+
+    $quality = 82;
+    $jpeg = null;
+    do {
+        ob_start();
+        imagejpeg($img, null, $quality);
+        $jpeg = ob_get_clean();
+        $quality -= 8;
+    } while ($jpeg !== false && strlen($jpeg) > 1024 * 1024 && $quality >= 40);
+
+    imagedestroy($img);
+    if ($jpeg === false || strlen($jpeg) < 100) {
+        throw new Exception("$label gagal dikompres");
+    }
+    if (strlen($jpeg) > 1024 * 1024) {
+        throw new Exception("$label melebihi 1 MB setelah kompresi");
+    }
+    return 'data:image/jpeg;base64,' . base64_encode($jpeg);
+}
+
 function validasiTtdDataUrl($nilai, $label) {
     // TTD dari browser tidak boleh gagal hanya karena terdapat baris baru/spasi
     // saat disimpan oleh PHP atau dipindahkan dari pengaturan lama.
+    // Semua format (PNG/JPEG/WebP) dikompres ke JPEG ≤ 1 MB sebelum disimpan.
     $nilai = preg_replace('/\s+/', '', trim((string) $nilai));
-    if (!preg_match('#^data:image/png;base64,([A-Za-z0-9+/=]+)$#', $nilai, $m)) {
+    if ($nilai === '') {
+        return '';
+    }
+    if (!preg_match('#^data:image/(png|jpeg|jpg|webp);base64,([A-Za-z0-9+/=]+)$#i', $nilai, $m)) {
         throw new Exception("$label wajib ditandatangani langsung pada kotak tanda tangan");
     }
-    $bin = base64_decode($m[1], true);
+    $bin = base64_decode($m[2], true);
     if ($bin === false || strlen($bin) < 100 || strlen($bin) > 1024 * 1024) {
-        throw new Exception("$label tidak valid atau terlalu besar");
+        throw new Exception("$label tidak valid atau terlalu besar (maks. 1 MB)");
     }
-    return $nilai;
+    return kompresTtdKeJpegDataUrl($bin, $label);
 }
 
 function bacaTtdRequest($field, $label) {
     $upload = $_FILES[$field . '_file'] ?? null;
-    if ($upload === null) return trim((string) ($_POST[$field] ?? ''));
+    if ($upload === null) {
+        $raw = trim((string) ($_POST[$field] ?? ''));
+        return $raw === '' ? '' : validasiTtdDataUrl($raw, $label);
+    }
     if (!is_array($upload) || !isset($upload['error'], $upload['tmp_name'], $upload['size'])
         || $upload['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($upload['tmp_name'])) {
         throw new Exception("Unggah $label gagal. Silakan coba lagi.");
@@ -56,12 +122,18 @@ function bacaTtdRequest($field, $label) {
         throw new Exception("$label tidak valid atau melebihi 1 MB.");
     }
     $gambar = @getimagesize($upload['tmp_name']);
-    if (!$gambar || $gambar[2] !== IMAGETYPE_PNG) {
-        throw new Exception("$label harus berupa gambar PNG.");
+    $okTypes = [IMAGETYPE_PNG, IMAGETYPE_JPEG];
+    if (defined('IMAGETYPE_WEBP')) {
+        $okTypes[] = IMAGETYPE_WEBP;
+    }
+    if (!$gambar || !in_array($gambar[2], $okTypes, true)) {
+        throw new Exception("$label harus berupa gambar PNG/JPEG.");
     }
     $isi = file_get_contents($upload['tmp_name']);
-    if ($isi === false) throw new Exception("$label gagal dibaca.");
-    return validasiTtdDataUrl('data:image/png;base64,' . base64_encode($isi), $label);
+    if ($isi === false) {
+        throw new Exception("$label gagal dibaca.");
+    }
+    return kompresTtdKeJpegDataUrl($isi, $label);
 }
 
 function nomorPerjanjian($pinjaman) {
@@ -71,8 +143,25 @@ function nomorPerjanjian($pinjaman) {
 }
 
 function dataUrlKeFileSementara($dataUrl) {
-    if (!preg_match('#^data:image/[^;]+;base64,(.+)$#', $dataUrl, $m)) return null;
+    if (!preg_match('#^data:image/([^;]+);base64,(.+)$#', (string) $dataUrl, $m)) {
+        return null;
+    }
     $tmp = tempnam(sys_get_temp_dir(), 'ttd_');
-    file_put_contents($tmp, base64_decode($m[1]));
+    file_put_contents($tmp, base64_decode($m[2]));
     return $tmp;
+}
+
+/** Tipe gambar TCPDF dari data-URL TTD (PNG lama / JPEG baru). */
+function dataUrlTipeTcpdf($dataUrl) {
+    if (!preg_match('#^data:image/([^;]+);#i', (string) $dataUrl, $m)) {
+        return 'JPEG';
+    }
+    $mime = strtolower($m[1]);
+    if ($mime === 'png') {
+        return 'PNG';
+    }
+    if ($mime === 'webp') {
+        return 'WEBP';
+    }
+    return 'JPEG';
 }

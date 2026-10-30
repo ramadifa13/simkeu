@@ -441,17 +441,28 @@ $logoAda = !empty($koperasi['logo']) && is_file($logoPath);
           data.set('update_perjanjian','1');
           var dirty=window.SimkeuSignaturePad ? SimkeuSignaturePad.isDirty(c) : !!field.value;
           if(dirty || (field && field.value && field.value !== existing)){
-            var blob=await new Promise(function(resolve){c.toBlob(resolve,'image/png')});
+            if(!window.SimkeuSignaturePad || !SimkeuSignaturePad.toJpegBlob){
+              throw new Error('Modul tanda tangan belum dimuat. Refresh halaman lalu coba lagi.');
+            }
+            var blob=await SimkeuSignaturePad.toJpegBlob(c);
             if(!blob)throw new Error('Tanda tangan gagal dibuat. Silakan coba lagi.');
             if(blob.size>1024*1024)throw new Error('Tanda tangan melebihi 1 MB.');
-            data.append('ttd_admin_file',blob,'ttd-admin.png');
+            data.delete('ttd_admin');
+            data.append('ttd_admin_file',blob,'ttd-admin.jpg');
           }
-          var response=await fetch(form.action,{method:'POST',body:data,credentials:'same-origin'});
+          var response=await fetch(form.action,{method:'POST',body:data,credentials:'same-origin',redirect:'manual'});
+          if(response.type==='opaqueredirect'||response.status===0){
+            window.location.assign(form.action||window.location.href);
+            return;
+          }
+          if(response.status>=300&&response.status<400){
+            window.location.assign(response.headers.get('Location')||form.action||window.location.href);
+            return;
+          }
           if(!response.ok)throw new Error(response.status===403
             ?'Server menolak penyimpanan (403). Periksa log keamanan hosting pada waktu penyimpanan ini.'
             :'Penyimpanan gagal (HTTP '+response.status+'). Silakan coba lagi.');
-          if(!response.redirected)throw new Error('Respons penyimpanan tidak sesuai. Periksa sesi login dan konfigurasi hosting.');
-          window.location.assign(response.url);
+          throw new Error('Respons penyimpanan tidak sesuai. Periksa sesi login dan konfigurasi hosting.');
         } catch(error) {
           alert(error.message || 'Koneksi gagal. Silakan coba lagi.');
         } finally {saving=false;button.disabled=false;}

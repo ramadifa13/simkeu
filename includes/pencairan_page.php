@@ -140,6 +140,10 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
     $errmode = $db->getAttribute(PDO::ATTR_ERRMODE);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     try {
+        layananValidasiToken();
+        if ($id < 1) {
+            throw new Exception('Pengajuan tidak valid. Buka ulang menu Proses Pencairan.');
+        }
         $db->beginTransaction();
 
         $stmt = $db->prepare("SELECT pp.*, jp.memerlukan_jaminan, jp.nama_jenis, j.id AS jaminan_id, j.jenis_barang,
@@ -232,7 +236,11 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         }
         foreach ($lampiran_upload as $info) $lampiran_paths[] = simpanFotoUpload($info, 'perjanjian');
         tandaiCicilanDimuka($db, $pinjaman_id, $sudah_dibayar);
-        $db->prepare("UPDATE pengajuan_pinjaman SET status = 'dicairkan' WHERE id = ?")->execute([$id]);
+        $updStatus = $db->prepare("UPDATE pengajuan_pinjaman SET status = 'dicairkan' WHERE id = ? AND status = 'disetujui'");
+        $updStatus->execute([$id]);
+        if ($updStatus->rowCount() < 1) {
+            throw new Exception('Status pengajuan gagal diubah menjadi dicairkan. Muat ulang halaman lalu coba lagi.');
+        }
 
         $nama_teller = $_SESSION['nama_lengkap'] ?? ($_SESSION['username'] ?? 'Teller');
         $hitung_surat = hitungDariPinjaman($pengajuan);
@@ -281,7 +289,8 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
             . (migrasiRevisiBelumDijalankan($db) ? " (database belum di-update, jalankan file migrasi)" : "");
     }
     $db->setAttribute(PDO::ATTR_ERRMODE, $errmode);
-    header("Location: pencairan.php");
+    // Jangan taruh #hash di Location (banyak browser mengabaikan fragment pada redirect).
+    header('Location: pencairan.php?' . ($committed ? 'ok=cair' : 'ok=error'));
     exit();
 }
 
@@ -942,6 +951,18 @@ $statusClassMap = [
     ?>
     <script>
     (function () {
+        // Jalankan sebelum DataTables init (DOMContentLoaded): buang filter "Siap cair" tersimpan.
+        try {
+            if (new URLSearchParams(window.location.search).get('ok') === 'cair') {
+                var pathBoot = window.location.pathname;
+                Object.keys(sessionStorage).forEach(function (k) {
+                    if (k.indexOf('simkeu-dt:') === 0 && k.indexOf(pathBoot) !== -1) {
+                        sessionStorage.removeItem(k);
+                    }
+                });
+            }
+        } catch (e) { /* ignore */ }
+
         var pencairanModal = document.getElementById('pencairanModal');
         var formPencairan = document.getElementById('formPencairan');
         var tcModal = document.getElementById('tcModal');
@@ -1101,7 +1122,9 @@ $statusClassMap = [
                 var w = Math.max(1, Math.round(r.width * ratio));
                 var h = Math.max(1, Math.round(r.height * ratio));
                 if (c.width === w && c.height === h) return;
-                var before = dirty ? c.toDataURL('image/png') : null;
+                var before = dirty
+                    ? (window.SimkeuSignaturePad ? SimkeuSignaturePad.toJpegDataURL(c) : c.toDataURL('image/jpeg', 0.82))
+                    : null;
                 c.width = w; c.height = h;
                 ctx = c.getContext('2d');
                 ctx.lineWidth = 2.5 * ratio;
@@ -1128,7 +1151,11 @@ $statusClassMap = [
             }
             function simpanTtdKeForm() {
                 var hid = document.getElementById('ttd_' + key);
-                if (hid) hid.value = dirty ? c.toDataURL('image/png') : '';
+                if (hid) {
+                    hid.value = dirty
+                        ? (window.SimkeuSignaturePad ? SimkeuSignaturePad.toJpegDataURL(c) : c.toDataURL('image/jpeg', 0.82))
+                        : '';
+                }
             }
             function stopTtd(e) {
                 drawing = false;
@@ -1188,51 +1215,49 @@ $statusClassMap = [
         });
 
         formPencairan.addEventListener('submit', async function (event) {
+            // Siapkan file (kompres + TTD) lalu submit native — 1x navigasi, toast & status langsung terlihat.
+            // Hindari fetch+redirect (lambat: unduh ulang halaman penuh; toast sering hilang).
+            if (formPencairan.dataset.readySubmit === '1') return;
             event.preventDefault();
             var form = this;
             var tombol = document.getElementById('btnCairkan');
             if (!tombol || tombol.disabled) return;
             tombol.disabled = true;
-            tombol.innerHTML = '<i class="ti ti-loader-2 ti-spin me-1"></i> Mengompres foto (maks. 1 MB)...';
+            tombol.innerHTML = '<i class="ti ti-loader-2 ti-spin me-1"></i> Mengompres foto...';
             try {
-                if (window.SimkeuKompresFoto && SimkeuKompresFoto.kompresSemuaInputDiForm) {
-                    await SimkeuKompresFoto.kompresSemuaInputDiForm(form);
-                } else {
+                if (!window.SimkeuKompresFoto || !SimkeuKompresFoto.kompresSemuaInputDiForm) {
                     throw new Error('Modul kompresi foto belum dimuat. Refresh halaman lalu coba lagi.');
                 }
+                await SimkeuKompresFoto.kompresSemuaInputDiForm(form);
+
                 var keys = Object.keys(signaturePads);
                 if (keys.length < 4 || !keys.every(function (k) { return signaturePads[k].isDirty(); })) {
                     throw new Error('TTD nasabah, Teller, dan kedua saksi wajib dibuat langsung pada layar.');
                 }
-                keys.forEach(function (k) {
-                    document.getElementById('ttd_' + k).value = signaturePads[k].canvas.toDataURL('image/png');
-                });
-                var data = new FormData(form);
-                var batas = (window.SimkeuKompresFoto && SimkeuKompresFoto.BATAS_FOTO) || (1024 * 1024);
+
+                tombol.innerHTML = '<i class="ti ti-loader-2 ti-spin me-1"></i> Menyiapkan tanda tangan...';
+                if (!window.SimkeuSignaturePad || !SimkeuSignaturePad.attachJpegFile) {
+                    throw new Error('Modul tanda tangan belum dimuat. Refresh halaman lalu coba lagi.');
+                }
                 for (var i = 0; i < keys.length; i++) {
                     var key = keys[i];
-                    data.delete('ttd_' + key);
-                    var blob = await new Promise(function (resolve) { signaturePads[key].canvas.toBlob(resolve, 'image/png'); });
-                    if (!blob || blob.size > batas) throw new Error('TTD gagal dibuat atau melebihi 1 MB.');
-                    data.append('ttd_' + key + '_file', blob, 'ttd-' + key + '.png');
+                    var hid = document.getElementById('ttd_' + key);
+                    if (hid) hid.value = ''; // jangan kirim data-URL besar di POST
+                    await SimkeuSignaturePad.attachJpegFile(form, signaturePads[key].canvas, 'ttd_' + key + '_file');
                 }
-                // Double-check semua file gambar di FormData ≤ 1 MB
-                data.forEach(function (val, name) {
-                    if (val && typeof val === 'object' && typeof val.size === 'number' && val.type && /^image\//i.test(val.type) && val.size > batas) {
-                        throw new Error('File "' + (val.name || name) + '" masih melebihi 1 MB.');
-                    }
-                });
-                tombol.innerHTML = '<i class="ti ti-loader-2 ti-spin me-1"></i> Mencairkan...';
-                var postUrl = form.getAttribute('action') || window.location.href;
-                var response = await fetch(postUrl, { method: 'POST', body: data, credentials: 'same-origin' });
-                if (!response.ok) {
-                    throw new Error(response.status === 403
-                        ? 'Server menolak pencairan (403). Periksa status pengajuan sebelum mencoba lagi.'
-                        : 'Respons server bermasalah (HTTP ' + response.status + ').');
-                }
-                if (!response.redirected) throw new Error('Respons pencairan tidak sesuai. Periksa status pengajuan dan sesi login.');
-                window.location.assign(response.url);
+
+                try {
+                    var path = window.location.pathname;
+                    Object.keys(sessionStorage).forEach(function (k) {
+                        if (k.indexOf('simkeu-dt:') === 0 && k.indexOf(path) !== -1) sessionStorage.removeItem(k);
+                    });
+                } catch (e) { /* ignore */ }
+
+                tombol.innerHTML = '<i class="ti ti-loader-2 ti-spin me-1"></i> Mengirim pencairan...';
+                formPencairan.dataset.readySubmit = '1';
+                HTMLFormElement.prototype.submit.call(form);
             } catch (err) {
+                formPencairan.dataset.readySubmit = '';
                 alert(err instanceof TypeError ? 'Koneksi terputus. Periksa status pengajuan sebelum mencoba lagi.' : err.message);
                 tombol.disabled = false;
                 tombol.innerHTML = '<i class="ti ti-circle-check me-1"></i> Cairkan pinjaman';

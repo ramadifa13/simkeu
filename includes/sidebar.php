@@ -80,7 +80,7 @@ if ($current_role === 'teller') {
             </a>
         </div>
         <div class="collapse navbar-collapse" id="sidebar-menu">
-            <ul class="navbar-nav pt-lg-3">
+            <ul class="navbar-nav pt-1">
                 <?php foreach ($menu_items as $idx => $item):
                     $pages = $item['pages'] ?? [];
                     $children = $item['children'] ?? [];
