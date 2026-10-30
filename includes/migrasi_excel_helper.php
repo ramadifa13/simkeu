@@ -170,6 +170,22 @@ if (!function_exists('migrasiKolomKeAngka')) {
             }
         }
         if ($alokasiModal > $modalDapin + 0.01) $errors[]='Total modal Dapin yang dialokasikan melebihi modal Dapin yang dicatat.';
+        // ANG wajib di Master_Simpanan: jurnal angsuran mengandalkan kode ini.
+        $kodeSimpanan = [];
+        foreach ($records['Master_Simpanan'] ?? [] as $row) {
+            $kode = strtoupper(trim((string) ($row['Kode Simpanan*'] ?? '')));
+            if ($kode !== '') {
+                $kodeSimpanan[$kode] = true;
+            }
+        }
+        if (!isset($kodeSimpanan['ANG'])) {
+            $errors[] = "Sheet Master_Simpanan wajib berisi baris dengan Kode Simpanan* = ANG (jurnal pembayaran angsuran).";
+        }
+        foreach (['POKOK' => 'simpanan pokok', 'WAJIB' => 'simpanan wajib'] as $kodeWajib => $label) {
+            if (!isset($kodeSimpanan[$kodeWajib])) {
+                $warnings[] = "Sheet Master_Simpanan tidak berisi kode $kodeWajib ($label). Tambahkan jika koperasi memakai jenis tersebut.";
+            }
+        }
         $bayarPinjaman = [];
         foreach ($records['Angsuran_Historis'] ?? [] as $row) if ($pembayaranAktual($row)) {
             $id=$row['ID Pinjaman Lama*'] ?? ''; $bayarPinjaman[$id]=($bayarPinjaman[$id] ?? 0)+$uang($row['Total Diterima (Rp)*'] ?? 0);

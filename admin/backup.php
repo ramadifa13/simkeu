@@ -211,112 +211,115 @@ if ($_GET && isset($_GET['download'])) {
     }
 }
 
-// Handle data reset (TERMASUK WASERDA)
-if ($_POST && isset($_POST['reset_data'])) {
-    $confirmation = $_POST['confirmation'] ?? '';
-    
-    if ($confirmation === 'RESET') {
-        $tables = [
-            'transaksi','simpanan','pinjaman','angsuran','pengajuan_pinjaman',
-            'pembelian_listrik','pembelian_indihome','kas','log_koreksi','waserda_transaksi'
-        ];
-        try {
-            $db->beginTransaction();
-            
-            // Disable foreign key checks
-            $db->exec("SET FOREIGN_KEY_CHECKS = 0");
-            
-            foreach ($tables as $table) {
-                // Use DELETE instead of TRUNCATE to avoid foreign key constraints
-                $delete_query = "DELETE FROM {$table}";
-                $db->exec($delete_query);
-            }
-            
-            // Reset anggota data but keep the structure and all uploaded documents.
-            // File paths are intentionally preserved so photos/TTD can still be
-            // reused when the member is imported again with the same code.
-            $reset_anggota_query = "UPDATE anggota SET 
-                                   alamat = '', 
-                                   telepon = '', 
-                                   email = '', 
-                                   tempat_lahir = '', 
-                                   tanggal_lahir = NULL, 
-                                   pekerjaan = '', 
-                                   ktp = '', 
-                                   rekening_bank = '',
-                                   tanggal_daftar = CURDATE()";
-            $db->exec($reset_anggota_query);
-            
-            // Re-enable foreign key checks
-            $db->exec("SET FOREIGN_KEY_CHECKS = 1");
-            
-            $db->commit();
-            // ALTER TABLE menyebabkan implicit commit di MySQL, sehingga harus dijalankan
-            // setelah transaksi selesai agar rollback tidak pernah gagal.
-            foreach ($tables as $table) $db->exec("ALTER TABLE {$table} AUTO_INCREMENT = 1");
-            $_SESSION['success'] = "Data berhasil direset! Data waserda, transaksi, simpanan, pinjaman telah dihapus. Data master dan pengguna tetap tersimpan.";
-            
-        } catch (Throwable $e) {
-            if ($db->inTransaction()) $db->rollBack();
-            // Re-enable foreign key checks even if error
-            try { $db->exec("SET FOREIGN_KEY_CHECKS = 1"); } catch (Throwable $ignored) {}
-            $_SESSION['error'] = "Gagal mereset data: " . $e->getMessage();
+/**
+ * Seed jenis simpanan sistem yang wajib ada setelah wipe master.
+ * ANG dipakai pembayaran angsuran; BONUS/SHU untuk jurnal khusus.
+ */
+function backupSeedJenisSimpananSistem(PDO $db): void
+{
+    $seed = [
+        ['ANG', 'Pembayaran Angsuran', 'Jurnal pembayaran angsuran pinjaman'],
+        ['BONUS', 'Bonus', 'Jurnal bonus anggota'],
+        ['SHU', 'Pembagian SHU', 'Jurnal pembagian SHU'],
+    ];
+    $cek = $db->prepare('SELECT id FROM jenis_simpanan WHERE kode_jenis = ? LIMIT 1');
+    $ins = $db->prepare(
+        "INSERT INTO jenis_simpanan (kode_jenis, nama_jenis, deskripsi, minimum, maksimum, bagi_hasil, status)
+         VALUES (?, ?, ?, 0, 0, 0, 'aktif')"
+    );
+    $aktif = $db->prepare("UPDATE jenis_simpanan SET status = 'aktif' WHERE id = ?");
+    foreach ($seed as [$kode, $nama, $deskripsi]) {
+        $cek->execute([$kode]);
+        $id = $cek->fetchColumn();
+        if ($id) {
+            $aktif->execute([(int) $id]);
+            continue;
         }
-    } else {
-        $_SESSION['error'] = "Konfirmasi tidak valid! Ketik 'RESET' untuk mengonfirmasi.";
+        $ins->execute([$kode, $nama, $deskripsi]);
     }
-    
-    header("Location: backup.php");
-    exit();
 }
 
 // Reset total untuk migrasi: semua data/master/pengaturan dikosongkan,
 // kecuali akun Admin yang sedang dipakai agar aplikasi tidak terkunci.
 if ($_POST && isset($_POST['reset_total_migrasi'])) {
-    if (trim((string)($_POST['confirmation_total'] ?? '')) !== 'RESET TOTAL') {
+    if (trim((string) ($_POST['confirmation_total'] ?? '')) !== 'RESET TOTAL') {
         $_SESSION['error'] = "Konfirmasi tidak valid! Ketik 'RESET TOTAL'.";
     } else {
         try {
             layananValidasiToken();
-            $adminId = (int)($_SESSION['user_id'] ?? 0);
-            if ($adminId <= 0) throw new RuntimeException('Admin aktif tidak ditemukan.');
-            $cekAdmin=$db->prepare("SELECT id FROM users WHERE id=? AND role='admin' AND status='aktif'");
+            $adminId = (int) ($_SESSION['user_id'] ?? 0);
+            if ($adminId <= 0) {
+                throw new RuntimeException('Admin aktif tidak ditemukan.');
+            }
+            $cekAdmin = $db->prepare("SELECT id FROM users WHERE id=? AND role='admin' AND status='aktif'");
             $cekAdmin->execute([$adminId]);
-            if (!$cekAdmin->fetchColumn()) throw new RuntimeException('Akun Admin aktif wajib tersedia untuk reset total.');
-            // Cadangkan SEMUA foto/TTD dulu (termasuk foto pencairan + perjanjian)
-            // agar setelah import dengan kode yang sama dokumen otomatis balik.
+            if (!$cekAdmin->fetchColumn()) {
+                throw new RuntimeException('Akun Admin aktif wajib tersedia untuk reset total.');
+            }
+
+            $backupDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'backups';
+            if (!is_dir($backupDir) && !mkdir($backupDir, 0755, true) && !is_dir($backupDir)) {
+                throw new RuntimeException('Folder backups/ tidak dapat dibuat. Reset dibatalkan.');
+            }
+            if (!is_writable($backupDir)) {
+                throw new RuntimeException('Folder backups/ tidak dapat ditulis. Reset dibatalkan.');
+            }
+
+            // Wajib sukses dulu: bila ZIP gagal, jangan hapus data.
+            $autoZipName = 'auto_pre_reset_' . date('Y-m-d_H-i-s') . '.zip';
+            $autoZip = migrasiExportBackupZip($db, $backupDir, null, $autoZipName);
+
+            // Cadangan mapping dokumen (juga sudah dijalankan di dalam ZIP; ulang aman/idempoten).
             $cadangan = migrasiSimpanCadanganDokumen($db);
-            $tables=$db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
-            // Do not remove uploaded files.  They live under uploads/ and are
-            // deliberately outside this database reset.  The anggota table is
-            // also retained so existing document references (foto KTP/KK,
-            // pasangan) remain available and can be matched by kode_anggota
-            // during the next import.
+
+            $tables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
             // Pertahankan identitas koperasi, TTD Admin, meta dokumen, dan cadangan foto/TTD.
-            $skip=['migrations','users','anggota','koperasi','pengaturan_perjanjian','migrasi_anggota_dokumen','migrasi_dokumen_cadangan'];
-            $target=array_values(array_filter($tables,function($table) use ($skip) { return !in_array($table,$skip,true); }));
-            $db->beginTransaction(); $db->exec('SET FOREIGN_KEY_CHECKS=0');
-            foreach ($target as $table) $db->exec("DELETE FROM `".str_replace('`','``',$table)."`");
-            // Pertahankan Admin yang login + seluruh akun Teller (staf operasional).
-            // Akun anggota dihapus; login anggota dibuat ulang bila diperlukan.
-            $hapusUser=$db->prepare("DELETE FROM users WHERE role='anggota' OR (role='admin' AND id<>?)");
+            // File uploads/ tidak dihapus; anggota dipertahankan agar path foto cocok saat import kode sama.
+            $skip = ['migrations', 'users', 'anggota', 'koperasi', 'pengaturan_perjanjian', 'migrasi_anggota_dokumen', 'migrasi_dokumen_cadangan'];
+            $target = array_values(array_filter($tables, static function ($table) use ($skip) {
+                return !in_array($table, $skip, true);
+            }));
+
+            $db->beginTransaction();
+            $db->exec('SET FOREIGN_KEY_CHECKS=0');
+            foreach ($target as $table) {
+                $db->exec('DELETE FROM `' . str_replace('`', '``', $table) . '`');
+            }
+            // Pertahankan Admin yang login + seluruh akun Teller.
+            $hapusUser = $db->prepare("DELETE FROM users WHERE role='anggota' OR (role='admin' AND id<>?)");
             $hapusUser->execute([$adminId]);
-            // Remove stale login links without touching the member documents.
             $db->exec("UPDATE anggota SET user_id = NULL, status = 'nonaktif'");
-            $db->exec('SET FOREIGN_KEY_CHECKS=1'); $db->commit();
-            foreach ($target as $table) $db->exec("ALTER TABLE `".str_replace('`','``',$table)."` AUTO_INCREMENT=1");
-            // Seed ulang pengaturan layanan (WA denda/lunas) agar tab Denda tidak error.
+            $db->exec('SET FOREIGN_KEY_CHECKS=1');
+            $db->commit();
+
+            foreach ($target as $table) {
+                $db->exec('ALTER TABLE `' . str_replace('`', '``', $table) . '` AUTO_INCREMENT=1');
+            }
+
+            backupSeedJenisSimpananSistem($db);
             if (function_exists('layananPastikanPengaturan')) {
                 layananPastikanPengaturan($db);
             }
-            $_SESSION['success']='Reset total selesai. Akun Admin & Teller tetap ada. Cadangan dokumen: '.(int)$cadangan['anggota'].' nasabah, '.(int)$cadangan['pinjaman'].' pinjaman. Setelah import (kode sama), foto KTP/KK/pencairan dan TTD perjanjian dipulihkan otomatis. File uploads/ tidak dihapus.';
+
+            $_SESSION['success'] = 'Reset total selesai. Auto-backup: ' . $autoZip['name']
+                . ' (Excel + ' . (int) $autoZip['files'] . ' file uploads). '
+                . 'Akun Admin & Teller tetap ada. Cadangan dokumen: '
+                . (int) $cadangan['anggota'] . ' nasabah, ' . (int) $cadangan['pinjaman'] . ' pinjaman. '
+                . 'Jenis sistem ANG/BONUS/SHU sudah di-seed. Langkah berikutnya: Import Migrasi (unggah Excel; Master_Simpanan wajib berisi ANG). '
+                . 'Folder uploads/ tidak dihapus.';
         } catch (Throwable $e) {
-            if ($db->inTransaction()) $db->rollBack();
-            try { $db->exec('SET FOREIGN_KEY_CHECKS=1'); } catch (Throwable $ignored) {}
-            $_SESSION['error']='Gagal melakukan reset total: '.$e->getMessage();
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            try {
+                $db->exec('SET FOREIGN_KEY_CHECKS=1');
+            } catch (Throwable $ignored) {
+            }
+            $_SESSION['error'] = 'Gagal melakukan reset total: ' . $e->getMessage();
         }
     }
-    header('Location: backup.php'); exit();
+    header('Location: backup.php');
+    exit();
 }
 
 // Get existing backups
@@ -456,11 +459,11 @@ $countZip = count(array_filter($backups, static function ($b) { return ($b['type
                             <span class="ui-dash-sec-note">Berbahaya</span>
                         </div>
                         <div class="card-body">
-                            <p class="small text-muted mb-3">
-                                Menghapus transaksi &amp; master. <strong>Admin &amp; Teller tetap ada</strong>.
-                                Foto/TTD dicadangkan dulu; setelah import (kode sama) dokumen dipulihkan.
-                                Folder <code>uploads/</code> tidak dihapus.
-                            </p>
+                            <ol class="small text-muted mb-3 ps-3">
+                                <li class="mb-1"><strong>ZIP otomatis</strong> dibuat dulu ke <code>backups/auto_pre_reset_*.zip</code>. Jika ZIP gagal, reset dibatalkan.</li>
+                                <li class="mb-1">Ketik <strong>RESET TOTAL</strong> lalu konfirmasi. Transaksi &amp; master dihapus; Admin/Teller, anggota+foto, <code>uploads/</code>, koperasi, TTD Admin tetap.</li>
+                                <li class="mb-0">Lanjut ke <a href="import_migrasi.php">Import Migrasi</a>. Sheet <code>Master_Simpanan</code> wajib berisi kode <strong>ANG</strong>.</li>
+                            </ol>
                             <form method="POST" id="resetTotalForm"><?php echo layananToken(); ?>
                                 <label class="form-label text-danger" for="confirm_total">Ketik <strong>RESET TOTAL</strong></label>
                                 <input type="text" id="confirm_total" name="confirmation_total" class="form-control mb-3" placeholder="RESET TOTAL" required pattern="RESET TOTAL" autocomplete="off">
@@ -534,7 +537,7 @@ $countZip = count(array_filter($backups, static function ($b) { return ($b['type
     <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
     <script>
         function confirmResetTotal() {
-            return confirm('PERINGATAN KERAS!\n\nTransaksi dan master akan dihapus. Dipertahankan: Admin aktif, anggota+foto, uploads/, koperasi, TTD Admin.\n\nBuat Backup ZIP lengkap dulu. Lanjutkan?');
+            return confirm('PERINGATAN KERAS!\n\n1) Backup ZIP otomatis dibuat dulu (auto_pre_reset_*.zip). Jika ZIP gagal, reset dibatalkan.\n2) Transaksi & master dihapus. Dipertahankan: Admin/Teller, anggota+foto, uploads/, koperasi, TTD Admin.\n3) Setelah reset: Import Migrasi (Master_Simpanan wajib ANG).\n\nLanjutkan?');
         }
     </script>
 </body>

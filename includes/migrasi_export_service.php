@@ -406,7 +406,7 @@ function migrasiExportBackupExcel(PDO $db, $backupDir) {
  *
  * @return array{path:string,name:string,counts:array,files:int}
  */
-function migrasiExportBackupZip(PDO $db, $backupDir, $uploadsDir = null) {
+function migrasiExportBackupZip(PDO $db, $backupDir, $uploadsDir = null, $fileName = null) {
     if (!class_exists('ZipArchive')) {
         throw new RuntimeException('Ekstensi ZIP PHP belum aktif.');
     }
@@ -414,7 +414,12 @@ function migrasiExportBackupZip(PDO $db, $backupDir, $uploadsDir = null) {
     migrasiSimpanCadanganDokumen($db);
     $excel = migrasiExportBackupExcel($db, $backupDir);
     $uploadsDir = $uploadsDir ?: (dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads');
-    $name = 'backup_lengkap_' . date('Y-m-d_H-i-s') . '.zip';
+    $name = $fileName !== null && $fileName !== ''
+        ? basename((string) $fileName)
+        : ('backup_lengkap_' . date('Y-m-d_H-i-s') . '.zip');
+    if (!preg_match('/\.zip$/i', $name)) {
+        $name .= '.zip';
+    }
     $path = rtrim($backupDir, '/\\') . DIRECTORY_SEPARATOR . $name;
     $tmp = $path . '.tmp.' . bin2hex(random_bytes(4));
 

@@ -132,11 +132,15 @@ $summaryLabels = [
                 <div class="ui-set-notes mb-3">
                     <article class="ui-set-note is-info">
                         <strong>Pratinjau aman</strong>
-                        <p>Tidak mengubah data. Import Final hanya muncul jika validasi lolos. Setelah import, pinjaman aktif langsung bisa diproses di Angsuran / Layanan.</p>
+                        <p>Tidak mengubah data. Import Final hanya muncul jika validasi lolos — unggah ulang file yang sama (stateless). Setelah import, pinjaman aktif langsung bisa diproses di Angsuran / Layanan.</p>
+                    </article>
+                    <article class="ui-set-note">
+                        <strong>Master_Simpanan</strong>
+                        <p>Wajib berisi baris kode <strong>ANG</strong> (jurnal angsuran). Disarankan juga POKOK/WAJIB. Reset Total sudah men-seed ANG/BONUS/SHU, tetapi Excel tetap harus punya ANG agar import final lolos validasi.</p>
                     </article>
                     <article class="ui-set-note">
                         <strong>Foto &amp; TTD</strong>
-                        <p>Reset Total mencadangkan dokumen. Import dengan kode sama memulihkan otomatis. File tetap di <code>uploads/</code>. Pindah hosting: pakai Backup ZIP.</p>
+                        <p>Reset Total membuat ZIP otomatis + cadangan dokumen. Import dengan kode sama memulihkan otomatis. File tetap di <code>uploads/</code>. Pindah hosting: pakai Backup ZIP.</p>
                     </article>
                 </div>
 
