@@ -1,146 +1,197 @@
 <?php
-require_once __DIR__.'/config/config.php';
-require_once __DIR__.'/includes/auth.php';
-require_once __DIR__.'/includes/brand.php';
-if(isLoggedIn()){redirectBasedOnRole();}
-$koperasi=$db->query('SELECT * FROM koperasi WHERE id=1')->fetch(PDO::FETCH_ASSOC) ?: ['nama'=>APP_NAME];
-$nama=$koperasi['nama'];
-$simpanan=$db->query("SELECT nama_jenis,deskripsi,minimum FROM jenis_simpanan WHERE status='aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU') ORDER BY id LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
-$pinjaman=$db->query("SELECT nama_jenis,deskripsi,memerlukan_jaminan FROM jenis_pinjaman WHERE status='aktif' ORDER BY id LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
-function homeEscape($v){return htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');}
+require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/brand.php';
+if (isLoggedIn()) {
+    redirectBasedOnRole();
+}
+$koperasi = $db->query('SELECT * FROM koperasi WHERE id=1')->fetch(PDO::FETCH_ASSOC) ?: ['nama' => APP_NAME];
+$nama = $koperasi['nama'] ?? APP_NAME;
+$simpanan = $db->query(
+    "SELECT nama_jenis, deskripsi, minimum FROM jenis_simpanan
+     WHERE status='aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU')
+     ORDER BY id LIMIT 4"
+)->fetchAll(PDO::FETCH_ASSOC);
+$pinjaman = $db->query(
+    "SELECT nama_jenis, deskripsi, memerlukan_jaminan FROM jenis_pinjaman
+     WHERE status='aktif' ORDER BY id LIMIT 4"
+)->fetchAll(PDO::FETCH_ASSOC);
+function homeEscape($v)
+{
+    return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+}
+$cssV = @filemtime(__DIR__ . '/assets/css/public-theme.css') ?: time();
+$jsV = @filemtime(__DIR__ . '/assets/js/public-home.js') ?: time();
 ?>
 <!doctype html>
 <html lang="id">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Layanan simpanan, pinjaman, dan informasi anggota koperasi.">
+    <meta name="description" content="Layanan simpanan, pinjaman, dan informasi anggota <?= homeEscape($nama) ?>.">
     <title><?= homeEscape($nama) ?> — Layanan koperasi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <?php $uiAssetPrefix = ''; include __DIR__ . '/includes/layout/assets.php'; ?>
-    <link rel="stylesheet" href="assets/css/public-theme.css?v=<?= filemtime(__DIR__ . '/assets/css/public-theme.css') ?>">
+    <link rel="stylesheet" href="assets/css/public-theme.css?v=<?= (int) $cssV ?>">
     <script src="assets/js/brand.js?v=20261019-6" defer></script>
+    <script src="assets/js/public-home.js?v=<?= (int) $jsV ?>" defer></script>
 </head>
 <body class="sk-home">
 <a class="visually-hidden-focusable" href="#utama">Lewati ke konten</a>
-<nav class="navbar navbar-expand-lg" aria-label="Navigasi utama">
-    <div class="container-xl">
-        <a class="home-brand" href="index.php"><?= brandLogo($koperasi['logo'] ?? '') ?><span><?= homeEscape($nama) ?><small>Layanan koperasi anggota</small></span></a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#homeLinks" aria-controls="homeLinks" aria-expanded="false" aria-label="Buka navigasi"><span class="navbar-toggler-icon"></span></button>
-        <div class="collapse navbar-collapse" id="homeLinks">
-            <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
-                <li class="nav-item"><a class="nav-link" href="#beranda">Beranda</a></li>
-                <li class="nav-item"><a class="nav-link" href="#layanan">Layanan</a></li>
-                <li class="nav-item"><a class="nav-link" href="#produk">Produk</a></li>
-                <li class="nav-item"><a class="nav-link" href="#tentang">Tentang</a></li>
-                <li class="nav-item"><a class="nav-link" href="#kontak">Kontak</a></li>
-                <li class="nav-item ms-lg-2"><a class="btn btn-primary" href="login.php">Masuk <i class="ti ti-arrow-right ms-1" aria-hidden="true"></i></a></li>
-            </ul>
-        </div>
+
+<header class="lp-nav" data-lp-nav>
+    <div class="lp-nav-inner">
+        <a class="lp-nav-brand" href="index.php">
+            <?= brandLogo($koperasi['logo'] ?? '') ?>
+            <span><?= homeEscape($nama) ?></span>
+        </a>
+        <button class="lp-nav-toggle" type="button" data-lp-toggle aria-controls="lpNavMenu" aria-expanded="false" aria-label="Buka menu">
+            <i class="ti ti-menu-2" aria-hidden="true"></i>
+        </button>
+        <nav class="lp-nav-menu" id="lpNavMenu" data-lp-menu aria-label="Navigasi utama">
+            <a href="#layanan">Layanan</a>
+            <a href="#produk">Produk</a>
+            <a href="#kontak">Kontak</a>
+            <a class="lp-nav-cta" href="login.php">Masuk</a>
+        </nav>
     </div>
-</nav>
+</header>
+
 <main id="utama">
-    <section class="sk-hero" id="beranda">
-        <div class="container-xl">
-            <div class="row align-items-center g-5">
-                <div class="col-lg-6">
-                    <span class="sk-eyebrow" style="color:var(--tblr-primary)">TUMBUH BERSAMA ANGGOTA</span>
-                    <h1>Langkah keuangan<br>lebih <em>tertata.</em></h1>
-                    <p class="lead text-secondary my-4">Simpan, ajukan pinjaman, dan pantau pembayaran Anda dalam satu layanan koperasi yang mudah diakses.</p>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a class="btn btn-primary btn-lg" href="login.php">Masuk ke akun <i class="ti ti-arrow-right ms-1" aria-hidden="true"></i></a>
-                        <a class="btn btn-outline-primary btn-lg" href="#produk">Kenali produk kami</a>
+    <section class="lp-hero" id="beranda" aria-label="Beranda">
+        <div class="lp-hero-visual" aria-hidden="true">
+            <div class="lp-hero-glow lp-hero-glow-a"></div>
+            <div class="lp-hero-glow lp-hero-glow-b"></div>
+            <svg class="lp-hero-art" viewBox="0 0 900 700" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+                <circle cx="720" cy="180" r="140" stroke="rgba(255,255,255,.12)" stroke-width="2"/>
+                <circle cx="720" cy="180" r="90" stroke="rgba(255,255,255,.18)" stroke-width="2"/>
+                <circle cx="160" cy="520" r="120" stroke="rgba(255,255,255,.1)" stroke-width="2"/>
+                <path d="M80 420c80-40 140-20 200 20s140 50 220 10 160-40 240 10" stroke="rgba(255,255,255,.16)" stroke-width="2" stroke-linecap="round"/>
+                <path d="M120 480c70-30 130-10 180 18s120 40 190 8 140-28 210 12" stroke="rgba(167,243,208,.28)" stroke-width="2.5" stroke-linecap="round"/>
+                <rect x="520" y="360" width="220" height="140" rx="28" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.16)"/>
+                <rect x="545" y="395" width="70" height="12" rx="6" fill="rgba(167,243,208,.55)"/>
+                <rect x="545" y="420" width="120" height="10" rx="5" fill="rgba(255,255,255,.28)"/>
+                <rect x="545" y="445" width="95" height="10" rx="5" fill="rgba(255,255,255,.18)"/>
+                <circle cx="700" cy="430" r="28" fill="rgba(45,212,191,.35)"/>
+                <path d="M688 430h24M700 418v24" stroke="#ecfdf5" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+        </div>
+        <div class="lp-hero-content">
+            <p class="lp-hero-brand lp-anim" data-lp-anim><?= homeEscape($nama) ?></p>
+            <h1 class="lp-hero-title lp-anim" data-lp-anim>Keuangan anggota,<br>lebih tertata.</h1>
+            <p class="lp-hero-lead lp-anim" data-lp-anim>Simpan, pinjam, dan pantau angsuran dalam satu layanan koperasi yang mudah diakses.</p>
+            <div class="lp-hero-actions lp-anim" data-lp-anim>
+                <a class="lp-btn lp-btn-primary" href="login.php">Masuk ke akun</a>
+                <a class="lp-btn lp-btn-ghost" href="#layanan">Jelajahi layanan</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="lp-section" id="layanan">
+        <div class="lp-wrap">
+            <header class="lp-section-head lp-reveal">
+                <h2>Layanan untuk anggota</h2>
+                <p>Semua kebutuhan keuangan koperasi dalam alur yang jelas, sesuai hak akses Anda.</p>
+            </header>
+            <div class="lp-service-grid">
+                <?php
+                $layanan = [
+                    ['ti-pig-money', 'Simpanan', 'Pantau saldo dan riwayat setoran maupun penarikan.'],
+                    ['ti-cash', 'Pinjaman', 'Ikuti status pengajuan, pencairan, dan jadwal angsuran.'],
+                    ['ti-building-store', 'Waserda', 'Lihat catatan belanja di warung koperasi.'],
+                    ['ti-coins', 'SHU', 'Akses hak SHU setelah pelunasan disahkan pengurus.'],
+                ];
+                foreach ($layanan as $item):
+                ?>
+                <a class="lp-service lp-reveal" href="login.php">
+                    <span class="lp-service-ico" aria-hidden="true"><i class="ti <?= $item[0] ?>"></i></span>
+                    <strong><?= homeEscape($item[1]) ?></strong>
+                    <span><?= homeEscape($item[2]) ?></span>
+                </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </section>
+
+    <section class="lp-section lp-section-soft" id="produk">
+        <div class="lp-wrap">
+            <header class="lp-section-head lp-reveal">
+                <h2>Produk koperasi</h2>
+                <p>Kenali pilihan simpanan dan pinjaman. Syarat lengkap tersedia melalui Teller.</p>
+            </header>
+
+            <h3 class="lp-subhead lp-reveal">Simpanan</h3>
+            <div class="lp-product-grid">
+                <?php if ($simpanan): foreach ($simpanan as $s): ?>
+                <article class="lp-product lp-reveal">
+                    <strong><?= homeEscape($s['nama_jenis']) ?></strong>
+                    <p><?= homeEscape($s['deskripsi'] ?: 'Ketentuan produk tersedia melalui Teller koperasi.') ?></p>
+                    <span class="lp-product-meta">Minimum <?= formatRupiah($s['minimum'] ?? 0) ?></span>
+                </article>
+                <?php endforeach; else: ?>
+                <p class="lp-empty lp-reveal">Informasi produk simpanan tersedia melalui Teller.</p>
+                <?php endif; ?>
+            </div>
+
+            <h3 class="lp-subhead lp-reveal">Pinjaman</h3>
+            <div class="lp-product-grid">
+                <?php if ($pinjaman): foreach ($pinjaman as $p): ?>
+                <article class="lp-product lp-reveal">
+                    <strong><?= homeEscape($p['nama_jenis']) ?></strong>
+                    <p><?= homeEscape($p['deskripsi'] ?: 'Ajukan pembiayaan melalui Teller koperasi.') ?></p>
+                    <span class="lp-product-meta"><?= !empty($p['memerlukan_jaminan']) ? 'Dengan jaminan' : 'Tanpa jaminan' ?></span>
+                </article>
+                <?php endforeach; else: ?>
+                <p class="lp-empty lp-reveal">Informasi produk pinjaman tersedia melalui Teller.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </section>
+
+    <section class="lp-contact" id="kontak">
+        <div class="lp-wrap lp-contact-grid">
+            <div class="lp-reveal">
+                <h2>Hubungi koperasi</h2>
+                <p>Butuh bantuan pendaftaran, pengajuan, atau transaksi? Tim pengurus siap membantu.</p>
+                <a class="lp-btn lp-btn-light" href="login.php">Masuk ke layanan</a>
+            </div>
+            <div class="lp-contact-list lp-reveal">
+                <?php
+                $kontak = [
+                    'alamat' => ['ti-map-pin', 'Alamat'],
+                    'telepon' => ['ti-phone', 'Telepon'],
+                    'email' => ['ti-mail', 'Email'],
+                ];
+                $adaKontak = false;
+                foreach ($kontak as $key => $meta):
+                    if (empty($koperasi[$key]) || $koperasi[$key] === '-') {
+                        continue;
+                    }
+                    $adaKontak = true;
+                ?>
+                <div class="lp-contact-item">
+                    <i class="ti <?= $meta[0] ?>" aria-hidden="true"></i>
+                    <div>
+                        <span><?= $meta[1] ?></span>
+                        <strong><?= homeEscape($koperasi[$key]) ?></strong>
                     </div>
-                    <p class="text-secondary small mt-3 mb-0"><i class="ti ti-lock me-1" aria-hidden="true"></i>Akses sesuai peran Admin, Teller, dan Anggota</p>
                 </div>
-                <div class="col-lg-6">
-                    <div class="sk-hero-card">
-                        <div class="d-flex align-items-center gap-3 mb-3">
-                            <span style="width:2.8rem;height:2.8rem;display:inline-flex"><?= brandLogo($koperasi['logo'] ?? '') ?></span>
-                            <div><div class="small text-secondary">LAYANAN ANGGOTA</div><strong><?= homeEscape($nama) ?></strong></div>
-                        </div>
-                        <h2 class="h3 mb-3">Kebutuhan anggota,<br>dalam satu tempat.</h2>
-                        <div class="item"><span class="sk-icon-badge"><i class="ti ti-pig-money" aria-hidden="true"></i></span><div class="flex-fill"><strong>Simpanan</strong><div class="small text-secondary">Catat dan pantau saldo simpanan</div></div><i class="ti ti-check text-green" aria-hidden="true"></i></div>
-                        <div class="item"><span class="sk-icon-badge"><i class="ti ti-moneybag" aria-hidden="true"></i></span><div class="flex-fill"><strong>Pinjaman &amp; angsuran</strong><div class="small text-secondary">Lihat tagihan dan riwayat pembayaran</div></div><i class="ti ti-check text-green" aria-hidden="true"></i></div>
-                        <div class="item"><span class="sk-icon-badge"><i class="ti ti-file-invoice" aria-hidden="true"></i></span><div class="flex-fill"><strong>Informasi SHU</strong><div class="small text-secondary">Lihat pembagian yang telah disahkan</div></div><i class="ti ti-check text-green" aria-hidden="true"></i></div>
-                        <div class="small text-secondary mt-2"><i class="ti ti-circle-check text-green me-1" aria-hidden="true"></i>Terhubung melalui akun anggota Anda</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section class="sk-section alt" id="layanan">
-        <div class="container-xl">
-            <div class="row g-4 align-items-end mb-4">
-                <div class="col-lg-6"><span class="sk-eyebrow" style="color:var(--tblr-primary)">LAYANAN KOPERASI</span><h2>Lebih mudah mengurus<br>kebutuhan keuangan.</h2></div>
-                <div class="col-lg-6"><p class="text-secondary mb-0">Dari pencatatan simpanan hingga pembayaran angsuran, layanan tersedia sesuai kebutuhan dan hak akses Anda.</p></div>
-            </div>
-            <div class="row g-3">
-                <?php foreach ([['ti-pig-money','Simpanan anggota','Kelola setoran dan penarikan, serta lihat riwayat saldo simpanan.'],['ti-moneybag','Pinjaman & angsuran','Ajukan pinjaman melalui Teller dan pantau jadwal pembayaran.'],['ti-receipt-2','Bukti & riwayat transaksi','Telusuri catatan transaksi dan bukti pembayaran yang tersedia.'],['ti-chart-pie','Informasi SHU','Akses informasi pembagian SHU anggota setelah disahkan pengurus.']] as $n => $item): ?>
-                <div class="col-sm-6 col-lg-3 sk-reveal"><article class="card sk-service mb-0"><div class="card-body"><span class="sk-icon-badge mb-3"><i class="ti <?= $item[0] ?>" aria-hidden="true"></i></span><h3 class="h4"><?= homeEscape($item[1]) ?></h3><p class="text-secondary mb-0"><?= homeEscape($item[2]) ?></p></div></article></div>
                 <?php endforeach; ?>
-            </div>
-        </div>
-    </section>
-
-    <section class="sk-section" id="produk">
-        <div class="container-xl">
-            <div class="row g-4 align-items-end mb-4">
-                <div class="col-lg-6"><span class="sk-eyebrow" style="color:var(--tblr-primary)">PILIHAN UNTUK ANGGOTA</span><h2>Kenali produk koperasi.</h2></div>
-                <div class="col-lg-6"><p class="text-secondary mb-0">Hubungi Teller untuk informasi syarat, biaya, dan ketentuan terbaru sebelum mengajukan produk.</p></div>
-            </div>
-            <h3 class="h4 mb-3"><i class="ti ti-wallet me-1 text-primary" aria-hidden="true"></i>Produk simpanan</h3>
-            <div class="row g-3 mb-5">
-                <?php foreach ($simpanan as $s): ?>
-                <div class="col-sm-6 col-lg-3 sk-reveal"><article class="card sk-product mb-0"><div class="card-body"><span class="badge bg-primary-lt mb-2">SIMPANAN</span><h4><?= homeEscape($s['nama_jenis']) ?></h4><p class="text-secondary"><?= homeEscape($s['deskripsi'] ?: 'Informasi dan ketentuan produk tersedia melalui Teller koperasi.') ?></p><div class="small text-secondary">Setoran minimum</div><strong><?= formatRupiah($s['minimum'] ?? 0) ?></strong></div></article></div>
-                <?php endforeach; ?>
-                <?php if (!$simpanan): ?><p class="text-secondary">Informasi produk simpanan tersedia melalui Teller.</p><?php endif; ?>
-            </div>
-            <h3 class="h4 mb-3"><i class="ti ti-moneybag me-1 text-primary" aria-hidden="true"></i>Produk pinjaman</h3>
-            <div class="row g-3">
-                <?php foreach ($pinjaman as $p): ?>
-                <div class="col-sm-6 col-lg-3 sk-reveal"><article class="card sk-product mb-0"><div class="card-body"><span class="badge bg-green-lt mb-2">PINJAMAN</span><h4><?= homeEscape($p['nama_jenis']) ?></h4><p class="text-secondary"><?= homeEscape($p['deskripsi'] ?: 'Ajukan kebutuhan pembiayaan Anda melalui Teller koperasi.') ?></p><div class="small text-secondary mb-2"><?= $p['memerlukan_jaminan'] ? 'Dengan jaminan' : 'Tanpa jaminan' ?></div><a href="login.php?role=anggota">Akses akun anggota <i class="ti ti-arrow-right" aria-hidden="true"></i></a></div></article></div>
-                <?php endforeach; ?>
-                <?php if (!$pinjaman): ?><p class="text-secondary">Informasi produk pinjaman tersedia melalui Teller.</p><?php endif; ?>
-            </div>
-        </div>
-    </section>
-
-    <section class="sk-section alt" id="tentang">
-        <div class="container-xl">
-            <div class="row g-5 align-items-center">
-                <div class="col-lg-5"><div class="card mb-0" style="background:var(--sk-grad);color:#fff;border:0"><div class="card-body p-5 text-center"><span style="width:4rem;height:4rem;display:inline-flex"><?= brandLogo($koperasi['logo'] ?? '') ?></span><div class="mt-3 small" style="letter-spacing:.14em">BERSAMA, LEBIH BERARTI.</div><h2 class="text-white mt-2">Dari anggota,<br>untuk anggota.</h2></div></div></div>
-                <div class="col-lg-7"><span class="sk-eyebrow" style="color:var(--tblr-primary)">TENTANG KOPERASI</span><h2><?= homeEscape($nama) ?></h2><p class="text-secondary">Kami membantu anggota mengelola kebutuhan simpanan dan pinjaman melalui pencatatan yang tertata dan layanan yang mudah dijangkau.</p><p class="text-secondary">Anggota dapat melihat informasi melalui akun masing-masing. Untuk pendaftaran, pengajuan, atau bantuan transaksi, silakan menghubungi pengurus atau Teller koperasi.</p><a class="btn btn-outline-primary" href="#kontak">Hubungi koperasi <i class="ti ti-arrow-right ms-1" aria-hidden="true"></i></a></div>
-            </div>
-        </div>
-    </section>
-
-    <section class="sk-contact" id="kontak">
-        <div class="container-xl">
-            <div class="row g-4 align-items-center">
-                <div class="col-lg-6"><span class="sk-eyebrow">KAMI SIAP MEMBANTU</span><h2>Mari bicarakan<br>kebutuhan Anda.</h2><p class="text-white-50 mb-0">Informasi dan layanan lebih lanjut tersedia melalui pengurus koperasi.</p></div>
-                <div class="col-lg-6">
-                    <?php foreach (['alamat' => ['ti-map-pin', 'Alamat koperasi'], 'telepon' => ['ti-phone', 'Telepon'], 'email' => ['ti-mail', 'Email']] as $key => $meta): ?>
-                        <?php if (!empty($koperasi[$key]) && $koperasi[$key] !== '-'): ?>
-                        <div class="d-flex align-items-center gap-3 mb-3"><span class="sk-icon-badge" style="background:rgba(255,255,255,.12);color:#fff"><i class="ti <?= $meta[0] ?>" aria-hidden="true"></i></span><span><small><?= $meta[1] ?></small><strong><?= homeEscape($koperasi[$key]) ?></strong></span></div>
-                        <?php endif; ?>
-                    <?php endforeach; ?>
-                    <a class="btn btn-light mt-2" href="login.php">Masuk ke layanan anggota <i class="ti ti-arrow-right ms-1" aria-hidden="true"></i></a>
-                </div>
+                <?php if (!$adaKontak): ?>
+                <p class="lp-contact-fallback">Informasi kontak tersedia di kantor koperasi.</p>
+                <?php endif; ?>
             </div>
         </div>
     </section>
 </main>
-<footer class="sk-footer"><div class="container-xl d-flex flex-wrap justify-content-between gap-2"><span>© <?= date('Y') ?> <?= homeEscape($nama) ?></span><a href="#beranda">Kembali ke atas <i class="ti ti-arrow-up" aria-hidden="true"></i></a></div></footer>
-<script src="assets/vendor/tabler/tabler.min.js"></script>
-<script>
-(function () {
-    var els = document.querySelectorAll('.sk-reveal');
-    if (!('IntersectionObserver' in window)) { els.forEach(function (e) { e.classList.add('in'); }); return; }
-    var io = new IntersectionObserver(function (items) { items.forEach(function (i) { if (i.isIntersecting) { i.target.classList.add('in'); io.unobserve(i.target); } }); }, { threshold: .15 });
-    els.forEach(function (e, i) { e.style.transitionDelay = (i % 4) * 70 + 'ms'; io.observe(e); });
-    document.querySelectorAll('#homeLinks a').forEach(function (a) { a.addEventListener('click', function () { var c = document.getElementById('homeLinks'); if (c.classList.contains('show')) bootstrap.Collapse.getOrCreateInstance(c).hide(); }); });
-})();
-</script>
+
+<footer class="lp-footer">
+    <div class="lp-wrap lp-footer-inner">
+        <span>© <?= date('Y') ?> <?= homeEscape($nama) ?></span>
+        <a href="#beranda">Kembali ke atas</a>
+    </div>
+</footer>
 </body>
 </html>
