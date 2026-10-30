@@ -13,8 +13,8 @@ if (!isAdmin()) {
 // Filter parameters
 $filter_anggota = $_GET['anggota_id'] ?? '';
 $filter_jenis = $_GET['jenis_simpanan_id'] ?? '';
-$filter_tanggal_awal = $_GET['tanggal_awal'] ?? '2026-02-01';
-$filter_tanggal_akhir = $_GET['tanggal_akhir'] ?? '2026-02-28';
+$filter_tanggal_awal = $_GET['tanggal_awal'] ?? date('Y-m-01');
+$filter_tanggal_akhir = $_GET['tanggal_akhir'] ?? date('Y-m-t');
 
 // Get data for filters
 $anggota_info = '';
@@ -125,11 +125,6 @@ foreach ($summary as &$s) {
 
 // Hitung total keseluruhan
 $total_semua = array_sum(array_column($simpanan, 'saldo'));
-
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
 
 // ============================================
 // BUAT PDF

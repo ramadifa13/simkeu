@@ -11,15 +11,28 @@ function nomorWhatsApp($nomor) {
 function tombolWhatsApp($nomor, $pesan = '', $label = 'WhatsApp') {
     $nomor = nomorWhatsApp($nomor);
     if (!$nomor) return '';
-    return '<a class="btn btn-sm btn-outline-success mt-1 service-wa-button" target="_blank" rel="noopener noreferrer" href="https://wa.me/' . $nomor . '?text=' . rawurlencode($pesan) . '"><i class="fab fa-whatsapp me-1"></i> ' . layananEscape($label) . '</a>';
+    $iconOnly = trim((string)$label) === '';
+    $class = $iconOnly
+        ? 'btn btn-sm btn-outline-success service-wa-button ui-wa-icon'
+        : 'btn btn-sm btn-outline-success mt-1 service-wa-button';
+    $inner = $iconOnly
+        ? '<i class="ti ti-brand-whatsapp" aria-hidden="true"></i><span class="visually-hidden">WhatsApp</span>'
+        : '<i class="ti ti-brand-whatsapp me-1" aria-hidden="true"></i>' . layananEscape($label);
+    return '<a class="' . $class . '" target="_blank" rel="noopener noreferrer" title="WhatsApp" aria-label="WhatsApp" href="https://wa.me/' . $nomor . '?text=' . rawurlencode($pesan) . '">' . $inner . '</a>';
 }
 function statusKolektibilitas($hari) {
     $hari = max(0, (int) $hari);
-    if ($hari <= 3) return ['Lancar', '#198754'];
-    if ($hari < 7) return ['Terlambat', '#997404'];
-    if ($hari < 30) return ['Macet Ringan', '#c65d00'];
-    if ($hari <= 90) return ['Macet Berat', '#dc3545'];
-    return ['Gagal Bayar', '#212529'];
+    // [label, bootstrap bg class] — kontras teks diatur CSS .ui-shell .badge
+    if ($hari <= 3) return ['Lancar', 'success'];
+    if ($hari < 7) return ['Terlambat', 'warning'];
+    if ($hari < 30) return ['Macet Ringan', 'warning'];
+    if ($hari <= 90) return ['Macet Berat', 'danger'];
+    return ['Gagal Bayar', 'dark'];
+}
+function statusKolektibilitasBadgeHtml($hari): string {
+    [$label, $warna] = statusKolektibilitas($hari);
+    $extra = ($warna === 'warning') ? ' text-dark' : '';
+    return '<span class="badge bg-' . $warna . $extra . '">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</span>';
 }
 function layananToken() {
     if (empty($_SESSION['layanan_csrf'])) $_SESSION['layanan_csrf'] = bin2hex(random_bytes(32));
@@ -32,7 +45,20 @@ function layananValidasiToken() {
     }
 }
 function sinkronkanProteksiUpload() {
-    $root = realpath(__DIR__ . '/..') . '/uploads';
+    if (function_exists('pastikanFolderUpload')) {
+        foreach (['anggota', 'jaminan_kembali', 'pembayaran', 'jaminan', 'pencairan', 'perjanjian', 'profil', 'logo'] as $sub) {
+            try {
+                pastikanFolderUpload($sub);
+            } catch (Exception $e) {
+                // Jangan gagalkan halaman layanan hanya karena folder belum bisa dibuat.
+            }
+        }
+        return;
+    }
+    $root = dirname(__DIR__) . '/uploads';
+    if (!is_dir($root) && !@mkdir($root, 0755, true) && !is_dir($root)) {
+        return;
+    }
     $template = $root . '/anggota/.htaccess';
     if (!file_exists($template)) return;
     foreach (['jaminan_kembali', 'pembayaran', 'jaminan', 'pencairan'] as $sub) {
@@ -68,38 +94,103 @@ function layananSiap($db) {
  * Setelah Reset Total, baris layanan_pengaturan id=1 hilang.
  * Pastikan selalu ada default agar tab denda/WA tidak error.
  */
+function layananTemplateSuratLunasDefault() {
+    return "SURAT KETERANGAN LUNAS\n\n"
+        . "Dengan ini dinyatakan bahwa pinjaman {norek} atas nama {nama} telah LUNAS pada {tanggal}.\n"
+        . "Seluruh kewajiban pokok, bunga, dan denda terkait pinjaman tersebut telah diselesaikan.";
+}
+
 function layananPastikanPengaturan($db) {
     if (!layananSiap($db)) {
         return false;
     }
-    $ada = $db->query('SELECT id FROM layanan_pengaturan WHERE id=1')->fetchColumn();
-    if ($ada) {
-        return true;
-    }
     $waDenda = 'Yth {nama}, Anda telat {hari} hari, denda Rp {denda}. Mohon segera dibayar.';
     $waLunas = 'Yth {nama}, Selamat pinjaman {norek} LUNAS. Silakan hubungi kantor untuk pengambilan jaminan.';
-    $surat = 'Dengan ini dinyatakan bahwa pinjaman {norek} atas nama {nama} telah LUNAS pada {tanggal}.';
+    $surat = layananTemplateSuratLunasDefault();
     $bast = 'Jaminan pinjaman {norek} telah diperiksa fisiknya dan diserahkan kepada {nama} pada {tanggal}.';
+    $ada = $db->query('SELECT id FROM layanan_pengaturan WHERE id=1')->fetchColumn();
+    if (!$ada) {
+        $db->prepare(
+            'INSERT INTO layanan_pengaturan
+             (id, diskon_pelunasan, pemutihan, wa_denda, wa_lunas, denda_jaminan_per_juta, surat_lunas, bast_jaminan, bonus_persen)
+             VALUES (1, 10, 1, ?, ?, 5000, ?, ?, 0)'
+        )->execute([$waDenda, $waLunas, $surat, $bast]);
+        return true;
+    }
+    // Setelah reset/import parsial, template bisa string kosong — isi ulang default.
     $db->prepare(
-        'INSERT INTO layanan_pengaturan
-         (id, diskon_pelunasan, pemutihan, wa_denda, wa_lunas, denda_jaminan_per_juta, surat_lunas, bast_jaminan, bonus_persen)
-         VALUES (1, 10, 1, ?, ?, 5000, ?, ?, 0)'
-    )->execute([$waDenda, $waLunas, $surat, $bast]);
+        "UPDATE layanan_pengaturan SET
+            surat_lunas = CASE WHEN TRIM(COALESCE(surat_lunas,''))='' THEN ? ELSE surat_lunas END,
+            bast_jaminan = CASE WHEN TRIM(COALESCE(bast_jaminan,''))='' THEN ? ELSE bast_jaminan END
+         WHERE id=1"
+    )->execute([$surat, $bast]);
     return true;
 }
-function layananSimpanFoto($foto, $folder) {
-    if (!in_array($folder,['pembayaran','jaminan_kembali'],true)) throw new Exception('Folder bukti tidak valid.');
-    $dir=__DIR__.'/../uploads/'.$folder;
-    if (!is_dir($dir) && !mkdir($dir,0755,true)) throw new Exception('Folder bukti tidak dapat dibuat.');
-    $htaccessFile = $dir.'/.htaccess';
-    $root = realpath(__DIR__ . '/..') . '/uploads';
-    if (file_exists($root . '/anggota/.htaccess')) {
-        $kontenHt = @file_get_contents($htaccessFile);
-        if (!$kontenHt || (strpos($kontenHt, 'Require all denied') !== false && strpos($kontenHt, 'FilesMatch') === false)) {
-            @copy($root . '/anggota/.htaccess', $htaccessFile);
-        }
+
+/**
+ * Jenis penutupan pinjaman untuk laporan/badge.
+ * @return array{0:string,1:string} [label, bootstrap bg class]
+ */
+function layananJenisPenutupan(PDO $db, $pinjamanId) {
+    $pinjamanId = (int) $pinjamanId;
+    $pl = $db->prepare("SELECT id FROM layanan_pelunasan WHERE pinjaman_id=? AND status='selesai' LIMIT 1");
+    $pl->execute([$pinjamanId]);
+    if ($pl->fetchColumn()) {
+        return ['Dipercepat', 'info'];
     }
-    return simpanFotoUpload($foto,$folder);
+    $ada = $db->prepare("SELECT COUNT(*) FROM angsuran WHERE pinjaman_id=? AND cara_bayar='pelunasan'");
+    $ada->execute([$pinjamanId]);
+    if ((int) $ada->fetchColumn() > 0) {
+        return ['Pelunasan', 'success'];
+    }
+    $pd = $db->prepare('SELECT COUNT(*) FROM pelunasan_dini WHERE pinjaman_id=?');
+    $pd->execute([$pinjamanId]);
+    if ((int) $pd->fetchColumn() > 0) {
+        return ['Pelunasan', 'success'];
+    }
+    return ['Lunas normal', 'secondary'];
+}
+
+/** Label status cicilan dari cara_bayar. */
+function layananLabelCaraBayar($status, $caraBayar) {
+    $status = strtolower(trim((string) $status));
+    if ($status !== 'lunas') {
+        $map = [
+            'belum_bayar' => 'Belum bayar',
+            'telat' => 'Telat',
+            'sebagian' => 'Sebagian',
+        ];
+        return [$map[$status] ?? ucwords(str_replace('_', ' ', $status)), $status === 'telat' ? 'danger' : 'warning'];
+    }
+    $cara = strtolower(trim((string) $caraBayar));
+    if ($cara === 'pelunasan') {
+        return ['Pelunasan', 'success'];
+    }
+    return ['Lunas normal', 'primary'];
+}
+
+/**
+ * Label ketepatan jadwal cicilan (terpisah dari status pembayaran).
+ * @return array{0:string,1:string} [label, tone]
+ */
+function layananLabelKetepatanCicilan(array $angsuran, int $hariTelat): array {
+    $sudahBayar = !empty($angsuran['tanggal_bayar']) || strtolower((string)($angsuran['status'] ?? '')) === 'lunas';
+    if (!$sudahBayar && $hariTelat === 0) {
+        return ['Belum jatuh tempo', 'info'];
+    }
+    if ($hariTelat === 0) {
+        return ['Tepat waktu', 'success'];
+    }
+    if ($hariTelat <= 3) {
+        return [$hariTelat . ' hari terlambat', 'warning'];
+    }
+    return [$hariTelat . ' hari terlambat', 'danger'];
+}
+function layananSimpanFoto($foto, $folder) {
+    if (!in_array($folder, ['pembayaran', 'jaminan_kembali'], true)) {
+        throw new Exception('Folder bukti tidak valid.');
+    }
+    return simpanFotoUpload($foto, $folder);
 }
 function layananPrioritasLayak($db,$anggota) {
     $s=$db->prepare("SELECT p.id, (SELECT COUNT(*) FROM angsuran a WHERE a.pinjaman_id=p.id AND (a.status<>'lunas' OR a.tanggal_bayar IS NULL OR DATE(a.tanggal_bayar)>a.tanggal_jatuh_tempo)) telat FROM pinjaman p WHERE p.anggota_id=? AND p.status='lunas' AND EXISTS(SELECT 1 FROM angsuran ax WHERE ax.pinjaman_id=p.id) ORDER BY p.tanggal_lunas DESC,p.id DESC LIMIT 2");

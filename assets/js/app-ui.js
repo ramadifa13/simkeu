@@ -1,4 +1,55 @@
 document.addEventListener('DOMContentLoaded', function () {
+    if (window.__simkeuAppUiReady) return;
+    window.__simkeuAppUiReady = true;
+
+    // Calm toast feedback from flash sources / legacy alerts
+    (function initToasts(){
+        let stack=document.querySelector('.ui-toast-stack');
+        if(!stack){stack=document.createElement('div');stack.className='ui-toast-stack';stack.setAttribute('aria-live','polite');stack.setAttribute('aria-relevant','additions');document.body.appendChild(stack);}
+        function iconFor(type){return type==='danger'?'ti-alert-circle':(type==='warning'?'ti-alert-triangle':'ti-circle-check');}
+        function showToast(type,message,opts){
+            if(!message)return;
+            const toast=document.createElement('div');
+            toast.className='ui-toast ui-toast-'+(type||'success');
+            toast.setAttribute('role','status');
+            const link=opts&&opts.href?('<div class="mt-1"><a href="'+opts.href+'">'+(opts.linkLabel||'Lihat detail')+'</a></div>'):'';
+            toast.innerHTML='<span class="ui-toast-icon" aria-hidden="true"><i class="ti '+iconFor(type)+'"></i></span><div class="ui-toast-body"><div>'+message+'</div>'+link+'</div><button type="button" class="ui-toast-close" aria-label="Tutup"><i class="ti ti-x" aria-hidden="true"></i></button>';
+            const close=()=>{toast.classList.add('is-leaving');setTimeout(()=>toast.remove(),180);};
+            toast.querySelector('.ui-toast-close').addEventListener('click',close);
+            stack.appendChild(toast);
+            setTimeout(close, type==='danger'?7000:4500);
+        }
+        const seen=new Set();
+        const pushOnce=(type,message,opts)=>{
+            const key=(type||'success')+'|'+String(message||'').slice(0,160);
+            if(!message||seen.has(key))return;
+            seen.add(key);
+            showToast(type,message,opts);
+        };
+        const sources=document.querySelectorAll('.ui-toast-source[data-ui-toast]');
+        sources.forEach(el=>{
+            pushOnce(el.getAttribute('data-ui-toast')||'success', el.getAttribute('data-ui-toast-message')||'', {
+                href: el.getAttribute('data-ui-toast-href')||'',
+                linkLabel: el.getAttribute('data-ui-toast-link')||'Lihat bukti'
+            });
+            el.remove();
+        });
+        // Legacy Bootstrap alerts → toast hanya jika belum ada ui-toast-source (hindari double)
+        if(!sources.length){
+            document.querySelectorAll('main > .alert.alert-dismissible, main > .alert[role="alert"]').forEach((alert,i)=>{
+                if(i>1)return;
+                // Instruksi halaman / info tetap di tempat (jangan diubah jadi toast)
+                if(alert.classList.contains('alert-info')||alert.classList.contains('alert-secondary')||alert.classList.contains('info-alert')||alert.hasAttribute('data-ui-toast-skip'))return;
+                const type=alert.classList.contains('alert-danger')?'danger':(alert.classList.contains('alert-warning')?'warning':'success');
+                const clone=alert.cloneNode(true);
+                clone.querySelectorAll('.btn-close,button').forEach(b=>b.remove());
+                const text=(clone.textContent||'').replace(/\s+/g,' ').trim();
+                if(text){pushOnce(type,text);alert.remove();}
+            });
+        }
+        window.uiToast=showToast;
+    })();
+
     function initAutocompleteSelect(select) {
         if(select.dataset.uiAutocompleteReady==='1'||select.multiple||select.closest('.ui-combobox'))return;
         const entity=/^(anggota_id|pinjaman_id|ketua_kelompok_id|jenis_pinjaman_id|jenis_simpanan_id)$/i.test(select.name||'');
@@ -7,23 +58,99 @@ document.addEventListener('DOMContentLoaded', function () {
         const box=document.createElement('div');box.className='ui-combobox';
         const input=document.createElement('input');input.type='search';input.className='form-control ui-combobox-input';input.autocomplete='off';input.spellcheck=false;
         input.placeholder=select.dataset.searchPlaceholder||'Ketik untuk mencari...';input.setAttribute('role','combobox');input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-expanded','false');
-        const toggle=document.createElement('button');toggle.type='button';toggle.className='ui-combobox-toggle';toggle.tabIndex=-1;toggle.setAttribute('aria-label','Tampilkan pilihan');toggle.innerHTML='<i class="fas fa-chevron-down" aria-hidden="true"></i>';
+        const toggle=document.createElement('button');toggle.type='button';toggle.className='ui-combobox-toggle';toggle.tabIndex=-1;toggle.setAttribute('aria-label','Tampilkan pilihan');toggle.innerHTML='<i class="ti ti-chevron-down" aria-hidden="true"></i>';
         const list=document.createElement('div');list.className='ui-combobox-list';list.setAttribute('role','listbox');list.hidden=true;
         const listId='ui-combobox-'+Math.random().toString(36).slice(2);list.id=listId;input.setAttribute('aria-controls',listId);
-        const wasRequired=select.required;select.required=false;input.required=wasRequired;
+        // Select native disembunyikan: required dipindah ke input pencarian.
+        let mustPick=!!select.required;select.required=false;input.required=mustPick;
         select.parentNode.insertBefore(box,select);box.append(input,toggle,list,select);select.classList.add('ui-combobox-native');select.setAttribute('aria-hidden','true');select.tabIndex=-1;let active=-1;
         function options(){return Array.from(select.options).filter(o=>!o.disabled);}
         function selectedLabel(){const o=select.selectedOptions[0];return o&&o.value?o.textContent.trim():'';}
-        function close(){list.hidden=true;input.setAttribute('aria-expanded','false');active=-1;}
-        function validate(){input.setCustomValidity(select.required&&!select.value?'Pilih salah satu data dari daftar.':'');}
+        function placeList(){
+            const rect=box.getBoundingClientRect();
+            const gap=6;const maxH=Math.min(270,window.innerHeight*0.42);
+            const spaceBelow=window.innerHeight-rect.bottom-gap;
+            const spaceAbove=rect.top-gap;
+            const openUp=spaceBelow<Math.min(180,maxH) && spaceAbove>spaceBelow;
+            list.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-rect.width-8))+'px';
+            list.style.width=Math.max(160,rect.width)+'px';
+            list.style.right='auto';
+            list.style.maxHeight=Math.max(120,Math.min(maxH,openUp?spaceAbove:spaceBelow))+'px';
+            if(openUp){list.style.top='auto';list.style.bottom=(window.innerHeight-rect.top+gap)+'px';}
+            else{list.style.bottom='auto';list.style.top=(rect.bottom+gap)+'px';}
+        }
+        let listPinned=false;
+        function unpinList(){
+            if(!listPinned)return;
+            listPinned=false;
+            window.removeEventListener('resize',placeList);
+            window.removeEventListener('scroll',placeList,true);
+        }
+        function pinList(){
+            if(listPinned){placeList();return;}
+            listPinned=true;
+            window.addEventListener('resize',placeList);
+            window.addEventListener('scroll',placeList,true);
+            placeList();
+        }
+        function close(){
+            list.hidden=true;list.classList.remove('ui-combobox-list-open');
+            input.setAttribute('aria-expanded','false');active=-1;
+            list.style.removeProperty('left');list.style.removeProperty('top');list.style.removeProperty('bottom');list.style.removeProperty('width');list.style.removeProperty('right');list.style.removeProperty('max-height');
+            unpinList();
+            if(list.parentElement!==box)box.appendChild(list);
+        }
+        function validate(){input.setCustomValidity(mustPick&&!select.value?'Pilih salah satu data dari daftar.':'');}
         function choose(value){select.value=value;input.value=selectedLabel();validate();select.dispatchEvent(new Event('change',{bubbles:true}));close();}
-        function render(term){const q=(term||'').trim().toLocaleLowerCase('id');const seen=new Set();const matches=options().filter(o=>(o.value||!q)&&o.textContent.toLocaleLowerCase('id').includes(q)).filter(o=>{if(seen.has(o.value))return false;seen.add(o.value);return true;}).slice(0,100);list.replaceChildren();active=-1;if(!matches.length){const empty=document.createElement('div');empty.className='ui-combobox-empty';empty.textContent='Data tidak ditemukan';list.append(empty);}matches.forEach(o=>{const item=document.createElement('button');item.type='button';item.className='ui-combobox-option';item.setAttribute('role','option');item.dataset.value=o.value;item.textContent=o.textContent.trim()||(o.value?'Pilihan':'Kosongkan pilihan');if(o.selected)item.setAttribute('aria-selected','true');item.addEventListener('mousedown',e=>e.preventDefault());item.addEventListener('click',()=>choose(o.value));list.append(item);});list.hidden=false;input.setAttribute('aria-expanded','true');}
+        function render(term){
+            const q=(term||'').trim().toLocaleLowerCase('id');const seen=new Set();
+            const matches=options().filter(o=>(o.value||!q)&&o.textContent.toLocaleLowerCase('id').includes(q)).filter(o=>{if(seen.has(o.value))return false;seen.add(o.value);return true;}).slice(0,100);
+            list.replaceChildren();active=-1;
+            if(!matches.length){const empty=document.createElement('div');empty.className='ui-combobox-empty';empty.textContent='Data tidak ditemukan';list.append(empty);}
+            matches.forEach(o=>{
+                const item=document.createElement('button');item.type='button';item.className='ui-combobox-option';item.setAttribute('role','option');item.dataset.value=o.value;
+                item.textContent=o.textContent.trim()||(o.value?'Pilihan':'Kosongkan pilihan');
+                if(o.selected)item.setAttribute('aria-selected','true');
+                item.addEventListener('mousedown',e=>e.preventDefault());
+                item.addEventListener('click',()=>choose(o.value));
+                list.append(item);
+            });
+            if(list.parentElement!==document.body)document.body.appendChild(list);
+            list.classList.add('ui-combobox-list-open');list.hidden=false;
+            input.setAttribute('aria-expanded','true');pinList();
+        }
         function move(step){const items=Array.from(list.querySelectorAll('.ui-combobox-option'));if(!items.length)return;active=(active+step+items.length)%items.length;items.forEach((el,i)=>el.classList.toggle('is-active',i===active));items[active].scrollIntoView({block:'nearest'});}
-        input.value=selectedLabel();input.addEventListener('focus',()=>render(''));input.addEventListener('input',()=>{if(input.value!==selectedLabel())select.value='';validate();render(input.value);});input.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();if(list.hidden)render(input.value);move(1);}else if(e.key==='ArrowUp'){e.preventDefault();move(-1);}else if(e.key==='Enter'&&!list.hidden){const items=list.querySelectorAll('.ui-combobox-option');if(active>=0&&items[active]){e.preventDefault();choose(items[active].dataset.value);}}else if(e.key==='Escape'){close();input.value=selectedLabel();validate();}});
-        input.addEventListener('blur',e=>{if(e.relatedTarget===toggle)return;setTimeout(()=>{if(document.activeElement!==toggle){close();input.value=selectedLabel();validate();}},120);});toggle.addEventListener('mousedown',e=>{e.preventDefault();if(list.hidden){input.focus();render('');}else close();});select.addEventListener('change',()=>{input.value=selectedLabel();validate();});
-        const sync=()=>{input.disabled=select.disabled;input.required=select.required;box.classList.toggle('is-disabled',select.disabled);input.value=selectedLabel();validate();};new MutationObserver(sync).observe(select,{childList:true,subtree:true,attributes:true});sync();
+        input.value=selectedLabel();
+        input.addEventListener('focus',()=>render(''));
+        input.addEventListener('input',()=>{if(input.value!==selectedLabel())select.value='';validate();render(input.value);});
+        input.addEventListener('keydown',e=>{
+            if(e.key==='ArrowDown'){e.preventDefault();if(list.hidden)render(input.value);move(1);}
+            else if(e.key==='ArrowUp'){e.preventDefault();if(list.hidden)render(input.value);move(-1);}
+            else if(e.key==='Enter'&&!list.hidden){const items=list.querySelectorAll('.ui-combobox-option');if(active>=0&&items[active]){e.preventDefault();choose(items[active].dataset.value);}else if(items.length===1){e.preventDefault();choose(items[0].dataset.value);}}
+            else if(e.key==='Escape'){close();input.value=selectedLabel();validate();}
+        });
+        input.addEventListener('blur',e=>{
+            if(e.relatedTarget===toggle||(e.relatedTarget&&list.contains(e.relatedTarget)))return;
+            setTimeout(()=>{if(document.activeElement!==toggle&&!list.contains(document.activeElement)){close();input.value=selectedLabel();validate();}},120);
+        });
+        toggle.addEventListener('mousedown',e=>{e.preventDefault();if(list.hidden){input.focus();render('');}else close();});
+        select.addEventListener('change',()=>{input.value=selectedLabel();validate();});
+        const sync=()=>{
+            if(select.required){mustPick=true;select.required=false;}
+            input.disabled=select.disabled;input.required=mustPick;
+            box.classList.toggle('is-disabled',select.disabled);
+            if(document.activeElement!==input)input.value=selectedLabel();
+            else if(!list.hidden)render(input.value);
+            validate();
+        };
+        new MutationObserver(sync).observe(select,{childList:true,subtree:true,attributes:true});sync();
     }
     document.querySelectorAll('main select,.modal select').forEach(initAutocompleteSelect);
+    window.uiInitAutocompleteSelect=initAutocompleteSelect;
+    // Select yang muncul belakangan (modal dinamis / partial reload) ikut diinisialisasi.
+    document.addEventListener('shown.bs.modal',function(e){
+        (e.target||document).querySelectorAll('select').forEach(initAutocompleteSelect);
+    });
 
     // Native validation pada input autocomplete sering hanya menampilkan tooltip
     // kecil yang tidak terlihat. Tampilkan alasan yang jelas dan fokus ke fieldnya.
@@ -34,15 +161,15 @@ document.addEventListener('DOMContentLoaded', function () {
             form.dataset.uiInvalidShown='1';
             field.dataset.uiInvalidShown='1';
             setTimeout(()=>{delete field.dataset.uiInvalidShown;form.dataset.uiInvalidShown='';},400);
-            const label=field.closest('.mb-3,.col-md-6,.col-md-4,.col-12')?.querySelector('label')?.textContent?.trim() || field.getAttribute('name') || 'Field';
+            const label=field.closest('.mb-3,.col-md-6,.col-md-4,.col-12,.form-group')?.querySelector('label')?.textContent?.trim() || field.getAttribute('name') || 'Field';
             const message=field.validity.valueMissing?' wajib diisi.':' belum valid.';
-            alert(label.replace(/\\s+/g,' ')+message);
+            alert(label.replace(/\s+/g,' ')+message);
             field.focus();
         },true);
     });
 
     const actionRules=[['danger',/(hapus|delete|tolak|batalkan|koreksi)/],['whatsapp',/(whatsapp|\bwa\b|tagih)/],['export',/(excel|csv|export)/],['print',/(cetak|print|pdf|kwitansi|surat|bast)/],['edit',/(edit|ubah|pengaturan)/],['view',/(lihat|detail|preview|foto|dokumen)/],['pay',/(bayar|pelunasan|cairkan|setujui|approve)/],['muted',/(reset|batal|tutup|kembali|hapus tanda tangan)/],['primary',/(simpan|tambah|buat|proses|kirim|cari|filter|terapkan|login)/]];
-    function classifyButton(button){if(button.classList.contains('badge')||button.classList.contains('btn-close')||button.classList.contains('ui-combobox-toggle'))return;const label=((button.getAttribute('aria-label')||'')+' '+(button.title||'')+' '+button.textContent).trim().toLocaleLowerCase('id');let type=label.includes('hapus tanda tangan')?'muted':'';for(const rule of actionRules)if(!type&&rule[1].test(label)){type=rule[0];break;}if(!type){const icon=button.querySelector('i')?.className||'';if(/trash/.test(icon))type='danger';else if(/edit|pen/.test(icon))type='edit';else if(/eye|camera|image/.test(icon))type='view';else if(/print|file-pdf/.test(icon))type='print';else if(/whatsapp/.test(icon))type='whatsapp';else if(/file-excel|download/.test(icon))type='export';}if(type)button.classList.add('ui-action','ui-action-'+type);}
+    function classifyButton(button){if(button.classList.contains('badge')||button.classList.contains('btn-close')||button.classList.contains('ui-combobox-toggle')||button.classList.contains('ui-ly-action'))return;const label=((button.getAttribute('aria-label')||'')+' '+(button.title||'')+' '+button.textContent).trim().toLocaleLowerCase('id');let type=label.includes('hapus tanda tangan')?'muted':'';for(const rule of actionRules)if(!type&&rule[1].test(label)){type=rule[0];break;}if(!type){const icon=button.querySelector('i')?.className||'';if(/trash/.test(icon))type='danger';else if(/edit|pen/.test(icon))type='edit';else if(/eye|camera|image/.test(icon))type='view';else if(/print|file-pdf/.test(icon))type='print';else if(/whatsapp/.test(icon))type='whatsapp';else if(/file-excel|download/.test(icon))type='export';}if(type)button.classList.add('ui-action','ui-action-'+type);}
     document.querySelectorAll('main .btn,.modal .btn').forEach(classifyButton);
     const sidebar = document.getElementById('sidebarMenu');
     const toggle = document.querySelector('.ui-menu-button');
@@ -82,11 +209,310 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     const account=document.querySelector('.ui-account');
     if(account){document.addEventListener('click',e=>{if(!account.contains(e.target))account.open=false;});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&account.open){account.open=false;account.querySelector('summary').focus();}});}
-    const notifications=document.querySelector('.ui-notifications');
-    if(notifications){document.addEventListener('click',e=>{if(!notifications.contains(e.target))notifications.open=false;});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&notifications.open){notifications.open=false;notifications.querySelector('summary').focus();}});}
+    // Notifikasi: posisi fixed ke tombol lonceng + animasi buka/tutup
+    (function initNotifMenu(){
+        const root=document.querySelector('.ui-notifications');
+        if(!root)return;
+        const toggle=root.querySelector('[data-bs-toggle="dropdown"]');
+        const menu=root.querySelector('.simkeu-notif-menu');
+        if(!toggle||!menu)return;
+
+        let scrim=document.querySelector('.simkeu-notif-scrim');
+        if(!scrim){
+            scrim=document.createElement('div');
+            scrim.className='simkeu-notif-scrim';
+            scrim.setAttribute('aria-hidden','true');
+            document.body.appendChild(scrim);
+        }
+
+        function viewport(){
+            const vv=window.visualViewport;
+            return {
+                w:(vv&&vv.width)||window.innerWidth,
+                h:(vv&&vv.height)||window.innerHeight,
+                ox:(vv&&vv.offsetLeft)||0,
+                oy:(vv&&vv.offsetTop)||0
+            };
+        }
+
+        function markVisibleItems(){
+            let i=0;
+            menu.querySelectorAll('.simkeu-notif-item').forEach(function(item){
+                const hidden=item.style.display==='none'||item.hasAttribute('hidden')||getComputedStyle(item).display==='none';
+                item.classList.toggle('is-visible',!hidden);
+                if(!hidden){
+                    item.style.setProperty('--simkeu-notif-i', String(i));
+                    i+=1;
+                }else{
+                    item.style.removeProperty('--simkeu-notif-i');
+                }
+            });
+        }
+
+        function placeMenu(){
+            const pad=window.matchMedia('(max-width:575.98px)').matches?8:12;
+            const gap=8;
+            const vp=viewport();
+            const btn=toggle.getBoundingClientRect();
+            const mobile=vp.w<576;
+            const maxW=Math.max(220, vp.w-pad*2);
+            const width=mobile?maxW:Math.min(368, maxW);
+
+            // Anchor di bawah lonceng; HP full-bleed horizontal, desktop rata kanan tombol
+            let x=mobile?pad:(btn.right-width);
+            let y=btn.bottom+gap;
+            if(x+width>vp.w-pad)x=vp.w-pad-width;
+            if(x<pad)x=pad;
+            if(y<pad)y=pad;
+
+            const availH=Math.max(160, vp.h-y-pad);
+            const panel=menu.querySelector('.simkeu-notif-panel');
+            if(panel)panel.style.maxHeight=availH+'px';
+
+            menu.style.setProperty('--simkeu-notif-origin', mobile?'top center':'top right');
+            menu.style.position='fixed';
+            menu.style.zIndex='1080';
+            menu.style.width=Math.round(width)+'px';
+            menu.style.maxWidth=Math.round(maxW)+'px';
+            menu.style.top=Math.round(y)+'px';
+            menu.style.left=Math.round(x)+'px';
+            menu.style.right='auto';
+            menu.style.bottom='auto';
+            menu.style.transform='none';
+            menu.style.inset='';
+            menu.style.margin='0';
+            menu.style.removeProperty('inset');
+        }
+
+        function setScrim(on){
+            const mobile=window.matchMedia('(max-width:575.98px)').matches;
+            if(on&&mobile)scrim.classList.add('is-on');
+            else scrim.classList.remove('is-on');
+        }
+
+        function clearInline(){
+            ['width','maxWidth','top','left','right','bottom','transform','position','zIndex','margin','inset'].forEach(function(p){
+                menu.style[p]='';
+            });
+            menu.style.removeProperty('--simkeu-notif-origin');
+            const panel=menu.querySelector('.simkeu-notif-panel');
+            if(panel)panel.style.maxHeight='';
+            menu.classList.remove('is-leaving');
+        }
+
+        // Matikan Popper: posisi dikunci manual supaya animasi panel tidak bentrok
+        toggle.setAttribute('data-bs-display','static');
+        toggle.removeAttribute('data-bs-popper-config');
+
+        let allowHide=false;
+        let hideTimer=null;
+        let placing=false;
+
+        root.addEventListener('show.bs.dropdown',function(){
+            menu.classList.remove('is-leaving');
+            allowHide=false;
+            markVisibleItems();
+            placeMenu();
+            setScrim(true);
+        });
+        root.addEventListener('shown.bs.dropdown',function(){
+            placeMenu();
+        });
+
+        root.addEventListener('hide.bs.dropdown',function(e){
+            if(allowHide){allowHide=false;return;}
+            if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+            e.preventDefault();
+            if(menu.classList.contains('is-leaving'))return;
+            menu.classList.add('is-leaving');
+            setScrim(false);
+            clearTimeout(hideTimer);
+            hideTimer=setTimeout(function(){
+                allowHide=true;
+                menu.classList.remove('is-leaving');
+                const inst=(typeof bootstrap!=='undefined'&&bootstrap.Dropdown)
+                    ?bootstrap.Dropdown.getInstance(toggle)
+                    :null;
+                if(inst)inst.hide();
+                else{
+                    menu.classList.remove('show');
+                    toggle.classList.remove('show');
+                    toggle.setAttribute('aria-expanded','false');
+                    setScrim(false);
+                    clearInline();
+                }
+            },180);
+        });
+        root.addEventListener('hidden.bs.dropdown',function(){
+            clearTimeout(hideTimer);
+            allowHide=false;
+            setScrim(false);
+            clearInline();
+        });
+
+        scrim.addEventListener('click',function(){
+            const inst=(typeof bootstrap!=='undefined'&&bootstrap.Dropdown)
+                ?bootstrap.Dropdown.getInstance(toggle)
+                :null;
+            if(inst)inst.hide();
+            else toggle.click();
+        });
+
+        const onViewport=function(){
+            if(!menu.classList.contains('show')||menu.classList.contains('is-leaving')||placing)return;
+            placing=true;
+            requestAnimationFrame(function(){placeMenu();placing=false;});
+        };
+        window.addEventListener('resize',onViewport,{passive:true});
+        window.addEventListener('scroll',onViewport,true);
+        if(window.visualViewport){
+            window.visualViewport.addEventListener('resize',onViewport,{passive:true});
+            window.visualViewport.addEventListener('scroll',onViewport,{passive:true});
+        }
+    })();
     const main=document.querySelector('main');
     if(main){main.id=main.id || 'konten-utama';main.setAttribute('tabindex','-1');document.querySelector('.ui-skip')?.setAttribute('href','#'+main.id);}
     document.querySelectorAll('main .row').forEach(row=>{if(Array.from(row.children).some(col=>Array.from(col.children).some(card=>card.classList.contains('stat-card')))){row.classList.add('ui-stat-grid');row.dataset.count=row.children.length;}});
+    // Standar tabel: bungkus aksi baris (2+ tombol) jadi menu ⋮ SEBELUM
+    // normalisasi .ui-table-actions — kalau dibalik, anak jadi 1 div dan ⋮ dilewati.
+    // Setiap item menu wajib ikon + teks (bukan tombol ikon berwarna).
+    const actionIconLabels = [
+        ['ti-trash', 'Hapus'], ['ti-x', 'Hapus'], ['ti-ban', 'Tolak'],
+        ['ti-edit', 'Ubah'], ['ti-edit', 'Ubah'],
+        ['ti-eye', 'Detail'], ['ti-search', 'Detail'],
+        ['ti-check', 'Setujui'], ['ti-thumb-up', 'Setujui'],
+        ['ti-printer', 'Cetak'], ['ti-file-type-pdf', 'PDF'], ['ti-file-spreadsheet', 'Excel'],
+        ['ti-key', 'Reset password'], ['ti-flag-check', 'Lunaskan'],
+        ['ti-brand-whatsapp', 'WhatsApp'], ['ti-download', 'Unduh'],
+        ['ti-refresh', 'Muat ulang'], ['ti-file-text', 'Surat'], ['ti-file-text', 'Surat']
+    ];
+    function collectActionables(root) {
+        return Array.from(root.children).filter(function (el) {
+            if (el.nodeType !== 1) return false;
+            if (el.classList.contains('modal') || el.classList.contains('dropdown-menu')) return false;
+            if (el.classList.contains('ui-action-menu') || el.classList.contains('dropdown')) return false;
+            return el.matches('a,button,form') || !!el.querySelector('a,button');
+        });
+    }
+    function resolveActionLabel(ctrl) {
+        const raw = ((ctrl.getAttribute('aria-label') || '') + ' ' + (ctrl.title || '') + ' ' + (ctrl.textContent || ''))
+            .replace(/\s+/g, ' ').trim();
+        if (raw) return raw;
+        const icon = ctrl.querySelector('i');
+        if (icon) {
+            for (let i = 0; i < actionIconLabels.length; i++) {
+                if (icon.classList.contains(actionIconLabels[i][0])) return actionIconLabels[i][1];
+            }
+        }
+        return 'Aksi';
+    }
+    function normalizeActionControl(ctrl, label) {
+        const keep = {};
+        Array.from(ctrl.attributes).forEach(function (attr) {
+            if (/^(data-|href$|target$|rel$|type$|name$|value$|onclick$|id$|form$)/i.test(attr.name)) {
+                keep[attr.name] = attr.value;
+            }
+        });
+        const icon = ctrl.querySelector('i');
+        const iconClass = icon ? icon.className.replace(/\s+/g, ' ').trim() : 'ti ti-circle';
+        // Rapikan kelas tombol berwarna → item menu teks seragam
+        ctrl.className = 'dropdown-item ui-action-item';
+        if (/(hapus|delete|tolak|batal)/i.test(label)) ctrl.classList.add('text-danger');
+        else if (/(setujui|approve|lunaskan|cairkan|bayar)/i.test(label)) ctrl.classList.add('text-success');
+        Object.keys(keep).forEach(function (k) { ctrl.setAttribute(k, keep[k]); });
+        if (!ctrl.getAttribute('type') && ctrl.tagName === 'BUTTON') ctrl.type = 'button';
+        ctrl.setAttribute('title', label);
+        ctrl.setAttribute('aria-label', label);
+        ctrl.innerHTML = '<i class="' + iconClass + '" aria-hidden="true"></i><span>' + label + '</span>';
+        return ctrl;
+    }
+    function convertCellToActionMenu(cell) {
+        if (!cell || cell.dataset.uiActionReady === '1') return false;
+        if (cell.querySelector(':scope > .ui-action-menu, :scope > .dropdown .action-menu, :scope > .dropdown .dropdown-menu')) {
+            // Sudah dropdown custom — pastikan item di dalamnya ikon+teks
+            cell.querySelectorAll('.dropdown-menu .dropdown-item, .action-menu .dropdown-item, .action-menu a, .action-menu button').forEach(function (item) {
+                if (item.dataset.uiLabelReady === '1') return;
+                item.dataset.uiLabelReady = '1';
+                const label = resolveActionLabel(item);
+                if (!item.querySelector('span') && item.querySelector('i') && !(item.textContent || '').replace(/\s+/g, '').replace(item.querySelector('i').textContent || '', '')) {
+                    normalizeActionControl(item, label);
+                } else if (item.querySelector('i') && !(item.textContent || '').trim().replace(item.querySelector('i').textContent || '', '').trim()) {
+                    normalizeActionControl(item, label);
+                } else {
+                    item.classList.add('ui-action-item');
+                }
+            });
+            cell.dataset.uiActionReady = '1';
+            return false;
+        }
+        const nested = cell.querySelector(':scope > .ui-table-actions, :scope > .service-row-actions');
+        const root = nested || cell;
+        const actionable = collectActionables(root);
+        if (actionable.length < 2) return false;
+        cell.dataset.uiActionReady = '1';
+        const wrap = document.createElement('div');
+        wrap.className = 'dropdown ui-action-menu';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-outline-secondary ui-action-toggle';
+        btn.setAttribute('data-bs-toggle', 'dropdown');
+        btn.setAttribute('data-bs-boundary', 'viewport');
+        btn.setAttribute('data-bs-popper-config', '{"strategy":"fixed"}');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.setAttribute('aria-label', 'Aksi baris');
+        btn.innerHTML = '<i class="ti ti-dots-vertical" aria-hidden="true"></i><span class="visually-hidden">Aksi</span>';
+        const menu = document.createElement('ul');
+        menu.className = 'dropdown-menu dropdown-menu-end shadow';
+        actionable.forEach(function (el) {
+            const li = document.createElement('li');
+            let ctrl = el.matches('a,button') ? el : el.querySelector('a.btn,button.btn,a,button');
+            if (!ctrl) {
+                li.appendChild(el);
+                menu.appendChild(li);
+                return;
+            }
+            const label = resolveActionLabel(ctrl);
+            if (el.matches('form')) {
+                // Form (mis. reset password): tampilkan tombol submit sebagai item menu
+                normalizeActionControl(ctrl, label);
+                el.classList.add('ui-action-form');
+                li.appendChild(el);
+            } else {
+                normalizeActionControl(ctrl, label);
+                li.appendChild(ctrl);
+            }
+            menu.appendChild(li);
+        });
+        wrap.appendChild(btn);
+        wrap.appendChild(menu);
+        cell.innerHTML = '';
+        cell.classList.add('table-actions', 'text-end', 'ui-actions-cell');
+        cell.appendChild(wrap);
+        if (window.bootstrap && bootstrap.Dropdown) {
+            btn.dataset.uiPopperFixed = '1';
+            new bootstrap.Dropdown(btn, {
+                boundary: 'viewport',
+                autoClose: 'outside',
+                popperConfig: function (defaultConfig) {
+                    return Object.assign({}, defaultConfig, {
+                        strategy: 'fixed',
+                        modifiers: (defaultConfig.modifiers || []).concat([
+                            { name: 'preventOverflow', options: { boundary: 'viewport', padding: 8 } },
+                            { name: 'flip', options: { boundary: 'viewport', padding: 8 } }
+                        ])
+                    });
+                }
+            });
+        }
+        return true;
+    }
+    function convertAllActionMenus(scope) {
+        (scope || document).querySelectorAll(
+            'td.table-actions, td.ui-actions-cell, .table-actions, .service-row-actions, td.no-print:has(.service-row-actions), main table td:has(> .btn + .btn), main table td:has(> a.btn + a.btn), main table td:has(> .btn + form), main table td:has(> form + .btn)'
+        ).forEach(convertCellToActionMenu);
+    }
+    convertAllActionMenus();
+
     // Keep primary values intact; allow only descriptive columns to wrap.
     document.querySelectorAll('main table.table').forEach(table=>{
         table.classList.add('ui-data-table');
@@ -109,9 +535,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 cell.querySelectorAll('.badge br').forEach(br=>br.replaceWith(document.createTextNode(' ')));
                 if(!info.action && !cell.classList.contains('table-actions') && !cell.classList.contains('ui-actions-cell'))return;
                 cell.classList.add('ui-actions-cell');
+                // Sudah menu ⋮ — jangan bungkus lagi ke .ui-table-actions
+                if(cell.querySelector('.ui-action-menu, :scope > .dropdown')){
+                    cell.dataset.uiActionReady='1';
+                    return;
+                }
+                // Coba konversi ⋮ dulu (tombol masih sejajar)
+                if(convertCellToActionMenu(cell))return;
                 if(cell.querySelector(':scope > .ui-table-actions'))return;
                 const group=document.createElement('div');group.className='ui-table-actions';
                 Array.from(cell.childNodes).filter(node=>!(node.nodeType===1 && node.classList.contains('modal'))).forEach(node=>group.appendChild(node));cell.appendChild(group);
+                // Setelah grouping, coba lagi (2+ di dalam group)
+                if(convertCellToActionMenu(cell))return;
                 group.querySelectorAll('a.btn,button.btn').forEach(button=>{classifyButton(button);const label=button.getAttribute('aria-label') || button.title || button.textContent.trim();if(label && !button.title)button.title=label;});
             });
         }
@@ -138,7 +573,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if(!wrapper){wrapper=document.createElement('div');wrapper.className='ui-table-scroll';table.parentNode.insertBefore(wrapper,table);wrapper.appendChild(table);}
         wrapper.classList.add('ui-table-scroll');
         if(scrollers.some(s=>s.wrapper===wrapper))return;
-        const hint=document.createElement('div');hint.className='ui-scroll-hint';hint.textContent='Geser tabel ke samping untuk melihat kolom lainnya.';wrapper.insertAdjacentElement('afterend',hint);
+        // Satu hint per wrapper; jangan dobel jika skrip/HTML sudah memasang hint.
+        let hint=wrapper.nextElementSibling;
+        if(!(hint&&hint.classList&&hint.classList.contains('ui-scroll-hint'))){
+            hint=document.createElement('div');
+            hint.className='ui-scroll-hint';
+            hint.textContent='Geser tabel ke samping untuk melihat kolom lainnya.';
+            wrapper.insertAdjacentElement('afterend',hint);
+        }
         const tbody=table.tBodies[0];
         if(tbody && !tbody.rows.length){
             const row=tbody.insertRow();row.className='ui-empty-row';
@@ -188,7 +630,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('main button,main a.btn').forEach(button=>{
         if(button.textContent.trim() || button.hasAttribute('aria-label'))return;
         const icon=button.querySelector('i');
-        const names=[['fa-search','Cari'],['fa-file-excel','Export Excel'],['fa-file-pdf','Download PDF'],['fa-print','Cetak'],['fa-eye','Lihat detail'],['fa-edit','Ubah data'],['fa-trash','Hapus data'],['fa-sync','Muat ulang']];
+        const names=[['ti-search','Cari'],['ti-file-spreadsheet','Export Excel'],['ti-file-type-pdf','Download PDF'],['ti-printer','Cetak'],['ti-eye','Lihat detail'],['ti-edit','Ubah data'],['ti-trash','Hapus data'],['ti-refresh','Muat ulang']];
         const match=names.find(([cls])=>icon?.classList.contains(cls));
         const label=button.title || match?.[1];if(label){button.setAttribute('aria-label',label);button.title=label;}
     });
@@ -214,9 +656,28 @@ document.addEventListener('DOMContentLoaded', function () {
         viewport.addEventListener('resize', updateModalViewport);
         viewport.addEventListener('scroll', updateModalViewport);
     }
-    document.addEventListener('shown.bs.modal', updateModalViewport);
+    function hardenModalScroll(root) {
+        (root || document).querySelectorAll('.modal-dialog').forEach(function (el) {
+            if (el.classList.contains('modal-fullscreen')) return;
+            el.classList.add('modal-dialog-scrollable');
+        });
+    }
+    document.addEventListener('show.bs.modal', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('modal')) {
+            hardenModalScroll(e.target);
+        }
+        updateModalViewport();
+    });
+    document.addEventListener('shown.bs.modal', function (e) {
+        updateModalViewport();
+        // Fokus field di dalam body yang panjang: pastikan area scroll siap
+        const body = e.target && e.target.querySelector ? e.target.querySelector('.modal-body') : null;
+        if (body && body.scrollHeight > body.clientHeight + 4) {
+            body.setAttribute('tabindex', '-1');
+        }
+    });
     updateModalViewport();
-    document.querySelectorAll('.modal-dialog:not(.modal-fullscreen)').forEach(el=>el.classList.add('modal-dialog-scrollable'));
+    hardenModalScroll(document);
     // Ulangi scroll anchor setelah panel dinamis selesai mengubah tinggi halaman.
     function scrollToCurrentHash() {
         if (!location.hash) return;
@@ -232,4 +693,123 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     window.addEventListener('pageshow',scrollToCurrentHash);
     window.addEventListener('hashchange',scrollToCurrentHash);
+
+    // Pastikan semua dropdown aksi ⋮ memakai fixed positioning (tidak ketiban overflow tabel).
+    function hardenActionDropdowns(root) {
+        (root || document).querySelectorAll('.ui-action-menu [data-bs-toggle="dropdown"], .action-dropdown-toggle').forEach(function (btn) {
+            btn.setAttribute('data-bs-boundary', 'viewport');
+            if (!btn.getAttribute('data-bs-popper-config')) {
+                btn.setAttribute('data-bs-popper-config', '{"strategy":"fixed"}');
+            }
+            if (!(window.bootstrap && bootstrap.Dropdown)) return;
+            const existing = bootstrap.Dropdown.getInstance(btn);
+            // Instance masih valid (mis. setelah sort DataTables) — jangan dispose ulang
+            if (existing && btn.dataset.uiPopperFixed === '1') return;
+            if (existing) existing.dispose();
+            btn.dataset.uiPopperFixed = '1';
+            new bootstrap.Dropdown(btn, {
+                boundary: 'viewport',
+                // 'outside' agar klik item di menu (termasuk yang di-portal ke body) tidak dianggap di luar
+                autoClose: 'outside',
+                popperConfig: function (defaultConfig) {
+                    return Object.assign({}, defaultConfig, {
+                        strategy: 'fixed',
+                        modifiers: (defaultConfig.modifiers || []).concat([
+                            { name: 'preventOverflow', options: { boundary: 'viewport', padding: 8 } },
+                            { name: 'flip', options: { boundary: 'viewport', padding: 8 } }
+                        ])
+                    });
+                }
+            });
+        });
+    }
+    hardenActionDropdowns();
+    document.addEventListener('simkeu:dt-ready', function () { hardenActionDropdowns(); });
+    document.addEventListener('simkeu:dt-draw', function () { hardenActionDropdowns(); });
+
+    function findActionMenuForToggle(toggle) {
+        if (!toggle || !toggle.closest) return null;
+        const wrap = toggle.closest('.ui-action-menu, .dropdown');
+        if (!wrap || (!wrap.classList.contains('ui-action-menu') && !toggle.classList.contains('ui-action-toggle') && !toggle.classList.contains('action-dropdown-toggle'))) {
+            return null;
+        }
+        return wrap;
+    }
+
+    // Portal menu ke <body> + posisi fixed — anti-clip overflow tabel/card
+    document.addEventListener('show.bs.dropdown', function (e) {
+        const toggle = e.target;
+        const wrap = findActionMenuForToggle(toggle);
+        if (!wrap) return;
+        const menu = wrap.querySelector(':scope > .dropdown-menu');
+        if (!menu) return;
+        if (!menu.dataset.uiMenuHome) {
+            menu.dataset.uiMenuHome = '1';
+            menu._uiHomeParent = wrap;
+            menu._uiHomeNext = menu.nextSibling;
+        }
+        if (menu.parentElement !== document.body) {
+            document.body.appendChild(menu);
+        }
+        menu.classList.add('ui-action-menu-open');
+        menu.style.zIndex = '2000';
+    });
+    document.addEventListener('hidden.bs.dropdown', function (e) {
+        const toggle = e.target;
+        const wrap = findActionMenuForToggle(toggle);
+        if (!wrap) return;
+        let menu = wrap.querySelector(':scope > .dropdown-menu');
+        if (!menu) {
+            menu = Array.from(document.body.querySelectorAll('.dropdown-menu.ui-action-menu-open')).find(function (m) {
+                return m._uiHomeParent === wrap;
+            });
+        }
+        if (!menu || !menu._uiHomeParent) return;
+        menu.classList.remove('ui-action-menu-open', 'show');
+        menu.style.removeProperty('z-index');
+        const home = menu._uiHomeParent;
+        if (menu._uiHomeNext && menu._uiHomeNext.parentNode === home) {
+            home.insertBefore(menu, menu._uiHomeNext);
+        } else {
+            home.appendChild(menu);
+        }
+    });
+
+    // Klik item menu aksi (termasuk yang di-portal): buka modal dengan relatedTarget yang benar
+    document.addEventListener('click', function (e) {
+        const item = e.target && e.target.closest && e.target.closest('.dropdown-menu .dropdown-item, .dropdown-menu .ui-action-item');
+        if (!item || item.classList.contains('disabled') || item.getAttribute('aria-disabled') === 'true') return;
+
+        const menu = item.closest('.dropdown-menu');
+        if (!menu || (!menu.classList.contains('ui-action-menu-open') && !menu.closest('.ui-action-menu'))) return;
+
+        // data-ui-modal ditangani halaman sendiri (mis. pencairan) — jangan dobel-buka
+        if (item.hasAttribute('data-ui-modal')) return;
+
+        const isModal = item.getAttribute('data-bs-toggle') === 'modal';
+        const sel = item.getAttribute('data-bs-target');
+        if (!isModal || !sel) return;
+
+        const modalEl = document.querySelector(sel);
+        if (!modalEl || !(window.bootstrap && bootstrap.Modal)) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+        const wrap = menu._uiHomeParent || menu.closest('.ui-action-menu');
+        const toggle = wrap && wrap.querySelector('[data-bs-toggle="dropdown"]');
+        const related = item;
+
+        if (toggle && bootstrap.Dropdown) {
+            const dd = bootstrap.Dropdown.getInstance(toggle);
+            if (dd) dd.hide();
+        }
+        window.setTimeout(function () {
+            document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+            const existing = bootstrap.Modal.getInstance(modalEl);
+            if (existing) existing.dispose();
+            new bootstrap.Modal(modalEl, { backdrop: true, keyboard: true, focus: true }).show(related);
+        }, 30);
+    }, true);
 });

@@ -208,11 +208,6 @@ if (!empty($kas)) {
 }
 $saldo_akhir = $saldo_awal + $total_masuk - $total_keluar;
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
-
 // ============================================
 // BUAT PDF
 // ============================================

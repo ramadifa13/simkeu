@@ -438,6 +438,33 @@ CREATE TABLE IF NOT EXISTS migrasi_dokumen_cadangan (
  KEY idx_migrasi_cadangan_anggota (kode_anggota)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Waserda & log koreksi (sebelumnya dibuat ad-hoc di request path)
+CREATE TABLE IF NOT EXISTS `waserda_transaksi` (
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
+  `kode_transaksi` VARCHAR(20) UNIQUE NOT NULL,
+  `anggota_id` INT NOT NULL,
+  `items` TEXT NOT NULL,
+  `total_bayar` DECIMAL(15,2) NOT NULL,
+  `metode_bayar` ENUM('tunai','transfer') NOT NULL,
+  `user_id` INT NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_waserda_anggota` FOREIGN KEY (`anggota_id`) REFERENCES `anggota` (`id`),
+  CONSTRAINT `fk_waserda_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE IF NOT EXISTS `log_koreksi` (
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
+  `transaksi_id` INT NOT NULL,
+  `jumlah_lama` DECIMAL(15,2) NOT NULL,
+  `jumlah_baru` DECIMAL(15,2) NOT NULL,
+  `selisih` DECIMAL(15,2) NOT NULL,
+  `keterangan` TEXT,
+  `user_id` INT NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_log_koreksi_transaksi` FOREIGN KEY (`transaksi_id`) REFERENCES `transaksi` (`id`),
+  CONSTRAINT `fk_log_koreksi_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
 SELECT 'Migrasi universal selesai dan aman dijalankan kembali.' AS hasil;
 
 -- Closing angsuran bulanan: pembayaran bulan yang sudah ditutup tidak boleh diubah.

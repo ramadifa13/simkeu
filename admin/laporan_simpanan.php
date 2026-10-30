@@ -2,22 +2,18 @@
 require_once '../includes/auth.php';
 require_once '../config/config.php';
 
-// Cek akses admin
 if (!isAdmin()) {
     $_SESSION['error'] = "Anda tidak memiliki akses ke halaman ini";
     header("Location: ../login.php");
     exit();
 }
 
-// Filter parameters - SET DEFAULT KE FEBRUARI 2026
 $filter_anggota = $_GET['anggota_id'] ?? '';
 $filter_jenis = $_GET['jenis_simpanan_id'] ?? '';
-$filter_tanggal_awal = $_GET['tanggal_awal'] ?? '2026-02-01'; // DEFAULT 1 FEB 2026
-$filter_tanggal_akhir = $_GET['tanggal_akhir'] ?? '2026-02-28'; // DEFAULT 28 FEB 2026
+$filter_tanggal_awal = $_GET['tanggal_awal'] ?? date('Y-m-01');
+$filter_tanggal_akhir = $_GET['tanggal_akhir'] ?? date('Y-m-t');
 
-// Handle export PDF
 if (isset($_GET['export_pdf']) && $_GET['export_pdf'] == 1) {
-    // Redirect ke halaman cetak_pdf.php dengan parameter yang sama
     $params = http_build_query([
         'anggota_id' => $filter_anggota,
         'jenis_simpanan_id' => $filter_jenis,
@@ -28,9 +24,7 @@ if (isset($_GET['export_pdf']) && $_GET['export_pdf'] == 1) {
     exit();
 }
 
-// Handle export Excel
 if (isset($_GET['export_excel']) && $_GET['export_excel'] == 1) {
-    // Redirect ke halaman export_excel.php dengan parameter yang sama
     $params = http_build_query([
         'anggota_id' => $filter_anggota,
         'jenis_simpanan_id' => $filter_jenis,
@@ -41,7 +35,6 @@ if (isset($_GET['export_excel']) && $_GET['export_excel'] == 1) {
     exit();
 }
 
-// Get data for filters - HANYA JENIS SIMPANAN REAL (EXCLUDE ANG)
 $query_anggota = "SELECT id, kode_anggota, nama_lengkap FROM anggota WHERE status = 'aktif' ORDER BY nama_lengkap";
 $stmt_anggota = $db->prepare($query_anggota);
 $stmt_anggota->execute();
@@ -52,7 +45,6 @@ $stmt_jenis = $db->prepare($query_jenis);
 $stmt_jenis->execute();
 $jenis_list = $stmt_jenis->fetchAll(PDO::FETCH_ASSOC);
 
-// HITUNG SALDO DARI TRANSAKSI - EXCLUDE JENIS ANG
 $query = "SELECT 
             a.id as anggota_id,
             a.kode_anggota, 
@@ -101,7 +93,6 @@ foreach ($params as $key => $value) {
 $stmt->execute();
 $simpanan = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Hitung total per jenis dari transaksi - EXCLUDE JENIS ANG
 $query_summary = "SELECT 
     j.kode_jenis,
     j.nama_jenis,
@@ -121,357 +112,202 @@ $stmt_summary->bindParam(':tanggal_akhir', $filter_tanggal_akhir);
 $stmt_summary->execute();
 $summary_per_jenis = $stmt_summary->fetchAll(PDO::FETCH_ASSOC);
 
-// Hitung total keseluruhan
 $total_semua = array_sum(array_column($summary_per_jenis, 'total_saldo'));
+$total_baris = count($simpanan);
+$anggota_unik = count(array_unique(array_column($simpanan, 'anggota_id')));
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
+$exportQs = http_build_query([
+    'anggota_id' => $filter_anggota,
+    'jenis_simpanan_id' => $filter_jenis,
+    'tanggal_awal' => $filter_tanggal_awal,
+    'tanggal_akhir' => $filter_tanggal_akhir,
+]);
+
+$badgeJenis = static function ($kode) {
+    $map = [
+        'POKOK' => 'is-pokok',
+        'WAJIB' => 'is-wajib',
+        'SUKARELA' => 'is-sukarela',
+        'DEPOSITO' => 'is-deposito',
+        'HAJI' => 'is-haji',
+        'UMROH' => 'is-umroh',
+    ];
+    return $map[$kode] ?? 'is-other';
+};
+
+$page_title = 'Laporan Simpanan';
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>Laporan Simpanan - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #2c3e50;
-            --secondary: #3498db;
-            --success: #27ae60;
-            --info: #17a2b8;
-            --warning: #f39c12;
-            --danger: #e74c3c;
-        }
-        
-        body {
-            background-color: #f8f9fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        @media (max-width: 767.98px) {
-            main {
-                margin-left: 0 !important;
-                padding: 10px 12px !important;
-                width: 100%;
-                margin-top: 60px !important;
-            }
-            
-            .table td, .table th {
-                font-size: 0.7rem;
-                padding: 0.3rem;
-            }
-        }
-        
-        @media (min-width: 992px) {
-            main {
-                margin-left: 280px !important;
-                padding: 20px !important;
-            }
-        }
-        
-        .page-header {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 8px;
-            margin-bottom: 20px;
-        }
-        
-        @media (min-width: 576px) {
-            .page-header {
-                flex-direction: row;
-                align-items: center;
-                justify-content: space-between;
-            }
-        }
-        
-        .stat-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            background: white;
-            padding: 15px;
-            height: 100%;
-            border-left: 4px solid var(--primary);
-        }
-        
-        .stat-card.success { border-left-color: var(--success); }
-        .stat-card.info { border-left-color: var(--info); }
-        
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        
-        .stat-label {
-            color: #6c757d;
-            font-size: 0.85rem;
-        }
-        
-        .filter-card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        
-        .table th {
-            border-top: none;
-            font-weight: 600;
-            color: #2c3e50;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            background-color: #f8f9fa;
-        }
-        
-        .table td {
-            vertical-align: middle;
-        }
-        
-        .badge-pokok { background-color: #2c3e50; color: white; }
-        .badge-wajib { background-color: #3498db; color: white; }
-        .badge-sukarela { background-color: #27ae60; color: white; }
-        .badge-deposito { background-color: #f39c12; color: white; }
-        .badge-haji { background-color: #9b59b6; color: white; }
-        .badge-umroh { background-color: #1abc9c; color: white; }
-        
-        .info-periode {
-            background: #e8f4fd;
-            border-radius: 5px;
-            padding: 10px 15px;
-            margin-bottom: 20px;
-            border-left: 4px solid #3498db;
-        }
-        
-        .info-simpanan {
-            background: #e6f7e6;
-            border-radius: 5px;
-            padding: 5px 10px;
-            border-left: 4px solid #28a745;
-            font-size: 0.85rem;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laporan Simpanan - <?php echo htmlspecialchars(APP_NAME); ?></title>
+    <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <!-- Page Header -->
-                <div class="page-header">
-                    <h1 class="h3 mb-0">
-                        <i class="fas fa-piggy-bank text-success me-2"></i>Laporan Simpanan
-                        <small class="text-muted fs-6 ms-2">(Tidak termasuk Angsuran)</small>
-                    </h1>
-                    <div class="btn-group">
-                        <a href="?export_pdf=1&<?php echo http_build_query($_GET); ?>" class="btn btn-sm btn-danger" target="_blank">
-                            <i class="fas fa-file-pdf"></i> <span class="d-none d-sm-inline">PDF</span>
+    <?php include __DIR__ . '/../includes/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-lsimp" aria-hidden="true"><i class="ti ti-pig-money"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Laporan</p>
+                        <h1 class="ui-dash-title">Laporan Simpanan</h1>
+                        <p class="ui-dash-meta mb-0">Mutasi simpanan real per periode — tanpa jurnal ANG / BONUS / SHU</p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <a href="?export_pdf=1&amp;<?php echo htmlspecialchars($exportQs); ?>" class="btn btn-outline-danger btn-sm" target="_blank" rel="noopener">
+                            <i class="ti ti-file-type-pdf me-1" aria-hidden="true"></i><span class="d-none d-sm-inline">PDF</span>
                         </a>
-                        <a href="?export_excel=1&<?php echo http_build_query($_GET); ?>" class="btn btn-sm btn-success">
-                            <i class="fas fa-file-excel"></i> <span class="d-none d-sm-inline">Excel</span>
-                        </a>
-                        <a href="laporan_simpanan.php" class="btn btn-sm btn-primary ms-2">
-                            <i class="fas fa-sync"></i> <span class="d-none d-sm-inline">Reset</span>
+                        <a href="?export_excel=1&amp;<?php echo htmlspecialchars($exportQs); ?>" class="btn btn-outline-success btn-sm">
+                            <i class="ti ti-file-spreadsheet me-1" aria-hidden="true"></i><span class="d-none d-sm-inline">Excel</span>
                         </a>
                     </div>
-                </div>
+                </header>
 
-                <!-- Info Periode -->
-                <div class="info-periode">
-                    <i class="fas fa-calendar-alt me-2 text-primary"></i>
-                    <strong>Periode:</strong> <?php echo date('d/m/Y', strtotime($filter_tanggal_awal)); ?> s/d <?php echo date('d/m/Y', strtotime($filter_tanggal_akhir)); ?>
-                    <?php if (empty($filter_anggota) && empty($filter_jenis)): ?>
-                        <span class="badge bg-info ms-2">Semua Anggota & Jenis Simpanan</span>
-                    <?php endif; ?>
-                    <span class="badge bg-success ms-2">Simpanan Real (Non-Angsuran)</span>
-                </div>
+                <?php ui_flash(); ?>
 
-                <!-- Statistics Cards -->
-                <div class="row mb-4">
-                    <div class="col-md-4">
-                        <div class="stat-card success">
-                            <div class="stat-value text-success"><?php echo formatRupiah($total_semua); ?></div>
-                            <div class="stat-label">Total Simpanan Periode Ini</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="stat-card">
-                            <div class="stat-value text-primary"><?php echo count($simpanan); ?></div>
-                            <div class="stat-label">Jumlah Record Simpanan</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="stat-card info">
-                            <div class="stat-value text-info"><?php echo count($summary_per_jenis); ?></div>
-                            <div class="stat-label">Jenis Simpanan Aktif</div>
-                        </div>
+                <div class="ui-lsimp-periode" role="status">
+                    <i class="ti ti-calendar-event" aria-hidden="true"></i>
+                    <div>
+                        <strong>Periode <?php echo htmlspecialchars(formatTanggalUi($filter_tanggal_awal)); ?> – <?php echo htmlspecialchars(formatTanggalUi($filter_tanggal_akhir)); ?></strong>
+                        <span>Simpanan real · Non-angsuran</span>
                     </div>
                 </div>
 
-                <!-- Filter Form -->
-                <div class="filter-card">
-                    <form method="GET" class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label small fw-bold">Tanggal Awal</label>
-                            <input type="date" name="tanggal_awal" class="form-control form-control-sm" value="<?php echo $filter_tanggal_awal; ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-bold">Tanggal Akhir</label>
-                            <input type="date" name="tanggal_akhir" class="form-control form-control-sm" value="<?php echo $filter_tanggal_akhir; ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-bold">Anggota</label>
-                            <select name="anggota_id" class="form-select form-select-sm">
-                                <option value="">Semua Anggota</option>
-                                <?php foreach ($anggota_list as $a): ?>
-                                <option value="<?php echo $a['id']; ?>" <?php echo $filter_anggota == $a['id'] ? 'selected' : ''; ?>>
-                                    <?php echo $a['kode_anggota'] . ' - ' . $a['nama_lengkap']; ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-bold">Jenis Simpanan</label>
-                            <select name="jenis_simpanan_id" class="form-select form-select-sm">
-                                <option value="">Semua Jenis</option>
-                                <?php foreach ($jenis_list as $j): ?>
-                                <option value="<?php echo $j['id']; ?>" <?php echo $filter_jenis == $j['id'] ? 'selected' : ''; ?>>
-                                    <?php echo $j['nama_jenis']; ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-12">
-                            <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="fas fa-search me-1"></i> Tampilkan
-                            </button>
-                            <a href="laporan_simpanan.php" class="btn btn-secondary btn-sm">
-                                <i class="fas fa-undo me-1"></i> Reset ke Februari 2026
-                            </a>
-                        </div>
-                    </form>
+                <div class="ui-lsimp-kpi">
+                <?php ui_stat_grid([
+                    ['label' => 'Total mutasi', 'value' => formatRupiah($total_semua), 'tone' => 'success', 'icon' => 'ti ti-pig-money', 'hint' => 'Netto periode'],
+                    ['label' => 'Baris data', 'value' => $total_baris, 'tone' => 'primary', 'icon' => 'ti ti-receipt-2', 'hint' => 'Anggota × jenis'],
+                    ['label' => 'Anggota', 'value' => $anggota_unik, 'tone' => 'info', 'icon' => 'ti ti-users', 'hint' => 'Dengan mutasi'],
+                    ['label' => 'Jenis aktif', 'value' => count($summary_per_jenis), 'tone' => 'warning', 'icon' => 'ti ti-stack-2', 'hint' => 'Jenis terpakai'],
+                ]); ?>
                 </div>
 
-                <!-- Summary per Jenis -->
-                <div class="card mb-4">
-                    <div class="card-header bg-white">
-                        <h6 class="mb-0"><i class="fas fa-chart-pie text-primary me-2"></i>Ringkasan per Jenis Simpanan <small class="text-muted">(Non-Angsuran)</small></h6>
+                <div class="card ui-lsimp-filter mb-3">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-filter" aria-hidden="true"></i>Filter laporan</span>
+                        <span class="ui-dash-sec-note">Periode &amp; scope data</span>
                     </div>
                     <div class="card-body">
-                        <?php if (empty($summary_per_jenis)): ?>
-                            <div class="text-center py-3">
-                                <p class="text-muted">Tidak ada data simpanan untuk periode ini</p>
-                            </div>
-                        <?php else: ?>
-                        <div class="row">
-                            <?php foreach ($summary_per_jenis as $s): 
-                                $badgeClass = '';
-                                switch ($s['kode_jenis']) {
-                                    case 'POKOK': $badgeClass = 'badge-pokok'; break;
-                                    case 'WAJIB': $badgeClass = 'badge-wajib'; break;
-                                    case 'SUKARELA': $badgeClass = 'badge-sukarela'; break;
-                                    case 'DEPOSITO': $badgeClass = 'badge-deposito'; break;
-                                    case 'HAJI': $badgeClass = 'badge-haji'; break;
-                                    case 'UMROH': $badgeClass = 'badge-umroh'; break;
-                                    default: $badgeClass = 'bg-secondary';
-                                }
-                            ?>
-                            <div class="col-md-4 col-6 mb-3">
-                                <div class="p-3 bg-light rounded">
-                                    <span class="badge <?php echo $badgeClass; ?> mb-2"><?php echo $s['kode_jenis']; ?></span>
-                                    <h6 class="fw-bold text-success"><?php echo formatRupiah($s['total_saldo']); ?></h6>
-                                    <small class="text-muted"><?php echo $s['nama_jenis']; ?> (<?php echo $s['jumlah_anggota']; ?> anggota)</small>
+                        <form method="GET" class="ui-lsimp-filter-form">
+                            <div class="ui-lsimp-filter-grid">
+                                <div class="ui-lsimp-field">
+                                    <label class="form-label" for="ls_tgl_awal">Tanggal awal</label>
+                                    <input type="date" id="ls_tgl_awal" name="tanggal_awal" class="form-control" value="<?php echo htmlspecialchars($filter_tanggal_awal); ?>">
+                                </div>
+                                <div class="ui-lsimp-field">
+                                    <label class="form-label" for="ls_tgl_akhir">Tanggal akhir</label>
+                                    <input type="date" id="ls_tgl_akhir" name="tanggal_akhir" class="form-control" value="<?php echo htmlspecialchars($filter_tanggal_akhir); ?>">
+                                </div>
+                                <div class="ui-lsimp-field">
+                                    <label class="form-label" for="ls_anggota">Anggota</label>
+                                    <select id="ls_anggota" name="anggota_id" class="form-select">
+                                        <option value="">Semua anggota</option>
+                                        <?php foreach ($anggota_list as $a): ?>
+                                        <option value="<?php echo (int)$a['id']; ?>" <?php echo (string)$filter_anggota === (string)$a['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($a['kode_anggota'] . ' — ' . $a['nama_lengkap']); ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="ui-lsimp-field">
+                                    <label class="form-label" for="ls_jenis">Jenis simpanan</label>
+                                    <select id="ls_jenis" name="jenis_simpanan_id" class="form-select">
+                                        <option value="">Semua jenis</option>
+                                        <?php foreach ($jenis_list as $j): ?>
+                                        <option value="<?php echo (int)$j['id']; ?>" <?php echo (string)$filter_jenis === (string)$j['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($j['nama_jenis']); ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
                             </div>
+                            <div class="ui-lsimp-filter-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="ti ti-search me-1" aria-hidden="true"></i>Tampilkan
+                                </button>
+                                <a href="laporan_simpanan.php" class="btn btn-outline-secondary">
+                                    <i class="ti ti-refresh me-1" aria-hidden="true"></i>Reset
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card ui-lsimp-summary mb-3">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-chart-pie" aria-hidden="true"></i>Ringkasan per jenis</span>
+                        <span class="ui-dash-sec-note"><?php echo (int)count($summary_per_jenis); ?> jenis</span>
+                    </div>
+                    <div class="card-body">
+                        <?php if (!$summary_per_jenis): ?>
+                        <div class="ui-lsimp-empty">
+                            <i class="ti ti-chart-pie-off" aria-hidden="true"></i>
+                            <strong>Tidak ada mutasi</strong>
+                            <p>Tidak ada data simpanan untuk periode ini.</p>
+                        </div>
+                        <?php else: ?>
+                        <div class="ui-lsimp-summary-grid">
+                            <?php foreach ($summary_per_jenis as $s): ?>
+                            <article class="ui-lsimp-summary-card">
+                                <span class="ui-lsimp-kode <?php echo htmlspecialchars($badgeJenis($s['kode_jenis'])); ?>"><?php echo htmlspecialchars($s['kode_jenis']); ?></span>
+                                <strong><?php echo formatRupiah($s['total_saldo']); ?></strong>
+                                <span><?php echo htmlspecialchars($s['nama_jenis']); ?> · <?php echo (int)$s['jumlah_anggota']; ?> anggota</span>
+                            </article>
                             <?php endforeach; ?>
                         </div>
                         <?php endif; ?>
                     </div>
                 </div>
 
-                <!-- Tabel Simpanan -->
-                <div class="card">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                        <span><i class="fas fa-list me-2"></i>Detail Simpanan Anggota <small class="text-muted">(Non-Angsuran)</small></span>
-                        <span class="badge bg-primary"><?php echo count($simpanan); ?> data</span>
+                <div class="card ui-lsimp-daftar">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-list" aria-hidden="true"></i>Detail simpanan anggota</span>
+                        <span class="ui-dash-sec-note"><?php echo (int)$total_baris; ?> data · total <?php echo formatRupiah(array_sum(array_column($simpanan, 'saldo'))); ?></span>
                     </div>
                     <div class="card-body p-0">
-                        <?php if (empty($simpanan)): ?>
-                            <div class="text-center py-5">
-                                <i class="fas fa-piggy-bank fa-4x text-muted mb-3"></i>
-                                <h5 class="text-muted">Tidak ada data simpanan</h5>
-                                <p class="text-muted mb-3">Untuk periode <?php echo date('d/m/Y', strtotime($filter_tanggal_awal)); ?> - <?php echo date('d/m/Y', strtotime($filter_tanggal_akhir)); ?></p>
-                            </div>
-                        <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="table table-striped table-hover mb-0">
+                        <div class="table-responsive ui-table-scroll">
+                            <table class="table table-hover table-sm align-middle mb-0 js-datatable"
+                                   data-dt-page-length="10"
+                                   data-dt-order="2,asc"
+                                   data-dt-filter="3"
+                                   data-empty-message="Tidak ada data simpanan untuk filter ini.">
                                 <thead>
                                     <tr>
-                                        <th>No</th>
+                                        <th class="text-muted">#</th>
                                         <th>Kode</th>
-                                        <th>Nama Anggota</th>
+                                        <th>Anggota</th>
                                         <th>Jenis</th>
                                         <th class="text-end">Saldo</th>
                                         <th class="text-end">Minimal</th>
                                         <th class="text-end">Maksimal</th>
-                                        <th class="text-center">Bagi Hasil</th>
+                                        <th class="text-end">Bagi hasil</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php 
-                                    $no = 1;
-                                    $total_display = 0;
-                                    foreach ($simpanan as $s): 
-                                        $total_display += $s['saldo'];
-                                        
-                                        $badgeClass = '';
-                                        switch ($s['kode_jenis']) {
-                                            case 'POKOK': $badgeClass = 'badge-pokok'; break;
-                                            case 'WAJIB': $badgeClass = 'badge-wajib'; break;
-                                            case 'SUKARELA': $badgeClass = 'badge-sukarela'; break;
-                                            case 'DEPOSITO': $badgeClass = 'badge-deposito'; break;
-                                            case 'HAJI': $badgeClass = 'badge-haji'; break;
-                                            case 'UMROH': $badgeClass = 'badge-umroh'; break;
-                                            default: $badgeClass = 'bg-secondary';
-                                        }
-                                    ?>
+                                <?php foreach ($simpanan as $i => $s): ?>
                                     <tr>
-                                        <td><?php echo $no++; ?></td>
-                                        <td><?php echo $s['kode_anggota']; ?></td>
-                                        <td><?php echo htmlspecialchars($s['nama_lengkap']); ?></td>
-                                        <td><span class="badge <?php echo $badgeClass; ?>"><?php echo $s['kode_jenis']; ?></span></td>
-                                        <td class="text-end fw-bold text-success"><?php echo formatRupiah($s['saldo']); ?></td>
-                                        <td class="text-end"><?php echo formatRupiah($s['minimum']); ?></td>
-                                        <td class="text-end"><?php echo formatRupiah($s['maksimum']); ?></td>
-                                        <td class="text-center"><?php echo $s['bagi_hasil']; ?>%</td>
+                                        <td class="text-muted"><?php echo (int)($i + 1); ?></td>
+                                        <td><code><?php echo htmlspecialchars($s['kode_anggota']); ?></code></td>
+                                        <td><strong class="ui-lsimp-name"><?php echo htmlspecialchars($s['nama_lengkap']); ?></strong></td>
+                                        <td data-filter="<?php echo htmlspecialchars($s['kode_jenis']); ?>">
+                                            <span class="ui-lsimp-kode <?php echo htmlspecialchars($badgeJenis($s['kode_jenis'])); ?>" title="<?php echo htmlspecialchars($s['nama_jenis']); ?>">
+                                                <?php echo htmlspecialchars($s['kode_jenis']); ?>
+                                            </span>
+                                        </td>
+                                        <td class="text-end fw-semibold text-success ui-lsimp-money"><?php echo formatRupiah($s['saldo']); ?></td>
+                                        <td class="text-end ui-lsimp-money"><?php echo formatRupiah($s['minimum']); ?></td>
+                                        <td class="text-end ui-lsimp-money"><?php echo (float)$s['maksimum'] > 0 ? formatRupiah($s['maksimum']) : '—'; ?></td>
+                                        <td class="text-end"><?php echo htmlspecialchars(rtrim(rtrim(number_format((float)$s['bagi_hasil'], 2, ',', '.'), '0'), ',')); ?>%</td>
                                     </tr>
-                                    <?php endforeach; ?>
+                                <?php endforeach; ?>
                                 </tbody>
-                                <tfoot class="table-light">
-                                    <tr>
-                                        <th colspan="4" class="text-end">TOTAL</th>
-                                        <th class="text-end text-success"><?php echo formatRupiah($total_display); ?></th>
-                                        <th colspan="3"></th>
-                                    </tr>
-                                </tfoot>
                             </table>
                         </div>
-                        <?php endif; ?>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+            </div>
+        <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
 </body>
 </html>

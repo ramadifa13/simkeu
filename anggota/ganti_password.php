@@ -2,50 +2,34 @@
 require_once '../includes/auth.php';
 checkAnggota();
 
-$anggota_id = $_SESSION['user_id'];
-$errors = [];
+$error = '';
 $success = '';
 
-// Handle password change
-if ($_POST && isset($_POST['ganti_password'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password_lama = $_POST['password_lama'] ?? '';
     $password_baru = $_POST['password_baru'] ?? '';
     $konfirmasi_password = $_POST['konfirmasi_password'] ?? '';
-    
-    // Validation
-    if (empty($password_lama) || empty($password_baru) || empty($konfirmasi_password)) {
-        $errors[] = "Semua field harus diisi";
-    } elseif ($password_baru !== $konfirmasi_password) {
-        $errors[] = "Konfirmasi password tidak sesuai";
+
+    if ($password_baru !== $konfirmasi_password) {
+        $error = 'Password baru dan konfirmasi tidak cocok';
     } elseif (strlen($password_baru) < 6) {
-        $errors[] = "Password baru minimal 6 karakter";
+        $error = 'Password baru minimal 6 karakter';
     } else {
-        try {
-            // Verify current password
-            $query_user = "SELECT password FROM users WHERE id = :user_id";
-            $stmt_user = $db->prepare($query_user);
-            $stmt_user->bindParam(':user_id', $anggota_id);
-            $stmt_user->execute();
-            $user_data = $stmt_user->fetch(PDO::FETCH_ASSOC);
-            
-            if ($user_data && password_verify($password_lama, $user_data['password'])) {
-                // Update password
-                $hashed_password = password_hash($password_baru, PASSWORD_DEFAULT);
-                $query_update = "UPDATE users SET password = :password WHERE id = :user_id";
-                $stmt_update = $db->prepare($query_update);
-                $stmt_update->bindParam(':password', $hashed_password);
-                $stmt_update->bindParam(':user_id', $anggota_id);
-                
-                if ($stmt_update->execute()) {
-                    $success = "Password berhasil diubah";
-                } else {
-                    $errors[] = "Gagal mengubah password";
-                }
-            } else {
-                $errors[] = "Password lama tidak sesuai";
+        $stmt = $db->prepare('SELECT password FROM users WHERE id = ?');
+        $stmt->execute([$_SESSION['user_id']]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($user && password_verify($password_lama, $user['password'])) {
+            $password_hash = password_hash($password_baru, PASSWORD_DEFAULT);
+            $stmt = $db->prepare('UPDATE users SET password = ? WHERE id = ?');
+            if ($stmt->execute([$password_hash, $_SESSION['user_id']])) {
+                $_SESSION['success'] = 'Password berhasil diubah';
+                header('Location: ganti_password.php');
+                exit();
             }
-        } catch (Exception $e) {
-            $errors[] = "Error: " . $e->getMessage();
+            $error = 'Gagal mengubah password';
+        } else {
+            $error = 'Password lama salah';
         }
     }
 }
@@ -55,297 +39,85 @@ if ($_POST && isset($_POST['ganti_password'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ganti Password - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .main-content {
-            margin-left: 280px;
-            margin-top: 10px; /* DIKURANGI DARI 70px MENJADI 10px */
-            padding: 15px;
-        }
-        .page-header {
-            padding-top: 5px;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-        }
-        .password-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .password-strength {
-            height: 5px;
-            margin-top: 5px;
-            border-radius: 3px;
-        }
-        .strength-weak { background-color: #dc3545; width: 25%; }
-        .strength-medium { background-color: #ffc107; width: 50%; }
-        .strength-strong { background-color: #28a745; width: 75%; }
-        .strength-very-strong { background-color: #20c997; width: 100%; }
-
-        @media (max-width: 768px) {
-            .main-content {
-                margin-left: 0;
-                margin-top: 60px;
-            }
-        }
-    </style>
+    <title>Ganti Password - <?php echo htmlspecialchars(APP_NAME); ?></title>
+    <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center page-header border-bottom">
-                    <h1 class="h3">
-                        <i class="fas fa-key me-2"></i>Ganti Password
-                    </h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <a href="profil.php" class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-arrow-left me-1"></i> Kembali ke Profil
+    <?php include __DIR__ . '/../includes/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-agtpass" aria-hidden="true"><i class="ti ti-lock"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Akun anggota</p>
+                        <h1 class="ui-dash-title">Ganti Password</h1>
+                        <p class="ui-dash-meta mb-0">Perbarui kata sandi login Anda secara berkala</p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <a href="profil.php" class="btn btn-sm ui-set-btn-ghost">
+                            <i class="ti ti-arrow-left me-1" aria-hidden="true"></i>Kembali ke profil
                         </a>
                     </div>
+                </header>
+
+                <?php ui_flash(); ?>
+                <?php if ($error !== ''): ?>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <?php echo htmlspecialchars($error); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
                 </div>
-
-                <?php if ($success): ?>
-                    <div class="alert alert-success alert-dismissible fade show py-2" role="alert">
-                        <i class="fas fa-check-circle me-2"></i><?php echo $success; ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-                
-                <?php if (!empty($errors)): ?>
-                    <?php foreach ($errors as $error): ?>
-                    <div class="alert alert-danger alert-dismissible fade show py-2" role="alert">
-                        <i class="fas fa-exclamation-triangle me-2"></i><?php echo $error; ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                    <?php endforeach; ?>
                 <?php endif; ?>
 
-                <div class="row justify-content-center">
-                    <div class="col-lg-6">
-                        <div class="card password-card">
-                            <div class="card-header py-2">
-                                <h6 class="card-title mb-0">
-                                    <i class="fas fa-lock me-2"></i>Form Ganti Password
-                                </h6>
+                <div class="row g-3 justify-content-center">
+                    <div class="col-12 col-lg-7 col-xl-6">
+                        <div class="card ui-agt-pass-card">
+                            <div class="card-header ui-dash-sec">
+                                <span class="ui-dash-sec-title"><i class="ti ti-key" aria-hidden="true"></i>Formulir password</span>
+                                <span class="ui-dash-sec-note">Minimal 6 karakter</span>
                             </div>
-                            <div class="card-body p-3">
-                                <form method="POST" id="passwordForm"><?php echo layananToken(); ?>
+                            <div class="card-body">
+                                <form method="POST" class="ui-agt-pass-form" autocomplete="off">
                                     <div class="mb-3">
-                                        <label class="form-label small">Password Lama</label>
-                                        <div class="input-group input-group-sm">
-                                            <input type="password" name="password_lama" class="form-control" required 
-                                                   placeholder="Masukkan password lama" id="passwordLama">
-                                            <button type="button" class="btn btn-outline-secondary toggle-password" 
-                                                    data-target="passwordLama">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
+                                        <label class="form-label" for="password_lama">Password lama</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="ti ti-lock" aria-hidden="true"></i></span>
+                                            <input type="password" class="form-control" id="password_lama" name="password_lama" required autocomplete="current-password">
                                         </div>
                                     </div>
-                                    
                                     <div class="mb-3">
-                                        <label class="form-label small">Password Baru</label>
-                                        <div class="input-group input-group-sm">
-                                            <input type="password" name="password_baru" class="form-control" required 
-                                                   placeholder="Masukkan password baru (minimal 6 karakter)" 
-                                                   id="passwordBaru" minlength="6">
-                                            <button type="button" class="btn btn-outline-secondary toggle-password" 
-                                                    data-target="passwordBaru">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
+                                        <label class="form-label" for="password_baru">Password baru</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="ti ti-key" aria-hidden="true"></i></span>
+                                            <input type="password" class="form-control" id="password_baru" name="password_baru" required minlength="6" autocomplete="new-password">
                                         </div>
-                                        <div class="password-strength mt-1" id="passwordStrength"></div>
-                                        <div class="form-text">
-                                            <small>Password harus minimal 6 karakter</small>
-                                        </div>
+                                        <div class="form-hint">Gunakan kombinasi huruf dan angka yang mudah Anda ingat.</div>
                                     </div>
-                                    
                                     <div class="mb-3">
-                                        <label class="form-label small">Konfirmasi Password Baru</label>
-                                        <div class="input-group input-group-sm">
-                                            <input type="password" name="konfirmasi_password" class="form-control" required 
-                                                   placeholder="Konfirmasi password baru" id="konfirmasiPassword">
-                                            <button type="button" class="btn btn-outline-secondary toggle-password" 
-                                                    data-target="konfirmasiPassword">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                        </div>
-                                        <div class="form-text">
-                                            <small id="passwordMatch" class="text-muted"></small>
+                                        <label class="form-label" for="konfirmasi_password">Konfirmasi password baru</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="ti ti-check" aria-hidden="true"></i></span>
+                                            <input type="password" class="form-control" id="konfirmasi_password" name="konfirmasi_password" required minlength="6" autocomplete="new-password">
                                         </div>
                                     </div>
-                                    
-                                    <div class="alert alert-info py-2">
-                                        <small>
-                                            <i class="fas fa-info-circle me-1"></i>
-                                            Pastikan password baru Anda kuat dan mudah diingat.
-                                        </small>
-                                    </div>
-                                    
-                                    <div class="d-grid gap-2">
-                                        <button type="submit" name="ganti_password" class="btn btn-warning btn-sm">
-                                            <i class="fas fa-save me-1"></i> Ganti Password
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="ti ti-device-floppy me-1" aria-hidden="true"></i>Simpan password
                                         </button>
-                                        <a href="profil.php" class="btn btn-secondary btn-sm">
-                                            <i class="fas fa-times me-1"></i> Batal
-                                        </a>
+                                        <a href="profil.php" class="btn btn-outline-secondary">Batal</a>
                                     </div>
                                 </form>
                             </div>
                         </div>
 
-                        <!-- Password Tips -->
-                        <div class="card password-card mt-3">
-                            <div class="card-header py-2">
-                                <h6 class="card-title mb-0">
-                                    <i class="fas fa-lightbulb me-2"></i>Tips Password Aman
-                                </h6>
-                            </div>
-                            <div class="card-body p-3">
-                                <ul class="list-unstyled small mb-0">
-                                    <li class="mb-1">
-                                        <i class="fas fa-check text-success me-2"></i>
-                                        Gunakan kombinasi huruf besar, kecil, angka, dan simbol
-                                    </li>
-                                    <li class="mb-1">
-                                        <i class="fas fa-check text-success me-2"></i>
-                                        Minimal 8 karakter untuk keamanan optimal
-                                    </li>
-                                    <li class="mb-1">
-                                        <i class="fas fa-check text-success me-2"></i>
-                                        Hindari menggunakan informasi pribadi yang mudah ditebak
-                                    </li>
-                                    <li class="mb-1">
-                                        <i class="fas fa-check text-success me-2"></i>
-                                        Jangan gunakan password yang sama untuk banyak akun
-                                    </li>
-                                    <li class="mb-0">
-                                        <i class="fas fa-check text-success me-2"></i>
-                                        Ganti password secara berkala
-                                    </li>
-                                </ul>
+                        <div class="ui-agt-note mt-3" role="note">
+                            <i class="ti ti-shield-check" aria-hidden="true"></i>
+                            <div>
+                                <strong>Keamanan akun</strong>
+                                <span>Jangan bagikan password kepada orang lain. Setelah diganti, gunakan password baru saat login berikutnya.</span>
                             </div>
                         </div>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Toggle password visibility
-        document.querySelectorAll('.toggle-password').forEach(button => {
-            button.addEventListener('click', function() {
-                const targetId = this.getAttribute('data-target');
-                const passwordInput = document.getElementById(targetId);
-                const icon = this.querySelector('i');
-                
-                if (passwordInput.type === 'password') {
-                    passwordInput.type = 'text';
-                    icon.classList.remove('fa-eye');
-                    icon.classList.add('fa-eye-slash');
-                } else {
-                    passwordInput.type = 'password';
-                    icon.classList.remove('fa-eye-slash');
-                    icon.classList.add('fa-eye');
-                }
-            });
-        });
-
-        // Password strength indicator
-        document.getElementById('passwordBaru').addEventListener('input', function() {
-            const password = this.value;
-            const strengthBar = document.getElementById('passwordStrength');
-            const strength = checkPasswordStrength(password);
-            
-            strengthBar.className = 'password-strength';
-            if (password.length > 0) {
-                strengthBar.classList.add('strength-' + strength.level);
-            }
-        });
-
-        // Password confirmation check
-        document.getElementById('konfirmasiPassword').addEventListener('input', function() {
-            const password = document.getElementById('passwordBaru').value;
-            const confirmPassword = this.value;
-            const matchText = document.getElementById('passwordMatch');
-            
-            if (confirmPassword.length === 0) {
-                matchText.textContent = '';
-                matchText.className = 'form-text text-muted';
-            } else if (password === confirmPassword) {
-                matchText.textContent = '✓ Password cocok';
-                matchText.className = 'form-text text-success';
-            } else {
-                matchText.textContent = '✗ Password tidak cocok';
-                matchText.className = 'form-text text-danger';
-            }
-        });
-
-        // Form validation
-        document.getElementById('passwordForm').addEventListener('submit', function(e) {
-            const passwordBaru = document.getElementById('passwordBaru').value;
-            const konfirmasiPassword = document.getElementById('konfirmasiPassword').value;
-            
-            if (passwordBaru.length < 6) {
-                e.preventDefault();
-                alert('Password baru harus minimal 6 karakter!');
-                return false;
-            }
-            
-            if (passwordBaru !== konfirmasiPassword) {
-                e.preventDefault();
-                alert('Konfirmasi password tidak sesuai!');
-                return false;
-            }
-            
-            return true;
-        });
-
-        // Password strength checker
-        function checkPasswordStrength(password) {
-            let score = 0;
-            
-            if (!password) {
-                return { level: 'none', score: 0 };
-            }
-            
-            // Length check
-            if (password.length >= 6) score += 1;
-            if (password.length >= 8) score += 1;
-            if (password.length >= 12) score += 1;
-            
-            // Character variety
-            if (/[a-z]/.test(password)) score += 1; // lowercase
-            if (/[A-Z]/.test(password)) score += 1; // uppercase
-            if (/[0-9]/.test(password)) score += 1; // numbers
-            if (/[^a-zA-Z0-9]/.test(password)) score += 1; // special characters
-            
-            // Determine strength level
-            if (score <= 2) return { level: 'weak', score: score };
-            if (score <= 4) return { level: 'medium', score: score };
-            if (score <= 6) return { level: 'strong', score: score };
-            return { level: 'very-strong', score: score };
-        }
-
-        // Real-time validation
-        document.addEventListener('DOMContentLoaded', function() {
-            const inputs = document.querySelectorAll('input[type="password"]');
-            inputs.forEach(input => {
-                input.addEventListener('input', function() {
-                    if (this.value.length > 0) {
-                        this.classList.remove('is-invalid');
-                    }
-                });
-            });
-        });
-    </script>
+            </div>
+    <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
 </body>
 </html>

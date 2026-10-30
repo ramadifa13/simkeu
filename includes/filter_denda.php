@@ -38,7 +38,7 @@
         <input type="date" name="sampai" class="form-control form-control-sm" value="<?php echo htmlspecialchars($filter_sampai); ?>">
     </div>
     <div class="col-lg-4 col-md-6 d-flex align-items-end gap-2">
-        <button class="btn btn-primary btn-sm" type="submit"><i class="fas fa-filter me-1"></i>Filter</button>
-        <a href="denda.php" class="btn btn-secondary btn-sm"><i class="fas fa-redo me-1"></i>Reset</a>
+        <button class="btn btn-primary btn-sm" type="submit"><i class="ti ti-filter me-1"></i>Filter</button>
+        <a href="denda.php" class="btn btn-secondary btn-sm"><i class="ti ti-refresh me-1"></i>Reset</a>
     </div>
 </form>

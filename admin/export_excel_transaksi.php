@@ -219,9 +219,6 @@ $stmt_saldo->execute();
 $saldo_data = $stmt_saldo->fetch(PDO::FETCH_ASSOC);
 $saldo_akhir = $saldo_data ? $saldo_data['saldo_sesudah'] : 0;
 
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
 ?>
 <html>
 <head>

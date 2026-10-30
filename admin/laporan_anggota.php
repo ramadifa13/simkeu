@@ -334,7 +334,7 @@ $html = '
     </tr>
     <tr>
         <td class="label">Tempat/Tgl Lahir</td>
-        <td class="value">: ' . $member['tempat_lahir'] . ', ' . ($member['tanggal_lahir'] ? date('d/m/Y', strtotime($member['tanggal_lahir'])) : '-') . '</td>
+        <td class="value">: ' . $member['tempat_lahir'] . ', ' . ($member['tanggal_lahir'] ? formatTanggalUi($member['tanggal_lahir']) : '-') . '</td>
     </tr>
     <tr>
         <td class="label">Telepon</td>
@@ -354,7 +354,7 @@ $html = '
     </tr>
     <tr>
         <td class="label">Tanggal Daftar</td>
-        <td class="value">: ' . date('d/m/Y', strtotime($member['tanggal_daftar'])) . '</td>
+        <td class="value">: ' . formatTanggalUi($member['tanggal_daftar']) . '</td>
     </tr>
 </table>';
 
@@ -516,7 +516,7 @@ if (!empty($active_loans)) {
             <td>' . $loan['nama_jenis'] . '</td>
             <td align="right">Rp ' . number_format($loan['jumlah_pinjaman'], 0, ',', '.') . '</td>
             <td align="right">Rp ' . number_format($loan['sisa_pokok'], 0, ',', '.') . '</td>
-            <td align="center">' . date('d/m/Y', strtotime($loan['tanggal_pencairan'])) . '</td>
+            <td align="center">' . formatTanggalUi($loan['tanggal_pencairan']) . '</td>
             <td align="center">' . $loan['angsuran_lunas'] . '/' . $loan['total_angsuran'] . ' (' . $progress . '%)</td>
         </tr>';
     }
@@ -576,7 +576,7 @@ if (!empty($transactions)) {
         $class = $trx['jenis_transaksi'] == 'setoran' ? 'setoran' : 'penarikan';
         $html_transaksi .= '
         <tr>
-            <td align="center">' . date('d/m/Y H:i', strtotime($trx['tanggal_transaksi'])) . '</td>
+            <td align="center">' . formatTanggalUi($trx['tanggal_transaksi'], true) . '</td>
             <td>' . $trx['kode_transaksi'] . '</td>
             <td>' . $trx['nama_jenis'] . '</td>
             <td align="center" class="' . $class . '">' . ucfirst($trx['jenis_transaksi']) . '</td>

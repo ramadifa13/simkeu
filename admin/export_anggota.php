@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 // Get filter parameters (sama seperti di anggota.php)
 $filter_status = $_GET['status'] ?? '';
-$filter_search = $_GET['search'] ?? '';
+$filter_search = trim((string)($_GET['q'] ?? $_GET['search'] ?? ''));
 
 // Build query with filters
 $query = "SELECT 

@@ -2,25 +2,21 @@
 require_once __DIR__ . '/../config/bootstrap.php';
 require_once '../includes/auth.php';
 
-// Check if user is logged in
 if (!isLoggedIn()) {
     header("Location: ../login.php");
     exit();
 }
 
-// Check if user has access to this page
 if (!isAdmin()) {
     $_SESSION['error'] = "Anda tidak memiliki akses ke halaman ini";
     header("Location: dashboard.php");
     exit();
 }
 
-// Filter parameters
 $filter_anggota = $_GET['anggota_id'] ?? '';
 $filter_jenis = $_GET['jenis_pinjaman_id'] ?? '';
 $filter_status = $_GET['status'] ?? '';
 
-// Handle export PDF
 if (isset($_GET['export_pdf']) && $_GET['export_pdf'] == 1) {
     $params = http_build_query([
         'anggota_id' => $filter_anggota,
@@ -31,7 +27,6 @@ if (isset($_GET['export_pdf']) && $_GET['export_pdf'] == 1) {
     exit();
 }
 
-// Handle export Excel
 if (isset($_GET['export_excel']) && $_GET['export_excel'] == 1) {
     $params = http_build_query([
         'anggota_id' => $filter_anggota,
@@ -42,7 +37,6 @@ if (isset($_GET['export_excel']) && $_GET['export_excel'] == 1) {
     exit();
 }
 
-// Build query dengan perhitungan yang benar
 $query = "SELECT 
             p.*, 
             a.kode_anggota, 
@@ -83,7 +77,6 @@ foreach ($params as $key => $value) {
 $stmt->execute();
 $pinjaman = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get data for filters
 $query_anggota = "SELECT * FROM anggota WHERE status = 'aktif' ORDER BY nama_lengkap";
 $stmt_anggota = $db->prepare($query_anggota);
 $stmt_anggota->execute();
@@ -94,197 +87,132 @@ $stmt_jenis = $db->prepare($query_jenis);
 $stmt_jenis->execute();
 $jenis_list = $stmt_jenis->fetchAll(PDO::FETCH_ASSOC);
 
-// Status options
 $status_list = [
     'aktif' => 'Aktif',
-    'lunas' => 'Lunas', 
+    'lunas' => 'Lunas',
     'macet' => 'Macet'
 ];
 
-// Hitung statistics untuk card
 $total_pinjaman_aktif = 0;
 $total_pinjaman_lunas = 0;
+$total_pinjaman_macet = 0;
 $total_sisa_pokok = 0;
 $total_dibayar = 0;
+$total_nominal = 0;
+$total_bunga_dibayar = 0;
+$total_denda_dibayar = 0;
 
 foreach ($pinjaman as $p) {
-    if ($p['status'] == 'aktif') $total_pinjaman_aktif++;
-    if ($p['status'] == 'lunas') $total_pinjaman_lunas++;
-    $total_sisa_pokok += $p['sisa_pokok'];
-    $total_dibayar += $p['total_pokok_dibayar'];
+    if (($p['status'] ?? '') === 'aktif') {
+        $total_pinjaman_aktif++;
+    } elseif (($p['status'] ?? '') === 'lunas') {
+        $total_pinjaman_lunas++;
+    } elseif (($p['status'] ?? '') === 'macet') {
+        $total_pinjaman_macet++;
+    }
+    $total_sisa_pokok += (float)$p['sisa_pokok'];
+    $total_dibayar += (float)$p['total_pokok_dibayar'];
+    $total_nominal += (float)$p['jumlah_pinjaman'];
+    $total_bunga_dibayar += (float)$p['total_bunga_dibayar'];
+    $total_denda_dibayar += (float)$p['total_denda_dibayar'];
 }
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
+$exportQs = http_build_query([
+    'anggota_id' => $filter_anggota,
+    'jenis_pinjaman_id' => $filter_jenis,
+    'status' => $filter_status,
+]);
 
+$page_title = 'Laporan Pinjaman';
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laporan Pinjaman - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .stat-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .progress {
-            height: 6px;
-        }
-    </style>
+    <title>Laporan Pinjaman - <?php echo htmlspecialchars(APP_NAME); ?></title>
+    <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-chart-bar me-2"></i>Laporan Pinjaman
-                    </h1>
-                    <div class="btn-group">
-                        <a href="?export_pdf=1&<?php echo http_build_query($_GET); ?>" class="btn btn-sm btn-danger" target="_blank">
-                            <i class="fas fa-file-pdf"></i> <span class="d-none d-sm-inline">PDF</span>
+    <?php include __DIR__ . '/../includes/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-lpin" aria-hidden="true"><i class="ti ti-report-money"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Laporan</p>
+                        <h1 class="ui-dash-title">Laporan Pinjaman</h1>
+                        <p class="ui-dash-meta mb-0">Rekap pinjaman aktif, lunas, outstanding, dan progress angsuran</p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <a href="?export_pdf=1&amp;<?php echo htmlspecialchars($exportQs); ?>" class="btn btn-outline-danger btn-sm" target="_blank" rel="noopener">
+                            <i class="ti ti-file-type-pdf me-1" aria-hidden="true"></i><span class="d-none d-sm-inline">PDF</span>
                         </a>
-                        <a href="?export_excel=1&<?php echo http_build_query($_GET); ?>" class="btn btn-sm btn-success">
-                            <i class="fas fa-file-excel"></i> <span class="d-none d-sm-inline">Excel</span>
-                        </a>
-                        <a href="laporan_pinjaman.php" class="btn btn-sm btn-primary ms-2">
-                            <i class="fas fa-sync"></i> <span class="d-none d-sm-inline">Reset</span>
+                        <a href="?export_excel=1&amp;<?php echo htmlspecialchars($exportQs); ?>" class="btn btn-outline-success btn-sm">
+                            <i class="ti ti-file-spreadsheet me-1" aria-hidden="true"></i><span class="d-none d-sm-inline">Excel</span>
                         </a>
                     </div>
+                </header>
+
+                <?php ui_flash(); ?>
+
+                <div class="ui-lpin-kpi">
+                <?php ui_stat_grid([
+                    ['label' => 'Total pinjaman', 'value' => count($pinjaman), 'tone' => 'primary', 'icon' => 'ti ti-moneybag', 'hint' => formatRupiah($total_nominal)],
+                    ['label' => 'Aktif', 'value' => $total_pinjaman_aktif, 'tone' => 'warning', 'icon' => 'ti ti-player-play', 'hint' => 'Belum lunas'],
+                    ['label' => 'Lunas', 'value' => $total_pinjaman_lunas, 'tone' => 'success', 'icon' => 'ti ti-flag-check', 'hint' => $total_pinjaman_macet ? $total_pinjaman_macet . ' macet' : 'Selesai'],
+                    ['label' => 'Sisa pokok', 'value' => formatRupiah($total_sisa_pokok), 'tone' => 'danger', 'icon' => 'ti ti-cash', 'hint' => 'Dibayar ' . formatRupiah($total_dibayar)],
+                ]); ?>
                 </div>
 
-                <!-- Statistics Cards -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-primary text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo count($pinjaman); ?></h4>
-                                        <p>Total Pinjaman</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-hand-holding-usd fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-success text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo $total_pinjaman_aktif; ?></h4>
-                                        <p>Pinjaman Aktif</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-play-circle fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-info text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo $total_pinjaman_lunas; ?></h4>
-                                        <p>Pinjaman Lunas</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-flag-checkered fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card bg-warning text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo formatRupiah($total_dibayar); ?></h4>
-                                        <p>Total Dibayar</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-money-bill-wave fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Filter Form -->
-                <div class="card mb-4">
-                    <div class="card-header bg-light">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-filter me-2"></i>Filter Laporan
-                        </h5>
+                <div class="card ui-lpin-filter mb-3">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-filter" aria-hidden="true"></i>Filter laporan</span>
+                        <span class="ui-dash-sec-note">Scope data pinjaman</span>
                     </div>
                     <div class="card-body">
-                        <form method="GET" class="row">
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label class="form-label">Filter Anggota</label>
-                                    <select name="anggota_id" class="form-select">
-                                        <option value="">-- Semua Anggota --</option>
+                        <form method="GET" class="ui-lpin-filter-form">
+                            <div class="ui-lpin-filter-grid">
+                                <div class="ui-lpin-field">
+                                    <label class="form-label" for="lp_anggota">Anggota</label>
+                                    <select id="lp_anggota" name="anggota_id" class="form-select">
+                                        <option value="">Semua anggota</option>
                                         <?php foreach ($anggota_list as $a): ?>
-                                        <option value="<?php echo $a['id']; ?>" <?php echo $filter_anggota == $a['id'] ? 'selected' : ''; ?>>
-                                            <?php echo $a['kode_anggota'] . ' - ' . $a['nama_lengkap']; ?>
+                                        <option value="<?php echo (int)$a['id']; ?>" <?php echo (string)$filter_anggota === (string)$a['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars(($a['kode_anggota'] ?? '') . ' — ' . ($a['nama_lengkap'] ?? '')); ?>
                                         </option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label class="form-label">Filter Jenis Pinjaman</label>
-                                    <select name="jenis_pinjaman_id" class="form-select">
-                                        <option value="">-- Semua Jenis --</option>
+                                <div class="ui-lpin-field">
+                                    <label class="form-label" for="lp_jenis">Jenis pinjaman</label>
+                                    <select id="lp_jenis" name="jenis_pinjaman_id" class="form-select">
+                                        <option value="">Semua jenis</option>
                                         <?php foreach ($jenis_list as $j): ?>
-                                        <option value="<?php echo $j['id']; ?>" <?php echo $filter_jenis == $j['id'] ? 'selected' : ''; ?>>
-                                            <?php echo $j['nama_jenis']; ?>
+                                        <option value="<?php echo (int)$j['id']; ?>" <?php echo (string)$filter_jenis === (string)$j['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($j['nama_jenis']); ?>
                                         </option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label class="form-label">Filter Status</label>
-                                    <select name="status" class="form-select">
-                                        <option value="">-- Semua Status --</option>
+                                <div class="ui-lpin-field">
+                                    <label class="form-label" for="lp_status">Status</label>
+                                    <select id="lp_status" name="status" class="form-select">
+                                        <option value="">Semua status</option>
                                         <?php foreach ($status_list as $key => $value): ?>
-                                        <option value="<?php echo $key; ?>" <?php echo $filter_status == $key ? 'selected' : ''; ?>>
-                                            <?php echo $value; ?>
+                                        <option value="<?php echo htmlspecialchars($key); ?>" <?php echo $filter_status === $key ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($value); ?>
                                         </option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label class="form-label">&nbsp;</label>
-                                    <div class="d-grid gap-2">
+                                <div class="ui-lpin-field ui-lpin-field-actions">
+                                    <label class="form-label d-none d-md-block">&nbsp;</label>
+                                    <div class="ui-lpin-filter-actions">
                                         <button type="submit" class="btn btn-primary">
-                                            <i class="fas fa-search me-1"></i> Terapkan Filter
+                                            <i class="ti ti-search me-1" aria-hidden="true"></i>Terapkan
                                         </button>
                                         <a href="laporan_pinjaman.php" class="btn btn-outline-secondary">
-                                            <i class="fas fa-refresh me-1"></i> Reset
+                                            <i class="ti ti-refresh me-1" aria-hidden="true"></i>Reset
                                         </a>
                                     </div>
                                 </div>
@@ -293,152 +221,110 @@ function formatRupiah($angka) {
                     </div>
                 </div>
 
-                <!-- Laporan Table -->
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-table me-2"></i>Data Pinjaman
-                        </h5>
-                        <div class="text-muted">
-                            <?php echo count($pinjaman); ?> data ditemukan
-                        </div>
+                <div class="card ui-lpin-daftar">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-table" aria-hidden="true"></i>Data pinjaman</span>
+                        <span class="ui-dash-sec-note"><?php echo (int)count($pinjaman); ?> data</span>
                     </div>
-                    <div class="card-body">
-                        <?php if (empty($pinjaman)): ?>
-                        <div class="text-center py-5">
-                            <i class="fas fa-info-circle fa-3x text-muted mb-3"></i>
-                            <h5 class="text-muted">Tidak ada data pinjaman</h5>
-                            <p class="text-muted">Tidak ada data pinjaman yang sesuai dengan filter yang dipilih.</p>
-                        </div>
-                        <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="table table-striped table-hover">
-                                <thead class="table-light">
+                    <div class="card-body p-0">
+                        <div class="table-responsive ui-table-scroll">
+                            <table class="table table-hover table-sm align-middle mb-0 js-datatable"
+                                   data-dt-page-length="10"
+                                   data-dt-order="9,desc"
+                                   data-dt-filter="2,10"
+                                   data-empty-message="Tidak ada data pinjaman untuk filter ini.">
+                                <thead>
                                     <tr>
-                                        <th>Kode Pinjaman</th>
+                                        <th>Kode</th>
                                         <th>Anggota</th>
-                                        <th>Jenis Pinjaman</th>
-                                        <th>Jumlah Pinjaman</th>
-                                        <th>Sisa Pokok</th>
-                                        <th>Sudah Dibayar</th>
+                                        <th>Jenis</th>
+                                        <th class="text-end">Pinjaman</th>
+                                        <th class="text-end">Sisa pokok</th>
+                                        <th class="text-end">Dibayar</th>
                                         <th>Progress</th>
                                         <th>Tenor</th>
                                         <th>Bunga</th>
-                                        <th>Tanggal Cair</th>
+                                        <th>Tgl cair</th>
                                         <th>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php 
-                                    $total_pinjaman = 0;
-                                    $total_sisa = 0;
-                                    $total_dibayar = 0;
-                                    $total_bunga_dibayar = 0;
-                                    $total_denda_dibayar = 0;
-                                    
-                                    foreach ($pinjaman as $p): 
-                                        $total_pinjaman += $p['jumlah_pinjaman'];
-                                        $total_sisa += $p['sisa_pokok'];
-                                        $total_dibayar += $p['total_pokok_dibayar'];
-                                        $total_bunga_dibayar += $p['total_bunga_dibayar'];
-                                        $total_denda_dibayar += $p['total_denda_dibayar'];
-                                        
-                                        // Calculate progress percentage
-                                        $progress = $p['jumlah_pinjaman'] > 0 ? ($p['total_pokok_dibayar'] / $p['jumlah_pinjaman']) * 100 : 0;
-                                        $progress = min(100, max(0, $progress)); // Ensure between 0-100
-                                        
-                                        // Status badge color
-                                        $status_class = 'bg-secondary';
-                                        if ($p['status'] == 'aktif') $status_class = 'bg-warning';
-                                        if ($p['status'] == 'lunas') $status_class = 'bg-success';
-                                        if ($p['status'] == 'macet') $status_class = 'bg-danger';
-                                    ?>
+                                <?php foreach ($pinjaman as $p):
+                                    $progress = (float)$p['jumlah_pinjaman'] > 0
+                                        ? ((float)$p['total_pokok_dibayar'] / (float)$p['jumlah_pinjaman']) * 100
+                                        : 0;
+                                    $progress = min(100, max(0, $progress));
+                                    $st = (string)($p['status'] ?? '');
+                                    $statusClass = 'bg-secondary';
+                                    $statusLabel = ucfirst($st ?: '—');
+                                    if ($st === 'aktif') {
+                                        $statusClass = 'bg-warning text-dark';
+                                        $statusLabel = 'Aktif';
+                                    } elseif ($st === 'lunas') {
+                                        $statusClass = 'bg-success';
+                                        $statusLabel = 'Lunas';
+                                    } elseif ($st === 'macet') {
+                                        $statusClass = 'bg-danger';
+                                        $statusLabel = 'Macet';
+                                    }
+                                    $cairTs = !empty($p['tanggal_pencairan']) ? strtotime($p['tanggal_pencairan']) : false;
+                                ?>
                                     <tr>
+                                        <td><code class="ui-lpin-kode"><?php echo htmlspecialchars($p['kode_pinjaman']); ?></code></td>
                                         <td>
-                                            <strong><?php echo $p['kode_pinjaman']; ?></strong>
+                                            <strong class="ui-lpin-name"><?php echo htmlspecialchars($p['nama_lengkap']); ?></strong>
+                                            <small class="ui-lpin-meta"><?php echo htmlspecialchars($p['kode_anggota']); ?></small>
                                         </td>
-                                        <td>
-                                            <div class="fw-semibold"><?php echo $p['nama_lengkap']; ?></div>
-                                            <small class="text-muted"><?php echo $p['kode_anggota']; ?></small>
-                                        </td>
-                                        <td><?php echo $p['nama_jenis']; ?></td>
-                                        <td>
-                                            <div class="fw-bold text-primary"><?php echo formatRupiah($p['jumlah_pinjaman']); ?></div>
-                                        </td>
-                                        <td>
-                                            <div class="fw-bold text-danger"><?php echo formatRupiah($p['sisa_pokok']); ?></div>
-                                        </td>
-                                        <td>
-                                            <div class="fw-bold text-success"><?php echo formatRupiah($p['total_pokok_dibayar']); ?></div>
-                                            <?php if ($p['total_bunga_dibayar'] > 0 || $p['total_denda_dibayar'] > 0): ?>
-                                            <small class="text-muted">
-                                                Bunga: <?php echo formatRupiah($p['total_bunga_dibayar']); ?>
-                                                <?php if ($p['total_denda_dibayar'] > 0): ?>
-                                                <br>Denda: <?php echo formatRupiah($p['total_denda_dibayar']); ?>
+                                        <td data-filter="<?php echo htmlspecialchars($p['nama_jenis']); ?>"><?php echo htmlspecialchars($p['nama_jenis']); ?></td>
+                                        <td class="text-end fw-semibold text-primary ui-lpin-money"><?php echo formatRupiah($p['jumlah_pinjaman']); ?></td>
+                                        <td class="text-end fw-semibold text-danger ui-lpin-money"><?php echo formatRupiah($p['sisa_pokok']); ?></td>
+                                        <td class="text-end">
+                                            <strong class="text-success ui-lpin-money d-block"><?php echo formatRupiah($p['total_pokok_dibayar']); ?></strong>
+                                            <?php if ((float)$p['total_bunga_dibayar'] > 0 || (float)$p['total_denda_dibayar'] > 0): ?>
+                                            <small class="ui-lpin-meta">
+                                                Bunga <?php echo formatRupiah($p['total_bunga_dibayar']); ?>
+                                                <?php if ((float)$p['total_denda_dibayar'] > 0): ?>
+                                                · Denda <?php echo formatRupiah($p['total_denda_dibayar']); ?>
                                                 <?php endif; ?>
                                             </small>
                                             <?php endif; ?>
                                         </td>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="progress flex-grow-1 me-2" style="width: 100px;">
-                                                    <div class="progress-bar bg-success" role="progressbar" 
-                                                         style="width: <?php echo $progress; ?>%" 
-                                                         aria-valuenow="<?php echo $progress; ?>" 
-                                                         aria-valuemin="0" aria-valuemax="100"></div>
-                                                </div>
-                                                <small class="text-muted"><?php echo round($progress, 1); ?>%</small>
+                                        <td data-order="<?php echo htmlspecialchars((string)round($progress, 1)); ?>">
+                                            <div class="ui-lpin-progress">
+                                                <div class="progress ui-lpin-progress-bar"><div class="progress-bar" style="width:<?php echo $progress; ?>%"></div></div>
+                                                <small><?php echo round($progress, 1); ?>%</small>
                                             </div>
-                                            <small class="text-muted">
-                                                <?php echo $p['angsuran_terbayar']; ?>/<?php echo $p['tenor']; ?> angsuran
-                                            </small>
+                                            <small class="ui-lpin-meta"><?php echo (int)$p['angsuran_terbayar']; ?>/<?php echo (int)$p['tenor']; ?> angsuran</small>
                                         </td>
-                                        <td>
-                                            <span class="badge bg-info"><?php echo labelTenorRow($p); ?></span>
+                                        <td><span class="badge bg-info-subtle text-info"><?php echo htmlspecialchars(labelTenorRow($p)); ?></span></td>
+                                        <td><span class="badge bg-secondary-subtle text-secondary"><?php echo htmlspecialchars(labelBungaRow($p)); ?></span></td>
+                                        <td data-order="<?php echo $cairTs ? date('Y-m-d', $cairTs) : ''; ?>">
+                                            <?php echo !empty($p['tanggal_pencairan']) ? htmlspecialchars(formatTanggalUi($p['tanggal_pencairan'])) : '—'; ?>
                                         </td>
-                                        <td>
-                                            <span class="badge bg-secondary"><?php echo labelBungaRow($p); ?></span>
-                                        </td>
-                                        <td>
-                                            <small><?php echo date('d/m/Y', strtotime($p['tanggal_pencairan'])); ?></small>
-                                        </td>
-                                        <td>
-                                            <span class="badge <?php echo $status_class; ?>">
-                                                <?php echo ucfirst($p['status']); ?>
-                                            </span>
+                                        <td data-filter="<?php echo htmlspecialchars($statusLabel); ?>">
+                                            <span class="badge <?php echo $statusClass; ?>"><?php echo htmlspecialchars($statusLabel); ?></span>
                                         </td>
                                     </tr>
-                                    <?php endforeach; ?>
+                                <?php endforeach; ?>
                                 </tbody>
-                                <tfoot class="table-light">
-                                    <tr class="fw-bold">
-                                        <td colspan="3" class="text-end">Total:</td>
-                                        <td class="text-primary"><?php echo formatRupiah($total_pinjaman); ?></td>
-                                        <td class="text-danger"><?php echo formatRupiah($total_sisa); ?></td>
-                                        <td class="text-success">
-                                            <?php echo formatRupiah($total_dibayar); ?>
-                                            <?php if ($total_bunga_dibayar > 0 || $total_denda_dibayar > 0): ?>
-                                            <br>
-                                            <small class="text-muted">
-                                                Bunga: <?php echo formatRupiah($total_bunga_dibayar); ?>
-                                                <?php if ($total_denda_dibayar > 0): ?>
-                                                | Denda: <?php echo formatRupiah($total_denda_dibayar); ?>
-                                                <?php endif; ?>
-                                            </small>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td colspan="5"></td>
-                                    </tr>
-                                </tfoot>
                             </table>
+                        </div>
+                        <?php if ($pinjaman): ?>
+                        <div class="ui-lpin-totals">
+                            <div><span>Total pinjaman</span><strong class="text-primary"><?php echo formatRupiah($total_nominal); ?></strong></div>
+                            <div><span>Sisa pokok</span><strong class="text-danger"><?php echo formatRupiah($total_sisa_pokok); ?></strong></div>
+                            <div><span>Pokok dibayar</span><strong class="text-success"><?php echo formatRupiah($total_dibayar); ?></strong></div>
+                            <?php if ($total_bunga_dibayar > 0 || $total_denda_dibayar > 0): ?>
+                            <div>
+                                <span>Bunga / denda</span>
+                                <strong><?php echo formatRupiah($total_bunga_dibayar); ?><?php if ($total_denda_dibayar > 0): ?> · <?php echo formatRupiah($total_denda_dibayar); ?><?php endif; ?></strong>
+                            </div>
+                            <?php endif; ?>
                         </div>
                         <?php endif; ?>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+            </div>
+        <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
 </body>
 </html>

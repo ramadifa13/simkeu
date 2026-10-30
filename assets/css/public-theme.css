@@ -1,0 +1,47 @@
+﻿/* Halaman publik SIMKEU (login & beranda) — di atas Tabler + simkeu-theme.css */
+.sk-eyebrow { display: inline-block; font-size: .72rem; font-weight: 700; letter-spacing: .14em; color: #a5b4fc; margin-bottom: .75rem; }
+.sk-auth-layout { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
+.sk-auth-intro { background: radial-gradient(1200px 600px at 10% 0%, #6366f1 0%, transparent 60%), linear-gradient(160deg, #1e1b4b, #172554); color: #fff; display: flex; align-items: center; padding: 3rem; position: relative; overflow: hidden; }
+.sk-auth-intro::after { content: ""; position: absolute; right: -120px; bottom: -120px; width: 380px; height: 380px; border-radius: 50%; background: rgba(129, 140, 248, .18); animation: sk-float 9s ease-in-out infinite; }
+@keyframes sk-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-24px); } }
+.sk-auth-intro-inner { max-width: 32rem; position: relative; z-index: 1; animation: sk-fade-up .6s ease both; }
+.sk-auth-intro h1 { font-size: clamp(1.8rem, 3vw, 2.6rem); line-height: 1.15; color: #fff; font-weight: 800; margin-bottom: 1rem; }
+.sk-auth-intro p { color: rgba(255, 255, 255, .78); font-size: 1.05rem; }
+.sk-auth-home { display: inline-flex; align-items: center; gap: .65rem; color: #fff; font-weight: 700; margin-bottom: 2.5rem; }
+.sk-auth-home:hover { color: #fff; }
+.sk-auth-home-logo { width: 2.5rem; height: 2.5rem; flex: 0 0 auto; }
+.sk-auth-home-logo .brand-logo { width: 100%; height: 100%; border-radius: .7rem; background: rgba(255,255,255,.14); color: #fff; }
+.sk-auth-points { list-style: none; padding: 0; margin: 1.5rem 0; display: grid; gap: .65rem; }
+.sk-auth-points li { display: flex; align-items: center; gap: .65rem; color: rgba(255, 255, 255, .9); }
+.sk-auth-points i { width: 2rem; height: 2rem; border-radius: .6rem; background: rgba(255, 255, 255, .12); display: inline-flex; align-items: center; justify-content: center; }
+.sk-auth-intro small { color: rgba(255, 255, 255, .55); }
+.sk-auth-main { display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; background: #f4f6fb; }
+.sk-auth-card { width: 100%; max-width: 27rem; border: 0; border-radius: 1.1rem; box-shadow: 0 24px 60px rgba(30, 27, 75, .14); animation: sk-fade-up .5s ease both; }
+.sk-auth-logo { width: 4.2rem; height: 4.2rem; }
+.brand-logo { display: inline-flex; width: 100%; height: 100%; position: relative; overflow: hidden; align-items: center; justify-content: center; border-radius: 1rem; background: #eef2ff; color: var(--tblr-primary); font-size: 1.8rem; }
+.brand-logo img { position: absolute; max-width: none; }
+@media (max-width: 900px) { .sk-auth-layout { grid-template-columns: 1fr; } .sk-auth-intro { padding: 2rem 1.5rem; } .sk-auth-intro p, .sk-auth-points, .sk-auth-intro small { display: none; } .sk-auth-home { margin-bottom: 1rem; } }
+
+/* ----- Beranda ----- */
+.sk-home .navbar { background: rgba(255, 255, 255, .88); backdrop-filter: blur(10px); border-bottom: 1px solid var(--sk-line); position: sticky; top: 0; z-index: 1030; }
+.sk-home .home-brand { display: inline-flex; align-items: center; gap: .65rem; color: var(--sk-ink); font-weight: 700; line-height: 1.1; }
+.sk-home .home-brand .brand-logo { width: 2.6rem; height: 2.6rem; flex: 0 0 auto; }
+.sk-home .home-brand small { display: block; font-weight: 400; color: var(--sk-muted); font-size: .72rem; }
+.sk-hero { background: radial-gradient(900px 480px at 85% 10%, rgba(99, 102, 241, .22), transparent 60%), linear-gradient(180deg, #fff, #f4f6fb); padding: 4.5rem 0 4rem; }
+.sk-hero h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.08; }
+.sk-hero h1 em { font-style: normal; background: var(--sk-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.sk-hero-card { background: #fff; border: 1px solid var(--sk-line); border-radius: 1.2rem; padding: 1.5rem; box-shadow: 0 24px 60px rgba(67, 56, 202, .14); animation: sk-float 8s ease-in-out infinite; }
+.sk-hero-card .item { display: flex; align-items: center; gap: .85rem; padding: .75rem 0; border-top: 1px solid var(--sk-line); }
+.sk-hero-card .item:first-of-type { border-top: 0; }
+.sk-icon-badge { width: 2.6rem; height: 2.6rem; border-radius: .8rem; display: inline-flex; align-items: center; justify-content: center; font-size: 1.4rem; background: #eef2ff; color: var(--tblr-primary); flex: 0 0 auto; }
+.sk-section { padding: 4rem 0; }
+.sk-section.alt { background: #fff; }
+.sk-section h2 { font-weight: 800; letter-spacing: -.01em; font-size: clamp(1.6rem, 3vw, 2.2rem); }
+.sk-service, .sk-product { height: 100%; transition: transform .25s, box-shadow .25s; }
+.sk-service:hover, .sk-product:hover { transform: translateY(-4px); box-shadow: var(--sk-shadow-hover); }
+.sk-contact { background: linear-gradient(160deg, #1e1b4b, #172554); color: #fff; padding: 4rem 0; }
+.sk-contact h2, .sk-contact strong { color: #fff; }
+.sk-contact small { color: rgba(255, 255, 255, .6); display: block; }
+.sk-footer { padding: 1.25rem 0; color: var(--sk-muted); font-size: .85rem; }
+.sk-reveal { opacity: 0; transform: translateY(16px); transition: opacity .6s ease, transform .6s ease; }
+.sk-reveal.in { opacity: 1; transform: none; }

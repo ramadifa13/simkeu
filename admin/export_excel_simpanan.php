@@ -10,8 +10,8 @@ if (!isAdmin()) {
 // Filter parameters
 $filter_anggota = $_GET['anggota_id'] ?? '';
 $filter_jenis = $_GET['jenis_simpanan_id'] ?? '';
-$filter_tanggal_awal = $_GET['tanggal_awal'] ?? '2026-02-01';
-$filter_tanggal_akhir = $_GET['tanggal_akhir'] ?? '2026-02-28';
+$filter_tanggal_awal = $_GET['tanggal_awal'] ?? date('Y-m-01');
+$filter_tanggal_akhir = $_GET['tanggal_akhir'] ?? date('Y-m-t');
 
 // Get data for filters (untuk informasi di header)
 $anggota_info = '';

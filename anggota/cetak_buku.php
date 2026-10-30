@@ -117,12 +117,6 @@ $stmt_koperasi = $db->prepare($query_koperasi);
 $stmt_koperasi->execute();
 $koperasi_data = $stmt_koperasi->fetch(PDO::FETCH_ASSOC);
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    if ($angka == 0) return 'Rp 0';
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
-
 // Handle PDF download
 if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
     require_once '../tcpdf/tcpdf.php';
@@ -244,19 +238,8 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cetak Buku Tabungan - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
     <style>
-        .main-content {
-            margin-left: 280px;
-            margin-top: 10px;
-            padding: 15px;
-        }
-        .page-header {
-            padding-top: 5px;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-        }
         .buku-header {
             border-bottom: 2px solid #000;
             padding-bottom: 10px;
@@ -264,14 +247,14 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
             text-align: center;
         }
         .info-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #087f83;
             color: white;
             border-radius: 10px;
             padding: 15px;
             margin-bottom: 20px;
         }
         .badge-deposito { background-color: #f39c12; color: white; }
-        .badge-haji { background-color: #9b59b6; color: white; }
+        .badge-haji { background-color: #087f83; color: white; }
         .badge-umroh { background-color: #1abc9c; color: white; }
         .stat-card {
             background: white;
@@ -289,71 +272,28 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
             background-color: #e9ecef;
             font-weight: bold;
         }
-        .btn-pdf {
-            background: linear-gradient(135deg, #dc3545, #c82333);
-            color: white;
-            border: none;
-        }
-        .btn-pdf:hover {
-            background: linear-gradient(135deg, #c82333, #b21f2d);
-            color: white;
-        }
         .table-responsive {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
-        .table {
-            min-width: 1000px; /* Memastikan tabel tidak mengecil */
+        .table-transaksi {
+            min-width: 1000px;
         }
-        .table th, .table td {
+        .table-transaksi th, .table-transaksi td {
             white-space: nowrap;
             padding: 0.5rem 0.75rem;
-        }
-        .table td:first-child, .table th:first-child {
-            position: sticky;
-            left: 0;
-            background-color: white;
-            z-index: 1;
-        }
-        .table thead th:first-child {
-            background-color: #343a40;
-            color: white;
-            z-index: 2;
-        }
-        @media (max-width: 768px) {
-            .main-content {
-                margin-left: 0;
-                margin-top: 60px;
-            }
-            .table td:first-child, .table th:first-child {
-                position: static;
-            }
         }
     </style>
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-                
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center page-header border-bottom">
-                    <h1 class="h3">
-                        <i class="fas fa-book me-2"></i>Buku Tabungan
-                    </h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <a href="?action=pdf&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>&jenis_simpanan=<?php echo $jenis_simpanan; ?>" 
-                           class="btn btn-sm btn-pdf me-2" target="_blank">
-                            <i class="fas fa-file-pdf me-1"></i> Download PDF
-                        </a>
-                        <a href="riwayat_simpanan.php" class="btn btn-sm btn-secondary">
-                            <i class="fas fa-arrow-left me-1"></i> Kembali
-                        </a>
-                    </div>
-                </div>
+    <?php include __DIR__ . '/../includes/layout/shell_start.php'; ?>
+                <?php ui_page_header([
+                    'title' => 'Buku Tabungan',
+                    'icon' => 'ti ti-book text-primary',
+                    'subtitle' => 'Cetak dan unduh buku tabungan',
+                    'actions' => '<a href="?action=pdf&start_date=' . urlencode((string)$start_date) . '&end_date=' . urlencode((string)$end_date) . '&jenis_simpanan=' . urlencode((string)$jenis_simpanan) . '" class="btn btn-sm btn-danger" target="_blank"><i class="ti ti-file-type-pdf me-1"></i>Download PDF</a>'
+                        . '<a href="riwayat_simpanan.php" class="btn btn-sm btn-outline-secondary"><i class="ti ti-arrow-left me-1"></i>Kembali</a>',
+                ]); ?>
 
                 <!-- Info Card -->
                 <div class="info-card">
@@ -391,7 +331,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                                     <small class="text-muted">Total Transaksi</small>
                                     <h4 class="mb-0"><?php echo $statistik['total_transaksi']; ?></h4>
                                 </div>
-                                <i class="fas fa-exchange-alt fa-2x text-primary opacity-50"></i>
+                                <i class="ti ti-arrows-exchange fs-1 text-primary opacity-50"></i>
                             </div>
                         </div>
                     </div>
@@ -402,7 +342,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                                     <small class="text-muted">Total Setoran</small>
                                     <h4 class="text-success mb-0"><?php echo formatRupiah($statistik['total_setoran']); ?></h4>
                                 </div>
-                                <i class="fas fa-arrow-down fa-2x text-success opacity-50"></i>
+                                <i class="ti ti-arrow-down fs-1 text-success opacity-50"></i>
                             </div>
                         </div>
                     </div>
@@ -413,7 +353,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                                     <small class="text-muted">Total Penarikan</small>
                                     <h4 class="text-danger mb-0"><?php echo formatRupiah($statistik['total_penarikan']); ?></h4>
                                 </div>
-                                <i class="fas fa-arrow-up fa-2x text-danger opacity-50"></i>
+                                <i class="ti ti-arrow-up fs-1 text-danger opacity-50"></i>
                             </div>
                         </div>
                     </div>
@@ -424,7 +364,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                                     <small class="text-muted">Saldo Akhir</small>
                                     <h4 class="text-info mb-0"><?php echo formatRupiah($total_saldo); ?></h4>
                                 </div>
-                                <i class="fas fa-wallet fa-2x text-info opacity-50"></i>
+                                <i class="ti ti-wallet fs-1 text-info opacity-50"></i>
                             </div>
                         </div>
                     </div>
@@ -433,7 +373,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                 <!-- Filter Form -->
                 <div class="card mb-4">
                     <div class="card-header bg-white py-2">
-                        <h6 class="mb-0"><i class="fas fa-filter me-2"></i>Filter Transaksi</h6>
+                        <h6 class="mb-0"><i class="ti ti-filter me-2"></i>Filter Transaksi</h6>
                     </div>
                     <div class="card-body py-2">
                         <form method="GET" class="row g-2">
@@ -455,12 +395,12 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                             </div>
                             <div class="col-md-3">
                                 <button type="submit" class="btn btn-sm btn-primary w-100">
-                                    <i class="fas fa-search me-1"></i> Tampilkan
+                                    <i class="ti ti-search me-1"></i> Tampilkan
                                 </button>
                             </div>
                         </form>
                         <small class="text-muted">
-                            <i class="fas fa-info-circle me-1"></i> Kosongkan tanggal untuk melihat semua transaksi
+                            <i class="ti ti-info-circle me-1"></i> Kosongkan tanggal untuk melihat semua transaksi
                         </small>
                     </div>
                 </div>
@@ -470,7 +410,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                     <div class="col-md-4">
                         <div class="card border-warning">
                             <div class="card-header bg-warning text-white py-1">
-                                <h6 class="mb-0"><i class="fas fa-coins me-2"></i>DEPOSITO</h6>
+                                <h6 class="mb-0"><i class="ti ti-coins me-2"></i>DEPOSITO</h6>
                             </div>
                             <div class="card-body py-2">
                                 <div class="d-flex justify-content-between">
@@ -492,7 +432,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                     <div class="col-md-4">
                         <div class="card border-info">
                             <div class="card-header bg-info text-white py-1">
-                                <h6 class="mb-0"><i class="fas fa-mosque me-2"></i>HAJI</h6>
+                                <h6 class="mb-0"><i class="ti ti-building-mosque me-2"></i>HAJI</h6>
                             </div>
                             <div class="card-body py-2">
                                 <div class="d-flex justify-content-between">
@@ -514,7 +454,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                     <div class="col-md-4">
                         <div class="card border-success">
                             <div class="card-header bg-success text-white py-1">
-                                <h6 class="mb-0"><i class="fas fa-kaaba me-2"></i>UMROH</h6>
+                                <h6 class="mb-0"><i class="ti ti-building me-2"></i>UMROH</h6>
                             </div>
                             <div class="card-body py-2">
                                 <div class="d-flex justify-content-between">
@@ -539,7 +479,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                 <div class="card">
                     <div class="card-header bg-white py-2">
                         <h6 class="mb-0">
-                            <i class="fas fa-list me-2"></i>Daftar Transaksi
+                            <i class="ti ti-list me-2"></i>Daftar Transaksi
                             <span class="badge bg-primary ms-2"><?php echo count($transaksi_list); ?> transaksi</span>
                         </h6>
                     </div>
@@ -593,7 +533,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                                     <?php else: ?>
                                         <tr>
                                             <td colspan="8" class="text-center py-3">
-                                                <i class="fas fa-info-circle me-2"></i>Tidak ada transaksi
+                                                <i class="ti ti-info-circle me-2"></i>Tidak ada transaksi
                                             </td>
                                         </tr>
                                     <?php endif; ?>
@@ -607,7 +547,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                 <div class="row mt-3">
                     <div class="col-md-6">
                         <div class="alert alert-secondary py-2 mb-0">
-                            <i class="fas fa-print me-2"></i>
+                            <i class="ti ti-printer me-2"></i>
                             <small>
                                 <strong>Informasi:</strong> 
                                 Total setoran: <?php echo formatRupiah($statistik['total_setoran']); ?>, 
@@ -622,10 +562,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'pdf') {
                         </small>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
 </body>
 </html>

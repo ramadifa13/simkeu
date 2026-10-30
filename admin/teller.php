@@ -2,350 +2,588 @@
 require_once '../includes/auth.php';
 require_once '../config/config.php';
 
-// Handle form actions
-if ($_POST) {
+if (!isLoggedIn() || !isAdmin()) {
+    http_response_code(403);
+    exit('Akses ditolak. Data teller khusus Admin.');
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add'])) {
-        $username = $_POST['username'];
-        $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-        $nama_lengkap = $_POST['nama_lengkap'];
-        $role = 'teller';
-        $status = $_POST['status'];
-        
-        $query = "INSERT INTO users (username, password, nama_lengkap, role, status) 
-                  VALUES (:username, :password, :nama_lengkap, :role, :status)";
-        $stmt = $db->prepare($query);
-        $stmt->bindParam(':username', $username);
-        $stmt->bindParam(':password', $password);
-        $stmt->bindParam(':nama_lengkap', $nama_lengkap);
-        $stmt->bindParam(':role', $role);
-        $stmt->bindParam(':status', $status);
-        
-        if ($stmt->execute()) {
-            $_SESSION['success'] = "Teller berhasil ditambahkan";
-        } else {
-            $_SESSION['error'] = "Gagal menambahkan teller";
+        try {
+            layananValidasiToken();
+            $username = trim((string)($_POST['username'] ?? ''));
+            $passwordPlain = (string)($_POST['password'] ?? '');
+            $nama_lengkap = trim((string)($_POST['nama_lengkap'] ?? ''));
+            $role = 'teller';
+            $status = ($_POST['status'] ?? '') === 'nonaktif' ? 'nonaktif' : 'aktif';
+
+            if ($username === '' || $nama_lengkap === '' || $passwordPlain === '') {
+                throw new Exception('Username, nama lengkap, dan password wajib diisi.');
+            }
+            if (strlen($passwordPlain) < 6) {
+                throw new Exception('Password minimal 6 karakter.');
+            }
+
+            $check = $db->prepare("SELECT id FROM users WHERE username = ?");
+            $check->execute([$username]);
+            if ($check->fetchColumn()) {
+                throw new Exception('Username sudah digunakan.');
+            }
+
+            $password = password_hash($passwordPlain, PASSWORD_DEFAULT);
+            $query = "INSERT INTO users (username, password, nama_lengkap, role, status)
+                      VALUES (:username, :password, :nama_lengkap, :role, :status)";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':username', $username);
+            $stmt->bindParam(':password', $password);
+            $stmt->bindParam(':nama_lengkap', $nama_lengkap);
+            $stmt->bindParam(':role', $role);
+            $stmt->bindParam(':status', $status);
+
+            if ($stmt->execute()) {
+                $_SESSION['success'] = "Teller berhasil ditambahkan";
+            } else {
+                throw new Exception("Gagal menambahkan teller");
+            }
+        } catch (Exception $e) {
+            $_SESSION['error'] = $e->getMessage();
         }
+        header('Location: teller.php');
+        exit;
     }
-    
+
     if (isset($_POST['edit'])) {
-        $id = $_POST['id'];
-        $username = $_POST['username'];
-        $nama_lengkap = $_POST['nama_lengkap'];
-        $status = $_POST['status'];
-        
-        $query = "UPDATE users SET username = :username, nama_lengkap = :nama_lengkap, 
-                  status = :status WHERE id = :id AND role = 'teller'";
-        $stmt = $db->prepare($query);
-        $stmt->bindParam(':id', $id);
-        $stmt->bindParam(':username', $username);
-        $stmt->bindParam(':nama_lengkap', $nama_lengkap);
-        $stmt->bindParam(':status', $status);
-        
-        if ($stmt->execute()) {
-            $_SESSION['success'] = "Data teller berhasil diupdate";
-        } else {
-            $_SESSION['error'] = "Gagal mengupdate data teller";
+        try {
+            layananValidasiToken();
+            $id = (int)($_POST['id'] ?? 0);
+            $username = trim((string)($_POST['username'] ?? ''));
+            $nama_lengkap = trim((string)($_POST['nama_lengkap'] ?? ''));
+            $status = ($_POST['status'] ?? '') === 'nonaktif' ? 'nonaktif' : 'aktif';
+
+            if ($id < 1 || $username === '' || $nama_lengkap === '') {
+                throw new Exception('Data teller tidak lengkap.');
+            }
+
+            $check = $db->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
+            $check->execute([$username, $id]);
+            if ($check->fetchColumn()) {
+                throw new Exception('Username sudah digunakan.');
+            }
+
+            $query = "UPDATE users SET username = :username, nama_lengkap = :nama_lengkap,
+                      status = :status WHERE id = :id AND role = 'teller'";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':id', $id);
+            $stmt->bindParam(':username', $username);
+            $stmt->bindParam(':nama_lengkap', $nama_lengkap);
+            $stmt->bindParam(':status', $status);
+
+            if ($stmt->execute()) {
+                $_SESSION['success'] = "Data teller berhasil diupdate";
+            } else {
+                throw new Exception("Gagal mengupdate data teller");
+            }
+        } catch (Exception $e) {
+            $_SESSION['error'] = $e->getMessage();
         }
+        header('Location: teller.php');
+        exit;
     }
-    
+
     if (isset($_POST['reset_password'])) {
-        $id = $_POST['id'];
-        $new_password = password_hash('123456', PASSWORD_DEFAULT);
-        
-        $query = "UPDATE users SET password = :password WHERE id = :id AND role = 'teller'";
-        $stmt = $db->prepare($query);
-        $stmt->bindParam(':password', $new_password);
-        $stmt->bindParam(':id', $id);
-        
-        if ($stmt->execute()) {
-            $_SESSION['success'] = "Password berhasil direset ke '123456'";
-        } else {
-            $_SESSION['error'] = "Gagal reset password";
+        try {
+            layananValidasiToken();
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id < 1) {
+                throw new Exception('Teller tidak valid.');
+            }
+            $new_password = password_hash('123456', PASSWORD_DEFAULT);
+
+            $query = "UPDATE users SET password = :password WHERE id = :id AND role = 'teller'";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':password', $new_password);
+            $stmt->bindParam(':id', $id);
+
+            if ($stmt->execute()) {
+                $_SESSION['success'] = "Password berhasil direset ke '123456'";
+            } else {
+                throw new Exception("Gagal reset password");
+            }
+        } catch (Exception $e) {
+            $_SESSION['error'] = $e->getMessage();
         }
+        header('Location: teller.php');
+        exit;
     }
 }
 
-// Get all tellers
-$query = "SELECT * FROM users WHERE role = 'teller' ORDER BY created_at DESC";
-$stmt = $db->prepare($query);
-$stmt->execute();
-$tellers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$tellers = $db->query(
+    "SELECT * FROM users WHERE role = 'teller' ORDER BY created_at DESC"
+)->fetchAll(PDO::FETCH_ASSOC);
 
-// Get statistics
-$query_stats = "SELECT 
-    COUNT(*) as total_teller,
-    COUNT(CASE WHEN status = 'aktif' THEN 1 END) as aktif,
-    COUNT(CASE WHEN status = 'nonaktif' THEN 1 END) as nonaktif
-    FROM users WHERE role = 'teller'";
-$stmt_stats = $db->prepare($query_stats);
-$stmt_stats->execute();
-$stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
+$total = count($tellers);
+$aktif = 0;
+$nonaktif = 0;
+$belumLogin = 0;
+foreach ($tellers as $t) {
+    if (($t['status'] ?? '') === 'aktif') {
+        $aktif++;
+    } else {
+        $nonaktif++;
+    }
+    if (empty($t['last_login'])) {
+        $belumLogin++;
+    }
+}
+
+$page_title = 'Data Teller';
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Teller - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .stat-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #007bff;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-        }
-    </style>
+    <title>Data Teller - <?php echo htmlspecialchars(APP_NAME); ?></title>
+    <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-user-tie me-2"></i>Data Teller
-                    </h1>
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
-                        <i class="fas fa-plus"></i> Tambah Teller
-                    </button>
+    <?php include __DIR__ . '/../includes/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-tlr" aria-hidden="true"><i class="ti ti-user-star"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Master data</p>
+                        <h1 class="ui-dash-title">Data Teller</h1>
+                        <p class="ui-dash-meta mb-0">Kelola akun petugas — login, status, dan reset password</p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <button type="button" class="btn ui-dash-btn-add" data-bs-toggle="modal" data-bs-target="#addModal">
+                            <i class="ti ti-plus me-1" aria-hidden="true"></i>
+                            <span class="d-none d-sm-inline">Tambah teller</span><span class="d-sm-none">Tambah</span>
+                        </button>
+                    </div>
+                </header>
+
+                <?php ui_flash(); ?>
+
+                <div class="alert alert-info ui-tlr-info" role="status" data-ui-toast-skip>
+                    <i class="ti ti-info-circle me-1" aria-hidden="true"></i>
+                    Reset password mengembalikan ke <strong>123456</strong>. Minta teller mengganti setelah login.
                 </div>
 
-                <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success"><?php echo $_SESSION['success']; unset($_SESSION['success']); ?></div>
-                <?php endif; ?>
-                
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger"><?php echo $_SESSION['error']; unset($_SESSION['error']); ?></div>
-                <?php endif; ?>
-
-                <!-- Statistics Cards -->
-                <div class="row mb-4">
-                    <div class="col-md-4">
-                        <div class="card stat-card bg-primary text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo $stats['total_teller']; ?></h4>
-                                        <p>Total Teller</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-users fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card stat-card bg-success text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo $stats['aktif']; ?></h4>
-                                        <p>Teller Aktif</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-user-check fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card stat-card bg-warning text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h4><?php echo $stats['nonaktif']; ?></h4>
-                                        <p>Teller Nonaktif</p>
-                                    </div>
-                                    <div class="align-self-center">
-                                        <i class="fas fa-user-times fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="ui-tlr-kpi">
+                <?php ui_stat_grid([
+                    ['label' => 'Total teller', 'value' => $total, 'tone' => 'primary', 'icon' => 'ti ti-users', 'hint' => 'Semua akun'],
+                    ['label' => 'Aktif', 'value' => $aktif, 'tone' => 'success', 'icon' => 'ti ti-user-check', 'hint' => 'Dapat login'],
+                    ['label' => 'Nonaktif', 'value' => $nonaktif, 'tone' => 'warning', 'icon' => 'ti ti-user-x', 'hint' => 'Diblokir'],
+                    ['label' => 'Belum login', 'value' => $belumLogin, 'tone' => 'info', 'icon' => 'ti ti-clock', 'hint' => 'Belum pernah masuk'],
+                ]); ?>
                 </div>
 
-                <!-- Teller Table -->
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-table me-2"></i>Daftar Teller
-                        </h5>
+                <div class="card ui-tlr-daftar">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-list" aria-hidden="true"></i>Daftar teller</span>
+                        <span class="ui-dash-sec-note"><?php echo (int)$total; ?> data</span>
                     </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
+                    <div class="card-body p-0">
+                        <div class="table-responsive ui-table-scroll">
+                            <table class="table table-hover table-sm align-middle mb-0 js-datatable"
+                                   data-dt-page-length="10"
+                                   data-dt-order="4,desc"
+                                   data-dt-filter="3"
+                                   data-empty-message="Belum ada data teller.">
                                 <thead>
                                     <tr>
-                                        <th>#</th>
+                                        <th class="text-muted">#</th>
+                                        <th>Petugas</th>
                                         <th>Username</th>
-                                        <th>Nama Lengkap</th>
                                         <th>Status</th>
-                                        <th>Terakhir Login</th>
-                                        <th>Tanggal Dibuat</th>
-                                        <th>Aksi</th>
+                                        <th>Terakhir login</th>
+                                        <th>Dibuat</th>
+                                        <th class="text-end no-sort">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($tellers as $index => $teller): ?>
+                                <?php foreach ($tellers as $index => $teller):
+                                    $isAktif = ($teller['status'] ?? '') === 'aktif';
+                                    $lastLogin = $teller['last_login'] ?? null;
+                                    $created = $teller['created_at'] ?? null;
+                                ?>
                                     <tr>
-                                        <td><?php echo $index + 1; ?></td>
+                                        <td class="text-muted"><?php echo (int)($index + 1); ?></td>
                                         <td>
-                                            <strong><?php echo $teller['username']; ?></strong>
-                                        </td>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="avatar me-3">
-                                                    <?php echo getInitials($teller['nama_lengkap']); ?>
-                                                </div>
-                                                <div>
-                                                    <div class="fw-semibold"><?php echo $teller['nama_lengkap']; ?></div>
-                                                    <small class="text-muted">Teller</small>
-                                                </div>
+                                            <div class="ui-tlr-person">
+                                                <span class="ui-tlr-avatar" aria-hidden="true"><?php echo htmlspecialchars(getInitials($teller['nama_lengkap'])); ?></span>
+                                                <span class="ui-tlr-person-copy">
+                                                    <strong><?php echo htmlspecialchars($teller['nama_lengkap']); ?></strong>
+                                                    <small>Teller</small>
+                                                </span>
                                             </div>
                                         </td>
-                                        <td>
-                                            <span class="badge bg-<?php echo $teller['status'] == 'aktif' ? 'success' : 'danger'; ?>">
-                                                <?php echo ucfirst($teller['status']); ?>
+                                        <td><code class="ui-tlr-user"><?php echo htmlspecialchars($teller['username']); ?></code></td>
+                                        <td data-filter="<?php echo $isAktif ? 'Aktif' : 'Nonaktif'; ?>">
+                                            <span class="badge <?php echo $isAktif ? 'bg-success' : 'bg-secondary'; ?>">
+                                                <?php echo $isAktif ? 'Aktif' : 'Nonaktif'; ?>
                                             </span>
                                         </td>
-                                        <td>
-                                            <?php echo $teller['last_login'] ? date('d/m/Y H:i', strtotime($teller['last_login'])) : 'Belum login'; ?>
+                                        <td data-order="<?php echo htmlspecialchars((string)($lastLogin ?: '')); ?>">
+                                            <?php echo $lastLogin ? htmlspecialchars(formatTanggalUi($lastLogin, true)) : '<span class="text-muted">Belum login</span>'; ?>
                                         </td>
-                                        <td><?php echo date('d/m/Y', strtotime($teller['created_at'])); ?></td>
-                                        <td>
-                                            <button class="btn btn-sm btn-warning" data-bs-toggle="modal" 
-                                                    data-bs-target="#editModal" 
-                                                    data-id="<?php echo $teller['id']; ?>"
-                                                    data-username="<?php echo $teller['username']; ?>"
-                                                    data-nama="<?php echo $teller['nama_lengkap']; ?>"
-                                                    data-status="<?php echo $teller['status']; ?>">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <form method="POST" class="d-inline"><?php echo layananToken(); ?>
-                                                <input type="hidden" name="id" value="<?php echo $teller['id']; ?>">
-                                                <button type="submit" name="reset_password" class="btn btn-sm btn-info" 
-                                                        onclick="return confirm('Reset password ke 123456?')">
-                                                    <i class="fas fa-key"></i>
-                                                </button>
-                                            </form>
+                                        <td data-order="<?php echo htmlspecialchars((string)($created ?: '')); ?>">
+                                            <?php echo $created ? htmlspecialchars(formatTanggalUi($created)) : '—'; ?>
+                                        </td>
+                                        <td class="table-actions text-end">
+                                            <?php echo ui_action_menu([
+                                                [
+                                                    'label' => 'Edit',
+                                                    'icon' => 'ti ti-edit',
+                                                    'class' => 'text-warning',
+                                                    'attrs' => [
+                                                        'data-bs-toggle' => 'modal',
+                                                        'data-bs-target' => '#editModal',
+                                                        'data-id' => (int)$teller['id'],
+                                                        'data-username' => $teller['username'],
+                                                        'data-nama' => $teller['nama_lengkap'],
+                                                        'data-status' => $teller['status'],
+                                                    ],
+                                                ],
+                                                [
+                                                    'label' => 'Reset password',
+                                                    'icon' => 'ti ti-key',
+                                                    'class' => 'text-info',
+                                                    'attrs' => [
+                                                        'data-bs-toggle' => 'modal',
+                                                        'data-bs-target' => '#resetModal',
+                                                        'data-id' => (int)$teller['id'],
+                                                        'data-nama' => $teller['nama_lengkap'],
+                                                        'data-username' => $teller['username'],
+                                                    ],
+                                                ],
+                                            ]); ?>
                                         </td>
                                     </tr>
-                                    <?php endforeach; ?>
+                                <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
+            </div>
+        <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
 
-    <!-- Add Modal -->
-    <div class="modal fade" id="addModal" tabindex="-1">
-        <div class="modal-dialog">
+    <div class="modal fade ui-tlr-modal" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
-                <form method="POST"><?php echo layananToken(); ?>
+                <form method="POST" class="ui-tlr-form-root" data-tlr-form="add" novalidate><?php echo layananToken(); ?>
                     <div class="modal-header">
-                        <h5 class="modal-title">Tambah Teller Baru</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        <div>
+                            <p class="ui-tlr-modal-eyebrow mb-0">Akun petugas</p>
+                            <h2 class="modal-title h5" id="addModalLabel">Tambah teller</h2>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Username *</label>
-                            <input type="text" name="username" class="form-control" required 
-                                   placeholder="Username untuk login">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Password *</label>
-                            <input type="password" name="password" class="form-control" required 
-                                   placeholder="Password untuk login">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Nama Lengkap *</label>
-                            <input type="text" name="nama_lengkap" class="form-control" required 
-                                   placeholder="Nama lengkap teller">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Status</label>
-                            <select name="status" class="form-control">
-                                <option value="aktif">Aktif</option>
-                                <option value="nonaktif">Nonaktif</option>
-                            </select>
+                        <div class="ui-tlr-form">
+                            <section class="ui-tlr-section">
+                                <header class="ui-tlr-section-head">
+                                    <i class="ti ti-user" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>Identitas</strong>
+                                        <span>Nama yang tampil di laporan &amp; kwitansi</span>
+                                    </div>
+                                </header>
+                                <div class="ui-tlr-field">
+                                    <label class="form-label" for="add_nama">Nama lengkap *</label>
+                                    <input type="text" name="nama_lengkap" id="add_nama" class="form-control form-control-lg"
+                                           required placeholder="Contoh: Siti Aminah" autocomplete="name" data-tlr="nama">
+                                </div>
+                            </section>
+
+                            <section class="ui-tlr-section">
+                                <header class="ui-tlr-section-head">
+                                    <i class="ti ti-lock" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>Login</strong>
+                                        <span>Kredensial untuk masuk ke aplikasi</span>
+                                    </div>
+                                </header>
+                                <div class="ui-tlr-field">
+                                    <label class="form-label" for="add_username">Username *</label>
+                                    <div class="ui-tlr-user-wrap">
+                                        <span class="ui-tlr-user-prefix" aria-hidden="true"><i class="ti ti-at"></i></span>
+                                        <input type="text" name="username" id="add_username" class="form-control ui-tlr-user-input"
+                                               required placeholder="teller01" autocomplete="username" maxlength="50" data-tlr="username">
+                                    </div>
+                                    <p class="form-text mb-0">Huruf kecil otomatis · tanpa spasi</p>
+                                </div>
+                                <div class="ui-tlr-field">
+                                    <label class="form-label" for="add_password">Password *</label>
+                                    <div class="input-group ui-tlr-pass-group">
+                                        <input type="password" name="password" id="add_password" class="form-control"
+                                               required minlength="6" placeholder="Minimal 6 karakter" autocomplete="new-password">
+                                        <button type="button" class="btn btn-outline-secondary" data-tlr-toggle-pass="#add_password" aria-label="Tampilkan password">
+                                            <i class="ti ti-eye" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="ui-tlr-section">
+                                <header class="ui-tlr-section-head">
+                                    <i class="ti ti-toggle-left" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>Status akun</strong>
+                                        <span>Nonaktif = tidak bisa login</span>
+                                    </div>
+                                </header>
+                                <div class="ui-tlr-status" role="radiogroup" aria-label="Status teller">
+                                    <label class="ui-tlr-status-opt">
+                                        <input type="radio" name="status" value="aktif" checked>
+                                        <span><i class="ti ti-user-check" aria-hidden="true"></i>Aktif</span>
+                                    </label>
+                                    <label class="ui-tlr-status-opt">
+                                        <input type="radio" name="status" value="nonaktif">
+                                        <span><i class="ti ti-user-x" aria-hidden="true"></i>Nonaktif</span>
+                                    </label>
+                                </div>
+                            </section>
+
+                            <aside class="ui-tlr-preview" data-tlr-preview aria-live="polite">
+                                <span class="ui-tlr-preview-label">Pratinjau</span>
+                                <div class="ui-tlr-preview-person">
+                                    <span class="ui-tlr-avatar is-lg" data-preview="initials">?</span>
+                                    <div>
+                                        <strong data-preview="nama">Nama teller</strong>
+                                        <code data-preview="username">@username</code>
+                                    </div>
+                                </div>
+                            </aside>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="add" class="btn btn-primary">Simpan</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" name="add" value="1" class="btn btn-primary">
+                            <i class="ti ti-device-floppy me-1" aria-hidden="true"></i>Simpan
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Edit Modal -->
-    <div class="modal fade" id="editModal" tabindex="-1">
-        <div class="modal-dialog">
+    <div class="modal fade ui-tlr-modal is-edit" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
-                <form method="POST"><?php echo layananToken(); ?>
+                <form method="POST" class="ui-tlr-form-root" data-tlr-form="edit" novalidate><?php echo layananToken(); ?>
                     <div class="modal-header">
-                        <h5 class="modal-title">Edit Data Teller</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        <div>
+                            <p class="ui-tlr-modal-eyebrow mb-0">Ubah akun</p>
+                            <h2 class="modal-title h5" id="editModalLabel">Edit teller</h2>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="id" id="edit_id">
-                        <div class="mb-3">
-                            <label class="form-label">Username *</label>
-                            <input type="text" name="username" id="edit_username" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Nama Lengkap *</label>
-                            <input type="text" name="nama_lengkap" id="edit_nama" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Status</label>
-                            <select name="status" id="edit_status" class="form-control">
-                                <option value="aktif">Aktif</option>
-                                <option value="nonaktif">Nonaktif</option>
-                            </select>
+                        <div class="ui-tlr-form">
+                            <section class="ui-tlr-section">
+                                <header class="ui-tlr-section-head">
+                                    <i class="ti ti-user" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>Identitas &amp; login</strong>
+                                        <span>Password diubah lewat Reset password</span>
+                                    </div>
+                                </header>
+                                <div class="ui-tlr-field">
+                                    <label class="form-label" for="edit_nama">Nama lengkap *</label>
+                                    <input type="text" name="nama_lengkap" id="edit_nama" class="form-control form-control-lg"
+                                           required autocomplete="name" data-tlr="nama">
+                                </div>
+                                <div class="ui-tlr-field">
+                                    <label class="form-label" for="edit_username">Username *</label>
+                                    <div class="ui-tlr-user-wrap">
+                                        <span class="ui-tlr-user-prefix" aria-hidden="true"><i class="ti ti-at"></i></span>
+                                        <input type="text" name="username" id="edit_username" class="form-control ui-tlr-user-input"
+                                               required maxlength="50" autocomplete="username" data-tlr="username">
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="ui-tlr-section">
+                                <header class="ui-tlr-section-head">
+                                    <i class="ti ti-toggle-left" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>Status akun</strong>
+                                        <span>Nonaktifkan bila petugas tidak lagi bertugas</span>
+                                    </div>
+                                </header>
+                                <div class="ui-tlr-status" role="radiogroup" aria-label="Status teller">
+                                    <label class="ui-tlr-status-opt">
+                                        <input type="radio" name="status" id="edit_status_aktif" value="aktif" checked>
+                                        <span><i class="ti ti-user-check" aria-hidden="true"></i>Aktif</span>
+                                    </label>
+                                    <label class="ui-tlr-status-opt">
+                                        <input type="radio" name="status" id="edit_status_nonaktif" value="nonaktif">
+                                        <span><i class="ti ti-user-x" aria-hidden="true"></i>Nonaktif</span>
+                                    </label>
+                                </div>
+                            </section>
+
+                            <aside class="ui-tlr-preview" data-tlr-preview aria-live="polite">
+                                <span class="ui-tlr-preview-label">Pratinjau</span>
+                                <div class="ui-tlr-preview-person">
+                                    <span class="ui-tlr-avatar is-lg" data-preview="initials">?</span>
+                                    <div>
+                                        <strong data-preview="nama">—</strong>
+                                        <code data-preview="username">@—</code>
+                                    </div>
+                                </div>
+                            </aside>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="edit" class="btn btn-primary">Update</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" name="edit" value="1" class="btn btn-warning">
+                            <i class="ti ti-check me-1" aria-hidden="true"></i>Update
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <div class="modal fade ui-tlr-modal is-reset" id="resetModal" tabindex="-1" aria-labelledby="resetModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST"><?php echo layananToken(); ?>
+                    <div class="modal-header">
+                        <h2 class="modal-title h5" id="resetModalLabel">Reset password</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="id" id="reset_id">
+                        <input type="hidden" name="reset_password" value="1">
+                        <div class="ui-tlr-reset">
+                            <i class="ti ti-key" aria-hidden="true"></i>
+                            <div>
+                                <p class="mb-1">Reset password untuk:</p>
+                                <strong id="reset_nama"></strong>
+                                <code class="d-block mt-1" id="reset_username"></code>
+                                <p class="text-muted small mb-0 mt-2">Password baru: <strong>123456</strong></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-info text-white">
+                            <i class="ti ti-refresh me-1" aria-hidden="true"></i>Reset sekarang
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
-        var editModal = document.getElementById('editModal');
-        editModal.addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            document.getElementById('edit_id').value = button.getAttribute('data-id');
-            document.getElementById('edit_username').value = button.getAttribute('data-username');
-            document.getElementById('edit_nama').value = button.getAttribute('data-nama');
-            document.getElementById('edit_status').value = button.getAttribute('data-status');
+    (function () {
+        ['addModal', 'editModal', 'resetModal'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el && el.parentElement !== document.body) document.body.appendChild(el);
         });
+
+        function initials(name) {
+            var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+            if (!parts.length) return '?';
+            var out = parts[0].charAt(0);
+            if (parts.length > 1) out += parts[parts.length - 1].charAt(0);
+            return out.toUpperCase();
+        }
+
+        function syncPreview(form) {
+            var box = form.querySelector('[data-tlr-preview]');
+            if (!box) return;
+            var nama = (form.querySelector('[data-tlr="nama"]') || {}).value || '';
+            var user = (form.querySelector('[data-tlr="username"]') || {}).value || '';
+            var n = box.querySelector('[data-preview="nama"]');
+            var u = box.querySelector('[data-preview="username"]');
+            var i = box.querySelector('[data-preview="initials"]');
+            if (n) n.textContent = nama.trim() || 'Nama teller';
+            if (u) u.textContent = user.trim() ? ('@' + user.trim()) : '@username';
+            if (i) i.textContent = initials(nama);
+        }
+
+        function bindForm(form) {
+            if (!form || form.dataset.tlrReady) return;
+            form.dataset.tlrReady = '1';
+
+            var user = form.querySelector('[data-tlr="username"]');
+            if (user) {
+                user.addEventListener('input', function () {
+                    var start = user.selectionStart;
+                    user.value = user.value.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9._-]/g, '');
+                    try { user.setSelectionRange(start, start); } catch (e) {}
+                    syncPreview(form);
+                });
+            }
+            var nama = form.querySelector('[data-tlr="nama"]');
+            if (nama) nama.addEventListener('input', function () { syncPreview(form); });
+
+            form.querySelectorAll('[data-tlr-toggle-pass]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var input = document.querySelector(btn.getAttribute('data-tlr-toggle-pass'));
+                    if (!input) return;
+                    var show = input.type === 'password';
+                    input.type = show ? 'text' : 'password';
+                    var icon = btn.querySelector('i');
+                    if (icon) icon.className = show ? 'ti ti-eye-off' : 'ti ti-eye';
+                });
+            });
+
+            syncPreview(form);
+        }
+
+        document.querySelectorAll('.ui-tlr-form-root').forEach(bindForm);
+
+        var addModal = document.getElementById('addModal');
+        if (addModal) {
+            addModal.addEventListener('show.bs.modal', function () {
+                var form = addModal.querySelector('.ui-tlr-form-root');
+                if (!form) return;
+                form.reset();
+                var aktif = form.querySelector('input[name="status"][value="aktif"]');
+                if (aktif) aktif.checked = true;
+                syncPreview(form);
+            });
+        }
+
+        var editModal = document.getElementById('editModal');
+        if (editModal) {
+            editModal.addEventListener('show.bs.modal', function (event) {
+                var button = event.relatedTarget;
+                var form = editModal.querySelector('.ui-tlr-form-root');
+                if (!button || !form) return;
+                document.getElementById('edit_id').value = button.getAttribute('data-id') || '';
+                document.getElementById('edit_username').value = button.getAttribute('data-username') || '';
+                document.getElementById('edit_nama').value = button.getAttribute('data-nama') || '';
+                var st = button.getAttribute('data-status') || 'aktif';
+                var aktif = document.getElementById('edit_status_aktif');
+                var non = document.getElementById('edit_status_nonaktif');
+                if (aktif) aktif.checked = st === 'aktif';
+                if (non) non.checked = st !== 'aktif';
+                syncPreview(form);
+            });
+        }
+
+        var resetModal = document.getElementById('resetModal');
+        if (resetModal) {
+            resetModal.addEventListener('show.bs.modal', function (event) {
+                var button = event.relatedTarget;
+                if (!button) return;
+                document.getElementById('reset_id').value = button.getAttribute('data-id') || '';
+                document.getElementById('reset_nama').textContent = button.getAttribute('data-nama') || '';
+                document.getElementById('reset_username').textContent = '@' + (button.getAttribute('data-username') || '');
+            });
+        }
+    })();
     </script>
 </body>
 </html>

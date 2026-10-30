@@ -321,3 +321,167 @@ if (!function_exists('migrasiRevisiBelumDijalankan')) {
         return $hasil;
     }
 }
+
+if (!function_exists('resetPasswordAnggota')) {
+    /**
+     * Reset password login anggota ke 123456.
+     * Menangani data lama: user_id kosong, username tidak sinkron, atau akun nonaktif.
+     *
+     * @return array{username:string,dibuat:bool,diaktifkan:bool}
+     */
+    function resetPasswordAnggota(PDO $db, int $anggotaId): array
+    {
+        if ($anggotaId <= 0) {
+            throw new Exception('ID anggota tidak valid.');
+        }
+        $stmt = $db->prepare('SELECT id, kode_anggota, nama_lengkap, user_id, status FROM anggota WHERE id = ?');
+        $stmt->execute([$anggotaId]);
+        $agt = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$agt) {
+            throw new Exception('Data anggota tidak ditemukan.');
+        }
+        $kode = trim((string)$agt['kode_anggota']);
+        if ($kode === '') {
+            throw new Exception('Kode anggota kosong; tidak bisa membuat akun login.');
+        }
+
+        $hash = password_hash('123456', PASSWORD_DEFAULT);
+        $userId = (int)($agt['user_id'] ?? 0);
+        $user = null;
+        if ($userId > 0) {
+            $q = $db->prepare("SELECT id, username, role, status FROM users WHERE id = ?");
+            $q->execute([$userId]);
+            $user = $q->fetch(PDO::FETCH_ASSOC) ?: null;
+            if ($user && ($user['role'] ?? '') !== 'anggota') {
+                throw new Exception('Akun tertaut bukan role anggota. Hubungi admin sistem.');
+            }
+        }
+        if (!$user) {
+            $q = $db->prepare("SELECT id, username, role, status FROM users WHERE username = ?");
+            $q->execute([$kode]);
+            $user = $q->fetch(PDO::FETCH_ASSOC) ?: null;
+            if ($user && ($user['role'] ?? '') !== 'anggota') {
+                throw new Exception('Username "' . $kode . '" sudah dipakai akun non-anggota.');
+            }
+        }
+
+        $dibuat = false;
+        $diaktifkan = false;
+        $db->beginTransaction();
+        try {
+            if (!$user) {
+                $ins = $db->prepare("INSERT INTO users (username, password, nama_lengkap, role, status) VALUES (?, ?, ?, 'anggota', 'aktif')");
+                $ins->execute([$kode, $hash, $agt['nama_lengkap']]);
+                $userId = (int)$db->lastInsertId();
+                $dibuat = true;
+            } else {
+                $userId = (int)$user['id'];
+                $diaktifkan = (($user['status'] ?? '') !== 'aktif');
+                $upd = $db->prepare("UPDATE users SET password = ?, username = ?, nama_lengkap = ?, status = 'aktif' WHERE id = ? AND role = 'anggota'");
+                $upd->execute([$hash, $kode, $agt['nama_lengkap'], $userId]);
+                if ($upd->rowCount() === 0) {
+                    // Password/hash sama + status sudah aktif → tetap OK; pastikan role benar
+                    $cek = $db->prepare("SELECT id FROM users WHERE id = ? AND role = 'anggota'");
+                    $cek->execute([$userId]);
+                    if (!$cek->fetchColumn()) {
+                        throw new Exception('Gagal memperbarui akun login anggota.');
+                    }
+                }
+            }
+            if ((int)($agt['user_id'] ?? 0) !== $userId) {
+                $link = $db->prepare('UPDATE anggota SET user_id = ? WHERE id = ?');
+                $link->execute([$userId, $anggotaId]);
+            }
+            $db->commit();
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw $e;
+        }
+
+        return [
+            'username' => $kode,
+            'dibuat' => $dibuat,
+            'diaktifkan' => $diaktifkan,
+        ];
+    }
+}
+
+if (!function_exists('pastikanAkunLoginAnggota')) {
+    /**
+     * Pastikan anggota punya akun users untuk login.
+     * - Buat akun baru (password default 123456) bila belum ada.
+     * - Sync status users dengan status anggota (nonaktif tetap tidak bisa login).
+     * - Tidak mereset password akun yang sudah ada.
+     *
+     * @return array{username:string,dibuat:bool}
+     */
+    function pastikanAkunLoginAnggota(PDO $db, int $anggotaId): array
+    {
+        if ($anggotaId <= 0) {
+            throw new Exception('ID anggota tidak valid.');
+        }
+        $stmt = $db->prepare('SELECT id, kode_anggota, nama_lengkap, user_id, status FROM anggota WHERE id = ?');
+        $stmt->execute([$anggotaId]);
+        $agt = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$agt) {
+            throw new Exception('Data anggota tidak ditemukan.');
+        }
+        $kode = trim((string) $agt['kode_anggota']);
+        if ($kode === '') {
+            throw new Exception('Kode anggota kosong; tidak bisa membuat akun login.');
+        }
+        $statusAkun = (strtolower((string) ($agt['status'] ?? 'aktif')) === 'nonaktif') ? 'nonaktif' : 'aktif';
+
+        $userId = (int) ($agt['user_id'] ?? 0);
+        $user = null;
+        if ($userId > 0) {
+            $q = $db->prepare('SELECT id, username, role, status FROM users WHERE id = ?');
+            $q->execute([$userId]);
+            $user = $q->fetch(PDO::FETCH_ASSOC) ?: null;
+            if ($user && ($user['role'] ?? '') !== 'anggota') {
+                throw new Exception('Akun tertaut bukan role anggota. Hubungi admin sistem.');
+            }
+        }
+        if (!$user) {
+            $q = $db->prepare('SELECT id, username, role, status FROM users WHERE username = ?');
+            $q->execute([$kode]);
+            $user = $q->fetch(PDO::FETCH_ASSOC) ?: null;
+            if ($user && ($user['role'] ?? '') !== 'anggota') {
+                throw new Exception('Username "' . $kode . '" sudah dipakai akun non-anggota.');
+            }
+        }
+
+        $dibuat = false;
+        $ownTx = !$db->inTransaction();
+        if ($ownTx) {
+            $db->beginTransaction();
+        }
+        try {
+            if (!$user) {
+                $ins = $db->prepare("INSERT INTO users (username, password, nama_lengkap, role, status) VALUES (?, ?, ?, 'anggota', ?)");
+                $ins->execute([$kode, password_hash('123456', PASSWORD_DEFAULT), $agt['nama_lengkap'], $statusAkun]);
+                $userId = (int) $db->lastInsertId();
+                $dibuat = true;
+            } else {
+                $userId = (int) $user['id'];
+                $upd = $db->prepare("UPDATE users SET username = ?, nama_lengkap = ?, status = ? WHERE id = ? AND role = 'anggota'");
+                $upd->execute([$kode, $agt['nama_lengkap'], $statusAkun, $userId]);
+            }
+            if ((int) ($agt['user_id'] ?? 0) !== $userId) {
+                $db->prepare('UPDATE anggota SET user_id = ? WHERE id = ?')->execute([$userId, $anggotaId]);
+            }
+            if ($ownTx) {
+                $db->commit();
+            }
+        } catch (Throwable $e) {
+            if ($ownTx && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw $e;
+        }
+
+        return ['username' => $kode, 'dibuat' => $dibuat];
+    }
+}

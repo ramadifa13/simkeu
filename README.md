@@ -6,7 +6,8 @@ Aplikasi koperasi simpan pinjam (PHP + MySQL) dengan 3 level login: Admin, Telle
 
 ## Kebutuhan
 
-- PHP **7.0 atau lebih baru** dengan ekstensi `pdo_mysql` dan `fileinfo`
+- PHP **8.2 atau lebih baru** (disarankan; lokal sering 8.3/8.4) dengan ekstensi `pdo_mysql` dan `fileinfo`
+- Lihat rencana revamp UI di [docs/IMPLEMENTASI_PLAN.md](docs/IMPLEMENTASI_PLAN.md)
 - MySQL / MariaDB
 - Apache dengan `AllowOverride All` (agar `.htaccess` di folder upload berlaku), misalnya XAMPP
 

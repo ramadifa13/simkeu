@@ -5,7 +5,7 @@ require_once __DIR__ . '/upload_foto.php';
  * Upload dokumen anggota (KTP, KK, KTP suami/istri).
  *
  * - Tipe divalidasi di server dengan finfo (bukan dari ekstensi/nama file).
- * - Maksimal 10 MB per file, format jpg/jpeg/png/webp.
+ * - File asal maksimal 10 MB (jpg/jpeg/png/webp); hasil disimpan maksimal 1 MB (kompres otomatis).
  * - Nama file acak, disimpan di uploads/anggota/{id_anggota}/ (eksekusi script
  *   diblokir oleh uploads/anggota/.htaccess).
  * - File foto_ktp lama (sebelum revisi) tetap dibaca dari assets/uploads/ktp/.
@@ -44,7 +44,63 @@ if (!function_exists('dokumenWajib')) {
 if (!function_exists('dirUploadAnggota')) {
     /** Path absolut folder upload dokumen anggota (tanpa slash akhir). */
     function dirUploadAnggota() {
-        return realpath(__DIR__ . '/..') . '/uploads/anggota';
+        if (function_exists('pastikanFolderUpload')) {
+            return pastikanFolderUpload('anggota');
+        }
+        $dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'anggota';
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            throw new Exception('Folder upload dokumen tidak dapat dibuat');
+        }
+        return $dir;
+    }
+}
+
+if (!function_exists('normalisasiPathDokumenAnggota')) {
+    /**
+     * Normalisasi nilai kolom foto ke path relatif konsisten.
+     * Baru: "anggota/{id}/{file}" ; legacy basename → assets/uploads/ktp/{file}.
+     */
+    function normalisasiPathDokumenAnggota($nilai) {
+        $nilai = str_replace('\\', '/', trim((string) $nilai));
+        if ($nilai === '' || preg_match('#^(https?:)?//#i', $nilai) || preg_match('#^[a-zA-Z]:/#', $nilai)) {
+            return '';
+        }
+        if (strpos($nilai, 'uploads/') === 0) {
+            $nilai = substr($nilai, 8);
+        }
+        $nilai = ltrim($nilai, '/');
+        if ($nilai === '' || strpos($nilai, '..') !== false) {
+            return '';
+        }
+        return $nilai;
+    }
+}
+
+if (!function_exists('pathAbsDokumenAnggota')) {
+    /** Path absolut di disk untuk nilai kolom dokumen; '' bila tidak bisa di-resolve. */
+    function pathAbsDokumenAnggota($nilai) {
+        $nilai = normalisasiPathDokumenAnggota($nilai);
+        if ($nilai === '') {
+            return '';
+        }
+        $root = realpath(__DIR__ . '/..');
+        if ($root === false) {
+            return '';
+        }
+        if (strpos($nilai, 'assets/uploads/ktp/') === 0) {
+            return $root . '/' . $nilai;
+        }
+        if (strpos($nilai, '/') === false) {
+            return $root . '/assets/uploads/ktp/' . $nilai;
+        }
+        return $root . '/uploads/' . $nilai;
+    }
+}
+
+if (!function_exists('dokumenAnggotaAdaDiDisk')) {
+    function dokumenAnggotaAdaDiDisk($nilai) {
+        $abs = pathAbsDokumenAnggota($nilai);
+        return $abs !== '' && is_file($abs);
     }
 }
 
@@ -54,8 +110,13 @@ if (!function_exists('urlDokumenAnggota')) {
      * Nilai baru: "anggota/{id}/{file}" ; nilai lama (hanya nama file): assets/uploads/ktp/.
      */
     function urlDokumenAnggota($nilai) {
-        if (empty($nilai)) {
+        $nilai = normalisasiPathDokumenAnggota($nilai);
+        if ($nilai === '') {
             return '';
+        }
+        if (strpos($nilai, 'assets/uploads/ktp/') === 0) {
+            $base = substr($nilai, strlen('assets/uploads/ktp/'));
+            return '../assets/uploads/ktp/' . rawurlencode(basename($base));
         }
         if (strpos($nilai, '/') !== false) {
             return '../uploads/' . $nilai;
@@ -140,9 +201,13 @@ if (!function_exists('simpanDokumenAnggota')) {
             return;
         }
         $anggota_id = (int) $anggota_id;
-        $dir = dirUploadAnggota() . '/' . $anggota_id;
-        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
-            throw new Exception("Folder upload dokumen tidak dapat dibuat");
+        if (function_exists('pastikanFolderUpload')) {
+            $dir = pastikanFolderUpload('anggota/' . $anggota_id);
+        } else {
+            $dir = dirUploadAnggota() . DIRECTORY_SEPARATOR . $anggota_id;
+            if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+                throw new Exception("Folder upload dokumen tidak dapat dibuat");
+            }
         }
 
         $baru = [];
@@ -151,9 +216,9 @@ if (!function_exists('simpanDokumenAnggota')) {
                 $nama = bin2hex(random_bytes(16)) . '.' . $info['ext'];
                 $destPath = $dir . '/' . $nama;
                 if (!kompresDanSimpanGambar($info['tmp'], $destPath, $info['ext'])) {
-                    throw new Exception("Gagal menyimpan file dokumen");
+                    throw new Exception("Gagal menyimpan file dokumen (hasil harus maksimal 1 MB)");
                 }
-                $baru[$field] = 'anggota/' . $anggota_id . '/' . $nama;
+                $baru[$field] = 'anggota/' . $anggota_id . '/' . basename($destPath);
             }
 
             $set = [];

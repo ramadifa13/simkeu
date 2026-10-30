@@ -138,11 +138,6 @@ foreach ($angsuran as $a) {
     if ($a['status'] == 'telat') $total_telat++;
 }
 
-// Fungsi format rupiah
-function formatRupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
-}
-
 // ============================================
 // BUAT PDF
 // ============================================

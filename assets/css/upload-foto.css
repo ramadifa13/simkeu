@@ -5,3 +5,7 @@ input[type=file].form-control::file-selector-button{margin:-.48rem .7rem -.48rem
 .foto-upload-status{display:block;margin:0 0 8px;padding:7px 10px;border:1px dashed #c8d9df;border-radius:8px;color:#71858e;background:#fbfdfd;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .foto-upload-status.has-file{border-color:#9bd2b0;color:#26734a;background:#f1fbf5}
 .foto-upload-native{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+/* Input multiple jangan di-clip 1px — di Android/iOS itu sering mematikan pilih banyak. */
+.foto-upload-native.foto-upload-native-multi{
+    position:static!important;width:100%!important;height:auto!important;padding:.48rem .7rem!important;margin:0!important;overflow:visible!important;clip:auto!important;white-space:normal!important;border:1px solid #dce6e9!important;clip-path:none!important
+}
