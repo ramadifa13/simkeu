@@ -54,7 +54,7 @@ if (!function_exists('dashboardLoadStaffDataDefaults')) {
             'transaksi_terbaru' => [],
             'angsuran_terbaru' => [],
             'transaksi_hari_ini' => ['total_transaksi' => 0],
-            'setoran_hari_ini' => ['total_transaksi' => 0, 'total_setoran' => 0],
+            'setoran_hari_ini' => ['total_transaksi' => 0, 'total_setoran' => 0, 'total_nasabah' => 0],
         ];
     }
 }
@@ -220,10 +220,17 @@ if (!function_exists('dashboardLoadStaffData')) {
         $transaksiHariIni = [
             'total_transaksi' => (int)dashboardFetchScalar($db, 'SELECT COUNT(*) FROM kas WHERE DATE(tanggal) = ?', [$today]),
         ];
-        $setoranHariIni = dashboardFetchRow($db, "SELECT COUNT(*) AS total_transaksi, COALESCE(SUM(jumlah),0) AS total_setoran
-            FROM kas WHERE jenis = 'masuk' AND DATE(tanggal) = ?
-            AND (keterangan = '' OR (keterangan NOT LIKE '%angsuran%' AND keterangan NOT LIKE '%Waserda%'))", [$today])
-            ?: ['total_transaksi' => 0, 'total_setoran' => 0];
+        // Setoran hari ini = kas masuk operasional (simpanan + angsuran/migrasi bayar).
+        // Waserda dikecualikan (ada KPI tersendiri). Label "setoran" harus mencerminkan uang masuk yang diinput teller/admin.
+        $setoranHariIni = dashboardFetchRow($db, "SELECT
+                COUNT(*) AS total_transaksi,
+                COALESCE(SUM(k.jumlah), 0) AS total_setoran,
+                COUNT(DISTINCT t.anggota_id) AS total_nasabah
+            FROM kas k
+            LEFT JOIN transaksi t ON t.id = k.transaksi_id
+            WHERE k.jenis = 'masuk' AND DATE(k.tanggal) = ?
+              AND (k.keterangan IS NULL OR k.keterangan = '' OR k.keterangan NOT LIKE '%Waserda%')", [$today])
+            ?: ['total_transaksi' => 0, 'total_setoran' => 0, 'total_nasabah' => 0];
 
         return [
             'role' => $role,

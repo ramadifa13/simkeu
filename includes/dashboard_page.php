@@ -29,10 +29,14 @@ $nama = htmlspecialchars((string)($_SESSION['nama_lengkap'] ?? 'Pengguna'), ENT_
 $isAdmin = $dashRole === 'admin';
 $pageTitle = $isAdmin ? 'Dashboard Admin' : 'Dashboard Teller';
 
+$setoranHariIniHint = ((int)($d['setoran_hari_ini']['total_nasabah'] ?? 0)) . ' nasabah · '
+    . ((int)$d['setoran_hari_ini']['total_transaksi']) . ' trx (simpanan+angsuran)';
+
 $primaryKpis = $isAdmin
     ? [
         ['label' => 'Anggota', 'value' => number_format((int)$d['stat_anggota']['total']), 'hint' => (int)$d['stat_anggota']['aktif'] . ' aktif', 'icon' => 'ti ti-users', 'tone' => 'primary'],
         ['label' => 'Simpanan', 'value' => formatRupiah($d['total_simpanan']), 'hint' => 'Saldo real', 'icon' => 'ti ti-pig-money', 'tone' => 'success'],
+        ['label' => 'Setoran hari ini', 'value' => formatRupiah($d['setoran_hari_ini']['total_setoran']), 'hint' => $setoranHariIniHint, 'icon' => 'ti ti-cash-banknote', 'tone' => 'success'],
         ['label' => 'Pinjaman cair', 'value' => formatRupiah($d['pinjaman_stats']['total_nominal']), 'hint' => (int)$d['pinjaman_stats']['aktif'] . ' aktif', 'icon' => 'ti ti-cash', 'tone' => 'danger'],
         ['label' => 'Sisa tagihan', 'value' => formatRupiah($d['pinjaman_stats']['total_sisa']), 'hint' => 'Pokok + bunga', 'icon' => 'ti ti-hourglass', 'tone' => 'warning'],
         ['label' => 'Saldo kas', 'value' => formatRupiah($d['stat_kas']['saldo']), 'hint' => 'Tersedia', 'icon' => 'ti ti-wallet', 'tone' => 'info'],
@@ -40,7 +44,7 @@ $primaryKpis = $isAdmin
     ]
     : [
         ['label' => 'Trx hari ini', 'value' => number_format((int)$d['transaksi_hari_ini']['total_transaksi']), 'hint' => 'Semua kas', 'icon' => 'ti ti-activity', 'tone' => 'primary'],
-        ['label' => 'Setoran hari ini', 'value' => formatRupiah($d['setoran_hari_ini']['total_setoran']), 'hint' => (int)$d['setoran_hari_ini']['total_transaksi'] . ' setoran', 'icon' => 'ti ti-cash-banknote', 'tone' => 'success'],
+        ['label' => 'Setoran hari ini', 'value' => formatRupiah($d['setoran_hari_ini']['total_setoran']), 'hint' => $setoranHariIniHint, 'icon' => 'ti ti-cash-banknote', 'tone' => 'success'],
         ['label' => 'Anggota aktif', 'value' => number_format((int)$d['stat_anggota']['aktif']), 'hint' => 'dari ' . number_format((int)$d['stat_anggota']['total']), 'icon' => 'ti ti-users', 'tone' => 'info'],
     ];
 
