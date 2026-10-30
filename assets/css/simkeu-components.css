@@ -558,13 +558,23 @@ body>.ui-combobox-list { max-height:min(220px,40vh) }
 .ui-combobox-list .ui-combobox-option { padding:10px }
 .btn.ui-action { min-height:38px }
 }
-/* Keyboard / viewport pendek: tetap scroll di .modal-body */
+/* Keyboard / viewport pendek: body tetap bisa di-scroll, footer tetap terlihat */
+.ui-modal-short .modal-dialog-centered{
+  min-height:0!important;
+  align-items:flex-start!important;
+}
+.ui-modal-short .modal-dialog-scrollable{
+  height:calc(var(--ui-modal-height, 100dvh) - 1rem)!important;
+  max-height:calc(var(--ui-modal-height, 100dvh) - 1rem)!important;
+}
 .ui-modal-short .modal-dialog-scrollable .modal-content,
 .ui-modal-short .modal-dialog-scrollable .modal-content > form{
-  max-height:calc(var(--ui-modal-height, 100dvh) - 1rem);
+  height:100%;
+  max-height:100%;
 }
+.ui-modal-short .modal .modal-body,
 .ui-modal-short .modal-dialog-scrollable .modal-body{
-  overflow-y:auto!important;flex-shrink:1;min-height:0;
+  overflow-y:auto!important;flex:1 1 auto;min-height:0!important;touch-action:pan-y;
 }
 .ui-notification-list a[data-notif-key="pelunasan_dini"] .ui-notification-icon,
 .ui-notification-list a[data-notif-key="pelunasan_disetujui"] .ui-notification-icon { background:#e9f7ed;color:#24804a }

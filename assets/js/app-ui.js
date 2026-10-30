@@ -642,9 +642,12 @@ document.addEventListener('DOMContentLoaded', function () {
         modalViewportFrame = requestAnimationFrame(function () {
             const height = viewport ? viewport.height : window.innerHeight;
             const top = viewport ? viewport.offsetTop : 0;
-            document.body.style.setProperty('--ui-modal-height', height + 'px');
+            // Pakai tinggi visual nyata (kurangi chrome browser / gesture bar)
+            const safeH = Math.max(240, Math.floor(height));
+            document.body.style.setProperty('--ui-modal-height', safeH + 'px');
             document.body.style.setProperty('--ui-modal-top', top + 'px');
-            document.body.classList.toggle('ui-modal-short', height <= 360);
+            // Hampir semua tablet (portrait & landscape) + keyboard
+            document.body.classList.toggle('ui-modal-short', safeH <= 920);
             const focused = document.activeElement;
             if (focused && focused.matches('input,select,textarea') && focused.closest('.modal.show')) {
                 focused.scrollIntoView({block:'nearest', inline:'nearest'});
@@ -656,11 +659,37 @@ document.addEventListener('DOMContentLoaded', function () {
         viewport.addEventListener('resize', updateModalViewport);
         viewport.addEventListener('scroll', updateModalViewport);
     }
+    function constrainModalToViewport(dialog) {
+        if (!dialog || dialog.classList.contains('modal-fullscreen')) return;
+        dialog.classList.add('modal-dialog-scrollable');
+        const content = dialog.querySelector(':scope > .modal-content');
+        if (!content) return;
+        const form = content.querySelector(':scope > form');
+        const shell = form || content;
+        const body = shell.querySelector(':scope > .modal-body');
+        if (body) {
+            body.style.webkitOverflowScrolling = 'touch';
+            body.style.touchAction = 'pan-y';
+            body.style.overflowY = 'auto';
+            body.style.minHeight = '0';
+        }
+        // Paksa content mengecil ke tinggi dialog agar footer selalu di dalam layar
+        const limit = dialog.clientHeight || 0;
+        if (limit > 0) {
+            content.style.maxHeight = limit + 'px';
+            if (form) form.style.maxHeight = limit + 'px';
+            // Jika isi lebih tinggi dari viewport, body harus mengisi sisa ruang lalu scroll
+            if (body && content.scrollHeight > limit + 2) {
+                content.style.height = limit + 'px';
+                if (form) form.style.height = '100%';
+            } else {
+                content.style.height = '';
+                if (form) form.style.height = '';
+            }
+        }
+    }
     function hardenModalScroll(root) {
-        (root || document).querySelectorAll('.modal-dialog').forEach(function (el) {
-            if (el.classList.contains('modal-fullscreen')) return;
-            el.classList.add('modal-dialog-scrollable');
-        });
+        (root || document).querySelectorAll('.modal-dialog').forEach(constrainModalToViewport);
     }
     document.addEventListener('show.bs.modal', function (e) {
         if (e.target && e.target.classList && e.target.classList.contains('modal')) {
@@ -670,11 +699,17 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.addEventListener('shown.bs.modal', function (e) {
         updateModalViewport();
-        // Fokus field di dalam body yang panjang: pastikan area scroll siap
-        const body = e.target && e.target.querySelector ? e.target.querySelector('.modal-body') : null;
-        if (body && body.scrollHeight > body.clientHeight + 4) {
-            body.setAttribute('tabindex', '-1');
-        }
+        hardenModalScroll(e.target);
+        requestAnimationFrame(function () {
+            hardenModalScroll(e.target);
+            const body = e.target && e.target.querySelector ? e.target.querySelector('.modal-body') : null;
+            if (body) {
+                body.scrollTop = 0;
+                if (body.scrollHeight > body.clientHeight + 4) {
+                    body.setAttribute('tabindex', '-1');
+                }
+            }
+        });
     });
     updateModalViewport();
     hardenModalScroll(document);

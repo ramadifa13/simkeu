@@ -57,48 +57,152 @@ a { text-decoration: none; }
 .modal-content { border: 0; border-radius: var(--tblr-border-radius-lg); box-shadow: 0 24px 60px rgba(15, 23, 42, .25); }
 .modal.fade .modal-dialog { transition: transform .25s ease, opacity .2s; }
 
-/* ---------- Modal scroll global (tinggi mengikuti visual viewport) ---------- */
-.modal{--ui-modal-gap:.75rem}
+/* ---------- Modal responsive global (tablet + HP + desktop) ---------- */
+.modal{
+  --ui-modal-gap:.75rem;
+  --ui-modal-max-h:calc(var(--ui-modal-height, 100dvh) - (var(--ui-modal-gap) * 2) - env(safe-area-inset-bottom, 0px));
+}
 .modal-dialog{
   margin-top:max(var(--ui-modal-gap), var(--ui-modal-top, 0px));
-  margin-bottom:var(--ui-modal-gap);
-  max-height:calc(var(--ui-modal-height, 100dvh) - (var(--ui-modal-gap) * 2));
+  margin-bottom:max(var(--ui-modal-gap), env(safe-area-inset-bottom, 0px));
+  max-width:min(var(--bs-modal-width, 500px), calc(100vw - (var(--ui-modal-gap) * 2)));
+  width:auto;
+  /* Tinggi dialog dibatasi viewport — footer tidak boleh keluar layar */
+  max-height:var(--ui-modal-max-h);
 }
-.modal-dialog-centered{
-  min-height:calc(var(--ui-modal-height, 100dvh) - (var(--ui-modal-gap) * 2));
-}
+.modal-dialog.modal-sm{--bs-modal-width:300px}
+.modal-dialog.modal-lg{--bs-modal-width:800px}
+.modal-dialog.modal-xl{--bs-modal-width:1140px}
+
+/*
+ * Scrollable modal (semua device):
+ * - Dialog dibatasi tinggi viewport (aman di tablet landscape)
+ * - Konten pendek tetap ringkas di atas (tidak dipaksa tinggi penuh)
+ * - Konten panjang: header+footer tetap, HANYA .modal-body yang scroll
+ * - Tidak center vertikal — center di tablet memotong atas/bawah
+ */
 .modal-dialog-scrollable{
-  height:auto!important;
-  max-height:calc(var(--ui-modal-height, 100dvh) - (var(--ui-modal-gap) * 2));
+  height:var(--ui-modal-max-h)!important;
+  max-height:var(--ui-modal-max-h)!important;
+  display:flex!important;
+  flex-direction:column;
+  align-items:stretch!important;
+  justify-content:flex-start!important;
+  min-height:0!important;
 }
-.modal-dialog-scrollable .modal-content{
-  max-height:calc(var(--ui-modal-height, 100dvh) - (var(--ui-modal-gap) * 2));
-  display:flex;flex-direction:column;
-  overflow:hidden; /* header/footer tetap; body yang scroll */
+.modal-dialog-scrollable.modal-dialog-centered{
+  align-items:stretch!important;
+  justify-content:flex-start!important;
+  min-height:0!important;
 }
-.modal-dialog-scrollable .modal-content > form{
-  display:flex;flex-direction:column;
-  min-height:0;max-height:100%;overflow:hidden;flex:1 1 auto;
+.modal-dialog-scrollable > .modal-content{
+  width:100%;
+  max-height:100%;
+  min-height:0;
+  height:auto;
+  flex:0 1 auto; /* boleh mengecil jika isi melebihi viewport */
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.modal-dialog-scrollable > .modal-content > form{
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  max-height:100%;
+  height:auto;
+  flex:1 1 auto;
+  overflow:hidden;
 }
 .modal-dialog-scrollable .modal-header,
-.modal-dialog-scrollable .modal-footer{flex-shrink:0}
-.modal-dialog-scrollable .modal-body{
+.modal-dialog-scrollable .modal-footer,
+.modal-dialog-scrollable > .modal-content > form > .modal-header,
+.modal-dialog-scrollable > .modal-content > form > .modal-footer{
+  flex:0 0 auto;
+}
+.modal-dialog-scrollable .modal-body,
+.modal-dialog-scrollable > .modal-content > form > .modal-body{
+  flex:1 1 auto;
+  min-height:0!important;
   overflow-y:auto!important;
   overflow-x:hidden;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
-  flex:1 1 auto;
+  touch-action:pan-y;
+}
+
+/* Modal tanpa scrollable: jangan melewati viewport */
+.modal-dialog-centered:not(.modal-dialog-scrollable){
   min-height:0;
+  align-items:safe center;
+}
+.modal .modal-content{
+  max-height:var(--ui-modal-max-h);
+}
+
+.modal-fullscreen .modal-dialog,
+.modal-fullscreen-sm-down .modal-dialog{
+  max-width:none;
+  width:100%;
+  height:var(--ui-modal-height, 100dvh)!important;
+  max-height:var(--ui-modal-height, 100dvh)!important;
 }
 .modal-fullscreen .modal-content,
 .modal-fullscreen-sm-down .modal-content{
-  max-height:var(--ui-modal-height, 100dvh);
+  height:100%;
+  max-height:100%;
+}
+
+/* Tablet/HP ATAU viewport pendek (termasuk tablet landscape lebar) */
+@media (max-width:991.98px), (max-height:900px){
+  .modal{--ui-modal-gap:.55rem}
+  .modal-dialog,
+  .modal-dialog.modal-sm,
+  .modal-dialog.modal-lg,
+  .modal-dialog.modal-xl{
+    --bs-modal-width:100%;
+    width:calc(100% - (var(--ui-modal-gap) * 2));
+    max-width:calc(100vw - (var(--ui-modal-gap) * 2));
+    margin-left:var(--ui-modal-gap);
+    margin-right:var(--ui-modal-gap);
+  }
+  .modal-dialog-centered{
+    min-height:0!important;
+    align-items:flex-start!important;
+  }
+  .modal .modal-footer{
+    padding-bottom:max(.7rem, env(safe-area-inset-bottom, 0px));
+    flex-wrap:wrap;
+    gap:.45rem;
+  }
+  .modal .modal-footer > .btn{
+    flex:1 1 auto;
+    min-width:min(100%, 8.5rem);
+  }
+  /* Area TTD lebih pendek agar sisa form & footer tetap kebaca */
+  .modal .signature-field canvas.signature,
+  .modal .signature-field canvas.signature-pad,
+  #pencairanModal .signature-pad,
+  #lunaskanModal .signature-pad{
+    height:150px!important;
+  }
 }
 @media (max-width:575.98px){
-  .modal{--ui-modal-gap:.5rem}
+  .modal{--ui-modal-gap:.4rem}
+  .modal-fullscreen-sm-down .modal-dialog{
+    width:100%;
+    max-width:100%;
+    margin:0;
+  }
   .modal-fullscreen-sm-down .modal-content{
-    height:var(--ui-modal-height, 100dvh);
-    max-height:var(--ui-modal-height, 100dvh);
+    height:100%;
+    max-height:100%;
+    border-radius:0;
+  }
+  .modal .signature-field canvas.signature,
+  .modal .signature-field canvas.signature-pad,
+  #pencairanModal .signature-pad{
+    height:140px!important;
   }
 }
 
@@ -1513,15 +1617,8 @@ button.ui-dash-btn-add:hover{
 }
 .ui-pl-footer{padding-bottom:max(.75rem,env(safe-area-inset-bottom));background:#fff}
 #lunaskanModal{z-index:1065}
-#lunaskanModal .modal-dialog{margin:1rem auto;max-height:calc(100vh - 2rem)}
-#lunaskanModal .modal-content{
-  display:flex;flex-direction:column;max-height:calc(100vh - 2rem);overflow:hidden;background:#fff;
-}
-#lunaskanModal .modal-content > form{display:flex;flex-direction:column;min-height:0;flex:1 1 auto;max-height:100%}
-#lunaskanModal .modal-header,#lunaskanModal .modal-footer{flex-shrink:0}
-#lunaskanModal .modal-body{
-  flex:1 1 auto;min-height:0;overflow-y:auto!important;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
-}
+#lunaskanModal .modal-content{background:#fff}
+#lunaskanModal .modal-footer{padding-bottom:max(.75rem,env(safe-area-inset-bottom));background:#fff}
 @media (max-width:767.98px){
   .ui-pl-hero{grid-template-columns:1fr}
   .ui-pl-hero-amount{text-align:left}
@@ -1750,22 +1847,9 @@ button.ui-dash-btn-add:hover{
 .ui-tx-page .ui-row-action > td:first-child + td{
   box-shadow:inset 3px 0 0 #f59e0b;
 }
-/* Modal pencairan — form modern, dialog Bootstrap aman */
+/* Modal pencairan — visual saja; tinggi/scroll mengikuti aturan modal global */
 #pencairanModal{z-index:1065}
-#pencairanModal .modal-dialog{margin:1rem auto;max-height:calc(100vh - 2rem)}
-#pencairanModal .modal-content{
-  display:flex;flex-direction:column;max-height:calc(100vh - 2rem);
-  overflow:hidden;background:#fff;
-}
-#pencairanModal .modal-content > form{
-  display:flex;flex-direction:column;min-height:0;flex:1 1 auto;max-height:100%;
-}
-#pencairanModal .modal-header,
-#pencairanModal .modal-footer{flex-shrink:0}
-#pencairanModal .modal-body{
-  flex:1 1 auto;min-height:0;overflow-y:auto!important;
-  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
-}
+#pencairanModal .modal-content{background:#fff}
 #pencairanModal .modal-footer{padding-bottom:max(.75rem,env(safe-area-inset-bottom));background:#fff}
 .ui-pc-modal-sub{font-size:.78rem;opacity:.85;margin-top:.2rem;font-weight:500}
 .ui-pc-form{display:grid;gap:.9rem}
@@ -1804,19 +1888,22 @@ button.ui-dash-btn-add:hover{
 }
 .ui-pc-sign{height:100%}
 .ui-pc-footer{gap:.5rem}
-#pencairanModal .signature-canvas-wrap{padding:10px;overflow:visible}
+#pencairanModal .signature-canvas-wrap{padding:10px;overflow:hidden}
 #pencairanModal .signature-pad{
-  display:block;width:100%!important;margin:0;height:200px!important;
+  display:block;width:100%!important;margin:0;height:160px!important;
   touch-action:none!important;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
 }
 #pencairanModal .signature-canvas-wrap.has-signature{background:#fff}
+@media (max-width:991.98px), (max-height:900px){
+  #pencairanModal .signature-pad{height:140px!important}
+  /* Satu kolom di tablet supaya area di luar canvas tetap bisa di-geser */
+  #pencairanModal .ui-pc-form .row > [class*="col-md-6"]{flex:0 0 100%;max-width:100%}
+}
 @media (max-width:767.98px){
   .ui-pc-hero{grid-template-columns:1fr}
 }
 @media (max-width:576px){
-  #pencairanModal .modal-dialog{margin:.5rem;max-height:calc(100vh - 1rem)}
-  #pencairanModal .modal-content{max-height:calc(100vh - 1rem)}
-  #pencairanModal .signature-pad{height:220px!important}
+  #pencairanModal .signature-pad{height:130px!important}
 }
 .ui-tx-btn-approve-ghost,
 .ui-dash-header .ui-tx-btn-approve-ghost{

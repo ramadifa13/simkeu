@@ -187,7 +187,10 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
             $kategori = trim($_POST['kategori_jaminan'] ?? '');
             $wajib = function ($nama, $label) {
                 $nilai = trim($_POST[$nama] ?? '');
-                if ($nilai === '') throw new Exception("$label wajib diisi");
+                // Tolak kosong dan placeholder umum seperti "-" agar tidak lolos ke server.
+                if ($nilai === '' || in_array($nilai, ['-', '–', '—', '.'], true)) {
+                    throw new Exception("$label wajib diisi");
+                }
                 return $nilai;
             };
             if ($kategori === 'hp') {
@@ -654,7 +657,7 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
 
                             <section id="jaminanFields" class="ui-form-section ui-pj-section ui-pj-jaminan" hidden>
                                 <h6 class="ui-form-section-title"><i class="ti ti-box" aria-hidden="true"></i>Barang jaminan</h6>
-                                <p class="ui-pj-section-note mb-3">Pilih kategori, lalu lengkapi detail barang.</p>
+                                <p class="ui-pj-section-note mb-3">Pilih kategori HP / motor / emas, lalu isi <strong>semua</strong> kolom bertanda * (tidak boleh kosong atau hanya “-”).</p>
                                 <div class="ui-pj-choices ui-pj-choices-3 mb-3" role="radiogroup" aria-label="Kategori jaminan">
                                     <div class="ui-pj-choice">
                                         <input class="btn-check kategori-jaminan" type="radio" name="kategori_jaminan" value="hp" id="jaminanHp">
@@ -1030,14 +1033,66 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
             renderFotoPreview(this, 'pengajuan_preview_foto_ktp_pasangan');
         });
 
+        function isBlankJaminan(nilai) {
+            const v = String(nilai || '').trim();
+            return v === '' || v === '-' || v === '–' || v === '—' || v === '.';
+        }
+
+        function labelFieldJaminan(el) {
+            const wrap = el.closest('[class*="col"]');
+            const lab = wrap && wrap.querySelector('label');
+            return ((lab && lab.textContent) || el.getAttribute('name') || 'Kolom')
+                .replace(/\*/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
         function aturKategoriJaminan() {
             const dipilih = document.querySelector('input[name="kategori_jaminan"]:checked');
             const kategori = dipilih ? dipilih.value : '';
             document.querySelectorAll('.jaminan-detail').forEach(function (panel) {
                 const aktif = panel.getAttribute('data-kategori') === kategori;
                 panel.hidden = !aktif;
-                panel.querySelectorAll('.detail-required').forEach(function (el) { el.required = aktif; });
+                panel.querySelectorAll('.detail-required').forEach(function (el) {
+                    el.required = aktif;
+                    if (!aktif) {
+                        el.classList.remove('is-invalid');
+                    }
+                });
             });
+        }
+
+        function validasiDetailJaminan() {
+            const dipilih = document.querySelector('input[name="kategori_jaminan"]:checked');
+            if (!dipilih) {
+                window.uiToast && uiToast('warning', 'Pilih kategori jaminan: HP, motor, atau emas');
+                return false;
+            }
+            const panel = document.querySelector('.jaminan-detail[data-kategori="' + dipilih.value + '"]');
+            if (!panel) return false;
+            let firstBad = null;
+            let jumlahKosong = 0;
+            panel.querySelectorAll('.detail-required').forEach(function (el) {
+                const kosong = isBlankJaminan(el.value);
+                el.classList.toggle('is-invalid', kosong);
+                if (kosong) {
+                    jumlahKosong += 1;
+                    if (!firstBad) firstBad = el;
+                }
+            });
+            if (!firstBad) return true;
+            const nama = labelFieldJaminan(firstBad);
+            const pesan = jumlahKosong > 1
+                ? nama + ' dan ' + (jumlahKosong - 1) + ' kolom lain masih kosong — isi semua kolom bertanda *'
+                : nama + ' wajib diisi';
+            window.uiToast && uiToast('warning', pesan);
+            try {
+                firstBad.focus({ preventScroll: true });
+            } catch (err) {
+                firstBad.focus();
+            }
+            firstBad.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+            return false;
         }
 
         function updateJenisMeta() {
@@ -1088,9 +1143,14 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
             if (!wajibJaminan) {
                 document.querySelectorAll('.jaminan-detail').forEach(function (panel) {
                     panel.hidden = true;
-                    panel.querySelectorAll('.detail-required').forEach(function (el) { el.required = false; });
+                    panel.querySelectorAll('.detail-required').forEach(function (el) {
+                        el.required = false;
+                        el.classList.remove('is-invalid');
+                    });
                 });
                 document.querySelectorAll('.kategori-jaminan').forEach(function (el) { el.checked = false; });
+            } else {
+                aturKategoriJaminan();
             }
             const hariGroup = document.getElementById('hariAngsuranGroup');
             const hariSelect = document.getElementById('hariAngsuranSelect');
@@ -1168,12 +1228,12 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
                 window.uiToast && uiToast('warning', 'Pilih hari angsuran');
                 return false;
             }
-            if (gadai && !document.querySelector('input[name="kategori_jaminan"]:checked')) {
-                window.uiToast && uiToast('warning', 'Pilih kategori jaminan');
+            if (gadai && !validasiDetailJaminan()) {
                 return false;
             }
             if (!(document.getElementById('tujuanPinjaman').value || '').trim()) {
                 window.uiToast && uiToast('warning', 'Isi tujuan pinjaman');
+                document.getElementById('tujuanPinjaman').focus();
                 return false;
             }
             const docsVisible = !document.getElementById('dokumenAgtjAgt').classList.contains('d-none');
@@ -1219,13 +1279,34 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
         document.querySelectorAll('.kategori-jaminan').forEach(function (radio) {
             radio.addEventListener('change', aturKategoriJaminan);
         });
+        document.querySelectorAll('.detail-required').forEach(function (el) {
+            el.addEventListener('input', function () {
+                if (!isBlankJaminan(this.value)) this.classList.remove('is-invalid');
+            });
+            el.addEventListener('blur', function () {
+                if (this.required) this.classList.toggle('is-invalid', isBlankJaminan(this.value));
+            });
+        });
 
         form.addEventListener('submit', function (e) {
-            if (allowSubmit) return;
+            if (allowSubmit) {
+                // Cadangan terakhir sebelum kirim (form memakai novalidate).
+                if (!validateForm()) {
+                    e.preventDefault();
+                    allowSubmit = false;
+                }
+                return;
+            }
             e.preventDefault();
             openConfirm();
         });
         document.getElementById('btnKonfirmasiPengajuan').addEventListener('click', function () {
+            if (!validateForm()) {
+                allowSubmit = false;
+                const confirmModal = bootstrap.Modal.getInstance(document.getElementById('modalKonfirmasiPengajuan'));
+                if (confirmModal) confirmModal.hide();
+                return;
+            }
             allowSubmit = true;
             const confirmModal = bootstrap.Modal.getInstance(document.getElementById('modalKonfirmasiPengajuan'));
             if (confirmModal) confirmModal.hide();
