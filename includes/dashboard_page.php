@@ -82,38 +82,35 @@ $kpiCount = count($primaryKpis);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle); ?> - <?php echo htmlspecialchars(APP_NAME); ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <?php $uiAssetPrefix = '../'; include __DIR__ . '/layout/assets.php'; ?>
 </head>
 <body>
-<?php include __DIR__ . '/header.php'; ?>
-<div class="container-fluid">
-    <div class="row">
-        <?php include __DIR__ . '/sidebar.php'; ?>
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-            <div class="ui-dash-header">
-                <h2 class="page-title"><i class="ti ti-dashboard me-1"></i><?php echo htmlspecialchars($pageTitle); ?></h2>
-                <p class="ui-dash-meta mb-0">Halo, <?php echo $nama; ?> · <?php echo htmlspecialchars($d['tanggal']); ?></p>
-            </div>
+<?php include __DIR__ . '/layout/shell_start.php'; ?>
+            <div class="ui-dash-page">
+            <header class="ui-dash-header">
+                <div class="ui-dash-header-icon" aria-hidden="true"><i class="ti ti-dashboard"></i></div>
+                <div class="ui-dash-header-copy">
+                    <p class="ui-dash-eyebrow mb-0">Ringkasan operasional</p>
+                    <h1 class="ui-dash-title"><?php echo htmlspecialchars($pageTitle); ?></h1>
+                    <p class="ui-dash-meta mb-0">Halo, <?php echo $nama; ?> · <?php echo htmlspecialchars($d['tanggal']); ?></p>
+                </div>
+            </header>
 
             <?php if (!$isAdmin): ?>
             <section class="ui-work-queue mb-3" aria-label="Antrian kerja hari ini">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                    <h3 class="h6 mb-0"><i class="ti ti-list-check me-1"></i>Antrian kerja hari ini</h3>
-                    <span class="text-muted small">Tindak lanjut prioritas</span>
+                <div class="ui-dash-sec">
+                    <h3 class="ui-dash-sec-title"><i class="ti ti-list-check" aria-hidden="true"></i>Antrian kerja hari ini</h3>
+                    <span class="ui-dash-sec-note">Tindak lanjut prioritas</span>
                 </div>
                 <div class="row g-2">
                     <?php foreach ($workQueue as $item): ?>
                         <div class="col-sm-4">
                             <a href="<?php echo htmlspecialchars($item['href']); ?>" class="ui-dash-attention tone-<?php echo htmlspecialchars($item['tone']); ?> text-decoration-none">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="ui-dash-attention-icon"><i class="<?php echo htmlspecialchars($item['icon']); ?>"></i></span>
-                                    <div class="min-w-0">
-                                        <div class="small text-muted text-truncate"><?php echo htmlspecialchars($item['label']); ?></div>
-                                        <div class="fw-semibold"><?php echo number_format((int)$item['value']); ?></div>
-                                    </div>
+                                <span class="ui-dash-attention-icon"><i class="<?php echo htmlspecialchars($item['icon']); ?>"></i></span>
+                                <div class="min-w-0 flex-fill">
+                                    <div class="small text-muted text-truncate"><?php echo htmlspecialchars($item['label']); ?></div>
                                 </div>
+                                <div class="fw-semibold"><?php echo number_format((int)$item['value']); ?></div>
                             </a>
                         </div>
                     <?php endforeach; ?>
@@ -141,37 +138,44 @@ $kpiCount = count($primaryKpis);
                 <?php foreach ($workQueue as $item): ?>
                     <div class="col-sm-4">
                         <a href="<?php echo htmlspecialchars($item['href']); ?>" class="ui-dash-attention tone-<?php echo htmlspecialchars($item['tone']); ?> text-decoration-none">
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="ui-dash-attention-icon"><i class="<?php echo htmlspecialchars($item['icon']); ?>"></i></span>
-                                <div class="min-w-0">
-                                    <div class="small text-muted text-truncate"><?php echo htmlspecialchars($item['label']); ?></div>
-                                    <div class="fw-semibold"><?php echo number_format((int)$item['value']); ?></div>
-                                </div>
+                            <span class="ui-dash-attention-icon"><i class="<?php echo htmlspecialchars($item['icon']); ?>"></i></span>
+                            <div class="min-w-0 flex-fill">
+                                <div class="small text-muted text-truncate"><?php echo htmlspecialchars($item['label']); ?></div>
                             </div>
+                            <div class="fw-semibold"><?php echo number_format((int)$item['value']); ?></div>
                         </a>
                     </div>
                 <?php endforeach; ?>
             </div>
             <?php endif; ?>
 
-            <div class="card ui-dash-panel">
-                <div class="card-body py-2">
-                    <h3 class="h6 mb-2"><i class="ti ti-bolt me-1"></i>Aksi cepat</h3>
-                    <div class="ui-dash-actions">
-                        <?php foreach ($quickActions as $i => $act): ?>
-                            <a class="btn btn-sm <?php echo $i === 0 ? 'btn-primary' : htmlspecialchars($act['class']); ?>" href="<?php echo htmlspecialchars($act['href']); ?>">
-                                <i class="<?php echo htmlspecialchars($act['icon']); ?> me-1"></i><?php echo htmlspecialchars($act['label']); ?>
-                            </a>
-                        <?php endforeach; ?>
-                    </div>
+            <section class="ui-dash-panel" aria-label="Aksi cepat">
+                <div class="ui-dash-sec">
+                    <h3 class="ui-dash-sec-title"><i class="ti ti-bolt" aria-hidden="true"></i>Aksi cepat</h3>
+                    <span class="ui-dash-sec-note">Pintasan transaksi</span>
                 </div>
-            </div>
+                <div class="ui-dash-actions" data-count="<?php echo count($quickActions); ?>">
+                    <?php foreach ($quickActions as $i => $act):
+                        $tone = ['primary','warning','info','success','danger','secondary'][$i % 6];
+                        if (str_contains($act['class'] ?? '', 'success')) $tone = 'success';
+                        elseif (str_contains($act['class'] ?? '', 'warning')) $tone = 'warning';
+                        elseif (str_contains($act['class'] ?? '', 'info')) $tone = 'info';
+                        elseif (str_contains($act['class'] ?? '', 'danger')) $tone = 'danger';
+                        elseif (str_contains($act['class'] ?? '', 'primary')) $tone = 'primary';
+                    ?>
+                        <a class="ui-dash-action tone-<?php echo $tone; ?><?php echo $i === 0 ? ' is-primary' : ''; ?>" href="<?php echo htmlspecialchars($act['href']); ?>">
+                            <span class="ui-dash-action-icon"><i class="<?php echo htmlspecialchars($act['icon']); ?>" aria-hidden="true"></i></span>
+                            <span class="ui-dash-action-label"><?php echo htmlspecialchars($act['label']); ?></span>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </section>
 
             <?php if (!empty($d['simpanan_per_jenis']) && $isAdmin): ?>
             <div class="card ui-dash-panel">
-                <div class="card-header">Saldo simpanan per jenis</div>
+                <div class="card-header ui-dash-sec"><span class="ui-dash-sec-title"><i class="ti ti-wallet" aria-hidden="true"></i>Saldo simpanan per jenis</span></div>
                 <div class="table-responsive ui-table-scroll">
-                    <table class="table table-vcenter table-sm mb-0">
+                    <table class="table table-vcenter table-sm mb-0 js-datatable" data-dt-plain>
                         <thead>
                             <tr><th>Jenis</th><th class="text-end">Saldo</th><th class="text-end">Anggota</th></tr>
                         </thead>
@@ -192,12 +196,12 @@ $kpiCount = count($primaryKpis);
             <div class="row g-2 mb-3">
                 <div class="col-lg-6">
                     <div class="card h-100">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span>Jatuh tempo (7 hari)</span>
-                            <a href="angsuran.php" class="small">Lihat semua</a>
+                        <div class="card-header ui-dash-sec">
+                            <span class="ui-dash-sec-title"><i class="ti ti-calendar-due" aria-hidden="true"></i>Jatuh tempo (7 hari)</span>
+                            <a href="angsuran.php" class="ui-dash-sec-link">Lihat semua</a>
                         </div>
                         <div class="table-responsive ui-table-scroll d-none d-md-block">
-                            <table class="table table-vcenter table-sm mb-0">
+                            <table class="table table-vcenter table-sm mb-0 js-datatable" data-dt-plain>
                                 <thead><tr><th>Anggota</th><th>Jatuh tempo</th><th class="text-end">Nominal</th></tr></thead>
                                 <tbody>
                                 <?php if (!$d['jatuh_tempo']): ?>
@@ -230,12 +234,12 @@ $kpiCount = count($primaryKpis);
                 </div>
                 <div class="col-lg-6">
                     <div class="card h-100">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span>Pinjaman aktif</span>
-                            <a href="pencairan.php" class="small">Pencairan</a>
+                        <div class="card-header ui-dash-sec">
+                            <span class="ui-dash-sec-title"><i class="ti ti-cash" aria-hidden="true"></i>Pinjaman aktif</span>
+                            <a href="pencairan.php" class="ui-dash-sec-link">Pencairan</a>
                         </div>
                         <div class="table-responsive ui-table-scroll d-none d-md-block">
-                            <table class="table table-vcenter table-sm mb-0">
+                            <table class="table table-vcenter table-sm mb-0 js-datatable" data-dt-plain>
                                 <thead><tr><th>Anggota</th><th>Progress</th><th class="text-end">Sisa</th></tr></thead>
                                 <tbody>
                                 <?php if (!$d['pinjaman_aktif']): ?>
@@ -271,7 +275,7 @@ $kpiCount = count($primaryKpis);
             <div class="row g-2">
                 <div class="col-lg-4">
                     <div class="card h-100">
-                        <div class="card-header"><?php echo $isAdmin ? 'Transaksi simpanan' : 'Transaksi saya'; ?></div>
+                        <div class="card-header ui-dash-sec"><span class="ui-dash-sec-title"><i class="ti ti-exchange" aria-hidden="true"></i><?php echo $isAdmin ? 'Transaksi simpanan' : 'Transaksi saya'; ?></span></div>
                         <div class="list-group list-group-flush ui-dash-list">
                             <?php if (!$d['transaksi_terbaru']): ?>
                                 <div class="list-group-item text-muted">Belum ada transaksi.</div>
@@ -293,7 +297,7 @@ $kpiCount = count($primaryKpis);
                 </div>
                 <div class="col-lg-4">
                     <div class="card h-100">
-                        <div class="card-header">Angsuran terbaru</div>
+                        <div class="card-header ui-dash-sec"><span class="ui-dash-sec-title"><i class="ti ti-receipt" aria-hidden="true"></i>Angsuran terbaru</span></div>
                         <div class="list-group list-group-flush ui-dash-list">
                             <?php if (!$d['angsuran_terbaru']): ?>
                                 <div class="list-group-item text-muted">Belum ada pembayaran.</div>
@@ -313,7 +317,7 @@ $kpiCount = count($primaryKpis);
                 </div>
                 <div class="col-lg-4">
                     <div class="card h-100">
-                        <div class="card-header">Waserda terbaru</div>
+                        <div class="card-header ui-dash-sec"><span class="ui-dash-sec-title"><i class="ti ti-building-store" aria-hidden="true"></i>Waserda terbaru</span></div>
                         <div class="list-group list-group-flush ui-dash-list">
                             <?php if (!$d['waserda_terbaru']): ?>
                                 <div class="list-group-item text-muted">Belum ada transaksi waserda.</div>
@@ -332,8 +336,7 @@ $kpiCount = count($primaryKpis);
                     </div>
                 </div>
             </div>
-        </main>
-    </div>
-</div>
+            </div>
+<?php include __DIR__ . '/layout/shell_end.php'; ?>
 </body>
 </html>

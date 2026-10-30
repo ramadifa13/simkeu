@@ -1,3 +1,7 @@
 <?php
-$_GET['tab']='lunas';
-require __DIR__.'/../includes/layanan_page.php';
+if (($_GET['tab'] ?? '') === 'pengaturan') {
+    header('Location: layanan.php?tab=pengaturan');
+    exit;
+}
+$_GET['tab'] = 'lunas';
+require __DIR__ . '/../includes/layanan_page.php';

@@ -2,27 +2,23 @@
 require_once '../includes/auth.php';
 require_once '../config/config.php';
 
-// Check if user is logged in
 if (!isLoggedIn()) {
     header("Location: ../login.php");
     exit();
 }
 
-// Check if user has access to this page
 if (!isAdmin() && !isTeller()) {
     $_SESSION['error'] = "Anda tidak memiliki akses ke halaman ini";
     header("Location: dashboard.php");
     exit();
 }
 
-// Filter parameters - Default to wider date range to show more data
 $start_date = $_GET['start_date'] ?? date('Y-m-01', strtotime('-1 month'));
 $end_date = $_GET['end_date'] ?? date('Y-m-d', strtotime('+6 months'));
 $filter_status = $_GET['status'] ?? '';
 $filter_anggota = $_GET['anggota_id'] ?? '';
 $filter_pinjaman = $_GET['pinjaman_id'] ?? '';
 
-// Handle export PDF
 if (isset($_GET['export_pdf']) && $_GET['export_pdf'] == 1) {
     $params = http_build_query([
         'start_date' => $start_date,
@@ -35,7 +31,6 @@ if (isset($_GET['export_pdf']) && $_GET['export_pdf'] == 1) {
     exit();
 }
 
-// Handle export Excel
 if (isset($_GET['export_excel']) && $_GET['export_excel'] == 1) {
     $params = http_build_query([
         'start_date' => $start_date,
@@ -48,7 +43,6 @@ if (isset($_GET['export_excel']) && $_GET['export_excel'] == 1) {
     exit();
 }
 
-// Build query - Modified to show all angsuran by default
 $query = "SELECT a.*, p.kode_pinjaman, p.anggota_id, p.tanggal_pencairan,
                  ag.kode_anggota, ag.nama_lengkap,
                  jp.nama_jenis as jenis_pinjaman
@@ -60,7 +54,6 @@ $query = "SELECT a.*, p.kode_pinjaman, p.anggota_id, p.tanggal_pencairan,
 
 $params = [];
 
-// Add date filter (optional)
 if (!empty($start_date) && !empty($end_date)) {
     $query .= " AND (a.tanggal_jatuh_tempo BETWEEN :tanggal_mulai AND :tanggal_selesai
                 OR a.tanggal_bayar BETWEEN :bayar_mulai AND :bayar_selesai)";
@@ -70,19 +63,16 @@ if (!empty($start_date) && !empty($end_date)) {
     $params[':bayar_selesai'] = $end_date;
 }
 
-// Add status filter
 if (!empty($filter_status)) {
     $query .= " AND a.status = :status";
     $params[':status'] = $filter_status;
 }
 
-// Add anggota filter
 if (!empty($filter_anggota)) {
     $query .= " AND p.anggota_id = :anggota_id";
     $params[':anggota_id'] = $filter_anggota;
 }
 
-// Add pinjaman filter
 if (!empty($filter_pinjaman)) {
     $query .= " AND p.id = :pinjaman_id";
     $params[':pinjaman_id'] = $filter_pinjaman;
@@ -96,33 +86,12 @@ foreach ($params as $key => $value) {
 }
 $stmt->execute();
 $angsuran = $stmt->fetchAll(PDO::FETCH_ASSOC);
-$__ui = ui_query_params([]);
-$__q = $__ui['q'];
-$__all = $angsuran;
-if ($__q !== '') {
-    $__fields = array (
-  0 => 'nama_lengkap',
-  1 => 'kode_anggota',
-  2 => 'kode_pinjaman',
-);
-    $__all = array_values(array_filter($__all, static function ($r) use ($__q, $__fields) {
-        $hay = '';
-        foreach ($__fields as $f) { $hay .= ' ' . ($r[$f] ?? ''); }
-        return stripos($hay, $__q) !== false;
-    }));
-}
-$pager = ui_paginate(count($__all), $__ui['page'], $__ui['per_page']);
-$angsuran = array_slice($__all, $pager['offset'], $pager['per_page']);
-$q = $__q;
 
-
-// Get anggota list for filter
 $query_anggota = "SELECT id, kode_anggota, nama_lengkap FROM anggota WHERE status = 'aktif' ORDER BY nama_lengkap";
 $stmt_anggota = $db->prepare($query_anggota);
 $stmt_anggota->execute();
 $anggota_list = $stmt_anggota->fetchAll(PDO::FETCH_ASSOC);
 
-// Get pinjaman list for filter
 $query_pinjaman = "SELECT p.id, p.kode_pinjaman, a.nama_lengkap 
                    FROM pinjaman p 
                    JOIN anggota a ON p.anggota_id = a.id 
@@ -132,15 +101,13 @@ $stmt_pinjaman = $db->prepare($query_pinjaman);
 $stmt_pinjaman->execute();
 $pinjaman_list = $stmt_pinjaman->fetchAll(PDO::FETCH_ASSOC);
 
-// Status options
 $status_list = [
-    '' => 'Semua Status',
-    'belum_bayar' => 'Belum Bayar',
+    '' => 'Semua status',
+    'belum_bayar' => 'Belum bayar',
     'lunas' => 'Lunas',
     'telat' => 'Telat'
 ];
 
-// Calculate totals
 $total_angsuran = 0;
 $total_pokok = 0;
 $total_bunga = 0;
@@ -148,390 +115,253 @@ $total_denda = 0;
 $total_lunas = 0;
 $total_belum_bayar = 0;
 $total_telat = 0;
+$pinjaman_unik = [];
 
 foreach ($angsuran as $a) {
-    $total_angsuran += $a['jumlah_angsuran'];
-    $total_pokok += $a['pokok'];
-    $total_bunga += $a['bunga'];
-    $total_denda += $a['denda'];
-    
-    if ($a['status'] == 'lunas') $total_lunas++;
-    if ($a['status'] == 'belum_bayar') $total_belum_bayar++;
-    if ($a['status'] == 'telat') $total_telat++;
+    $total_angsuran += (float)$a['jumlah_angsuran'];
+    $total_pokok += (float)$a['pokok'];
+    $total_bunga += (float)$a['bunga'];
+    $total_denda += (float)$a['denda'];
+    if (($a['status'] ?? '') === 'lunas') {
+        $total_lunas++;
+    } elseif (($a['status'] ?? '') === 'belum_bayar') {
+        $total_belum_bayar++;
+    } elseif (($a['status'] ?? '') === 'telat') {
+        $total_telat++;
+    }
+    $pinjaman_unik[$a['kode_pinjaman']] = true;
 }
 
+$exportQs = http_build_query([
+    'start_date' => $start_date,
+    'end_date' => $end_date,
+    'status' => $filter_status,
+    'anggota_id' => $filter_anggota,
+    'pinjaman_id' => $filter_pinjaman,
+]);
+
+$statusLabel = static function ($status) {
+    $map = [
+        'belum_bayar' => 'Belum bayar',
+        'lunas' => 'Lunas',
+        'telat' => 'Telat',
+    ];
+    return $map[$status] ?? ucfirst(str_replace('_', ' ', (string)$status));
+};
+
+$page_title = 'Laporan Angsuran';
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laporan Angsuran - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .stat-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .table-actions {
-            white-space: nowrap;
-        }
-        .loan-info {
-            background-color: #f8f9fa;
-            border-left: 4px solid #007bff;
-            padding: 10px;
-            margin-bottom: 15px;
-        }
-        @media print {
-            .no-print {
-                display: none !important;
-            }
-            .card {
-                border: none !important;
-                box-shadow: none !important;
-            }
-        }
-    </style>
+    <title>Laporan Angsuran - <?php echo htmlspecialchars(APP_NAME); ?></title>
+    <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <?php ui_page_header([
-                    'title' => 'Laporan Angsuran',
-                    'icon' => 'fas fa-chart-bar text-primary',
-                    'subtitle' => 'Rekap jadwal dan status angsuran pinjaman',
-                    'actions' => '<div class="btn-group">'
-                        . '<a href="?export_pdf=1&' . http_build_query($_GET) . '" class="btn btn-sm btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> <span class="d-none d-sm-inline">PDF</span></a>'
-                        . '<a href="?export_excel=1&' . http_build_query($_GET) . '" class="btn btn-sm btn-success"><i class="fas fa-file-excel"></i> <span class="d-none d-sm-inline">Excel</span></a>'
-                        . '<a href="laporan_angsuran.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-sync"></i> <span class="d-none d-sm-inline">Reset</span></a>'
-                        . '</div>',
-                ]); ?>
-                <div class="alert alert-info no-print">
-                    <i class="fas fa-info-circle me-1"></i>
-                    Halaman ini hanya laporan (tidak bisa mengedit denda). Denda otomatis muncul pada cicilan belum lunas yang lewat jatuh tempo.
-                    Untuk koreksi: perbaiki riwayat di <a href="import_migrasi.php">Import Migrasi</a> (sheet Angsuran_Historis),
-                    bayar/ubah denda di <a href="angsuran.php">Angsuran</a>, atau kelola di <a href="denda.php">Denda</a>.
+    <?php include __DIR__ . '/../includes/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-lang" aria-hidden="true"><i class="ti ti-calendar-stats"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Laporan</p>
+                        <h1 class="ui-dash-title">Laporan Angsuran</h1>
+                        <p class="ui-dash-meta mb-0">Jadwal cicilan, status bayar, denda, dan keterlambatan</p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <a href="?export_pdf=1&amp;<?php echo htmlspecialchars($exportQs); ?>" class="btn btn-outline-danger btn-sm" target="_blank" rel="noopener">
+                            <i class="ti ti-file-type-pdf me-1" aria-hidden="true"></i><span class="d-none d-sm-inline">PDF</span>
+                        </a>
+                        <a href="?export_excel=1&amp;<?php echo htmlspecialchars($exportQs); ?>" class="btn btn-outline-success btn-sm">
+                            <i class="ti ti-file-spreadsheet me-1" aria-hidden="true"></i><span class="d-none d-sm-inline">Excel</span>
+                        </a>
+                    </div>
+                </header>
+
+                <?php ui_flash(); ?>
+
+                <div class="alert alert-info ui-lang-info no-print" role="status" data-ui-toast-skip>
+                    <i class="ti ti-info-circle me-1" aria-hidden="true"></i>
+                    Halaman laporan saja. Koreksi denda lewat <a href="angsuran.php">Angsuran</a> / <a href="denda.php">Denda</a>, atau riwayat migrasi di <a href="import_migrasi.php">Import Migrasi</a>.
                 </div>
 
+                <div class="ui-lang-kpi">
                 <?php ui_stat_grid([
-                    ['label' => 'Total angsuran', 'value' => count($angsuran), 'tone' => 'primary', 'icon' => 'fas fa-list', 'hint' => 'Hasil filter'],
-                    ['label' => 'Lunas', 'value' => (int)$total_lunas, 'tone' => 'success', 'icon' => 'fas fa-check-circle', 'hint' => 'Sudah dibayar'],
-                    ['label' => 'Belum bayar', 'value' => (int)$total_belum_bayar, 'tone' => 'warning', 'icon' => 'fas fa-clock', 'hint' => 'Menunggu'],
-                    ['label' => 'Telat', 'value' => (int)$total_telat, 'tone' => 'danger', 'icon' => 'fas fa-exclamation-triangle', 'hint' => 'Lewat jatuh tempo'],
+                    ['label' => 'Total angsuran', 'value' => count($angsuran), 'tone' => 'primary', 'icon' => 'ti ti-list', 'hint' => count($pinjaman_unik) . ' pinjaman'],
+                    ['label' => 'Lunas', 'value' => $total_lunas, 'tone' => 'success', 'icon' => 'ti ti-circle-check', 'hint' => 'Sudah dibayar'],
+                    ['label' => 'Belum bayar', 'value' => $total_belum_bayar, 'tone' => 'warning', 'icon' => 'ti ti-clock', 'hint' => 'Menunggu'],
+                    ['label' => 'Telat', 'value' => $total_telat, 'tone' => 'danger', 'icon' => 'ti ti-alert-triangle', 'hint' => 'Lewat jatuh tempo'],
                 ]); ?>
+                </div>
 
-                <!-- Ringkasan Nilai -->
-                <div class="row mb-4">
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-body">
-                                <h6 class="card-title text-muted">
-                                    <i class="fas fa-money-bill-wave text-primary me-1"></i>Total Nilai Angsuran
-                                </h6>
-                                <h4 class="fw-bold text-primary"><?php echo formatRupiah($total_angsuran); ?></h4>
-                                <small class="text-muted">Dari <?php echo count($angsuran); ?> transaksi</small>
-                            </div>
-                        </div>
+                <div class="ui-lang-nilai mb-3">
+                    <div class="ui-lang-nilai-card">
+                        <span>Total nilai</span>
+                        <strong class="text-primary"><?php echo formatRupiah($total_angsuran); ?></strong>
                     </div>
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-body">
-                                <h6 class="card-title text-muted">
-                                    <i class="fas fa-percent text-info me-1"></i>Total Pokok & Bunga
-                                </h6>
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <small>Pokok</small>
-                                        <h6 class="fw-bold"><?php echo formatRupiah($total_pokok); ?></h6>
-                                    </div>
-                                    <div>
-                                        <small>Bunga</small>
-                                        <h6 class="fw-bold text-info"><?php echo formatRupiah($total_bunga); ?></h6>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="ui-lang-nilai-card">
+                        <span>Pokok</span>
+                        <strong><?php echo formatRupiah($total_pokok); ?></strong>
                     </div>
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-body">
-                                <h6 class="card-title text-muted">
-                                    <i class="fas fa-exclamation-circle text-danger me-1"></i>Total Denda
-                                </h6>
-                                <h4 class="fw-bold text-danger"><?php echo formatRupiah($total_denda); ?></h4>
-                                <small class="text-muted">Dari <?php echo $total_telat; ?> angsuran telat</small>
-                            </div>
-                        </div>
+                    <div class="ui-lang-nilai-card">
+                        <span>Bunga</span>
+                        <strong class="text-info"><?php echo formatRupiah($total_bunga); ?></strong>
+                    </div>
+                    <div class="ui-lang-nilai-card">
+                        <span>Denda</span>
+                        <strong class="text-danger"><?php echo formatRupiah($total_denda); ?></strong>
                     </div>
                 </div>
 
-                <!-- Filter Form -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-filter me-2"></i>Filter Laporan
-                        </h5>
+                <div class="card ui-lang-filter mb-3">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-filter" aria-hidden="true"></i>Filter laporan</span>
+                        <span class="ui-dash-sec-note"><?php echo htmlspecialchars(formatTanggalUi($start_date)); ?> – <?php echo htmlspecialchars(formatTanggalUi($end_date)); ?></span>
                     </div>
                     <div class="card-body">
-                        <form method="GET" class="row">
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label class="form-label">Dari Tanggal</label>
-                                    <input type="date" name="start_date" class="form-control" value="<?php echo $start_date; ?>">
+                        <form method="GET" class="ui-lang-filter-form">
+                            <div class="ui-lang-filter-grid">
+                                <div class="ui-lang-field">
+                                    <label class="form-label" for="la_start">Dari tanggal</label>
+                                    <input type="date" id="la_start" name="start_date" class="form-control" value="<?php echo htmlspecialchars($start_date); ?>">
                                 </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label class="form-label">Sampai Tanggal</label>
-                                    <input type="date" name="end_date" class="form-control" value="<?php echo $end_date; ?>">
+                                <div class="ui-lang-field">
+                                    <label class="form-label" for="la_end">Sampai tanggal</label>
+                                    <input type="date" id="la_end" name="end_date" class="form-control" value="<?php echo htmlspecialchars($end_date); ?>">
                                 </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="mb-3">
-                                    <label class="form-label">Status</label>
-                                    <select name="status" class="form-select">
+                                <div class="ui-lang-field">
+                                    <label class="form-label" for="la_status">Status</label>
+                                    <select id="la_status" name="status" class="form-select">
                                         <?php foreach ($status_list as $key => $value): ?>
-                                        <option value="<?php echo $key; ?>" <?php echo $filter_status == $key ? 'selected' : ''; ?>>
-                                            <?php echo $value; ?>
+                                        <option value="<?php echo htmlspecialchars($key); ?>" <?php echo (string)$filter_status === (string)$key ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($value); ?>
                                         </option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="mb-3">
-                                    <label class="form-label">Anggota</label>
-                                    <select name="anggota_id" class="form-select">
-                                        <option value="">Semua Anggota</option>
+                                <div class="ui-lang-field">
+                                    <label class="form-label" for="la_anggota">Anggota</label>
+                                    <select id="la_anggota" name="anggota_id" class="form-select">
+                                        <option value="">Semua anggota</option>
                                         <?php foreach ($anggota_list as $anggota): ?>
-                                        <option value="<?php echo $anggota['id']; ?>" <?php echo $filter_anggota == $anggota['id'] ? 'selected' : ''; ?>>
-                                            <?php echo $anggota['kode_anggota'] . ' - ' . $anggota['nama_lengkap']; ?>
+                                        <option value="<?php echo (int)$anggota['id']; ?>" <?php echo (string)$filter_anggota === (string)$anggota['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($anggota['kode_anggota'] . ' — ' . $anggota['nama_lengkap']); ?>
                                         </option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="mb-3">
-                                    <label class="form-label">Pinjaman</label>
-                                    <select name="pinjaman_id" class="form-select">
-                                        <option value="">Semua Pinjaman</option>
+                                <div class="ui-lang-field">
+                                    <label class="form-label" for="la_pinjaman">Pinjaman aktif</label>
+                                    <select id="la_pinjaman" name="pinjaman_id" class="form-select">
+                                        <option value="">Semua pinjaman</option>
                                         <?php foreach ($pinjaman_list as $pinjaman): ?>
-                                        <option value="<?php echo $pinjaman['id']; ?>" <?php echo $filter_pinjaman == $pinjaman['id'] ? 'selected' : ''; ?>>
-                                            <?php echo $pinjaman['kode_pinjaman'] . ' - ' . $pinjaman['nama_lengkap']; ?>
+                                        <option value="<?php echo (int)$pinjaman['id']; ?>" <?php echo (string)$filter_pinjaman === (string)$pinjaman['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($pinjaman['kode_pinjaman'] . ' — ' . $pinjaman['nama_lengkap']); ?>
                                         </option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-12">
+                            <div class="ui-lang-filter-actions">
                                 <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-search me-1"></i> Terapkan Filter
+                                    <i class="ti ti-search me-1" aria-hidden="true"></i>Terapkan
                                 </button>
-                                <a href="laporan_angsuran.php" class="btn btn-secondary">
-                                    <i class="fas fa-refresh me-1"></i> Reset
+                                <a href="laporan_angsuran.php" class="btn btn-outline-secondary">
+                                    <i class="ti ti-refresh me-1" aria-hidden="true"></i>Reset
                                 </a>
-                                <small class="text-muted ms-2">
-                                    Menampilkan <?php echo count($angsuran); ?> data angsuran
-                                </small>
                             </div>
                         </form>
                     </div>
                 </div>
 
-                <!-- Laporan Table -->
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-table me-2"></i>Data Angsuran
-                            <small class="text-muted">
-                                (<?php echo formatTanggalUi($start_date) . ' - ' . formatTanggalUi($end_date); ?>)
-                            </small>
-                        </h5>
+                <div class="card ui-lang-daftar">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-table" aria-hidden="true"></i>Data angsuran</span>
+                        <span class="ui-dash-sec-note"><?php echo (int)count($angsuran); ?> baris · <?php echo (int)count($pinjaman_unik); ?> pinjaman</span>
                     </div>
-                    <div class="card-body">
-                        <?php if (isset($pager)) ui_table_toolbar([
-                            'action' => 'laporan_angsuran.php',
-                            'q' => $q ?? '',
-                            'placeholder' => 'Cari nama, kode anggota, kode pinjaman…',
-                            'per_page' => $pager['per_page'],
-                            'reset_href' => 'laporan_angsuran.php',
-                            'hidden' => array_filter([
-                                'start_date' => $start_date ?? '',
-                                'end_date' => $end_date ?? '',
-                                'status' => $filter_status ?? '',
-                                'anggota_id' => $filter_anggota ?? '',
-                                'pinjaman_id' => $filter_pinjaman ?? '',
-                            ], static fn($v) => $v !== '' && $v !== null),
-                        ]); ?>
-                        <?php if (empty($angsuran)): ?>
-                            <div class="text-center py-5">
-                                <i class="fas fa-info-circle fa-3x text-muted mb-3"></i>
-                                <h5 class="text-muted">Tidak ada data angsuran</h5>
-                                <p class="text-muted">Tidak ditemukan data angsuran dengan filter yang dipilih.</p>
-                                <a href="laporan_angsuran.php" class="btn btn-primary">
-                                    <i class="fas fa-refresh me-1"></i> Tampilkan Semua Data
-                                </a>
-                            </div>
-                        <?php else: ?>
-                        
-                        <!-- Group by Pinjaman -->
-                        <?php
-                        $grouped_angsuran = [];
-                        foreach ($angsuran as $a) {
-                            $pinjaman_key = $a['kode_pinjaman'];
-                            if (!isset($grouped_angsuran[$pinjaman_key])) {
-                                $grouped_angsuran[$pinjaman_key] = [
-                                    'anggota' => $a['nama_lengkap'],
-                                    'kode_anggota' => $a['kode_anggota'],
-                                    'jenis_pinjaman' => $a['jenis_pinjaman'],
-                                    'angsuran' => []
-                                ];
-                            }
-                            $grouped_angsuran[$pinjaman_key]['angsuran'][] = $a;
-                        }
-                        ?>
-                        
-                        <?php foreach ($grouped_angsuran as $kode_pinjaman => $data): ?>
-                        <div class="loan-info">
-                            <h6 class="mb-1">
-                                <i class="fas fa-file-invoice-dollar me-2"></i>
-                                <?php echo $kode_pinjaman; ?>
-                            </h6>
-                            <p class="mb-1">
-                                <strong>Anggota:</strong> <?php echo $data['kode_anggota']; ?> - <?php echo $data['anggota']; ?> |
-                                <strong>Jenis:</strong> <?php echo $data['jenis_pinjaman']; ?> |
-                                <strong>Total Angsuran:</strong> <?php echo count($data['angsuran']); ?>
-                            </p>
-                        </div>
-                        
-                        <div class="table-responsive ui-table-scroll mb-4">
-                            <table class="table table-striped table-bordered table-sm">
-                                <thead class="table-light">
+                    <div class="card-body p-0">
+                        <div class="table-responsive ui-table-scroll">
+                            <table class="table table-hover table-sm align-middle mb-0 js-datatable"
+                                   data-dt-page-length="25"
+                                   data-dt-order="3,asc"
+                                   data-dt-filter="10"
+                                   data-empty-message="Tidak ada data angsuran untuk filter ini.">
+                                <thead>
                                     <tr>
-                                        <th>Angsuran Ke</th>
-                                        <th>Jatuh Tempo</th>
-                                        <th>Pokok</th>
-                                        <th>Bunga</th>
-                                        <th>Denda</th>
-                                        <th>Total</th>
-                                        <th>Tanggal Bayar</th>
+                                        <th>Pinjaman</th>
+                                        <th>Anggota</th>
+                                        <th>Jenis</th>
+                                        <th class="text-end">Ke</th>
+                                        <th>Jatuh tempo</th>
+                                        <th class="text-end">Pokok</th>
+                                        <th class="text-end">Bunga</th>
+                                        <th class="text-end">Denda</th>
+                                        <th class="text-end">Total</th>
+                                        <th>Tgl bayar</th>
                                         <th>Status</th>
-                                        <th>Keterlambatan</th>
+                                        <th>Telat</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($data['angsuran'] as $a): 
-                                        // Status badge color
-                                        $status_class = '';
-                                        if ($a['status'] == 'belum_bayar') $status_class = 'bg-warning';
-                                        if ($a['status'] == 'lunas') $status_class = 'bg-success';
-                                        if ($a['status'] == 'telat') $status_class = 'bg-danger';
-                                    ?>
+                                <?php foreach ($angsuran as $a):
+                                    $st = (string)($a['status'] ?? '');
+                                    $statusClass = 'bg-secondary';
+                                    if ($st === 'belum_bayar') {
+                                        $statusClass = 'bg-warning text-dark';
+                                    } elseif ($st === 'lunas') {
+                                        $statusClass = 'bg-success';
+                                    } elseif ($st === 'telat') {
+                                        $statusClass = 'bg-danger';
+                                    }
+                                    $label = $statusLabel($st);
+                                    $jt = !empty($a['tanggal_jatuh_tempo']) ? strtotime($a['tanggal_jatuh_tempo']) : false;
+                                    $tb = !empty($a['tanggal_bayar']) ? strtotime($a['tanggal_bayar']) : false;
+                                ?>
                                     <tr>
-                                        <td class="text-center">
-                                            <span class="badge bg-primary"><?php echo $a['angsuran_ke']; ?></span>
+                                        <td><code class="ui-lang-kode"><?php echo htmlspecialchars($a['kode_pinjaman']); ?></code></td>
+                                        <td>
+                                            <strong class="ui-lang-name"><?php echo htmlspecialchars($a['nama_lengkap']); ?></strong>
+                                            <small class="ui-lang-meta"><?php echo htmlspecialchars($a['kode_anggota']); ?></small>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($a['jenis_pinjaman']); ?></td>
+                                        <td class="text-end"><span class="badge bg-primary"><?php echo (int)$a['angsuran_ke']; ?></span></td>
+                                        <td data-order="<?php echo $jt ? date('Y-m-d', $jt) : ''; ?>">
+                                            <?php echo !empty($a['tanggal_jatuh_tempo']) ? htmlspecialchars(formatTanggalUi($a['tanggal_jatuh_tempo'])) : '—'; ?>
+                                        </td>
+                                        <td class="text-end ui-lang-money"><?php echo formatRupiah($a['pokok']); ?></td>
+                                        <td class="text-end ui-lang-money"><?php echo formatRupiah($a['bunga']); ?></td>
+                                        <td class="text-end fw-semibold text-danger ui-lang-money"><?php echo formatRupiah($a['denda']); ?></td>
+                                        <td class="text-end fw-semibold text-primary ui-lang-money"><?php echo formatRupiah($a['jumlah_angsuran']); ?></td>
+                                        <td data-order="<?php echo $tb ? date('Y-m-d', $tb) : ''; ?>">
+                                            <?php echo !empty($a['tanggal_bayar']) ? htmlspecialchars(formatTanggalUi($a['tanggal_bayar'])) : '<span class="text-muted">—</span>'; ?>
+                                        </td>
+                                        <td data-filter="<?php echo htmlspecialchars($label); ?>">
+                                            <span class="badge <?php echo $statusClass; ?>"><?php echo htmlspecialchars($label); ?></span>
                                         </td>
                                         <td>
-                                            <?php echo formatTanggalUi($a['tanggal_jatuh_tempo']); ?>
-                                        </td>
-                                        <td class="text-end"><?php echo formatRupiah($a['pokok']); ?></td>
-                                        <td class="text-end"><?php echo formatRupiah($a['bunga']); ?></td>
-                                        <td class="text-end text-danger fw-bold"><?php echo formatRupiah($a['denda']); ?></td>
-                                        <td class="text-end fw-bold text-primary"><?php echo formatRupiah($a['jumlah_angsuran']); ?></td>
-                                        <td>
-                                            <?php if ($a['tanggal_bayar']): ?>
-                                                <span class="text-success">
-                                                    <?php echo formatTanggalUi($a['tanggal_bayar']); ?>
-                                                </span>
+                                            <?php if ((int)($a['keterlambatan_hari'] ?? 0) > 0): ?>
+                                            <span class="text-danger fw-semibold">+<?php echo (int)$a['keterlambatan_hari']; ?> hari</span>
                                             <?php else: ?>
-                                                <span class="text-muted">-</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <span class="badge <?php echo $status_class; ?>">
-                                                <?php echo ucfirst(str_replace('_', ' ', $a['status'])); ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <?php if ($a['keterlambatan_hari'] > 0): ?>
-                                                <span class="text-danger fw-bold">
-                                                    +<?php echo $a['keterlambatan_hari']; ?> hari
-                                                </span>
-                                            <?php else: ?>
-                                                <span class="text-muted">-</span>
+                                            <span class="text-muted">—</span>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
-                                    <?php endforeach; ?>
+                                <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
-                        <hr class="my-4">
-                        <?php endforeach; ?>
-                        
-                        <!-- Summary -->
-                        <div class="row mt-4">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="card-title mb-0">Ringkasan Laporan</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <table class="table table-sm">
-                                            <tr>
-                                                <td>Periode Laporan:</td>
-                                                <td class="fw-bold">
-                                                    <?php echo formatTanggalUi($start_date) . ' - ' . formatTanggalUi($end_date); ?>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>Total Data:</td>
-                                                <td class="fw-bold"><?php echo count($angsuran); ?> angsuran</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Total Pinjaman:</td>
-                                                <td class="fw-bold"><?php echo count($grouped_angsuran); ?> pinjaman</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Total Nilai Angsuran:</td>
-                                                <td class="fw-bold text-primary"><?php echo formatRupiah($total_angsuran); ?></td>
-                                            </tr>
-                                            <tr>
-                                                <td>Total Denda:</td>
-                                                <td class="fw-bold text-danger"><?php echo formatRupiah($total_denda); ?></td>
-                                            </tr>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
+                        <?php if ($angsuran): ?>
+                        <div class="ui-lang-totals">
+                            <div><span>Total angsuran</span><strong class="text-primary"><?php echo formatRupiah($total_angsuran); ?></strong></div>
+                            <div><span>Pokok</span><strong><?php echo formatRupiah($total_pokok); ?></strong></div>
+                            <div><span>Bunga</span><strong class="text-info"><?php echo formatRupiah($total_bunga); ?></strong></div>
+                            <div><span>Denda</span><strong class="text-danger"><?php echo formatRupiah($total_denda); ?></strong></div>
                         </div>
                         <?php endif; ?>
                     </div>
                 </div>
-                <?php if (isset($pager)) ui_pagination($pager, 'laporan_angsuran.php'); ?>
-            </main>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Auto-submit form when dates change for better UX
-        document.addEventListener('DOMContentLoaded', function() {
-            const dateInputs = document.querySelectorAll('input[type="date"]');
-            dateInputs.forEach(input => {
-                input.addEventListener('change', function() {
-                    this.form.submit();
-                });
-            });
-        });
-    </script>
+            </div>
+        <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
 </body>
 </html>

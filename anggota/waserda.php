@@ -2,310 +2,294 @@
 require_once '../includes/auth.php';
 require_once '../config/config.php';
 
-// Cek akses anggota
 if (!isAnggota()) {
-    $_SESSION['error'] = "Anda tidak memiliki akses ke halaman ini";
-    header("Location: ../login.php");
+    $_SESSION['error'] = 'Anda tidak memiliki akses ke halaman ini';
+    header('Location: ../login.php');
     exit();
 }
 
 $user_id = $_SESSION['user_id'];
-
-// Dapatkan data anggota berdasarkan user_id
-$query_anggota = "SELECT id FROM anggota WHERE user_id = :user_id";
-$stmt_anggota = $db->prepare($query_anggota);
+$stmt_anggota = $db->prepare('SELECT id, kode_anggota, nama_lengkap FROM anggota WHERE user_id = :user_id');
 $stmt_anggota->bindParam(':user_id', $user_id);
 $stmt_anggota->execute();
 $anggota = $stmt_anggota->fetch(PDO::FETCH_ASSOC);
-
 if (!$anggota) {
-    $_SESSION['error'] = "Data anggota tidak ditemukan";
-    header("Location: dashboard.php");
+    $_SESSION['error'] = 'Data anggota tidak ditemukan';
+    header('Location: dashboard.php');
     exit();
 }
+$anggota_id = (int) $anggota['id'];
 
-$anggota_id = $anggota['id'];
-
-// ============================================
-// AMBIL DATA TRANSAKSI WASERDA ANGGOTA
-// ============================================
-$query_transaksi = "SELECT 
-    w.*,
-    u.nama_lengkap as petugas
-FROM waserda_transaksi w
-LEFT JOIN users u ON w.user_id = u.id
-WHERE w.anggota_id = :anggota_id
-ORDER BY w.created_at DESC";
-
-$stmt_transaksi = $db->prepare($query_transaksi);
+$stmt_transaksi = $db->prepare(
+    'SELECT w.*, u.nama_lengkap AS petugas
+     FROM waserda_transaksi w
+     LEFT JOIN users u ON w.user_id = u.id
+     WHERE w.anggota_id = :anggota_id
+     ORDER BY w.created_at DESC'
+);
 $stmt_transaksi->bindParam(':anggota_id', $anggota_id);
 $stmt_transaksi->execute();
 $transaksi = $stmt_transaksi->fetchAll(PDO::FETCH_ASSOC);
-$__ui = ui_query_params([]);
-$__q = $__ui['q'];
-$__all = $transaksi;
-if ($__q !== '') {
-    $__fields = array (
-  0 => 'kode_transaksi',
-  1 => 'metode_bayar',
-);
-    $__all = array_values(array_filter($__all, static function ($r) use ($__q, $__fields) {
-        $hay = '';
-        foreach ($__fields as $f) { $hay .= ' ' . ($r[$f] ?? ''); }
-        return stripos($hay, $__q) !== false;
-    }));
-}
-$pager = ui_paginate(count($__all), $__ui['page'], $__ui['per_page']);
-$transaksi = array_slice($__all, $pager['offset'], $pager['per_page']);
-$q = $__q;
 
-// Hitung total pembelian
 $total_pembelian = 0;
+$total_item = 0;
+$detailMap = [];
 foreach ($transaksi as $t) {
-    $total_pembelian += $t['total_bayar'];
+    $total_pembelian += (float) $t['total_bayar'];
+    $items = json_decode($t['items'] ?? '[]', true);
+    if (!is_array($items)) {
+        $items = [];
+    }
+    $total_item += count($items);
+    $detailMap[(int) $t['id']] = [
+        'id' => (int) $t['id'],
+        'kode' => (string) $t['kode_transaksi'],
+        'total' => (float) $t['total_bayar'],
+        'metode' => (string) ($t['metode_bayar'] ?? ''),
+        'petugas' => (string) ($t['petugas'] ?? '—'),
+        'tanggal' => (string) ($t['created_at'] ?? ''),
+        'items' => array_values(array_map(static function ($it) {
+            return [
+                'nama' => (string) ($it['nama'] ?? '-'),
+                'harga' => (float) ($it['harga'] ?? 0),
+                'jumlah' => (int) ($it['jumlah'] ?? 0),
+            ];
+        }, $items)),
+    ];
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transaksi Waserda Saya - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        .card-header {
-            background: white;
-            border-bottom: 2px solid #f0f0f0;
-            font-weight: 600;
-            padding: 15px 20px;
-        }
-        .summary-card {
-            background: linear-gradient(135deg, #28a745, #20c997);
-            color: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .summary-value {
-            font-size: 1.15rem;
-            font-weight: 700;
-        }
-        .table th {
-            background-color: #f8f9fa;
-        }
-        .badge-waserda {
-            background-color: #28a745;
-            color: white;
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 0.7rem;
-        }
-        .empty-state {
-            text-align: center;
-            padding: 22px 20px;
-        }
-        .empty-state i {
-            font-size: 1.6rem;
-            color: #ccc;
-            margin-bottom: 15px;
-        }
-        .detail-item {
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            padding: 5px 10px;
-            margin: 2px 0;
-        }
-    </style>
+    <title>Waserda Saya - <?php echo htmlspecialchars(APP_NAME); ?></title>
+    <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <?php ui_page_header([
-                    'title' => 'Transaksi Waserda Saya',
-                    'icon' => 'fas fa-store text-success',
-                    'subtitle' => 'Riwayat pembelian di warung koperasi',
-                    'actions' => '<span class="badge bg-success"><i class="fas fa-shopping-cart me-1"></i>Total: ' . count($transaksi) . '</span>',
-                ]); ?>
-
-                <!-- Info -->
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Halaman ini menampilkan riwayat pembelian Anda di Waserda. Anda tidak dapat melakukan transaksi di sini.
-                </div>
-
-                <!-- Summary Card -->
-                <div class="summary-card">
-                    <div class="row align-items-center">
-                        <div class="col-md-8">
-                            <h5 class="mb-2">Total Pembelian Anda</h5>
-                            <div class="summary-value"><?php echo formatRupiah($total_pembelian); ?></div>
-                            <small><?php echo count($transaksi); ?> transaksi</small>
-                        </div>
-                        <div class="col-md-4 text-end">
-                            <i class="fas fa-store fa-4x opacity-50"></i>
-                        </div>
+    <?php include __DIR__ . '/../includes/layout/shell_start.php'; ?>
+            <div class="ui-tx-page ui-agt-waserda">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-agtwas" aria-hidden="true"><i class="ti ti-building-store"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Akun anggota</p>
+                        <h1 class="ui-dash-title">Waserda Saya</h1>
+                        <p class="ui-dash-meta mb-0">Riwayat belanja warung koperasi</p>
                     </div>
-                </div>
+                </header>
 
                 <?php ui_flash(); ?>
 
-                <!-- Tabel Transaksi -->
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="fas fa-history me-2"></i>Riwayat Pembelian Waserda</span>
-                        <span class="badge bg-primary"><?php echo count($transaksi); ?> data</span>
-                    </div>
-                    <div class="card-body p-0">
-                        <?php if (empty($transaksi)): ?>
-                            <div class="empty-state">
-                                <i class="fas fa-store"></i>
-                                <h5 class="text-muted">Belum ada transaksi waserda</h5>
-                                <p class="text-muted">Anda belum melakukan pembelian di waserda.</p>
-                            </div>
-                        <?php else: ?>
-                            <?php if (isset($pager)) ui_table_toolbar(['action'=>'waserda.php','q'=>$q ?? '','placeholder'=>'Cari…','per_page'=>$pager['per_page'],'reset_href'=>'waserda.php']); ?>
-                        <div class="table-responsive ui-table-scroll">
-                                <table class="table table-striped table-hover mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Tanggal</th>
-                                            <th>Kode Transaksi</th>
-                                            <th>Item</th>
-                                            <th>Total Bayar</th>
-                                            <th>Metode</th>
-                                            <th>Petugas</th>
-                                            <th>Detail</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($transaksi as $t): 
-                                            $items = json_decode($t['items'], true);
-                                            $jumlah_item = count($items);
-                                            $first_item = $items[0]['nama'] ?? 'Barang';
-                                        ?>
-                                        <tr>
-                                            <td><?php echo formatTanggalUi($t['created_at'], true); ?></td>
-                                            <td><small><?php echo $t['kode_transaksi']; ?></small></td>
-                                            <td>
-                                                <?php echo $first_item; ?>
-                                                <?php if ($jumlah_item > 1): ?>
-                                                    <br><small class="text-muted">+<?php echo $jumlah_item - 1; ?> item lainnya</small>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td class="fw-bold text-success"><?php echo formatRupiah($t['total_bayar']); ?></td>
-                                            <td><span class="badge bg-info"><?php echo ucfirst($t['metode_bayar']); ?></span></td>
-                                            <td><?php echo $t['petugas'] ?? '-'; ?></td>
-                                            <td>
-                                                <button class="btn btn-sm btn-outline-info" onclick="showDetail(<?php echo htmlspecialchars(json_encode($items)); ?>, '<?php echo $t['kode_transaksi']; ?>', <?php echo $t['total_bayar']; ?>)">
-                                                    <i class="fas fa-eye"></i> Detail
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
+                <div class="ui-agt-kpi">
+                <?php ui_stat_grid([
+                    ['label' => 'Total belanja', 'value' => formatRupiah($total_pembelian), 'tone' => 'success', 'icon' => 'ti ti-shopping-cart', 'hint' => 'Semua waktu'],
+                    ['label' => 'Nota', 'value' => count($transaksi), 'tone' => 'primary', 'icon' => 'ti ti-receipt-2', 'hint' => 'Jumlah transaksi'],
+                    ['label' => 'Item terbeli', 'value' => $total_item, 'tone' => 'info', 'icon' => 'ti ti-package', 'hint' => 'Semua baris item'],
+                ]); ?>
+                </div>
+
+                <div class="ui-agt-note mb-3" role="note">
+                    <i class="ti ti-info-circle" aria-hidden="true"></i>
+                    <div>
+                        <strong>Hanya riwayat</strong>
+                        <span>Pembelian dilakukan di waserda. Ketuk kartu atau tombol Detail untuk melihat isi nota.</span>
                     </div>
                 </div>
 
-                <!-- Modal Detail Item -->
-                <div class="modal fade" id="detailModal" tabindex="-1">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header bg-success text-white">
-                                <h5 class="modal-title">
-                                    <i class="fas fa-shopping-cart me-2"></i>Detail Pembelian
-                                </h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <p class="fw-bold" id="modalKodeTransaksi"></p>
-                                <div class="table-responsive ui-table-scroll">
-                                    <table class="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>No</th>
-                                                <th>Nama Barang</th>
-                                                <th class="text-end">Harga</th>
-                                                <th class="text-center">Jumlah</th>
-                                                <th class="text-end">Subtotal</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="modalItems">
-                                        </tbody>
-                                        <tfoot id="modalTotal">
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-                            </div>
+                <?php if (!$transaksi): ?>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="ui-agt-empty">
+                            <i class="ti ti-building-store" aria-hidden="true"></i>
+                            <strong>Belum ada belanja</strong>
+                            <p>Transaksi waserda Anda akan muncul di sini setelah belanja di koperasi.</p>
+                        </div>
+                    </div>
+                </div>
+                <?php else: ?>
+
+                <div class="card ui-agt-daftar ui-agt-was-desktop d-none d-lg-block">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-history" aria-hidden="true"></i>Riwayat pembelian</span>
+                        <span class="ui-dash-sec-note"><?php echo (int) count($transaksi); ?> nota</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive ui-table-scroll">
+                            <table class="table table-hover table-sm align-middle mb-0 js-datatable"
+                                   data-dt-page-length="10"
+                                   data-dt-order="0,desc"
+                                   data-dt-filter="4"
+                                   data-empty-message="Belum ada transaksi waserda.">
+                                <thead>
+                                    <tr>
+                                        <th>Tanggal</th>
+                                        <th>Kode</th>
+                                        <th>Item</th>
+                                        <th class="text-end">Total</th>
+                                        <th>Metode</th>
+                                        <th>Petugas</th>
+                                        <th class="text-end no-sort">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($transaksi as $t):
+                                    $items = json_decode($t['items'] ?? '[]', true);
+                                    if (!is_array($items)) {
+                                        $items = [];
+                                    }
+                                    $jumlah_item = count($items);
+                                    $first_item = $items[0]['nama'] ?? 'Barang';
+                                    $metode = (string) ($t['metode_bayar'] ?? '');
+                                    ?>
+                                    <tr>
+                                        <td data-order="<?php echo htmlspecialchars((string) $t['created_at']); ?>">
+                                            <span class="ui-agt-text"><?php echo htmlspecialchars(formatTanggalUi($t['created_at'], true)); ?></span>
+                                        </td>
+                                        <td><code class="ui-agt-code"><?php echo htmlspecialchars($t['kode_transaksi']); ?></code></td>
+                                        <td>
+                                            <strong class="ui-agt-name"><?php echo htmlspecialchars($first_item); ?></strong>
+                                            <?php if ($jumlah_item > 1): ?>
+                                            <span class="ui-agt-meta">+<?php echo $jumlah_item - 1; ?> item lain</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="text-end"><strong class="ui-agt-money is-in"><?php echo formatRupiah($t['total_bayar']); ?></strong></td>
+                                        <td data-filter="<?php echo htmlspecialchars($metode); ?>">
+                                            <span class="ui-agt-pill is-<?php echo htmlspecialchars($metode); ?>"><?php echo htmlspecialchars(ucfirst($metode)); ?></span>
+                                        </td>
+                                        <td><span class="ui-agt-text"><?php echo htmlspecialchars($t['petugas'] ?? '—'); ?></span></td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-sm btn-outline-primary js-agt-was-detail"
+                                                    data-was-id="<?php echo (int) $t['id']; ?>">
+                                                <i class="ti ti-eye" aria-hidden="true"></i> Detail
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
 
-                <!-- Catatan -->
-                <div class="alert alert-light mt-3">
-                    <i class="fas fa-info-circle me-2 text-success"></i>
-                    <small>
-                        Untuk melakukan pembelian di waserda, silakan datang langsung ke kantor koperasi.
-                        Halaman ini hanya menampilkan riwayat transaksi Anda.
-                    </small>
+                <div class="ui-agt-was-list d-lg-none" aria-label="Daftar pembelian">
+                    <?php foreach ($transaksi as $t):
+                        $items = json_decode($t['items'] ?? '[]', true);
+                        if (!is_array($items)) {
+                            $items = [];
+                        }
+                        $jumlah_item = count($items);
+                        $first_item = $items[0]['nama'] ?? 'Barang';
+                        $metode = (string) ($t['metode_bayar'] ?? '');
+                        ?>
+                    <article class="ui-agt-was-card">
+                        <button type="button" class="ui-agt-was-card-hit js-agt-was-detail" data-was-id="<?php echo (int) $t['id']; ?>" aria-label="Detail <?php echo htmlspecialchars($t['kode_transaksi']); ?>">
+                            <div class="ui-agt-was-card-top">
+                                <div>
+                                    <code class="ui-agt-code"><?php echo htmlspecialchars($t['kode_transaksi']); ?></code>
+                                    <span class="ui-agt-meta"><?php echo htmlspecialchars(formatTanggalUi($t['created_at'], true)); ?></span>
+                                </div>
+                                <strong class="ui-agt-money is-in"><?php echo formatRupiah($t['total_bayar']); ?></strong>
+                            </div>
+                            <div class="ui-agt-was-card-body">
+                                <strong class="ui-agt-name"><?php echo htmlspecialchars($first_item); ?></strong>
+                                <?php if ($jumlah_item > 1): ?>
+                                <span class="ui-agt-meta">+<?php echo $jumlah_item - 1; ?> item lain</span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="ui-agt-was-card-foot">
+                                <span class="ui-agt-pill is-<?php echo htmlspecialchars($metode); ?>"><?php echo htmlspecialchars(ucfirst($metode)); ?></span>
+                                <span class="ui-agt-was-petugas"><i class="ti ti-user" aria-hidden="true"></i><?php echo htmlspecialchars($t['petugas'] ?? '—'); ?></span>
+                                <span class="ui-agt-was-cta">Detail <i class="ti ti-chevron-right" aria-hidden="true"></i></span>
+                            </div>
+                        </button>
+                    </article>
+                    <?php endforeach; ?>
                 </div>
-                <?php if (isset($pager)) ui_pagination($pager, 'waserda.php'); ?>
+                <?php endif; ?>
+            </div>
+    <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
 
-            </main>
+<div class="modal fade" id="detailWaserdaModal" tabindex="-1" aria-labelledby="detailWaserdaTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content ui-agt-was-modal">
+            <div class="modal-header">
+                <h5 class="modal-title" id="detailWaserdaTitle"><i class="ti ti-receipt-2 me-1" aria-hidden="true"></i>Detail pembelian</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body" id="detailWaserdaBody">
+                <p class="text-muted mb-0">Memuat…</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+            </div>
         </div>
     </div>
+</div>
+<script>
+window.__agtWaserdaDetail = <?php echo json_encode($detailMap, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
+(function () {
+    var map = window.__agtWaserdaDetail || {};
+    var modalEl = document.getElementById('detailWaserdaModal');
+    if (!modalEl || typeof bootstrap === 'undefined') return;
+    document.body.appendChild(modalEl);
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    var bodyEl = document.getElementById('detailWaserdaBody');
+    var titleEl = document.getElementById('detailWaserdaTitle');
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        function showDetail(items, kode, total) {
-            const modalItems = document.getElementById('modalItems');
-            const modalTotal = document.getElementById('modalTotal');
-            document.getElementById('modalKodeTransaksi').textContent = 'Kode: ' + kode;
-            
-            let html = '';
-            
-            items.forEach((item, index) => {
-                const subtotal = item.harga * item.jumlah;
-                html += `
-                    <tr>
-                        <td>${index + 1}</td>
-                        <td>${item.nama}</td>
-                        <td class="text-end">Rp ${item.harga.toLocaleString('id-ID')}</td>
-                        <td class="text-center">${item.jumlah}</td>
-                        <td class="text-end">Rp ${subtotal.toLocaleString('id-ID')}</td>
-                    </tr>
-                `;
-            });
-            
-            modalItems.innerHTML = html;
-            modalTotal.innerHTML = `
-                <tr>
-                    <th colspan="4" class="text-end">TOTAL</th>
-                    <th class="text-end text-success">Rp ${total.toLocaleString('id-ID')}</th>
-                </tr>
-            `;
-            
-            var detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
-            detailModal.show();
+    function formatRupiah(n) {
+        n = Math.round(Number(n) || 0);
+        return 'Rp ' + Math.abs(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+    function formatTanggal(value) {
+        if (!value) return '—';
+        var m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+        if (m) {
+            return m[3] + '/' + m[2] + '/' + m[1] + (m[4] ? (' ' + m[4] + ':' + m[5]) : '');
         }
-    </script>
+        return String(value);
+    }
+    function escapeHtml(v) {
+        return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c];
+        });
+    }
+    function render(d) {
+        titleEl.innerHTML = '<i class="ti ti-receipt-2 me-1" aria-hidden="true"></i>' + escapeHtml(d.kode);
+        var rows = '';
+        (d.items || []).forEach(function (item, i) {
+            var sub = (Number(item.harga) || 0) * (Number(item.jumlah) || 0);
+            rows += '<tr><td>' + (i + 1) + '</td><td>' + escapeHtml(item.nama) + '</td>'
+                + '<td class="text-end">' + formatRupiah(item.harga) + '</td>'
+                + '<td class="text-center">' + (item.jumlah || 0) + '</td>'
+                + '<td class="text-end fw-semibold">' + formatRupiah(sub) + '</td></tr>';
+        });
+        bodyEl.innerHTML =
+            '<div class="ui-agt-was-modal-meta">'
+            + '<div><span>Tanggal</span><strong>' + escapeHtml(formatTanggal(d.tanggal)) + '</strong></div>'
+            + '<div><span>Metode</span><strong>' + escapeHtml((d.metode || '—').replace(/^./, function (c) { return c.toUpperCase(); })) + '</strong></div>'
+            + '<div><span>Petugas</span><strong>' + escapeHtml(d.petugas || '—') + '</strong></div>'
+            + '</div>'
+            + '<div class="table-responsive"><table class="table table-sm align-middle mb-0">'
+            + '<thead><tr><th>No</th><th>Barang</th><th class="text-end">Harga</th><th class="text-center">Qty</th><th class="text-end">Subtotal</th></tr></thead>'
+            + '<tbody>' + (rows || '<tr><td colspan="5" class="text-center text-muted">Tidak ada item</td></tr>') + '</tbody>'
+            + '<tfoot><tr><th colspan="4" class="text-end">TOTAL</th><th class="text-end text-success">' + formatRupiah(d.total) + '</th></tr></tfoot>'
+            + '</table></div>';
+    }
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.js-agt-was-detail');
+        if (!btn) return;
+        e.preventDefault();
+        var id = String(btn.getAttribute('data-was-id') || '');
+        var d = map[id];
+        if (!d) {
+            bodyEl.innerHTML = '<div class="alert alert-warning mb-0">Detail tidak ditemukan.</div>';
+        } else {
+            render(d);
+        }
+        modal.show();
+    });
+})();
+</script>
 </body>
 </html>

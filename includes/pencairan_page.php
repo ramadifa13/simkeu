@@ -299,17 +299,6 @@ if ($_POST && isset($_POST['lengkapi_foto_pencairan'])) {
     exit();
 }
 
-$filter_cari = trim(isset($_GET['q']) ? $_GET['q'] : '');
-$filter_tanggal_mulai = trim(isset($_GET['tanggal_mulai']) ? $_GET['tanggal_mulai'] : '');
-$filter_tanggal_selesai = trim(isset($_GET['tanggal_selesai']) ? $_GET['tanggal_selesai'] : '');
-if ($filter_tanggal_mulai !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $filter_tanggal_mulai)) $filter_tanggal_mulai = '';
-if ($filter_tanggal_selesai !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $filter_tanggal_selesai)) $filter_tanggal_selesai = '';
-if ($filter_tanggal_mulai !== '' && $filter_tanggal_selesai !== '' && $filter_tanggal_mulai > $filter_tanggal_selesai) {
-    $tmp_tanggal = $filter_tanggal_mulai;
-    $filter_tanggal_mulai = $filter_tanggal_selesai;
-    $filter_tanggal_selesai = $tmp_tanggal;
-}
-
 $query = "SELECT pp.*, a.nama_lengkap,
           CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
           jp.nama_jenis,
@@ -317,7 +306,7 @@ $query = "SELECT pp.*, a.nama_lengkap,
           j.jenis_barang, j.foto_barang, j.foto_nasabah_barang,
           p.id as pinjaman_id, p.kode_pinjaman, p.tanggal_pencairan, p.status as status_pinjaman,
           p.foto_pencairan, uc.nama_lengkap as teller_name,
-          pr.id AS perjanjian_id, tc.status AS status_tc, tc.alasan AS alasan_tc, tc.catatan_admin AS catatan_tc,
+          pr.id AS perjanjian_id, tc.id AS tc_id, tc.status AS status_tc, tc.alasan AS alasan_tc, tc.catatan_admin AS catatan_tc,
           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status <> 'lunas') AS cicilan_belum,
           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) AS total_cicilan
           FROM pengajuan_pinjaman pp
@@ -330,38 +319,13 @@ $query = "SELECT pp.*, a.nama_lengkap,
           LEFT JOIN perjanjian_pinjaman pr ON pr.pinjaman_id = p.id
           LEFT JOIN layanan_tunda_cair tc ON tc.pengajuan_id = pp.id
           WHERE (pp.status IN ('menunggu', 'disetujui', 'dicairkan', 'develop')
-          OR (pp.status = '' AND pp.tanggal_persetujuan IS NOT NULL))";
-$params_filter = [];
-if ($filter_cari !== '') {
-    $query .= " AND (a.nama_lengkap LIKE :cari_nama OR a.kode_anggota LIKE :cari_kode
-                OR COALESCE(a.kode_anggota_jaminan, '') LIKE :cari_kode_jaminan
-                OR pp.kode_pengajuan LIKE :cari_pengajuan OR COALESCE(p.kode_pinjaman, '') LIKE :cari_pinjaman)";
-    $nilai_cari = '%' . $filter_cari . '%';
-    $params_filter[':cari_nama'] = $nilai_cari;
-    $params_filter[':cari_kode'] = $nilai_cari;
-    $params_filter[':cari_kode_jaminan'] = $nilai_cari;
-    $params_filter[':cari_pengajuan'] = $nilai_cari;
-    $params_filter[':cari_pinjaman'] = $nilai_cari;
-}
-if ($filter_tanggal_mulai !== '') {
-    $query .= " AND p.tanggal_pencairan >= :tanggal_mulai";
-    $params_filter[':tanggal_mulai'] = $filter_tanggal_mulai;
-}
-if ($filter_tanggal_selesai !== '') {
-    $query .= " AND p.tanggal_pencairan <= :tanggal_selesai";
-    $params_filter[':tanggal_selesai'] = $filter_tanggal_selesai;
-}
-$query .= " ORDER BY pp.tanggal_persetujuan DESC";
-
+          OR (pp.status = '' AND pp.tanggal_persetujuan IS NOT NULL))
+          ORDER BY COALESCE(pp.tanggal_persetujuan, pp.tanggal_pengajuan) DESC";
 $stmt = $db->prepare($query);
-$stmt->execute($params_filter);
-$pengajuan_all = $stmt->fetchAll(PDO::FETCH_ASSOC);
-$ui_pp = ui_query_params([]);
-$pager = ui_paginate(count($pengajuan_all), $ui_pp['page'], $ui_pp['per_page']);
-$pengajuan_list = array_slice($pengajuan_all, $pager['offset'], $pager['per_page']);
+$stmt->execute();
+$pengajuan_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get statistics
-$query_stats = "SELECT 
+$query_stats = "SELECT
     COUNT(*) as total_pengajuan,
     COUNT(CASE WHEN status = 'menunggu' OR (status = '' AND tanggal_persetujuan IS NULL) THEN 1 END) as menunggu,
     COUNT(CASE WHEN status = 'disetujui' OR status = 'develop' OR (status = '' AND tanggal_persetujuan IS NOT NULL) THEN 1 END) as disetujui,
@@ -371,15 +335,18 @@ $query_stats = "SELECT
 $stmt_stats = $db->prepare($query_stats);
 $stmt_stats->execute();
 $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
-// Kartu: "Disetujui" = disetujui tapi BELUM dicairkan; "Dicairkan" = sudah punya pinjaman
 $stats['disetujui'] = (int) $db->query("SELECT COUNT(*) FROM pengajuan_pinjaman pp WHERE pp.status = 'disetujui'
                                         AND NOT EXISTS (SELECT 1 FROM pinjaman p WHERE p.pengajuan_id = pp.id)")->fetchColumn();
 $stats['dicairkan'] = (int) $db->query("SELECT COUNT(*) FROM pinjaman")->fetchColumn();
 
-$tcMenunggu = [];
-if ($bolehKeputusanTc) {
-    $tcMenunggu = $db->query("SELECT tc.*,pp.kode_pengajuan,a.nama_lengkap,a.kode_anggota,u.nama_lengkap teller FROM layanan_tunda_cair tc JOIN pengajuan_pinjaman pp ON pp.id=tc.pengajuan_id JOIN anggota a ON a.id=pp.anggota_id JOIN users u ON u.id=tc.user_id WHERE tc.status='menunggu' ORDER BY tc.created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
-}
+$statusClassMap = [
+    'menunggu' => 'warning',
+    'disetujui' => 'success',
+    'dicairkan' => 'info',
+    'ditolak' => 'danger',
+    'develop' => 'success',
+    'batal_cair' => 'secondary',
+];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -387,689 +354,572 @@ if ($bolehKeputusanTc) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Status Pencairan Pinjaman - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <?php $uiAssetPrefix = '../'; include __DIR__ . '/layout/assets.php'; ?>
-    <style>
-        .stat-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .table-actions {
-            white-space: nowrap;
-        }
-        .status-badge {
-            font-size: 0.75rem;
-            padding: 0.5rem 0.75rem;
-        }
-        .btn-action {
-            margin: 2px;
-        }
-        .action-menu {
-            min-width: 255px;
-            max-width: calc(100vw - 24px);
-            padding: .45rem;
-            border: 1px solid #dbe7ea;
-            border-radius: .75rem;
-            box-shadow: 0 .75rem 1.75rem rgba(31, 66, 80, .18);
-            z-index: 1080;
-        }
-        .action-menu.show { display: grid !important; gap: .25rem; }
-        .table-actions { position: relative; overflow: visible !important; }
-        .ui-shell .ui-actions-cell:last-child:has(.action-menu.show),
-        .ui-shell .table-actions:has(.action-menu.show) { z-index: 2000 !important; }
-        .ui-shell .table-actions .dropdown:has(.action-menu.show) { z-index: 2001; }
-        .action-menu .btn, .action-menu .badge {
-            width: 100%;
-            min-height: 38px;
-            margin: 0;
-            display: flex;
-            align-items: center;
-            gap: .55rem;
-            text-align: left;
-            white-space: normal;
-        }
-        .action-menu .btn i { width: 1rem; text-align: center; }
-        /* Saat tabel perlu digeser, menu aksi tetap muncul di layar dan tidak
-           terpotong oleh area scroll tabel. Posisi dihitung ulang lewat JS. */
-        .action-menu.action-menu-viewport { position: fixed !important; z-index: 2100 !important; }
-        @media (max-width: 576px) {
-            .action-menu { min-width: min(255px, calc(100vw - 24px)); }
-        }
-        .info-alert {
-            background-color: #e7f3ff;
-            border-left: 4px solid #3498db;
-        }
-        #pencairanModal .modal-dialog {
-            height: calc(var(--pencairan-viewport-height, 100vh) - 1rem);
-            margin-top: .5rem;
-            margin-bottom: .5rem;
-        }
-        #pencairanModal .modal-content {
-            height: 100%;
-            max-height: 100%;
-            min-height: 0;
-            overflow: hidden;
-        }
-        #pencairanModal .modal-content > form {
-            flex: 1 1 0;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            height: 100%;
-            max-height: 100%;
-        }
-        #pencairanModal .modal-body {
-            flex: 1 1 auto;
-            min-height: 0;
-            max-height: none;
-            overflow-y: auto !important;
-            overscroll-behavior: contain;
-            -webkit-overflow-scrolling: touch;
-        }
-        #pencairanModal .modal-header,
-        #pencairanModal .modal-footer { flex-shrink: 0; }
-        #pencairanModal .modal-footer {
-            padding-bottom: max(.75rem, env(safe-area-inset-bottom));
-            background: #fff;
-        }
-        /* Gutter aman di wrap (bukan margin canvas) agar cursor/jari tetap akurat. */
-        #pencairanModal .signature-canvas-wrap { padding: 12px; overflow: visible; }
-        #pencairanModal .signature-pad {
-            display: block;
-            width: 100% !important;
-            margin: 0;
-            height: 260px !important;
-            touch-action: none !important;
-            -webkit-user-select: none;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-        #pencairanModal .signature-canvas-wrap.has-signature { background: #fff; }
-        @media (max-width: 576px) { #pencairanModal .signature-pad { height: 280px !important; } }
-    </style>
 </head>
 <body>
-    <?php include __DIR__ . '/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include __DIR__ . '/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <?php
-                $pencairanActions = '';
-                if (isAdmin()) {
-                    $pencairanActions .= '<a href="?sync=1" class="btn btn-outline-secondary" onclick="return confirm(\'Sinkronisasi data pengajuan dengan pinjaman?\')"><i class="fas fa-sync me-1"></i>Sinkronisasi</a>';
-                }
-                $pencairanActions .= '<a href="persetujuan.php" class="btn btn-primary"><i class="fas fa-check-circle me-1"></i>Persetujuan</a>';
-                ui_page_header([
-                    'title' => 'Status Pencairan Pinjaman',
-                    'icon' => 'fas fa-money-bill-wave text-success',
-                    'subtitle' => 'Proses pencairan pinjaman yang sudah disetujui',
-                    'actions' => $pencairanActions,
-                ]);
-                ui_flash();
-                ?>
-
-                <!-- Info Alert -->
-                <div class="alert alert-info info-alert" role="status" data-ui-toast-skip>
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-info-circle text-primary me-3 fa-lg"></i>
-                        <div>
-                            <h6 class="alert-heading mb-1">Informasi Akses</h6>
-                            <p class="mb-0">Pengajuan yang sudah disetujui Admin menunggu diproses di sini.
-                            <strong>Staff menekan "Proses Pencairan" dan wajib mengunggah foto nasabah</strong>; jadwal angsuran dibuat saat itu, jatuh tempo dihitung dari <?php echo JADWAL_DARI_PENGAJUAN ? 'tanggal pengajuan' : 'tanggal pencairan'; ?>.</p>
-                        </div>
+    <?php include __DIR__ . '/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-cair" aria-hidden="true"><i class="ti ti-cash"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Pinjaman</p>
+                        <h1 class="ui-dash-title">Pencairan Pinjaman</h1>
+                        <p class="ui-dash-meta mb-0">Proses pencairan pengajuan yang sudah disetujui</p>
                     </div>
-                </div>
-
-                <?php if ($bolehKeputusanTc): ?>
-                <div class="card mb-4 border-warning">
-                    <div class="card-header bg-warning">
-                        <h5 class="mb-0"><i class="fas fa-pause-circle me-2"></i>Pengajuan Tunda Cair (TC) <span class="badge bg-light text-dark ms-2"><?= count($tcMenunggu) ?> Data</span></h5>
-                    </div>
-                    <div class="card-body">
-                        <?php if (!$tcMenunggu): ?>
-                            <p class="text-muted mb-0">Tidak ada TC yang menunggu keputusan.</p>
-                        <?php else: ?>
-                            <div class="table-responsive ui-table-scroll">
-                                <table class="table table-sm align-middle">
-                                    <thead><tr><th>Pengajuan</th><th>Nasabah</th><th>Alasan Teller</th><th>Waktu</th><th>Keputusan Admin</th></tr></thead>
-                                    <tbody>
-                                    <?php foreach ($tcMenunggu as $tc): ?>
-                                        <tr>
-                                            <td><?= htmlspecialchars($tc['kode_pengajuan']) ?></td>
-                                            <td><strong><?= htmlspecialchars($tc['nama_lengkap']) ?></strong><br><small><?= htmlspecialchars($tc['kode_anggota']) ?></small></td>
-                                            <td><?= nl2br(htmlspecialchars($tc['alasan'])) ?></td>
-                                            <td><?= formatTanggalUi($tc['created_at'], true) ?><br><small><?= htmlspecialchars($tc['teller']) ?></small></td>
-                                            <td>
-                                                <form method="post" class="d-flex flex-column gap-1">
-                                                    <?= layananToken() ?>
-                                                    <input type="hidden" name="tc_id" value="<?= (int)$tc['id'] ?>">
-                                                    <textarea name="catatan_tc" class="form-control form-control-sm" rows="2" minlength="5" maxlength="2000" required placeholder="Keterangan keputusan Admin"></textarea>
-                                                    <div class="btn-group">
-                                                        <button name="keputusan_tc" value="disetujui" class="btn btn-sm btn-success">Approve TC</button>
-                                                        <button name="keputusan_tc" value="ditolak" class="btn btn-sm btn-danger">Tolak TC</button>
-                                                    </div>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
+                    <div class="ui-dash-header-actions">
+                        <?php if (isAdmin()): ?>
+                        <a href="?sync=1" class="btn btn-outline-light" onclick="return confirm('Sinkronisasi data pengajuan dengan pinjaman?')">
+                            <i class="ti ti-refresh me-1" aria-hidden="true"></i>
+                            <span class="d-none d-sm-inline">Sinkronisasi</span>
+                        </a>
                         <?php endif; ?>
+                        <a href="persetujuan.php" class="btn ui-tx-btn-cair-ghost">
+                            <i class="ti ti-circle-check me-1" aria-hidden="true"></i>
+                            <span class="d-none d-sm-inline">Persetujuan</span><span class="d-sm-none">Setuju</span>
+                        </a>
                     </div>
+                </header>
+
+                <div class="alert alert-info ui-pc-info" role="status" data-ui-toast-skip>
+                    <i class="ti ti-info-circle me-1" aria-hidden="true"></i>
+                    Pengajuan disetujui Admin diproses di sini.
+                    <?php if ($bolehCairkan): ?>
+                    <strong>Proses Pencairan</strong> wajib unggah foto nasabah; jadwal angsuran dari <?php echo JADWAL_DARI_PENGAJUAN ? 'tanggal pengajuan' : 'tanggal pencairan'; ?>.
+                    <?php else: ?>
+                    Mode lihat saja untuk akun ini; pencairan dilakukan staff yang berwenang.
+                    <?php endif; ?>
                 </div>
-                <?php endif; ?>
 
+                <?php ui_flash(); ?>
+
+                <div class="ui-pc-kpi">
                 <?php ui_stat_grid([
-                    ['label' => 'Total pengajuan', 'value' => (int)$stats['total_pengajuan'], 'tone' => 'primary', 'icon' => 'fas fa-file-alt', 'hint' => 'Semua'],
-                    ['label' => 'Menunggu', 'value' => (int)$stats['menunggu'], 'tone' => 'warning', 'icon' => 'fas fa-clock', 'hint' => 'Antrian cair'],
-                    ['label' => 'Disetujui', 'value' => (int)$stats['disetujui'], 'tone' => 'success', 'icon' => 'fas fa-check-circle', 'hint' => 'Siap proses'],
-                    ['label' => 'Dicairkan', 'value' => (int)$stats['dicairkan'], 'tone' => 'info', 'icon' => 'fas fa-money-bill-wave', 'hint' => 'Sudah cair'],
+                    ['label' => 'Total pengajuan', 'value' => (int)$stats['total_pengajuan'], 'tone' => 'primary', 'icon' => 'ti ti-file-text', 'hint' => 'Semua'],
+                    ['label' => 'Menunggu', 'value' => (int)$stats['menunggu'], 'tone' => 'warning', 'icon' => 'ti ti-clock', 'hint' => 'Antrian'],
+                    ['label' => 'Siap cair', 'value' => (int)$stats['disetujui'], 'tone' => 'success', 'icon' => 'ti ti-circle-check', 'hint' => 'Disetujui'],
+                    ['label' => 'Dicairkan', 'value' => (int)$stats['dicairkan'], 'tone' => 'info', 'icon' => 'ti ti-cash', 'hint' => 'Sudah cair'],
                 ]); ?>
+                </div>
 
-                <?php
-                ui_table_toolbar([
-                    'action' => 'pencairan.php',
-                    'q' => $filter_cari,
-                    'placeholder' => 'Nama, AGT/AGTJ, kode pengajuan/pinjaman',
-                    'per_page' => $pager['per_page'],
-                    'reset_href' => 'pencairan.php',
-                    'filters' => [
-                        ['name' => 'tanggal_mulai', 'label' => 'Pencairan Mulai', 'type' => 'date', 'value' => $filter_tanggal_mulai],
-                        ['name' => 'tanggal_selesai', 'label' => 'Pencairan Sampai', 'type' => 'date', 'value' => $filter_tanggal_selesai],
-                    ],
-                ]);
-                ?>
-                <p class="text-muted small mb-3">Filter tanggal hanya menampilkan data yang sudah memiliki tanggal pencairan.</p>
-
-                <!-- Pengajuan Table - HANYA VIEW -->
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-list me-2"></i>Daftar Status Pengajuan Pinjaman
-                        </h5>
-                        <div>
-                            <span class="text-muted me-2">
-                                <?php echo (int)$pager['total']; ?> data (hal. <?php echo (int)$pager['page']; ?>)
-                            </span>
-                        </div>
+                <div class="card mt-3" id="riwayat">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-list" aria-hidden="true"></i>Daftar status pencairan</span>
+                        <span class="ui-dash-sec-note"><?= (int)count($pengajuan_list) ?> data</span>
                     </div>
-                    <div class="card-body">
-                        <?php if (empty($pengajuan_list)): ?>
-                        <div class="text-center py-5">
-                            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
-                            <h5 class="text-muted">Tidak ada data pengajuan</h5>
-                            <p class="text-muted">Belum ada pengajuan pinjaman yang disetujui atau dicairkan.</p>
-                        </div>
-                        <?php else: ?>
+                    <div class="card-body p-0">
                         <div class="table-responsive ui-table-scroll">
-                            <table class="table table-striped table-hover">
+                            <table class="table table-hover align-middle mb-0 js-datatable"
+                                   data-dt-page-length="10"
+                                   data-dt-order="0,asc;1,desc"
+                                   data-dt-filter="6"
+                                   data-dt-date-col="1">
                                 <thead>
                                     <tr>
+                                        <th class="dt-prio">Prio</th>
+                                        <th>Tanggal</th>
                                         <th>Kode</th>
                                         <th>Anggota</th>
-                                        <th>Jenis Pinjaman</th>
-                                        <th>Jumlah</th>
-                                        <th>Tenor</th>
-                                        <th>Bunga</th>
+                                        <th>Jenis</th>
+                                        <th class="text-end">Jumlah</th>
                                         <th>Status</th>
-                                        <th>Tanggal Persetujuan</th>
-                                        <th>Disetujui Oleh</th>
-                                        <th>Aksi</th>
+                                        <th class="text-end">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($pengajuan_list as $pengajuan):
-                                            // Handle status
-                                            $status = $pengajuan['status'];
-                                            if ($status == 'develop' || ($status == '' && $pengajuan['tanggal_persetujuan'])) {
-                                                $status = 'disetujui';
-                                            }
-                                            // Di menu Pencairan status selalu mengikuti tahap pencairan,
-                                            // bukan siklus pelunasan pinjaman.
-                                            if (!empty($pengajuan['pinjaman_id'])) $status = 'dicairkan';
-                                            $belum_cair = ($status == 'disetujui' && empty($pengajuan['pinjaman_id']));
-                                            $status_class = [
-                                                'menunggu' => 'warning',
-                                                'disetujui' => 'success',
-                                                'dicairkan' => 'info',
-                                                'ditolak' => 'danger',
-                                                'develop' => 'success'
-                                            ];
-                                            $status_tc = $pengajuan['status_tc'] ?? '';
-                                            $menuItems = [
-                                                [
-                                                    'label' => 'Detail pengajuan',
-                                                    'icon' => 'fas fa-eye',
-                                                    'title' => 'Detail',
-                                                    'attrs' => [
-                                                        'data-bs-toggle' => 'modal',
-                                                        'data-bs-target' => '#detailModal',
-                                                        'data-kode' => $pengajuan['kode_pengajuan'],
-                                                        'data-nama' => $pengajuan['nama_lengkap'],
-                                                        'data-kode_anggota' => $pengajuan['kode_anggota'],
-                                                        'data-jenis' => $pengajuan['nama_jenis'],
-                                                        'data-jumlah' => $pengajuan['jumlah_pinjaman'],
-                                                        'data-tenor' => $pengajuan['tenor'],
-                                                        'data-bunga' => labelBungaRow($pengajuan),
-                                                        'data-tujuan' => $pengajuan['tujuan_pinjaman'],
-                                                        'data-status' => $status,
-                                                        'data-tanggal' => $pengajuan['tanggal_persetujuan'] ? formatTanggalUi($pengajuan['tanggal_persetujuan'], true) : '-',
-                                                        'data-catatan' => $pengajuan['catatan_admin'],
-                                                        'data-admin' => $pengajuan['admin_name'] ?: '-',
-                                                        'data-kode_pinjaman' => $pengajuan['kode_pinjaman'] ?: '-',
-                                                        'data-tanggal_pencairan' => $pengajuan['tanggal_pencairan'] ? formatTanggalUi($pengajuan['tanggal_pencairan']) : '-',
-                                                    ],
+                                        $status = $pengajuan['status'];
+                                        if ($status == 'develop' || ($status == '' && $pengajuan['tanggal_persetujuan'])) {
+                                            $status = 'disetujui';
+                                        }
+                                        if (!empty($pengajuan['pinjaman_id'])) {
+                                            $status = 'dicairkan';
+                                        }
+                                        $belum_cair = ($status == 'disetujui' && empty($pengajuan['pinjaman_id']));
+                                        $status_tc = $pengajuan['status_tc'] ?? '';
+                                        $statusLabel = $belum_cair ? 'Siap cair' : ucfirst((string)$status);
+                                        if ($status_tc === 'menunggu') {
+                                            $statusLabel = 'TC menunggu';
+                                        } elseif ($status_tc === 'disetujui' && $belum_cair) {
+                                            $statusLabel = 'TC disetujui';
+                                        }
+                                        $badge = $statusClassMap[$status] ?? 'secondary';
+                                        if ($status_tc === 'menunggu') {
+                                            $badge = 'warning';
+                                        } elseif ($status_tc === 'disetujui' && $belum_cair) {
+                                            $badge = 'secondary';
+                                        }
+                                        $tanggalUrut = $pengajuan['tanggal_pencairan'] ?: ($pengajuan['tanggal_persetujuan'] ?: $pengajuan['tanggal_pengajuan']);
+                                        $ts = strtotime((string)$tanggalUrut);
+                                        $orderTs = $ts ? date('Y-m-d H:i:s', $ts) : '';
+                                        $day = $ts ? date('Y-m-d', $ts) : '';
+                                        // 0 = butuh aksi role; semakin kecil semakin atas
+                                        $prio = 9;
+                                        if ($bolehKeputusanTc && $status_tc === 'menunggu') {
+                                            $prio = 0;
+                                        } elseif ($bolehCairkan && $belum_cair && !in_array($status_tc, ['menunggu', 'disetujui'], true)) {
+                                            $prio = 1;
+                                        } elseif (!empty($pengajuan['pinjaman_id']) && empty($pengajuan['foto_pencairan'])) {
+                                            $prio = 2;
+                                        }
+
+                                        $menuItems = [
+                                            [
+                                                'label' => 'Detail',
+                                                'icon' => 'ti ti-eye',
+                                                'attrs' => [
+                                                    'data-bs-toggle' => 'modal',
+                                                    'data-bs-target' => '#detailModal',
+                                                    'data-kode' => $pengajuan['kode_pengajuan'],
+                                                    'data-nama' => $pengajuan['nama_lengkap'],
+                                                    'data-kode_anggota' => $pengajuan['kode_anggota'],
+                                                    'data-jenis' => $pengajuan['nama_jenis'],
+                                                    'data-jumlah' => $pengajuan['jumlah_pinjaman'],
+                                                    'data-tenor' => labelTenorRow($pengajuan),
+                                                    'data-bunga' => labelBungaRow($pengajuan),
+                                                    'data-tujuan' => $pengajuan['tujuan_pinjaman'],
+                                                    'data-status' => $status,
+                                                    'data-status-label' => $statusLabel,
+                                                    'data-tanggal' => $pengajuan['tanggal_persetujuan'] ? formatTanggalUi($pengajuan['tanggal_persetujuan'], true) : '-',
+                                                    'data-catatan' => $pengajuan['catatan_admin'],
+                                                    'data-admin' => $pengajuan['admin_name'] ?: '-',
+                                                    'data-kode_pinjaman' => $pengajuan['kode_pinjaman'] ?: '-',
+                                                    'data-tanggal_pencairan' => $pengajuan['tanggal_pencairan'] ? formatTanggalUi($pengajuan['tanggal_pencairan']) : '-',
+                                                    'data-teller' => $pengajuan['teller_name'] ?: '-',
                                                 ],
-                                            ];
-                                            if ($belum_cair && !in_array($status_tc, ['menunggu', 'disetujui'], true)) {
-                                                if ($bolehCairkan) {
-                                                    $menuItems[] = [
-                                                        'label' => 'Proses Pencairan',
-                                                        'icon' => 'fas fa-hand-holding-usd',
-                                                        'attrs' => [
-                                                            'data-bs-toggle' => 'modal',
-                                                            'data-bs-target' => '#pencairanModal',
-                                                            'data-id' => (int)$pengajuan['id'],
-                                                            'data-nama' => $pengajuan['nama_lengkap'],
-                                                            'data-kode' => $pengajuan['kode_pengajuan'],
-                                                            'data-jumlah' => $pengajuan['jumlah_pinjaman'],
-                                                            'data-tgl-pengajuan' => date('Y-m-d', strtotime($pengajuan['tanggal_pengajuan'])),
-                                                            'data-cicilan' => (int)hitungDariPinjaman($pengajuan)['jumlah_cicilan'],
-                                                            'data-frekuensi' => isset($pengajuan['frekuensi']) ? $pengajuan['frekuensi'] : 'bulanan',
-                                                            'data-gadai' => !empty($pengajuan['memerlukan_jaminan']) ? '1' : '0',
-                                                            'data-jenis-barang' => $pengajuan['jenis_barang'] ?: 'barang',
-                                                            'data-ringkas' => labelTenorRow($pengajuan) . ' | ' . ringkasanAngsuran(hitungDariPinjaman($pengajuan)),
-                                                        ],
-                                                    ];
-                                                }
+                                            ],
+                                        ];
+                                        if ($belum_cair && !in_array($status_tc, ['menunggu', 'disetujui'], true)) {
+                                            if ($bolehCairkan) {
                                                 $menuItems[] = [
-                                                    'label' => 'Draft perjanjian',
-                                                    'icon' => 'fas fa-file-contract',
-                                                    'title' => 'Cetak surat perjanjian sebelum pencairan',
-                                                    'href' => 'cetak_draft_perjanjian.php?id=' . (int)$pengajuan['id'],
-                                                    'target' => '_blank',
-                                                ];
-                                            }
-                                            if ($belum_cair && empty($status_tc)) {
-                                                $menuItems[] = [
-                                                    'label' => 'Tunda cair (TC)',
-                                                    'icon' => 'fas fa-pause-circle',
-                                                    'title' => 'Tunda Cair',
+                                                    'label' => 'Proses Pencairan',
+                                                    'icon' => 'ti ti-moneybag',
+                                                    'class' => 'text-success',
                                                     'attrs' => [
-                                                        'data-bs-toggle' => 'modal',
-                                                        'data-bs-target' => '#tcModal',
+                                                        'data-ui-modal' => '#pencairanModal',
                                                         'data-id' => (int)$pengajuan['id'],
                                                         'data-nama' => $pengajuan['nama_lengkap'],
                                                         'data-kode' => $pengajuan['kode_pengajuan'],
+                                                        'data-jumlah' => $pengajuan['jumlah_pinjaman'],
+                                                        'data-tgl-pengajuan' => date('Y-m-d', strtotime($pengajuan['tanggal_pengajuan'])),
+                                                        'data-cicilan' => (int)hitungDariPinjaman($pengajuan)['jumlah_cicilan'],
+                                                        'data-frekuensi' => isset($pengajuan['frekuensi']) ? $pengajuan['frekuensi'] : 'bulanan',
+                                                        'data-gadai' => !empty($pengajuan['memerlukan_jaminan']) ? '1' : '0',
+                                                        'data-jenis-barang' => $pengajuan['jenis_barang'] ?: 'barang',
+                                                        'data-ringkas' => labelTenorRow($pengajuan) . ' | ' . ringkasanAngsuran(hitungDariPinjaman($pengajuan)),
                                                     ],
                                                 ];
                                             }
-                                            if ($status_tc === 'menunggu') {
-                                                $menuItems[] = ['label' => 'TC menunggu Admin', 'icon' => 'fas fa-hourglass-half', 'disabled' => true];
-                                            } elseif ($status_tc === 'disetujui') {
+                                            $menuItems[] = [
+                                                'label' => 'Draft perjanjian',
+                                                'icon' => 'ti ti-file-description',
+                                                'title' => 'Cetak surat perjanjian sebelum pencairan',
+                                                'href' => 'cetak_draft_perjanjian.php?id=' . (int)$pengajuan['id'],
+                                                'target' => '_blank',
+                                            ];
+                                        }
+                                        if ($belum_cair && empty($status_tc)) {
+                                            $menuItems[] = [
+                                                'label' => 'Tunda cair (TC)',
+                                                'icon' => 'ti ti-player-pause',
+                                                'attrs' => [
+                                                    'data-bs-toggle' => 'modal',
+                                                    'data-bs-target' => '#tcModal',
+                                                    'data-id' => (int)$pengajuan['id'],
+                                                    'data-nama' => $pengajuan['nama_lengkap'],
+                                                    'data-kode' => $pengajuan['kode_pengajuan'],
+                                                ],
+                                            ];
+                                        }
+                                        if ($status_tc === 'menunggu') {
+                                            if ($bolehKeputusanTc && !empty($pengajuan['tc_id'])) {
                                                 $menuItems[] = [
-                                                    'label' => 'TC disetujui',
-                                                    'icon' => 'fas fa-check',
-                                                    'disabled' => true,
-                                                    'title' => (string)($pengajuan['alasan_tc'] ?? ''),
-                                                ];
-                                            } elseif ($status_tc === 'ditolak') {
-                                                $menuItems[] = [
-                                                    'label' => 'TC ditolak',
-                                                    'icon' => 'fas fa-ban',
-                                                    'disabled' => true,
-                                                    'title' => 'TC yang sudah ditolak tidak dapat diajukan ulang',
-                                                ];
-                                            }
-                                            if (!empty($pengajuan['foto_pencairan'])) {
-                                                $menuItems[] = [
-                                                    'label' => 'Foto nasabah',
-                                                    'icon' => 'fas fa-camera',
-                                                    'title' => 'Foto nasabah saat pencairan',
-                                                    'onclick' => "lihatDokumen('" . htmlspecialchars(urlFoto($pengajuan['foto_pencairan']), ENT_QUOTES) . "', 'Foto nasabah - " . htmlspecialchars($pengajuan['nama_lengkap'], ENT_QUOTES) . "')",
-                                                ];
-                                            } elseif (!empty($pengajuan['pinjaman_id'])) {
-                                                $menuItems[] = [
-                                                    'label' => 'Lengkapi foto',
-                                                    'icon' => 'fas fa-camera',
-                                                    'title' => 'Lengkapi foto pencairan',
+                                                    'label' => 'Putuskan TC',
+                                                    'icon' => 'ti ti-gavel',
+                                                    'class' => 'text-warning',
                                                     'attrs' => [
                                                         'data-bs-toggle' => 'modal',
-                                                        'data-bs-target' => '#lengkapiFotoModal',
-                                                        'data-lengkapi-foto' => '1',
-                                                        'data-id' => (int)$pengajuan['pinjaman_id'],
-                                                        'data-kode' => $pengajuan['kode_pinjaman'] ?: $pengajuan['kode_pengajuan'],
+                                                        'data-bs-target' => '#keputusanTcModal',
+                                                        'data-tc-id' => (int)$pengajuan['tc_id'],
                                                         'data-nama' => $pengajuan['nama_lengkap'],
-                                                        'data-gadai' => !empty($pengajuan['memerlukan_jaminan']) ? '1' : '0',
+                                                        'data-kode' => $pengajuan['kode_pengajuan'],
+                                                        'data-alasan' => (string)($pengajuan['alasan_tc'] ?? ''),
                                                     ],
                                                 ];
+                                            } else {
+                                                $menuItems[] = ['label' => 'TC menunggu Admin', 'icon' => 'ti ti-hourglass', 'disabled' => true];
                                             }
-                                            if (!empty($pengajuan['foto_barang'])) {
+                                        } elseif ($status_tc === 'disetujui') {
+                                            $menuItems[] = [
+                                                'label' => 'TC disetujui',
+                                                'icon' => 'ti ti-check',
+                                                'disabled' => true,
+                                                'title' => (string)($pengajuan['alasan_tc'] ?? ''),
+                                            ];
+                                        } elseif ($status_tc === 'ditolak') {
+                                            $menuItems[] = [
+                                                'label' => 'TC ditolak',
+                                                'icon' => 'ti ti-ban',
+                                                'disabled' => true,
+                                                'title' => 'TC yang sudah ditolak tidak dapat diajukan ulang',
+                                            ];
+                                        }
+                                        if (!empty($pengajuan['foto_pencairan'])) {
+                                            $menuItems[] = [
+                                                'label' => 'Foto nasabah',
+                                                'icon' => 'ti ti-camera',
+                                                'onclick' => 'lihatDokumen(' . json_encode(urlFoto($pengajuan['foto_pencairan']), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ', ' . json_encode('Foto nasabah - ' . $pengajuan['nama_lengkap'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ')',
+                                            ];
+                                        } elseif (!empty($pengajuan['pinjaman_id'])) {
+                                            $menuItems[] = [
+                                                'label' => 'Lengkapi foto',
+                                                'icon' => 'ti ti-camera',
+                                                'attrs' => [
+                                                    'data-bs-toggle' => 'modal',
+                                                    'data-bs-target' => '#lengkapiFotoModal',
+                                                    'data-lengkapi-foto' => '1',
+                                                    'data-id' => (int)$pengajuan['pinjaman_id'],
+                                                    'data-kode' => $pengajuan['kode_pinjaman'] ?: $pengajuan['kode_pengajuan'],
+                                                    'data-nama' => $pengajuan['nama_lengkap'],
+                                                    'data-gadai' => !empty($pengajuan['memerlukan_jaminan']) ? '1' : '0',
+                                                ],
+                                            ];
+                                        }
+                                        if (!empty($pengajuan['foto_barang'])) {
+                                            $menuItems[] = [
+                                                'label' => 'Foto barang jaminan',
+                                                'icon' => 'ti ti-box',
+                                                'onclick' => 'lihatDokumen(' . json_encode(urlFoto($pengajuan['foto_barang']), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ', ' . json_encode('Foto ' . (string)$pengajuan['jenis_barang'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ')',
+                                            ];
+                                        }
+                                        if (!empty($pengajuan['foto_nasabah_barang'])) {
+                                            $menuItems[] = [
+                                                'label' => 'Foto nasabah & barang',
+                                                'icon' => 'ti ti-tag',
+                                                'onclick' => 'lihatDokumen(' . json_encode(urlFoto($pengajuan['foto_nasabah_barang']), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ', "Foto nasabah dengan barang jaminan")',
+                                            ];
+                                        }
+                                        if (!empty($pengajuan['pinjaman_id'])) {
+                                            $menuItems[] = [
+                                                'label' => 'Cetak slip pencairan',
+                                                'icon' => 'ti ti-printer',
+                                                'href' => 'cetak_slip_pencairan.php?id=' . (int)$pengajuan['pinjaman_id'],
+                                                'target' => '_blank',
+                                            ];
+                                            if (!empty($pengajuan['perjanjian_id'])) {
                                                 $menuItems[] = [
-                                                    'label' => 'Foto barang jaminan',
-                                                    'icon' => 'fas fa-box',
-                                                    'title' => 'Foto barang jaminan',
-                                                    'onclick' => "lihatDokumen('" . htmlspecialchars(urlFoto($pengajuan['foto_barang']), ENT_QUOTES) . "', 'Foto " . htmlspecialchars($pengajuan['jenis_barang'], ENT_QUOTES) . "')",
-                                                ];
-                                            }
-                                            if (!empty($pengajuan['foto_nasabah_barang'])) {
-                                                $menuItems[] = [
-                                                    'label' => 'Foto nasabah & barang',
-                                                    'icon' => 'fas fa-user-tag',
-                                                    'title' => 'Foto nasabah dengan barang jaminan',
-                                                    'onclick' => "lihatDokumen('" . htmlspecialchars(urlFoto($pengajuan['foto_nasabah_barang']), ENT_QUOTES) . "', 'Foto nasabah dengan barang jaminan')",
-                                                ];
-                                            }
-                                            if (!empty($pengajuan['pinjaman_id'])) {
-                                                $menuItems[] = [
-                                                    'label' => 'Cetak slip pencairan',
-                                                    'icon' => 'fas fa-print',
-                                                    'title' => 'Cetak Slip',
-                                                    'href' => 'cetak_slip_pencairan.php?id=' . (int)$pengajuan['pinjaman_id'],
+                                                    'label' => 'PDF perjanjian',
+                                                    'icon' => 'ti ti-file-type-pdf',
+                                                    'href' => 'cetak_perjanjian.php?id=' . (int)$pengajuan['pinjaman_id'],
                                                     'target' => '_blank',
                                                 ];
-                                                if (!empty($pengajuan['perjanjian_id'])) {
-                                                    $menuItems[] = [
-                                                        'label' => 'PDF perjanjian',
-                                                        'icon' => 'fas fa-file-pdf',
-                                                        'title' => 'Cetak Surat Perjanjian & Lampiran',
-                                                        'href' => 'cetak_perjanjian.php?id=' . (int)$pengajuan['pinjaman_id'],
-                                                        'target' => '_blank',
-                                                    ];
-                                                } else {
-                                                    $menuItems[] = [
-                                                        'label' => 'PDF perjanjian',
-                                                        'icon' => 'fas fa-file-pdf',
-                                                        'disabled' => true,
-                                                        'title' => 'PDF tersedia setelah pencairan dan seluruh TTD disimpan',
-                                                    ];
-                                                }
+                                            } else {
+                                                $menuItems[] = [
+                                                    'label' => 'PDF perjanjian',
+                                                    'icon' => 'ti ti-file-type-pdf',
+                                                    'disabled' => true,
+                                                    'title' => 'PDF tersedia setelah pencairan dan seluruh TTD disimpan',
+                                                ];
                                             }
+                                        }
                                     ?>
-                                    <tr>
+                                    <tr<?= $prio < 9 ? ' class="ui-row-action"' : '' ?>>
+                                        <td><?= (int)$prio ?></td>
+                                        <td data-order="<?= htmlspecialchars($orderTs) ?>" data-date="<?= htmlspecialchars($day) ?>">
+                                            <?= htmlspecialchars(formatTanggalUi($tanggalUrut, true, true)) ?>
+                                        </td>
                                         <td>
-                                            <strong><?php echo $pengajuan['kode_pengajuan']; ?></strong>
-                                            <?php if ($pengajuan['kode_pinjaman']): ?>
-                                                <br><small class="text-success"><?php echo $pengajuan['kode_pinjaman']; ?></small>
+                                            <code><?= htmlspecialchars($pengajuan['kode_pengajuan']) ?></code>
+                                            <?php if (!empty($pengajuan['kode_pinjaman'])): ?>
+                                            <div class="small text-success"><?= htmlspecialchars($pengajuan['kode_pinjaman']) ?></div>
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <div class="fw-semibold"><?php echo $pengajuan['nama_lengkap']; ?></div>
-                                            <small class="text-muted"><?php echo $pengajuan['kode_anggota']; ?></small>
+                                            <div class="fw-semibold"><?= htmlspecialchars($pengajuan['nama_lengkap']) ?></div>
+                                            <small class="text-muted"><?= htmlspecialchars((string)$pengajuan['kode_anggota']) ?></small>
                                         </td>
                                         <td>
-                                            <div><?php echo $pengajuan['nama_jenis']; ?></div>
-                                            <small class="text-muted">Maks: <?php echo formatRupiah($pengajuan['maksimal_pinjaman']); ?></small>
+                                            <div><?= htmlspecialchars($pengajuan['nama_jenis']) ?></div>
+                                            <small class="text-muted"><?= htmlspecialchars(labelTenorRow($pengajuan)) ?> · <?= htmlspecialchars(labelBungaRow($pengajuan)) ?></small>
                                         </td>
-                                        <td>
-                                            <div class="fw-bold text-primary"><?php echo formatRupiah($pengajuan['jumlah_pinjaman']); ?></div>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-info"><?php echo labelTenorRow($pengajuan); ?></span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-success"><?php echo labelBungaRow($pengajuan); ?></span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-<?php echo $status_class[$status] ?? 'secondary'; ?> status-badge">
-                                                <?php echo $belum_cair ? 'Disetujui (belum dicairkan)' : ucfirst($status); ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <?php if ($pengajuan['tanggal_persetujuan']): ?>
-                                                <small><?php echo formatTanggalUi($pengajuan['tanggal_persetujuan'], true); ?></small>
-                                            <?php else: ?>
-                                                <span class="text-muted">-</span>
+                                        <td class="text-end fw-semibold"><?= formatRupiah($pengajuan['jumlah_pinjaman']) ?></td>
+                                        <td data-filter="<?= htmlspecialchars($statusLabel) ?>">
+                                            <span class="badge bg-<?= htmlspecialchars($badge) ?>"><?= htmlspecialchars($statusLabel) ?></span>
+                                            <?php if ($status_tc === 'menunggu' && !empty($pengajuan['alasan_tc'])): ?>
+                                            <div class="small text-muted mt-1 ui-pc-tc-alasan"><?php
+                                                $alasanShort = (string)$pengajuan['alasan_tc'];
+                                                if (strlen($alasanShort) > 80) { $alasanShort = substr($alasanShort, 0, 77) . '…'; }
+                                                echo htmlspecialchars($alasanShort);
+                                            ?></div>
+                                            <?php elseif (!empty($pengajuan['admin_name'])): ?>
+                                            <div class="small text-muted mt-1">Oleh: <?= htmlspecialchars($pengajuan['admin_name']) ?></div>
                                             <?php endif; ?>
                                         </td>
-                                        <td>
-                                            <small><?php echo $pengajuan['admin_name'] ?: '-'; ?></small>
-                                        </td>
-                                        <td class="text-end"><?= ui_action_menu($menuItems) ?></td>
+                                        <td class="text-end table-actions"><?= ui_action_menu($menuItems) ?></td>
                                     </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
-                        <?php endif; ?>
                     </div>
                 </div>
+            </div>
+            <?php include __DIR__ . '/layout/shell_end.php'; ?>
 
-                <!-- Additional Information -->
-                <div class="row mt-4">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="card-title mb-0">
-                                    <i class="fas fa-info-circle me-2"></i>Informasi Status
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="mb-3">
-                                    <span class="badge bg-warning me-2">Menunggu</span>
-                                    <small>Pengajuan sedang menunggu persetujuan admin</small>
-                                </div>
-                                <div class="mb-3">
-                                    <span class="badge bg-success me-2">Disetujui</span>
-                                    <small>Pengajuan sudah disetujui dan siap dicairkan</small>
-                                </div>
-                                <div class="mb-3">
-                                    <span class="badge bg-info me-2">Dicairkan</span>
-                                    <small>Pinjaman sudah dicairkan dan aktif</small>
-                                </div>
-                                <div>
-                                    <span class="badge bg-danger me-2">Ditolak</span>
-                                    <small>Pengajuan ditolak oleh admin</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="card-title mb-0">
-                                    <i class="fas fa-shield-alt me-2"></i>Hak Akses Teller
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="alert alert-warning mb-0">
-                                    <small>
-                                        <i class="fas fa-exclamation-triangle me-2"></i>
-                                        <strong>Perhatian:</strong> Sebagai Teller, Anda hanya memiliki akses untuk:
-                                        <ul class="mt-2 mb-0">
-                                            <li>Melihat status pengajuan pinjaman</li>
-                                            <li>Melakukan pembayaran angsuran</li>
-                                            <li>Mengelola pembayaran denda</li>
-                                            <li>Melihat riwayat transaksi</li>
-                                            <li>Mencetak slip pinjaman yang sudah dicairkan</li>
-                                        </ul>
-                                        <strong class="mt-2 d-block">Tidak termasuk:</strong>
-                                        <ul class="mb-0">
-                                            <li>Menyetujui atau menolak pengajuan</li>
-                                            <li>Mencairkan pinjaman</li>
-                                        </ul>
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <?php if (isset($pager)) ui_pagination($pager, 'pencairan.php'); ?>
-            </main>
-        </div>
-    </div>
-
-    <!-- Detail Modal -->
-    <div class="modal fade" id="detailModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+    <div class="modal fade ui-tx-modal ui-tx-modal-cair" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Detail Pengajuan Pinjaman</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h2 class="modal-title h5" id="detailModalLabel">Detail pencairan</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <table class="table table-borderless">
-                                <tr>
-                                    <th width="40%">Kode Pengajuan</th>
-                                    <td id="detail_kode"></td>
-                                </tr>
-                                <tr>
-                                    <th>Kode Pinjaman</th>
-                                    <td id="detail_kode_pinjaman"></td>
-                                </tr>
-                                <tr>
-                                    <th>Nama Anggota</th>
-                                    <td id="detail_nama"></td>
-                                </tr>
-                                <tr>
-                                    <th>Kode Anggota</th>
-                                    <td id="detail_kode_anggota"></td>
-                                </tr>
-                                <tr>
-                                    <th>Jenis Pinjaman</th>
-                                    <td id="detail_jenis"></td>
-                                </tr>
-                                <tr>
-                                    <th>Disetujui Oleh</th>
-                                    <td id="detail_admin"></td>
-                                </tr>
-                            </table>
+                    <div class="ui-pj-detail">
+                        <div class="ui-pj-detail-hero">
+                            <div class="ui-pj-detail-hero-main min-w-0">
+                                <div class="ui-pj-detail-kode" id="detail_kode">—</div>
+                                <div class="ui-pj-detail-nama text-truncate" id="detail_nama">—</div>
+                                <div class="ui-pj-detail-meta" id="detail_kode_anggota">—</div>
+                            </div>
+                            <div class="ui-pj-detail-hero-status" id="detail_status">—</div>
                         </div>
-                        <div class="col-md-6">
-                            <table class="table table-borderless">
-                                <tr>
-                                    <th width="40%">Jumlah Pinjaman</th>
-                                    <td id="detail_jumlah" class="fw-bold text-primary"></td>
-                                </tr>
-                                <tr>
-                                    <th>Tenor</th>
-                                    <td id="detail_tenor"></td>
-                                </tr>
-                                <tr>
-                                    <th>Bunga</th>
-                                    <td id="detail_bunga"></td>
-                                </tr>
-                                <tr>
-                                    <th>Status</th>
-                                    <td id="detail_status"></td>
-                                </tr>
-                                <tr>
-                                    <th>Tanggal Persetujuan</th>
-                                    <td id="detail_tanggal"></td>
-                                </tr>
-                                <tr>
-                                    <th>Tanggal Pencairan</th>
-                                    <td id="detail_tanggal_pencairan"></td>
-                                </tr>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-12">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Tujuan Pinjaman</label>
-                                <div id="detail_tujuan" class="p-3 bg-light rounded"></div>
+                        <div class="ui-pj-detail-amount">
+                            <div class="ui-pj-detail-amount-item">
+                                <span class="ui-pj-detail-amount-label">Jumlah pinjaman</span>
+                                <strong class="ui-pj-detail-amount-value" id="detail_jumlah">—</strong>
+                            </div>
+                            <div class="ui-pj-detail-amount-item">
+                                <span class="ui-pj-detail-amount-label">Jenis</span>
+                                <strong class="ui-pj-detail-amount-sub" id="detail_jenis">—</strong>
                             </div>
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-12">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Catatan Admin</label>
-                                <div id="detail_catatan" class="p-2 bg-light rounded"></div>
-                            </div>
+                        <div class="ui-pj-detail-grid">
+                            <section class="ui-pj-detail-card">
+                                <h3 class="ui-pj-detail-card-title"><i class="ti ti-percentage" aria-hidden="true"></i>Syarat pinjaman</h3>
+                                <dl class="ui-pj-detail-dl">
+                                    <div><dt>Tenor</dt><dd id="detail_tenor">—</dd></div>
+                                    <div><dt>Bunga</dt><dd id="detail_bunga">—</dd></div>
+                                    <div><dt>Disetujui</dt><dd id="detail_tanggal">—</dd></div>
+                                </dl>
+                            </section>
+                            <section class="ui-pj-detail-card">
+                                <h3 class="ui-pj-detail-card-title"><i class="ti ti-cash" aria-hidden="true"></i>Pencairan</h3>
+                                <dl class="ui-pj-detail-dl">
+                                    <div><dt>Kode pinjaman</dt><dd id="detail_kode_pinjaman">—</dd></div>
+                                    <div><dt>Tgl cair</dt><dd id="detail_tanggal_pencairan">—</dd></div>
+                                    <div><dt>Oleh</dt><dd id="detail_admin">—</dd></div>
+                                    <div><dt>Teller</dt><dd id="detail_teller">—</dd></div>
+                                </dl>
+                            </section>
+                            <section class="ui-pj-detail-card ui-pj-detail-card-wide">
+                                <h3 class="ui-pj-detail-card-title"><i class="ti ti-target" aria-hidden="true"></i>Tujuan pinjaman</h3>
+                                <p class="ui-pj-detail-tujuan mb-0" id="detail_tujuan">—</p>
+                            </section>
+                            <section class="ui-pj-detail-card ui-pj-detail-card-wide">
+                                <h3 class="ui-pj-detail-card-title"><i class="ti ti-notes" aria-hidden="true"></i>Catatan admin</h3>
+                                <p class="ui-pj-detail-tujuan mb-0" id="detail_catatan">—</p>
+                            </section>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Tunda Cair Modal -->
-    <div class="modal fade" id="tcModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="post"><?= layananToken() ?><input type="hidden" name="ajukan_tc" value="1"><input type="hidden" name="id" id="tc_id"><div class="modal-header bg-warning"><h5 class="modal-title"><i class="fas fa-pause-circle me-2"></i>Tunda Cair (TC)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p>Ajukan penundaan pencairan untuk <strong id="tc_nama"></strong> (<span id="tc_kode"></span>).</p><label class="form-label">Keterangan alasan TC <span class="text-danger">*</span></label><textarea name="alasan_tc" class="form-control" rows="4" minlength="5" maxlength="2000" required placeholder="Contoh: Nasabah meminta pencairan ditunda hingga dokumen dilengkapi."></textarea><small class="text-muted">Pengajuan akan diperiksa Admin. Pencairan tidak dapat diproses selama TC menunggu atau disetujui.</small></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-warning">Ajukan TC</button></div></form></div></div></div>
-
-    <!-- Proses Pencairan Modal -->
-    <div class="modal fade" id="pencairanModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal fade ui-tx-modal ui-tx-modal-tc" id="tcModal" tabindex="-1" aria-labelledby="tcModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <form method="POST" enctype="multipart/form-data" id="formPencairan"><?php echo layananToken(); ?>
-                    <input type="hidden" name="proses_pencairan" value="1">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title"><i class="fas fa-hand-holding-usd me-2"></i>Proses Pencairan</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <form method="post">
+                    <?= layananToken() ?>
+                    <input type="hidden" name="ajukan_tc" value="1">
+                    <input type="hidden" name="id" id="ajukan_tc_pengajuan_id">
+                    <div class="modal-header">
+                        <h2 class="modal-title h5" id="tcModalLabel"><i class="ti ti-player-pause me-1" aria-hidden="true"></i>Tunda Cair (TC)</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body">
-                        <input type="hidden" name="id" id="pencairan_id">
-                        <div class="alert alert-warning">
-                            <strong id="pencairan_nama"></strong><br>
-                            Kode: <span id="pencairan_kode"></span><br>
-                            Jumlah: <strong id="pencairan_jumlah"></strong><br>
-                            <small id="pencairan_ringkas"></small>
+                        <div class="ui-ps-confirm">
+                            <div class="ui-ps-confirm-label">Anggota</div>
+                            <div class="ui-ps-confirm-value" id="ajukan_tc_nama">—</div>
+                            <div class="ui-ps-confirm-meta">Kode: <span id="ajukan_tc_kode">—</span></div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Foto Nasabah Saat Menerima Uang <span class="text-danger">*</span></label>
-                            <input type="file" name="foto_nasabah" id="foto_nasabah" class="form-control" required
-                                   accept="image/*">
-                            <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB. Foto yang lebih besar akan dikompres otomatis.</small>
-                            <img id="foto_nasabah_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau foto">
-                        </div>
-                        <div id="foto_gadai_fields" class="d-none">
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold" id="label_foto_barang">Foto Barang Jaminan <span class="text-danger">*</span></label>
-                                <input type="file" name="foto_barang_jaminan" id="foto_barang_jaminan" class="form-control"
-                                       accept="image/*">
-                                <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB. Foto yang lebih besar akan dikompres otomatis.</small>
-                                <img id="foto_barang_jaminan_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau foto barang jaminan">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Foto Nasabah dengan Barang Jaminan <span class="text-danger">*</span></label>
-                                <input type="file" name="foto_nasabah_barang" id="foto_nasabah_barang" class="form-control"
-                                       accept="image/*">
-                                <small class="text-muted">JPG/PNG/WEBP, maksimal 5 MB. Foto yang lebih besar akan dikompres otomatis.</small>
-                                <img id="foto_nasabah_barang_preview" class="img-thumbnail mt-2 d-none" style="max-height:160px" alt="Pratinjau nasabah dengan barang jaminan">
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Tanggal Pencairan <span class="text-danger">*</span></label>
-                            <input type="date" name="tanggal_pencairan" id="tanggal_pencairan" class="form-control" required
-                                   value="<?php echo date('Y-m-d'); ?>" max="<?php echo date('Y-m-d'); ?>">
-                            <small class="text-muted">Isi tanggal lama bila ini data nasabah yang sudah cair sebelumnya. Jatuh tempo dihitung dari tanggal ini.</small>
-                        </div>
-                        <div class="mb-3 d-none" id="blok_dimuka">
-                            <label class="form-label fw-semibold">Sudah dibayar sampai cicilan ke-</label>
-                            <input type="number" name="sudah_dibayar" id="sudah_dibayar" class="form-control" min="0" value="0">
-                            <small class="text-muted" id="info_dimuka"></small>
-                        </div>
-                        <hr><h6><i class="fas fa-file-signature me-1"></i>Surat Perjanjian & Tanda Tangan</h6>
-                        <input type="hidden" name="versi_perjanjian" value="lengkap">
-                        <div class="alert alert-info border py-2 mb-3"><i class="fas fa-file-contract me-1" aria-hidden="true"></i><strong>Surat Perjanjian:</strong> Versi lengkap</div>
-                        <div class="mb-3"><label class="form-label">Lampiran surat tambahan (opsional, maksimal 10 halaman)</label><input type="file" class="form-control" id="surat_tambahan" name="surat_tambahan[]" accept="image/*" multiple><small class="text-muted">Setiap gambar maksimal 5 MB dan akan digabung ke PDF.</small></div>
-                        <div class="row"><div class="col-md-6 mb-3"><label class="form-label">Nama Saksi 1 *</label><input class="form-control" name="nama_saksi_1" required></div><div class="col-md-6 mb-3"><label class="form-label">Nama Saksi 2 *</label><input class="form-control" name="nama_saksi_2" required></div></div>
-                        <?php foreach (['nasabah'=>'Nasabah','teller'=>'Teller','saksi_1'=>'Saksi 1','saksi_2'=>'Saksi 2'] as $key=>$label): ?>
-                        <div class="signature-field mb-3"><div class="signature-field-head"><div><label class="signature-field-title mb-0">TTD <?php echo $label; ?> *</label><small class="signature-field-help">Goreskan tanda tangan pada area putih. Area ini tidak menggeser halaman di HP.</small></div><span class="signature-status" id="status_<?php echo $key; ?>"><i class="fas fa-pen-nib"></i> Belum diisi</span></div><div class="signature-canvas-wrap"><canvas id="canvas_<?php echo $key; ?>" class="signature-pad" width="700" height="260"></canvas></div><input type="hidden" name="ttd_<?php echo $key; ?>" id="ttd_<?php echo $key; ?>"><div class="signature-field-foot"><span class="signature-field-note">Status berubah hijau setelah tanda tangan terdeteksi.</span><button type="button" class="signature-clear btn btn-sm btn-outline-danger clear-signature" data-key="<?php echo $key; ?>"><i class="fas fa-eraser me-1"></i>Hapus</button></div></div>
-                        <?php endforeach; ?>
-                        <div class="alert alert-secondary"><small>TTD Admin diambil otomatis dari Pengaturan Admin. Seluruh data transaksi disimpan sebagai arsip tetap saat pencairan.</small></div>
-                        <div class="alert alert-info mb-0" id="info_jadwal">
-                            <i class="fas fa-info-circle me-1"></i>
-                            Jadwal angsuran dibuat otomatis dari tanggal pengajuan. Cicilan lama yang ditandai sudah dibayar
-                            tidak masuk kas; cicilan lewat jatuh tempo yang belum dibayar langsung kena denda.
-                        </div>
+                        <label class="form-label">Keterangan alasan TC <span class="text-danger">*</span></label>
+                        <textarea name="alasan_tc" class="form-control" rows="4" minlength="5" maxlength="2000" required placeholder="Contoh: Nasabah meminta pencairan ditunda hingga dokumen dilengkapi."></textarea>
+                        <p class="ui-pj-section-note mt-2 mb-0">Pengajuan diperiksa Admin. Pencairan tidak dapat diproses selama TC menunggu atau disetujui.</p>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" id="btnCairkan" class="btn btn-primary">
-                            <i class="fas fa-check-circle me-1"></i> Cairkan
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-warning">Ajukan TC</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <?php if ($bolehKeputusanTc): ?>
+    <div class="modal fade ui-tx-modal ui-tx-modal-tc" id="keputusanTcModal" tabindex="-1" aria-labelledby="keputusanTcModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post">
+                    <?= layananToken() ?>
+                    <input type="hidden" name="tc_id" id="keputusan_tc_id">
+                    <div class="modal-header">
+                        <h2 class="modal-title h5" id="keputusanTcModalLabel"><i class="ti ti-gavel me-1" aria-hidden="true"></i>Putuskan Tunda Cair</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="ui-ps-confirm">
+                            <div class="ui-ps-confirm-label">Anggota</div>
+                            <div class="ui-ps-confirm-value" id="keputusan_tc_nama">—</div>
+                            <div class="ui-ps-confirm-meta">Kode: <span id="keputusan_tc_kode">—</span></div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="ui-ps-confirm-label mb-1">Alasan Teller</div>
+                            <p class="ui-pj-detail-tujuan mb-0" id="keputusan_tc_alasan">—</p>
+                        </div>
+                        <label class="form-label">Keterangan keputusan Admin <span class="text-danger">*</span></label>
+                        <textarea name="catatan_tc" class="form-control" rows="3" minlength="5" maxlength="2000" required placeholder="Alasan menyetujui atau menolak TC"></textarea>
+                        <p class="ui-pj-section-note mt-2 mb-0">Approve TC = batal cair. Tolak TC = pengajuan kembali bisa dicairkan.</p>
+                    </div>
+                    <div class="modal-footer flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" name="keputusan_tc" value="ditolak" class="btn btn-outline-danger">Tolak TC</button>
+                        <button type="submit" name="keputusan_tc" value="disetujui" class="btn btn-success">Approve TC</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <div class="modal fade ui-tx-modal ui-tx-modal-cair" id="pencairanModal" tabindex="-1" aria-labelledby="pencairanModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST" action="" enctype="multipart/form-data" id="formPencairan" data-ajax-upload="1"><?php echo layananToken(); ?>
+                    <input type="hidden" name="proses_pencairan" value="1">
+                    <input type="hidden" name="id" id="pencairan_id">
+                    <input type="hidden" name="versi_perjanjian" value="lengkap">
+                    <div class="modal-header">
+                        <div class="min-w-0">
+                            <h2 class="modal-title h5 mb-0" id="pencairanModalLabel"><i class="ti ti-moneybag me-1" aria-hidden="true"></i>Proses Pencairan</h2>
+                            <p class="ui-pc-modal-sub mb-0">Unggah foto, isi tanggal, lalu tanda tangan perjanjian</p>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="ui-pc-form">
+                            <div class="ui-pc-hero">
+                                <div class="ui-pc-hero-main min-w-0">
+                                    <div class="ui-pc-hero-label">Nasabah</div>
+                                    <div class="ui-pc-hero-nama text-truncate" id="pencairan_nama">—</div>
+                                    <div class="ui-pc-hero-meta">Kode <code id="pencairan_kode">—</code></div>
+                                </div>
+                                <div class="ui-pc-hero-amount">
+                                    <div class="ui-pc-hero-label">Jumlah cair</div>
+                                    <div class="ui-pc-hero-value" id="pencairan_jumlah">—</div>
+                                    <div class="ui-pc-hero-meta" id="pencairan_ringkas"></div>
+                                </div>
+                            </div>
+
+                            <section class="ui-form-section ui-pj-section ui-pc-section">
+                                <h6 class="ui-form-section-title"><i class="ti ti-camera" aria-hidden="true"></i>1. Foto pencairan</h6>
+                                <p class="ui-pj-section-note mb-3">JPG/PNG/WEBP · otomatis dikompres ke maksimal 1 MB sebelum diunggah. Foto nasabah wajib.</p>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <div class="ui-pc-upload">
+                                            <label class="form-label" for="foto_nasabah">Foto nasabah menerima uang <span class="text-danger">*</span></label>
+                                            <input type="file" name="foto_nasabah" id="foto_nasabah" class="form-control form-control-sm" required accept="image/*">
+                                            <img id="foto_nasabah_preview" class="ui-pc-upload-preview d-none" alt="Pratinjau nasabah">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 d-none" id="wrap_foto_barang">
+                                        <div class="ui-pc-upload">
+                                            <label class="form-label" for="foto_barang_jaminan" id="label_foto_barang">Foto barang jaminan <span class="text-danger">*</span></label>
+                                            <input type="file" name="foto_barang_jaminan" id="foto_barang_jaminan" class="form-control form-control-sm" accept="image/*">
+                                            <img id="foto_barang_jaminan_preview" class="ui-pc-upload-preview d-none" alt="Pratinjau barang">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 d-none" id="wrap_foto_nasabah_barang">
+                                        <div class="ui-pc-upload">
+                                            <label class="form-label" for="foto_nasabah_barang">Foto nasabah &amp; barang <span class="text-danger">*</span></label>
+                                            <input type="file" name="foto_nasabah_barang" id="foto_nasabah_barang" class="form-control form-control-sm" accept="image/*">
+                                            <img id="foto_nasabah_barang_preview" class="ui-pc-upload-preview d-none" alt="Pratinjau nasabah & barang">
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="ui-form-section ui-pj-section ui-pc-section">
+                                <h6 class="ui-form-section-title"><i class="ti ti-calendar" aria-hidden="true"></i>2. Tanggal &amp; cicilan</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="tanggal_pencairan">Tanggal pencairan <span class="text-danger">*</span></label>
+                                        <input type="date" name="tanggal_pencairan" id="tanggal_pencairan" class="form-control" required
+                                               value="<?php echo date('Y-m-d'); ?>" max="<?php echo date('Y-m-d'); ?>">
+                                        <p class="ui-pj-section-note mt-1 mb-0">Boleh tanggal lampau untuk data yang sudah cair. Jatuh tempo dihitung dari tanggal ini.</p>
+                                    </div>
+                                    <div class="col-md-6 d-none" id="blok_dimuka">
+                                        <label class="form-label" for="sudah_dibayar">Sudah dibayar sampai cicilan ke-</label>
+                                        <input type="number" name="sudah_dibayar" id="sudah_dibayar" class="form-control" min="0" value="0">
+                                        <p class="ui-pj-section-note mt-1 mb-0" id="info_dimuka"></p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="ui-form-section ui-pj-section ui-pc-section">
+                                <h6 class="ui-form-section-title"><i class="ti ti-file-pencil" aria-hidden="true"></i>3. Perjanjian &amp; tanda tangan</h6>
+                                <div class="ui-pc-versi mb-3">
+                                    <i class="ti ti-file-description" aria-hidden="true"></i>
+                                    <span>Surat perjanjian versi <strong>lengkap</strong></span>
+                                </div>
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="nama_saksi_1">Nama saksi 1 <span class="text-danger">*</span></label>
+                                        <input class="form-control" name="nama_saksi_1" id="nama_saksi_1" required autocomplete="name">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="nama_saksi_2">Nama saksi 2 <span class="text-danger">*</span></label>
+                                        <input class="form-control" name="nama_saksi_2" id="nama_saksi_2" required autocomplete="name">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="surat_tambahan">Lampiran surat tambahan <span class="text-muted fw-normal">(opsional, maks. 10 gambar)</span></label>
+                                        <input type="file" class="form-control form-control-sm" id="surat_tambahan" name="surat_tambahan[]" accept="image/jpeg,image/png,image/webp,image/*" multiple data-max-files="10" data-label="Lampiran surat tambahan">
+                                    </div>
+                                </div>
+                                <div class="row g-3">
+                                    <?php foreach (['nasabah'=>'Nasabah','teller'=>'Teller','saksi_1'=>'Saksi 1','saksi_2'=>'Saksi 2'] as $key=>$label): ?>
+                                    <div class="col-md-6">
+                                        <div class="signature-field ui-pc-sign mb-0">
+                                            <div class="signature-field-head">
+                                                <div>
+                                                    <label class="signature-field-title mb-0">TTD <?php echo $label; ?> *</label>
+                                                    <small class="signature-field-help">Gores pada area putih · tidak menggeser halaman di HP</small>
+                                                </div>
+                                                <span class="signature-status" id="status_<?php echo $key; ?>"><i class="ti ti-signature"></i> Belum</span>
+                                            </div>
+                                            <div class="signature-canvas-wrap"><canvas id="canvas_<?php echo $key; ?>" class="signature-pad" width="700" height="220"></canvas></div>
+                                            <input type="hidden" name="ttd_<?php echo $key; ?>" id="ttd_<?php echo $key; ?>">
+                                            <div class="signature-field-foot">
+                                                <span class="signature-field-note">Hijau = siap</span>
+                                                <button type="button" class="signature-clear btn btn-sm btn-outline-danger clear-signature" data-key="<?php echo $key; ?>"><i class="ti ti-eraser me-1"></i>Hapus</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </div>
+                                <p class="ui-pj-section-note mt-3 mb-0" id="info_jadwal">
+                                    <i class="ti ti-info-circle me-1" aria-hidden="true"></i>
+                                    TTD Admin dari Pengaturan. Jadwal angsuran dari tanggal pengajuan; cicilan dimuka tidak masuk kas.
+                                </p>
+                            </section>
+                        </div>
+                    </div>
+                    <div class="modal-footer ui-pc-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" id="btnCairkan" class="btn btn-success">
+                            <i class="ti ti-circle-check me-1" aria-hidden="true"></i> Cairkan pinjaman
                         </button>
                     </div>
                 </form>
@@ -1077,258 +927,336 @@ if ($bolehKeputusanTc) {
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <?php
     require_once __DIR__ . '/lengkapi_foto_pencairan.php';
     renderModalLengkapiFotoPencairan();
     include __DIR__ . '/modal_dokumen.php';
     ?>
     <script>
+    (function () {
         var pencairanModal = document.getElementById('pencairanModal');
-        var tcModal=document.getElementById('tcModal');
-        tcModal.addEventListener('show.bs.modal',function(event){var b=event.relatedTarget;document.getElementById('tc_id').value=b.getAttribute('data-id');document.getElementById('tc_nama').textContent=b.getAttribute('data-nama');document.getElementById('tc_kode').textContent=b.getAttribute('data-kode');});
-        function updatePencairanViewport() {
-            var height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-            pencairanModal.style.setProperty('--pencairan-viewport-height', height + 'px');
-        }
-        pencairanModal.addEventListener('show.bs.modal', updatePencairanViewport);
-        window.addEventListener('resize', updatePencairanViewport);
-        if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', updatePencairanViewport);
-        }
-        pencairanModal.addEventListener('show.bs.modal', function (event) {
-            var b = event.relatedTarget;
-            document.getElementById('pencairan_id').value = b.getAttribute('data-id');
-            document.getElementById('pencairan_nama').textContent = b.getAttribute('data-nama');
-            document.getElementById('pencairan_kode').textContent = b.getAttribute('data-kode');
-            document.getElementById('pencairan_jumlah').textContent = 'Rp ' + Number(b.getAttribute('data-jumlah')).toLocaleString('id-ID');
-            document.getElementById('pencairan_ringkas').textContent = b.getAttribute('data-ringkas');
-            var gadai = b.getAttribute('data-gadai') === '1';
-            var fotoGadaiFields = document.getElementById('foto_gadai_fields');
-            var fotoBarang = document.getElementById('foto_barang_jaminan');
-            var fotoNasabahBarang = document.getElementById('foto_nasabah_barang');
-            fotoGadaiFields.classList.toggle('d-none', !gadai);
-            fotoBarang.required = gadai;
-            fotoNasabahBarang.required = gadai;
-            var jenisBarang = (b.getAttribute('data-jenis-barang') || 'barang').split(' - ')[0];
-            document.getElementById('label_foto_barang').innerHTML = 'Foto Barang Jaminan ' + jenisBarang +
-                ' <span class="text-danger">*</span>';
-            var tgl = document.getElementById('tanggal_pencairan');
-            tgl.min = b.getAttribute('data-tgl-pengajuan');
-            tgl.value = tgl.max;
-            var n = b.getAttribute('data-cicilan');
-            var sd = document.getElementById('sudah_dibayar');
-            sd.max = n; sd.value = 0;
-            document.getElementById('info_dimuka').textContent = 'Isi 0 bila belum ada cicilan yang dibayar. Maksimal ' + n +
-                ' (' + ({mingguan: 'mingguan', dua_mingguan: '2 minggu sekali', bulanan: 'bulanan'}[b.getAttribute('data-frekuensi')] || 'bulanan') + ').';
-            tgl.dispatchEvent(new Event('change'));
-            document.getElementById('foto_nasabah').value = '';
-            document.getElementById('foto_nasabah_preview').classList.add('d-none');
-            ['foto_barang_jaminan', 'foto_nasabah_barang'].forEach(function (id) {
-                document.getElementById(id).value = '';
-                document.getElementById(id + '_preview').classList.add('d-none');
+        var formPencairan = document.getElementById('formPencairan');
+        var tcModal = document.getElementById('tcModal');
+        var detailModal = document.getElementById('detailModal');
+        if (!pencairanModal || !formPencairan) return;
+
+        if (tcModal) {
+            tcModal.addEventListener('show.bs.modal', function (event) {
+                var b = event.relatedTarget;
+                if (!b || !b.getAttribute) return;
+                document.getElementById('ajukan_tc_pengajuan_id').value = b.getAttribute('data-id');
+                document.getElementById('ajukan_tc_nama').textContent = b.getAttribute('data-nama');
+                document.getElementById('ajukan_tc_kode').textContent = b.getAttribute('data-kode');
             });
-        });
-        document.getElementById('tanggal_pencairan').addEventListener('change', function () {
-            var mundur = this.value && this.value < this.max;
-            document.getElementById('blok_dimuka').classList.toggle('d-none', !mundur);
-            if (!mundur) { document.getElementById('sudah_dibayar').value = 0; }
-        });
-        document.getElementById('foto_nasabah').addEventListener('change', function () {
-            var img = document.getElementById('foto_nasabah_preview');
-            if (this.files.length) {
-                img.src = URL.createObjectURL(this.files[0]);
+        }
+        var keputusanTcModal = document.getElementById('keputusanTcModal');
+        if (keputusanTcModal) {
+            keputusanTcModal.addEventListener('show.bs.modal', function (event) {
+                var b = event.relatedTarget;
+                if (!b || !b.getAttribute) return;
+                document.getElementById('keputusan_tc_id').value = b.getAttribute('data-tc-id');
+                document.getElementById('keputusan_tc_nama').textContent = b.getAttribute('data-nama');
+                document.getElementById('keputusan_tc_kode').textContent = b.getAttribute('data-kode');
+                document.getElementById('keputusan_tc_alasan').textContent = b.getAttribute('data-alasan') || '—';
+            });
+        }
+
+        function bersihkanBackdropPencairan() {
+            document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+        }
+
+        function setPreview(inputId, show) {
+            var input = document.getElementById(inputId);
+            var img = document.getElementById(inputId + '_preview');
+            if (!input || !img) return;
+            if (show && input.files && input.files.length) {
+                img.src = URL.createObjectURL(input.files[0]);
                 img.classList.remove('d-none');
             } else {
                 img.classList.add('d-none');
+                img.removeAttribute('src');
             }
+        }
+
+        function isiFormPencairanDariTombol(b) {
+            if (!b || !b.getAttribute) return false;
+            var id = b.getAttribute('data-id');
+            if (!id) return false;
+            document.getElementById('pencairan_id').value = id;
+            document.getElementById('pencairan_nama').textContent = b.getAttribute('data-nama') || '—';
+            document.getElementById('pencairan_kode').textContent = b.getAttribute('data-kode') || '—';
+            document.getElementById('pencairan_jumlah').textContent = 'Rp ' + Number(b.getAttribute('data-jumlah') || 0).toLocaleString('id-ID');
+            document.getElementById('pencairan_ringkas').textContent = b.getAttribute('data-ringkas') || '';
+
+            var gadai = b.getAttribute('data-gadai') === '1';
+            var wrapBarang = document.getElementById('wrap_foto_barang');
+            var wrapNasabahBarang = document.getElementById('wrap_foto_nasabah_barang');
+            var fotoBarang = document.getElementById('foto_barang_jaminan');
+            var fotoNasabahBarang = document.getElementById('foto_nasabah_barang');
+            if (wrapBarang) wrapBarang.classList.toggle('d-none', !gadai);
+            if (wrapNasabahBarang) wrapNasabahBarang.classList.toggle('d-none', !gadai);
+            if (fotoBarang) fotoBarang.required = gadai;
+            if (fotoNasabahBarang) fotoNasabahBarang.required = gadai;
+            var jenisBarang = (b.getAttribute('data-jenis-barang') || 'barang').split(' - ')[0];
+            var labelBarang = document.getElementById('label_foto_barang');
+            if (labelBarang) {
+                labelBarang.innerHTML = 'Foto barang jaminan ' + jenisBarang + ' <span class="text-danger">*</span>';
+            }
+
+            var tgl = document.getElementById('tanggal_pencairan');
+            if (tgl) {
+                tgl.min = b.getAttribute('data-tgl-pengajuan') || '';
+                tgl.value = tgl.max || tgl.value;
+                tgl.dispatchEvent(new Event('change'));
+            }
+            var n = b.getAttribute('data-cicilan') || '0';
+            var sd = document.getElementById('sudah_dibayar');
+            if (sd) { sd.max = n; sd.value = 0; }
+            var info = document.getElementById('info_dimuka');
+            if (info) {
+                info.textContent = 'Isi 0 bila belum ada cicilan yang dibayar. Maksimal ' + n +
+                    ' (' + ({mingguan: 'mingguan', dua_mingguan: '2 minggu sekali', bulanan: 'bulanan'}[b.getAttribute('data-frekuensi')] || 'bulanan') + ').';
+            }
+
+            ['foto_nasabah', 'foto_barang_jaminan', 'foto_nasabah_barang'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
+                setPreview(id, false);
+            });
+            return true;
+        }
+
+        function bukaModalPencairan(b) {
+            if (!isiFormPencairanDariTombol(b)) return;
+            var menu = b.closest('.dropdown-menu');
+            var wrap = (menu && menu._uiHomeParent) || b.closest('.ui-action-menu');
+            var toggle = wrap && wrap.querySelector('[data-bs-toggle="dropdown"]');
+            if (toggle && window.bootstrap && bootstrap.Dropdown) {
+                var dd = bootstrap.Dropdown.getInstance(toggle);
+                if (dd) dd.hide();
+            }
+            window.setTimeout(function () {
+                bersihkanBackdropPencairan();
+                if (!(window.bootstrap && bootstrap.Modal)) return;
+                bootstrap.Modal.getOrCreateInstance(pencairanModal, {
+                    backdrop: true,
+                    keyboard: true,
+                    focus: true
+                }).show(b);
+            }, 40);
+        }
+
+        pencairanModal.addEventListener('show.bs.modal', function (event) {
+            if (event.relatedTarget) isiFormPencairanDariTombol(event.relatedTarget);
         });
-        ['foto_barang_jaminan', 'foto_nasabah_barang'].forEach(function (id) {
-            document.getElementById(id).addEventListener('change', function () {
-                var img = document.getElementById(id + '_preview');
-                if (this.files.length) {
-                    img.src = URL.createObjectURL(this.files[0]);
-                    img.classList.remove('d-none');
-                } else {
-                    img.classList.add('d-none');
+
+        document.addEventListener('click', function (e) {
+            var b = e.target && e.target.closest && e.target.closest('[data-ui-modal="#pencairanModal"]');
+            if (!b || !b.closest('.dropdown-menu')) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+            bukaModalPencairan(b);
+        }, true);
+
+        var tglEl = document.getElementById('tanggal_pencairan');
+        if (tglEl) {
+            tglEl.addEventListener('change', function () {
+                var mundur = this.value && this.max && this.value < this.max;
+                var blok = document.getElementById('blok_dimuka');
+                if (blok) blok.classList.toggle('d-none', !mundur);
+                if (!mundur) {
+                    var sd = document.getElementById('sudah_dibayar');
+                    if (sd) sd.value = 0;
                 }
             });
+        }
+        ['foto_nasabah', 'foto_barang_jaminan', 'foto_nasabah_barang'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('change', function () { setPreview(id, true); });
         });
 
         var signaturePads = {};
-        ['nasabah','teller','saksi_1','saksi_2'].forEach(function(key){
-            var c=document.getElementById('canvas_'+key), ctx=c.getContext('2d'), drawing=false, dirty=false;
-            // Gunakan ukuran visual kanvas untuk mengubah sentuhan menjadi piksel
-            // kanvas. Ini menjaga posisi tinta tetap tepat di HP/tablet (DPI/zoom).
-            function resize(){var r=c.getBoundingClientRect(),ratio=window.devicePixelRatio||1,w=Math.max(1,Math.round(r.width*ratio)),h=Math.max(1,Math.round(r.height*ratio));if(c.width===w&&c.height===h)return;var before=dirty?c.toDataURL('image/png'):null;c.width=w;c.height=h;ctx=c.getContext('2d');ctx.lineWidth=2.5*ratio;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#183f49';if(before){var image=new Image();image.onload=function(){ctx.drawImage(image,0,0,c.width,c.height);};image.src=before;}}
-            function pos(e){var r=c.getBoundingClientRect();return [(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]}
+        ['nasabah', 'teller', 'saksi_1', 'saksi_2'].forEach(function (key) {
+            var c = document.getElementById('canvas_' + key);
+            if (!c || !c.getContext) return;
+            var ctx = c.getContext('2d');
+            var drawing = false;
+            var dirty = false;
+            function resize() {
+                var r = c.getBoundingClientRect();
+                var ratio = window.devicePixelRatio || 1;
+                var w = Math.max(1, Math.round(r.width * ratio));
+                var h = Math.max(1, Math.round(r.height * ratio));
+                if (c.width === w && c.height === h) return;
+                var before = dirty ? c.toDataURL('image/png') : null;
+                c.width = w; c.height = h;
+                ctx = c.getContext('2d');
+                ctx.lineWidth = 2.5 * ratio;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = '#183f49';
+                if (before) {
+                    var image = new Image();
+                    image.onload = function () { ctx.drawImage(image, 0, 0, c.width, c.height); };
+                    image.src = before;
+                }
+            }
+            function pos(e) {
+                var r = c.getBoundingClientRect();
+                return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height];
+            }
+            function setStatus(ready) {
+                var s = document.getElementById('status_' + key);
+                var w = c.closest('.signature-canvas-wrap');
+                if (!s) return;
+                s.classList.toggle('is-ready', ready);
+                s.innerHTML = ready ? '<i class="ti ti-circle-check"></i> Siap' : '<i class="ti ti-signature"></i> Belum';
+                if (w) w.classList.toggle('has-signature', ready);
+            }
+            function simpanTtdKeForm() {
+                var hid = document.getElementById('ttd_' + key);
+                if (hid) hid.value = dirty ? c.toDataURL('image/png') : '';
+            }
+            function stopTtd(e) {
+                drawing = false;
+                simpanTtdKeForm();
+                if (c.hasPointerCapture && c.hasPointerCapture(e.pointerId)) c.releasePointerCapture(e.pointerId);
+            }
             resize();
-            c.addEventListener('pointerdown',function(e){if(!e.isPrimary)return;e.preventDefault();resize();drawing=true;dirty=true;var p=pos(e);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(p[0]+0.01,p[1]+0.01);ctx.stroke();c.setPointerCapture(e.pointerId);setStatus(true)},{passive:false});
-            c.addEventListener('pointermove',function(e){if(!drawing||!e.isPrimary)return;e.preventDefault();var p=pos(e);ctx.lineTo(p[0],p[1]);ctx.stroke()},{passive:false});
-            function simpanTtdKeForm(){document.getElementById('ttd_'+key).value=dirty?c.toDataURL('image/png'):'';}
-            function stopTtd(e){drawing=false;simpanTtdKeForm();if(c.hasPointerCapture && c.hasPointerCapture(e.pointerId))c.releasePointerCapture(e.pointerId)}
-            c.addEventListener('pointerup',stopTtd);c.addEventListener('pointercancel',stopTtd);c.addEventListener('lostpointercapture',stopTtd);
-            function setStatus(ready){var s=document.getElementById('status_'+key),w=c.closest('.signature-canvas-wrap');if(!s)return;s.classList.toggle('is-ready',ready);s.innerHTML=ready?'<i class="fas fa-check-circle"></i> Siap disimpan':'<i class="fas fa-pen-nib"></i> Belum diisi';w.classList.toggle('has-signature',ready)}
-            if(window.ResizeObserver)new ResizeObserver(function(){if(!drawing)resize();}).observe(c);
-            signaturePads[key]={canvas:c,ctx:ctx,resize:resize,isDirty:function(){return dirty},clear:function(){ctx.clearRect(0,0,c.width,c.height);dirty=false;document.getElementById('ttd_'+key).value='';setStatus(false)}};
+            c.addEventListener('pointerdown', function (e) {
+                if (!e.isPrimary) return;
+                e.preventDefault();
+                resize();
+                drawing = true;
+                dirty = true;
+                var p = pos(e);
+                ctx.beginPath();
+                ctx.moveTo(p[0], p[1]);
+                ctx.lineTo(p[0] + 0.01, p[1] + 0.01);
+                ctx.stroke();
+                c.setPointerCapture(e.pointerId);
+                setStatus(true);
+            }, { passive: false });
+            c.addEventListener('pointermove', function (e) {
+                if (!drawing || !e.isPrimary) return;
+                e.preventDefault();
+                var p = pos(e);
+                ctx.lineTo(p[0], p[1]);
+                ctx.stroke();
+            }, { passive: false });
+            c.addEventListener('pointerup', stopTtd);
+            c.addEventListener('pointercancel', stopTtd);
+            c.addEventListener('lostpointercapture', stopTtd);
+            if (window.ResizeObserver) new ResizeObserver(function () { if (!drawing) resize(); }).observe(c);
+            signaturePads[key] = {
+                canvas: c,
+                resize: resize,
+                isDirty: function () { return dirty; },
+                clear: function () {
+                    ctx.clearRect(0, 0, c.width, c.height);
+                    dirty = false;
+                    var hid = document.getElementById('ttd_' + key);
+                    if (hid) hid.value = '';
+                    setStatus(false);
+                }
+            };
         });
-        document.querySelectorAll('.clear-signature').forEach(function(b){b.onclick=function(){signaturePads[this.dataset.key].clear()}});
-        pencairanModal.addEventListener('shown.bs.modal', function(){Object.keys(signaturePads).forEach(function(k){signaturePads[k].resize();signaturePads[k].clear();});});
-
-        // PHP menolak berkas yang sudah melewati upload_max_filesize sebelum kode
-        // server berjalan. Karena itu foto besar dikompres dahulu di browser/HP.
-        var BATAS_FOTO = 1024 * 1024;
-        var TARGET_FOTO = 300 * 1024;
-
-        function canvasKeBlob(canvas, kualitas) {
-            return new Promise(function (resolve) {
-                canvas.toBlob(resolve, 'image/jpeg', kualitas);
+        document.querySelectorAll('.clear-signature').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var pad = signaturePads[this.dataset.key];
+                if (pad) pad.clear();
             });
-        }
+        });
+        pencairanModal.addEventListener('shown.bs.modal', function () {
+            Object.keys(signaturePads).forEach(function (k) {
+                signaturePads[k].resize();
+                signaturePads[k].clear();
+            });
+        });
 
-        async function kompresFoto(input) {
-            if (!input.files.length) return;
-            var transfer = new DataTransfer();
-            for (var f=0; f<input.files.length; f++) transfer.items.add(await kompresSatuFoto(input.files[f]));
-            input.files = transfer.files;
-        }
-        async function kompresSatuFoto(file) {
-            if (file.size <= TARGET_FOTO) return file;
-            var bitmap;
-            try {
-                bitmap = await createImageBitmap(file);
-            } catch (e) {
-                throw new Error('Foto "' + file.name + '" tidak dapat dikompres. Gunakan format JPG, PNG, atau WEBP.');
-            }
-
-            var skala = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
-            var canvas = document.createElement('canvas');
-            canvas.width = Math.max(1, Math.round(bitmap.width * skala));
-            canvas.height = Math.max(1, Math.round(bitmap.height * skala));
-            var ctx = canvas.getContext('2d');
-            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-            if (bitmap.close) bitmap.close();
-
-            var blob = null;
-            var kualitas = 0.88;
-            while (kualitas >= 0.45) {
-                blob = await canvasKeBlob(canvas, kualitas);
-                if (blob && blob.size <= TARGET_FOTO) break;
-                kualitas -= 0.08;
-            }
-            while (blob && blob.size > TARGET_FOTO && canvas.width > 800 && canvas.height > 800) {
-                var kecil = document.createElement('canvas');
-                kecil.width = Math.round(canvas.width * 0.8);
-                kecil.height = Math.round(canvas.height * 0.8);
-                kecil.getContext('2d').drawImage(canvas, 0, 0, kecil.width, kecil.height);
-                canvas = kecil;
-                blob = await canvasKeBlob(canvas, 0.7);
-            }
-            if (!blob || blob.size > BATAS_FOTO) {
-                throw new Error('Foto "' + file.name + '" masih melebihi 1 MB setelah dikompres.');
-            }
-
-            var nama = file.name.replace(/\.[^.]+$/, '') + '-kompres.jpg';
-            var hasil = new File([blob], nama, {type: 'image/jpeg', lastModified: Date.now()});
-            return hasil;
-        }
-
-        document.getElementById('formPencairan').addEventListener('submit', async function (event) {
+        formPencairan.addEventListener('submit', async function (event) {
             event.preventDefault();
             var form = this;
             var tombol = document.getElementById('btnCairkan');
-            if (tombol.disabled) return;
+            if (!tombol || tombol.disabled) return;
             tombol.disabled = true;
-            tombol.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Menyiapkan foto...';
+            tombol.innerHTML = '<i class="ti ti-loader-2 ti-spin me-1"></i> Mengompres foto (maks. 1 MB)...';
             try {
-                await kompresFoto(document.getElementById('foto_nasabah'));
-                await kompresFoto(document.getElementById('foto_barang_jaminan'));
-                await kompresFoto(document.getElementById('foto_nasabah_barang'));
-                await kompresFoto(document.getElementById('surat_tambahan'));
-                var ttdLengkap=Object.keys(signaturePads).every(function(k){return signaturePads[k].isDirty()});
-                if(!ttdLengkap) throw new Error('TTD nasabah, Teller, dan kedua saksi wajib dibuat langsung pada layar.');
-                // Isi hidden field lebih dulu. Ini menjadi cadangan yang valid bila
-                // unggahan Blob tidak diterima browser/server tertentu.
-                Object.keys(signaturePads).forEach(function(k){
+                if (window.SimkeuKompresFoto && SimkeuKompresFoto.kompresSemuaInputDiForm) {
+                    await SimkeuKompresFoto.kompresSemuaInputDiForm(form);
+                } else {
+                    throw new Error('Modul kompresi foto belum dimuat. Refresh halaman lalu coba lagi.');
+                }
+                var keys = Object.keys(signaturePads);
+                if (keys.length < 4 || !keys.every(function (k) { return signaturePads[k].isDirty(); })) {
+                    throw new Error('TTD nasabah, Teller, dan kedua saksi wajib dibuat langsung pada layar.');
+                }
+                keys.forEach(function (k) {
                     document.getElementById('ttd_' + k).value = signaturePads[k].canvas.toDataURL('image/png');
                 });
                 var data = new FormData(form);
-                for (var key of Object.keys(signaturePads)) {
+                var batas = (window.SimkeuKompresFoto && SimkeuKompresFoto.BATAS_FOTO) || (1024 * 1024);
+                for (var i = 0; i < keys.length; i++) {
+                    var key = keys[i];
                     data.delete('ttd_' + key);
-                    var blob = await new Promise(function(resolve){signaturePads[key].canvas.toBlob(resolve, 'image/png')});
-                    if (!blob || blob.size > 1024 * 1024) throw new Error('TTD gagal dibuat atau melebihi 1 MB.');
+                    var blob = await new Promise(function (resolve) { signaturePads[key].canvas.toBlob(resolve, 'image/png'); });
+                    if (!blob || blob.size > batas) throw new Error('TTD gagal dibuat atau melebihi 1 MB.');
                     data.append('ttd_' + key + '_file', blob, 'ttd-' + key + '.png');
                 }
-                tombol.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Mencairkan...';
-                var response = await fetch(form.action, {method: 'POST', body: data, credentials: 'same-origin'});
-                if (!response.ok) throw new Error(response.status === 403
-                    ? 'Server menolak pencairan (403). Periksa log keamanan hosting pada waktu transaksi ini. Jangan ulangi pencairan sebelum memeriksa status pengajuan.'
-                    : 'Respons server bermasalah (HTTP ' + response.status + '). Periksa status pengajuan sebelum mencoba lagi.');
-                if (!response.redirected) throw new Error('Respons pencairan tidak sesuai. Periksa status pengajuan dan sesi login sebelum mencoba lagi.');
+                // Double-check semua file gambar di FormData ≤ 1 MB
+                data.forEach(function (val, name) {
+                    if (val && typeof val === 'object' && typeof val.size === 'number' && val.type && /^image\//i.test(val.type) && val.size > batas) {
+                        throw new Error('File "' + (val.name || name) + '" masih melebihi 1 MB.');
+                    }
+                });
+                tombol.innerHTML = '<i class="ti ti-loader-2 ti-spin me-1"></i> Mencairkan...';
+                var postUrl = form.getAttribute('action') || window.location.href;
+                var response = await fetch(postUrl, { method: 'POST', body: data, credentials: 'same-origin' });
+                if (!response.ok) {
+                    throw new Error(response.status === 403
+                        ? 'Server menolak pencairan (403). Periksa status pengajuan sebelum mencoba lagi.'
+                        : 'Respons server bermasalah (HTTP ' + response.status + ').');
+                }
+                if (!response.redirected) throw new Error('Respons pencairan tidak sesuai. Periksa status pengajuan dan sesi login.');
                 window.location.assign(response.url);
-            } catch (e) {
-                alert(e instanceof TypeError ? 'Koneksi terputus. Periksa status pengajuan sebelum mencoba pencairan lagi.' : e.message);
+            } catch (err) {
+                alert(err instanceof TypeError ? 'Koneksi terputus. Periksa status pengajuan sebelum mencoba lagi.' : err.message);
                 tombol.disabled = false;
-                tombol.innerHTML = '<i class="fas fa-check-circle me-1"></i> Cairkan';
+                tombol.innerHTML = '<i class="ti ti-circle-check me-1"></i> Cairkan pinjaman';
             }
         });
-        document.querySelectorAll('.table-actions .dropdown').forEach(function(dropdown){
-            dropdown.addEventListener('shown.bs.dropdown', function(){
-                var button=this.querySelector('.action-dropdown-toggle'), menu=this.querySelector('.action-menu');
-                if(!button||!menu)return;
-                var rect=button.getBoundingClientRect();
-                menu.classList.add('action-menu-viewport');
-                var width=menu.offsetWidth, height=menu.offsetHeight;
-                menu.style.left=Math.max(12,Math.min(rect.right-width,window.innerWidth-width-12))+'px';
-                menu.style.top=Math.max(12,Math.min(rect.bottom+6,window.innerHeight-height-12))+'px';
-            });
-            dropdown.addEventListener('hidden.bs.dropdown', function(){
-                var menu=this.querySelector('.action-menu');
-                if(!menu)return;
-                menu.classList.remove('action-menu-viewport');
-                menu.style.left=''; menu.style.top='';
-            });
-        });
-    </script>
-    <script>
-        // Detail Modal
-        var detailModal = document.getElementById('detailModal');
-        detailModal.addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            document.getElementById('detail_kode').textContent = button.getAttribute('data-kode');
-            document.getElementById('detail_kode_pinjaman').textContent = button.getAttribute('data-kode_pinjaman');
-            document.getElementById('detail_nama').textContent = button.getAttribute('data-nama');
-            document.getElementById('detail_kode_anggota').textContent = button.getAttribute('data-kode_anggota');
-            document.getElementById('detail_jenis').textContent = button.getAttribute('data-jenis');
-            document.getElementById('detail_jumlah').textContent = 'Rp ' + Number(button.getAttribute('data-jumlah')).toLocaleString('id-ID');
-            document.getElementById('detail_tenor').textContent = button.getAttribute('data-tenor') + ' bulan';
-            document.getElementById('detail_bunga').textContent = button.getAttribute('data-bunga');
-            document.getElementById('detail_admin').textContent = button.getAttribute('data-admin');
-            document.getElementById('detail_tanggal_pencairan').textContent = button.getAttribute('data-tanggal_pencairan');
-            
-            var status = button.getAttribute('data-status');
-            var statusClass = {
-                'menunggu': 'warning',
-                'disetujui': 'success',
-                'dicairkan': 'info',
-                'ditolak': 'danger',
-                'develop': 'success'
-            };
-            document.getElementById('detail_status').innerHTML = '<span class="badge bg-' + statusClass[status] + '">' + status.charAt(0).toUpperCase() + status.slice(1) + '</span>';
-            
-            document.getElementById('detail_tujuan').textContent = button.getAttribute('data-tujuan') || '-';
-            document.getElementById('detail_tanggal').textContent = button.getAttribute('data-tanggal');
-            document.getElementById('detail_catatan').textContent = button.getAttribute('data-catatan') || '-';
-        });
 
-        // Auto close alerts after 5 seconds
-        setTimeout(function() {
-            var alerts = document.querySelectorAll('.alert-success'); // pesan error tetap tampil sampai ditutup
-            alerts.forEach(function(alert) {
-                var bsAlert = new bootstrap.Alert(alert);
-                bsAlert.close();
+        if (detailModal) {
+            detailModal.addEventListener('show.bs.modal', function (event) {
+                var button = event.relatedTarget;
+                if (!button) return;
+                document.getElementById('detail_kode').textContent = button.getAttribute('data-kode');
+                document.getElementById('detail_kode_pinjaman').textContent = button.getAttribute('data-kode_pinjaman');
+                document.getElementById('detail_nama').textContent = button.getAttribute('data-nama');
+                document.getElementById('detail_kode_anggota').textContent = button.getAttribute('data-kode_anggota');
+                document.getElementById('detail_jenis').textContent = button.getAttribute('data-jenis');
+                document.getElementById('detail_jumlah').textContent = 'Rp ' + Number(button.getAttribute('data-jumlah')).toLocaleString('id-ID');
+                document.getElementById('detail_tenor').textContent = button.getAttribute('data-tenor');
+                document.getElementById('detail_bunga').textContent = button.getAttribute('data-bunga');
+                document.getElementById('detail_admin').textContent = button.getAttribute('data-admin');
+                document.getElementById('detail_teller').textContent = button.getAttribute('data-teller');
+                document.getElementById('detail_tanggal_pencairan').textContent = button.getAttribute('data-tanggal_pencairan');
+                var status = button.getAttribute('data-status');
+                var statusLabel = button.getAttribute('data-status-label') || status;
+                var statusClass = { menunggu: 'warning', disetujui: 'success', dicairkan: 'info', ditolak: 'danger', develop: 'success' };
+                document.getElementById('detail_status').innerHTML = '<span class="badge bg-' + (statusClass[status] || 'secondary') + '">' + statusLabel + '</span>';
+                document.getElementById('detail_tujuan').textContent = button.getAttribute('data-tujuan') || '-';
+                document.getElementById('detail_tanggal').textContent = button.getAttribute('data-tanggal');
+                document.getElementById('detail_catatan').textContent = button.getAttribute('data-catatan') || '-';
             });
-        }, 5000);
+        }
+    })();
     </script>
 </body>
 </html>
+

@@ -97,60 +97,22 @@ if ($_POST) {
     }
 }
 
-$ui = ui_query_params(['status', 'tanggal_mulai', 'tanggal_selesai']);
-$filter_status = $ui['filters']['status'] ?? '';
-$filter_tanggal_mulai = $ui['filters']['tanggal_mulai'] ?? '';
-$filter_tanggal_selesai = $ui['filters']['tanggal_selesai'] ?? '';
-$filter_q = $ui['q'];
-
-$from = " FROM pengajuan_pinjaman pp
-          JOIN anggota a ON pp.anggota_id = a.id
-          JOIN jenis_pinjaman jp ON pp.jenis_pinjaman_id = jp.id
-          LEFT JOIN users u ON pp.admin_id = u.id
-          WHERE 1=1";
-$params = [];
-if ($filter_status !== '') {
-    $from .= ' AND pp.status = :status';
-    $params[':status'] = $filter_status;
-}
-if ($filter_tanggal_mulai !== '') {
-    $from .= ' AND DATE(pp.tanggal_pengajuan) >= :tanggal_mulai';
-    $params[':tanggal_mulai'] = $filter_tanggal_mulai;
-}
-if ($filter_tanggal_selesai !== '') {
-    $from .= ' AND DATE(pp.tanggal_pengajuan) <= :tanggal_selesai';
-    $params[':tanggal_selesai'] = $filter_tanggal_selesai;
-}
-if ($filter_q !== '') {
-    $from .= ' AND (a.nama_lengkap LIKE :q1 OR a.kode_anggota LIKE :q2 OR pp.kode_pengajuan LIKE :q3)';
-    $params[':q1'] = $params[':q2'] = $params[':q3'] = '%' . $filter_q . '%';
-}
-
-$countStmt = $db->prepare('SELECT COUNT(*)' . $from);
-foreach ($params as $key => $value) {
-    $countStmt->bindValue($key, $value);
-}
-$countStmt->execute();
-$pager = ui_paginate((int)$countStmt->fetchColumn(), $ui['page'], $ui['per_page']);
-
+// Daftar semua pengajuan (filter/sort di DataTables client)
 $query = "SELECT pp.*, a.nama_lengkap, a.foto_ktp, a.foto_kk, a.foto_ktp_pasangan,
           CASE WHEN jp.memerlukan_jaminan = 1 THEN COALESCE(a.kode_anggota_jaminan, a.kode_anggota) ELSE a.kode_anggota END AS kode_anggota,
           jp.nama_jenis, jp.memerlukan_jaminan,
           (SELECT COUNT(*) FROM pinjaman pj WHERE pj.pengajuan_id = pp.id) AS sudah_cair,
           jp.maksimal_pinjaman, u.nama_lengkap as admin_name
-          $from
-          ORDER BY pp.tanggal_pengajuan DESC
-          LIMIT {$pager['per_page']} OFFSET {$pager['offset']}";
-
+          FROM pengajuan_pinjaman pp
+          JOIN anggota a ON pp.anggota_id = a.id
+          JOIN jenis_pinjaman jp ON pp.jenis_pinjaman_id = jp.id
+          LEFT JOIN users u ON pp.admin_id = u.id
+          ORDER BY pp.tanggal_pengajuan DESC";
 $stmt = $db->prepare($query);
-foreach ($params as $key => $value) {
-    $stmt->bindValue($key, $value);
-}
 $stmt->execute();
 $pengajuan_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get statistics
-$query_stats = "SELECT 
+$query_stats = "SELECT
     COUNT(*) as total_pengajuan,
     COUNT(CASE WHEN status = 'menunggu' THEN 1 END) as menunggu,
     COUNT(CASE WHEN status = 'disetujui' AND NOT EXISTS (SELECT 1 FROM pinjaman pj WHERE pj.pengajuan_id = pengajuan_pinjaman.id) THEN 1 END) as disetujui,
@@ -159,6 +121,14 @@ $query_stats = "SELECT
 $stmt_stats = $db->prepare($query_stats);
 $stmt_stats->execute();
 $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
+
+$statusClassMap = [
+    'menunggu' => 'warning',
+    'disetujui' => 'success',
+    'ditolak' => 'danger',
+    'batal_cair' => 'secondary',
+    'dicairkan' => 'info',
+];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -166,178 +136,110 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Persetujuan Pinjaman - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <?php $uiAssetPrefix = '../'; include __DIR__ . '/layout/assets.php'; ?>
-    <style>
-        .stat-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .table-actions {
-            white-space: nowrap;
-        }
-        .status-badge {
-            font-size: 0.75rem;
-            padding: 0.5rem 0.75rem;
-        }
-        .filter-card {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 14px;
-        }
-        .document-card { height: 100%; border: 1px solid #dee2e6; border-radius: .5rem; padding: .75rem; background: #f8f9fa; }
-        .document-card img { width: 100%; height: 160px; object-fit: contain; background: #fff; border: 1px solid #dee2e6; border-radius: .375rem; }
-        .document-empty { height: 160px; display: flex; align-items: center; justify-content: center; text-align: center; color: #842029; background: #f8d7da; border-radius: .375rem; }
-    </style>
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <?php ui_page_header([
-                    'title' => 'Persetujuan Pinjaman',
-                    'icon' => 'fas fa-check-circle text-success',
-                    'subtitle' => 'Review dan putuskan pengajuan pinjaman',
-                    'actions' => '<a href="pencairan.php" class="btn btn-success"><i class="fas fa-money-bill-wave me-1"></i>Pencairan</a>',
-                ]); ?>
+    <?php include __DIR__ . '/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-approve" aria-hidden="true"><i class="ti ti-circle-check"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Pinjaman</p>
+                        <h1 class="ui-dash-title">Persetujuan Pinjaman</h1>
+                        <p class="ui-dash-meta mb-0">Review dan putuskan pengajuan — pencairan diproses Teller</p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <a href="pencairan.php" class="btn ui-tx-btn-approve-ghost">
+                            <i class="ti ti-cash me-1" aria-hidden="true"></i>
+                            <span class="d-none d-sm-inline">Ke pencairan</span><span class="d-sm-none">Cair</span>
+                        </a>
+                    </div>
+                </header>
+
                 <?php if (!$bolehMutasi): ?>
-                    <div class="alert alert-info">Mode lihat saja. Persetujuan/penolakan pengajuan hanya dilakukan Admin.</div>
+                <div class="alert alert-info ui-ps-readonly">
+                    <i class="ti ti-eye me-1" aria-hidden="true"></i>
+                    Mode lihat saja. Persetujuan/penolakan hanya dilakukan Admin.
+                </div>
                 <?php endif; ?>
+
                 <?php ui_flash(); ?>
 
+                <div class="ui-ps-kpi">
                 <?php ui_stat_grid([
-                    ['label' => 'Total pengajuan', 'value' => (int)$stats['total_pengajuan'], 'tone' => 'primary', 'icon' => 'fas fa-file-alt', 'hint' => 'Semua'],
-                    ['label' => 'Menunggu', 'value' => (int)$stats['menunggu'], 'tone' => 'warning', 'icon' => 'fas fa-clock', 'hint' => 'Perlu putusan'],
-                    ['label' => 'Disetujui', 'value' => (int)$stats['disetujui'], 'tone' => 'success', 'icon' => 'fas fa-check-circle', 'hint' => 'Siap cair'],
-                    ['label' => 'Ditolak', 'value' => (int)$stats['ditolak'], 'tone' => 'danger', 'icon' => 'fas fa-times-circle', 'hint' => 'Ditolak'],
+                    ['label' => 'Total pengajuan', 'value' => (int)$stats['total_pengajuan'], 'tone' => 'primary', 'icon' => 'ti ti-file-text', 'hint' => 'Semua'],
+                    ['label' => 'Menunggu', 'value' => (int)$stats['menunggu'], 'tone' => 'warning', 'icon' => 'ti ti-clock', 'hint' => 'Perlu putusan'],
+                    ['label' => 'Disetujui', 'value' => (int)$stats['disetujui'], 'tone' => 'success', 'icon' => 'ti ti-circle-check', 'hint' => 'Siap cair'],
+                    ['label' => 'Ditolak', 'value' => (int)$stats['ditolak'], 'tone' => 'danger', 'icon' => 'ti ti-circle-x', 'hint' => 'Ditolak'],
                 ]); ?>
-
-                <!-- Filter Section -->
-                <div class="card filter-card mb-4">
-                    <div class="card-body">
-                        <?php
-                        ui_table_toolbar([
-                            'action' => 'persetujuan.php',
-                            'q' => $filter_q,
-                            'placeholder' => 'Cari nama, kode anggota, kode pengajuan…',
-                            'per_page' => $pager['per_page'],
-                            'reset_href' => 'persetujuan.php',
-                            'filters' => [
-                                [
-                                    'name' => 'status',
-                                    'label' => 'Status',
-                                    'type' => 'select',
-                                    'value' => $filter_status,
-                                    'options' => ['' => 'Semua Status', 'menunggu' => 'Menunggu', 'disetujui' => 'Disetujui', 'ditolak' => 'Ditolak'],
-                                ],
-                                ['name' => 'tanggal_mulai', 'label' => 'Tanggal mulai', 'type' => 'date', 'value' => $filter_tanggal_mulai],
-                                ['name' => 'tanggal_selesai', 'label' => 'Tanggal selesai', 'type' => 'date', 'value' => $filter_tanggal_selesai],
-                            ],
-                        ]);
-                        ?>
-                    </div>
                 </div>
 
-                <!-- Pengajuan Table -->
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-list me-2"></i>Daftar Pengajuan Pinjaman
-                        </h5>
-                        <div>
-                            <span class="text-muted me-2">
-                                <?php echo (int)$pager['total']; ?> data ditemukan
-                            </span>
-                        </div>
+                <div class="card mt-3" id="riwayat">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-list-check" aria-hidden="true"></i>Daftar pengajuan</span>
+                        <span class="ui-dash-sec-note"><?= (int)count($pengajuan_list) ?> data</span>
                     </div>
-                    <div class="card-body">
-                        <?php if (empty($pengajuan_list)): ?>
-                        <div class="text-center py-5">
-                            <i class="fas fa-file-alt fa-4x text-muted mb-3"></i>
-                            <h5 class="text-muted">Belum ada pengajuan pinjaman</h5>
-                            <p class="text-muted">Semua pengajuan pinjaman dari anggota akan muncul di sini</p>
-                        </div>
-                        <?php else: ?>
+                    <div class="card-body p-0">
                         <div class="table-responsive ui-table-scroll">
-                            <table class="table table-striped table-hover">
+                            <table class="table table-hover align-middle mb-0 js-datatable"
+                                   data-dt-page-length="10"
+                                   data-dt-order="0,asc;1,desc"
+                                   data-dt-filter="6"
+                                   data-dt-date-col="1">
                                 <thead>
                                     <tr>
+                                        <th class="dt-prio">Prio</th>
+                                        <th>Tanggal</th>
                                         <th>Kode</th>
                                         <th>Anggota</th>
-                                        <th>Jenis Pinjaman</th>
-                                        <th>Jumlah</th>
-                                        <th>Tenor</th>
-                                        <th>Bunga</th>
+                                        <th>Jenis</th>
+                                        <th class="text-end">Jumlah</th>
                                         <th>Status</th>
-                                        <th>Tanggal</th>
-                                        <th>Aksi</th>
+                                        <th class="text-end">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($pengajuan_list as $pengajuan): ?>
-                                    <tr>
+                                    <?php foreach ($pengajuan_list as $pengajuan):
+                                        $ts = strtotime((string)($pengajuan['tanggal_pengajuan'] ?? ''));
+                                        $orderTs = $ts ? date('Y-m-d H:i:s', $ts) : '';
+                                        $day = $ts ? date('Y-m-d', $ts) : '';
+                                        $statusTampil = $pengajuan['status'] === 'dicairkan' ? 'disetujui' : $pengajuan['status'];
+                                        $badge = $statusClassMap[$statusTampil] ?? 'secondary';
+                                        $statusLabel = $statusTampil === 'batal_cair' ? 'Batal Cair' : ucfirst((string)$statusTampil);
+                                        $prio = ($bolehMutasi && $pengajuan['status'] === 'menunggu') ? 0 : 9;
+                                        $dokumen_detail = [
+                                            'foto_ktp' => urlDokumenAnggota($pengajuan['foto_ktp']),
+                                            'foto_kk' => urlDokumenAnggota($pengajuan['foto_kk']),
+                                            'foto_ktp_pasangan' => urlDokumenAnggota($pengajuan['foto_ktp_pasangan']),
+                                        ];
+                                    ?>
+                                    <tr<?= $prio < 9 ? ' class="ui-row-action"' : '' ?>>
+                                        <td><?= (int)$prio ?></td>
+                                        <td data-order="<?= htmlspecialchars($orderTs) ?>" data-date="<?= htmlspecialchars($day) ?>">
+                                            <?= htmlspecialchars(formatTanggalUi($pengajuan['tanggal_pengajuan'], true, true)) ?>
+                                        </td>
+                                        <td><code><?= htmlspecialchars($pengajuan['kode_pengajuan']) ?></code></td>
                                         <td>
-                                            <strong><?php echo $pengajuan['kode_pengajuan']; ?></strong>
+                                            <div class="fw-semibold"><?= htmlspecialchars($pengajuan['nama_lengkap']) ?></div>
+                                            <small class="text-muted"><?= htmlspecialchars((string)$pengajuan['kode_anggota']) ?></small>
                                         </td>
                                         <td>
-                                            <div class="fw-semibold"><?php echo $pengajuan['nama_lengkap']; ?></div>
-                                            <small class="text-muted"><?php echo $pengajuan['kode_anggota']; ?></small>
+                                            <div><?= htmlspecialchars($pengajuan['nama_jenis']) ?></div>
+                                            <small class="text-muted"><?= htmlspecialchars(labelTenorRow($pengajuan)) ?> · <?= htmlspecialchars(labelBungaRow($pengajuan)) ?></small>
                                         </td>
-                                        <td>
-                                            <div><?php echo $pengajuan['nama_jenis']; ?></div>
-                                            <small class="text-muted">Maks: <?php echo formatRupiah($pengajuan['maksimal_pinjaman']); ?></small>
-                                        </td>
-                                        <td>
-                                            <div class="fw-bold text-primary"><?php echo formatRupiah($pengajuan['jumlah_pinjaman']); ?></div>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-info"><?php echo labelTenorRow($pengajuan); ?></span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-success"><?php echo labelBungaRow($pengajuan); ?></span>
-                                        </td>
-                                        <td>
-                                            <?php
-                                            // Tahap pencairan hanya ditampilkan di menu Pencairan.
-                                            $statusTampil = $pengajuan['status']==='dicairkan' ? 'disetujui' : $pengajuan['status'];
-                                            $status_class = [
-                                                'menunggu' => 'warning',
-                                                'disetujui' => 'success',
-                                                'ditolak' => 'danger',
-                                                'batal_cair' => 'secondary'
-                                            ];
-                                            $label_status = $statusTampil === 'batal_cair' ? 'Batal Cair' : ucfirst($statusTampil);
-                                            ?>
-                                            <span class="badge bg-<?php echo $status_class[$statusTampil] ?? 'secondary'; ?> status-badge">
-                                                <?php echo $label_status; ?>
-                                            </span>
-                                            <?php if ($pengajuan['admin_name']): ?>
-                                                <br>
-                                                <small class="text-muted">Oleh: <?php echo $pengajuan['admin_name']; ?></small>
+                                        <td class="text-end fw-semibold"><?= formatRupiah($pengajuan['jumlah_pinjaman']) ?></td>
+                                        <td data-filter="<?= htmlspecialchars($statusLabel) ?>">
+                                            <span class="badge bg-<?= htmlspecialchars($badge) ?>"><?= htmlspecialchars($statusLabel) ?></span>
+                                            <?php if (!empty($pengajuan['admin_name'])): ?>
+                                            <div class="small text-muted mt-1">Oleh: <?= htmlspecialchars($pengajuan['admin_name']) ?></div>
                                             <?php endif; ?>
                                         </td>
-                                        <td>
-                                            <small><?php echo formatTanggalUi($pengajuan['tanggal_pengajuan']); ?></small>
-                                            <br>
-                                            <small class="text-muted"><?php echo date('H:i', strtotime($pengajuan['tanggal_pengajuan'])); ?></small>
-                                        </td>
-                                        <td class="table-actions text-end">
+                                        <td class="text-end table-actions">
                                             <?php
-                                            $dokumen_detail = [
-                                                'foto_ktp' => urlDokumenAnggota($pengajuan['foto_ktp']),
-                                                'foto_kk' => urlDokumenAnggota($pengajuan['foto_kk']),
-                                                'foto_ktp_pasangan' => urlDokumenAnggota($pengajuan['foto_ktp_pasangan']),
-                                            ];
                                             $aksiPersetujuan = [
                                                 [
                                                     'label' => 'Detail',
-                                                    'icon' => 'fas fa-eye',
+                                                    'icon' => 'ti ti-eye',
                                                     'attrs' => [
                                                         'data-bs-toggle' => 'modal',
                                                         'data-bs-target' => '#detailModal',
@@ -360,7 +262,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                             if ($bolehMutasi && $pengajuan['status'] == 'menunggu') {
                                                 $aksiPersetujuan[] = [
                                                     'label' => 'Setujui',
-                                                    'icon' => 'fas fa-check',
+                                                    'icon' => 'ti ti-check',
                                                     'class' => 'text-success',
                                                     'attrs' => [
                                                         'data-bs-toggle' => 'modal',
@@ -372,7 +274,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                 ];
                                                 $aksiPersetujuan[] = [
                                                     'label' => 'Tolak',
-                                                    'icon' => 'fas fa-times',
+                                                    'icon' => 'ti ti-x',
                                                     'class' => 'text-danger',
                                                     'attrs' => [
                                                         'data-bs-toggle' => 'modal',
@@ -387,7 +289,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                                 $aksiPersetujuan[] = ['divider' => true];
                                                 $aksiPersetujuan[] = [
                                                     'label' => 'Hapus',
-                                                    'icon' => 'fas fa-trash',
+                                                    'icon' => 'ti ti-trash',
                                                     'class' => 'text-danger',
                                                     'attrs' => [
                                                         'data-bs-toggle' => 'modal',
@@ -406,196 +308,165 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                 </tbody>
                             </table>
                         </div>
-                        <?php ui_pagination($pager, 'persetujuan.php'); ?>
-                        <?php endif; ?>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
+            </div>
+            <?php include __DIR__ . '/layout/shell_end.php'; ?>
 
-    <!-- Detail Modal -->
-    <div class="modal fade" id="detailModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+    <div class="modal fade ui-tx-modal ui-tx-modal-approve" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Detail Pengajuan Pinjaman</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h2 class="modal-title h5" id="detailModalLabel">Detail pengajuan</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <table class="table table-borderless">
-                                <tr>
-                                    <th width="40%">Kode Pengajuan</th>
-                                    <td id="detail_kode"></td>
-                                </tr>
-                                <tr>
-                                    <th>Nama Anggota</th>
-                                    <td id="detail_nama"></td>
-                                </tr>
-                                <tr>
-                                    <th>Kode Anggota</th>
-                                    <td id="detail_kode_anggota"></td>
-                                </tr>
-                                <tr>
-                                    <th>Jenis Pinjaman</th>
-                                    <td id="detail_jenis"></td>
-                                </tr>
-                            </table>
+                    <div class="ui-pj-detail">
+                        <div class="ui-pj-detail-hero">
+                            <div class="ui-pj-detail-hero-main min-w-0">
+                                <div class="ui-pj-detail-kode" id="detail_kode">—</div>
+                                <div class="ui-pj-detail-nama text-truncate" id="detail_nama">—</div>
+                                <div class="ui-pj-detail-meta" id="detail_kode_anggota">—</div>
+                            </div>
+                            <div class="ui-pj-detail-hero-status" id="detail_status">—</div>
                         </div>
-                        <div class="col-md-6">
-                            <table class="table table-borderless">
-                                <tr>
-                                    <th width="40%">Jumlah Pinjaman</th>
-                                    <td id="detail_jumlah" class="fw-bold text-primary"></td>
-                                </tr>
-                                <tr>
-                                    <th>Tenor</th>
-                                    <td id="detail_tenor"></td>
-                                </tr>
-                                <tr>
-                                    <th>Bunga</th>
-                                    <td id="detail_bunga"></td>
-                                </tr>
-                                <tr>
-                                    <th>Status</th>
-                                    <td id="detail_status"></td>
-                                </tr>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-12">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Tujuan Pinjaman</label>
-                                <div id="detail_tujuan" class="p-3 bg-light rounded"></div>
+                        <div class="ui-pj-detail-amount">
+                            <div class="ui-pj-detail-amount-item">
+                                <span class="ui-pj-detail-amount-label">Jumlah pinjaman</span>
+                                <strong class="ui-pj-detail-amount-value" id="detail_jumlah">—</strong>
+                            </div>
+                            <div class="ui-pj-detail-amount-item">
+                                <span class="ui-pj-detail-amount-label">Jenis</span>
+                                <strong class="ui-pj-detail-amount-sub" id="detail_jenis">—</strong>
                             </div>
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Tanggal Pengajuan</label>
-                                <div id="detail_tanggal" class="p-2 bg-light rounded"></div>
-                            </div>
+                        <div class="ui-pj-detail-grid">
+                            <section class="ui-pj-detail-card">
+                                <h3 class="ui-pj-detail-card-title"><i class="ti ti-percentage" aria-hidden="true"></i>Syarat pinjaman</h3>
+                                <dl class="ui-pj-detail-dl">
+                                    <div><dt>Tenor</dt><dd id="detail_tenor">—</dd></div>
+                                    <div><dt>Bunga</dt><dd id="detail_bunga">—</dd></div>
+                                    <div><dt>Tanggal</dt><dd id="detail_tanggal">—</dd></div>
+                                </dl>
+                            </section>
+                            <section class="ui-pj-detail-card">
+                                <h3 class="ui-pj-detail-card-title"><i class="ti ti-notes" aria-hidden="true"></i>Catatan admin</h3>
+                                <p class="ui-pj-detail-tujuan mb-0" id="detail_catatan">—</p>
+                            </section>
+                            <section class="ui-pj-detail-card ui-pj-detail-card-wide">
+                                <h3 class="ui-pj-detail-card-title"><i class="ti ti-target" aria-hidden="true"></i>Tujuan pinjaman</h3>
+                                <p class="ui-pj-detail-tujuan mb-0" id="detail_tujuan">—</p>
+                            </section>
+                            <section class="ui-pj-detail-card ui-pj-detail-card-wide">
+                                <div class="d-flex align-items-center justify-content-between gap-2 mb-2 flex-wrap">
+                                    <h3 class="ui-pj-detail-card-title mb-0"><i class="ti ti-photo" aria-hidden="true"></i>Dokumen anggota</h3>
+                                    <span id="detail_dokumen_status" class="badge bg-secondary">Memeriksa</span>
+                                </div>
+                                <p class="ui-pj-section-note mb-3" id="detail_dokumen_info"></p>
+                                <div id="detail_dokumen" class="row g-3"></div>
+                            </section>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Catatan Admin</label>
-                                <div id="detail_catatan" class="p-2 bg-light rounded"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="border-top pt-3 mt-1">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <label class="form-label fw-bold mb-0">Kelengkapan Dokumen Anggota</label>
-                            <span id="detail_dokumen_status" class="badge bg-secondary">Memeriksa</span>
-                        </div>
-                        <div id="detail_dokumen_info" class="small text-muted mb-3"></div>
-                        <div id="detail_dokumen" class="row g-3"></div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
                 </div>
             </div>
         </div>
     </div>
 
     <?php if ($bolehMutasi): ?>
-    <!-- Approve Modal -->
-    <div class="modal fade" id="approveModal" tabindex="-1">
-        <div class="modal-dialog">
+    <div class="modal fade ui-tx-modal ui-tx-modal-approve" id="approveModal" tabindex="-1" aria-labelledby="approveModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
-                        <h5 class="modal-title text-success">Setujui Pengajuan</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        <h2 class="modal-title h5" id="approveModalLabel">Setujui pengajuan</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="id" id="approve_id">
-                        <p>Apakah Anda yakin ingin menyetujui pengajuan pinjaman:</p>
-                        <p class="fw-bold" id="approve_nama"></p>
-                        <p><strong>Kode:</strong> <span id="approve_kode"></span></p>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Catatan (Opsional)</label>
-                            <textarea name="catatan_admin" class="form-control" rows="3" 
-                                      placeholder="Berikan catatan untuk anggota..."></textarea>
+                        <div class="ui-ps-confirm">
+                            <div class="ui-ps-confirm-label">Anggota</div>
+                            <div class="ui-ps-confirm-value" id="approve_nama">—</div>
+                            <div class="ui-ps-confirm-meta">Kode: <span id="approve_kode">—</span></div>
                         </div>
-                        
-                        <div class="alert alert-info">
-                            <small>
-                                <i class="fas fa-info-circle me-1"></i>
-                                Setelah disetujui, pengajuan menunggu diproses pencairan oleh Teller (jadwal angsuran dibuat saat pencairan).
-                            </small>
+                        <div class="mb-3">
+                            <label class="form-label" for="approve_catatan">Catatan (opsional)</label>
+                            <textarea name="catatan_admin" id="approve_catatan" class="form-control" rows="3"
+                                      placeholder="Catatan untuk anggota…"></textarea>
+                        </div>
+                        <div class="alert alert-info mb-0 py-2">
+                            <small><i class="ti ti-info-circle me-1"></i>Setelah disetujui, menunggu Teller memproses pencairan.</small>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="approve" class="btn btn-success">Setujui</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" name="approve" value="1" class="btn btn-success">
+                            <i class="ti ti-check me-1" aria-hidden="true"></i>Setujui
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Reject Modal -->
-    <div class="modal fade" id="rejectModal" tabindex="-1">
-        <div class="modal-dialog">
+    <div class="modal fade ui-tx-modal ui-tx-modal-reject" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
-                        <h5 class="modal-title text-danger">Tolak Pengajuan</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        <h2 class="modal-title h5" id="rejectModalLabel">Tolak pengajuan</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="id" id="reject_id">
-                        <p>Apakah Anda yakin ingin menolak pengajuan pinjaman:</p>
-                        <p class="fw-bold" id="reject_nama"></p>
-                        <p><strong>Kode:</strong> <span id="reject_kode"></span></p>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Alasan Penolakan *</label>
-                            <textarea name="catatan_admin" class="form-control" rows="3" 
-                                      placeholder="Berikan alasan penolakan..." required></textarea>
+                        <div class="ui-ps-confirm">
+                            <div class="ui-ps-confirm-label">Anggota</div>
+                            <div class="ui-ps-confirm-value" id="reject_nama">—</div>
+                            <div class="ui-ps-confirm-meta">Kode: <span id="reject_kode">—</span></div>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label" for="reject_catatan">Alasan penolakan *</label>
+                            <textarea name="catatan_admin" id="reject_catatan" class="form-control" rows="3"
+                                      placeholder="Berikan alasan penolakan…" required></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="reject" class="btn btn-danger">Tolak</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" name="reject" value="1" class="btn btn-danger">
+                            <i class="ti ti-x me-1" aria-hidden="true"></i>Tolak
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Delete Modal -->
-    <div class="modal fade" id="deleteModal" tabindex="-1">
-        <div class="modal-dialog">
+    <div class="modal fade ui-tx-modal ui-tx-modal-reject" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <form method="POST"><?php echo layananToken(); ?>
                     <div class="modal-header">
-                        <h5 class="modal-title text-danger">Hapus Pengajuan</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        <h2 class="modal-title h5" id="deleteModalLabel">Hapus pengajuan</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="id" id="delete_id">
-                        <p>Apakah Anda yakin ingin menghapus pengajuan pinjaman:</p>
-                        <p class="fw-bold" id="delete_nama"></p>
-                        <p><strong>Kode:</strong> <span id="delete_kode"></span></p>
-                        
-                        <div class="alert alert-warning">
-                            <small>
-                                <i class="fas fa-exclamation-triangle me-1"></i>
-                                Data yang dihapus tidak dapat dikembalikan.
-                            </small>
+                        <div class="ui-ps-confirm">
+                            <div class="ui-ps-confirm-label">Anggota</div>
+                            <div class="ui-ps-confirm-value" id="delete_nama">—</div>
+                            <div class="ui-ps-confirm-meta">Kode: <span id="delete_kode">—</span></div>
+                        </div>
+                        <div class="alert alert-warning mb-0 py-2">
+                            <small><i class="ti ti-alert-triangle me-1"></i>Data yang dihapus tidak dapat dikembalikan.</small>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="delete" class="btn btn-danger">Hapus</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" name="delete" value="1" class="btn btn-danger">
+                            <i class="ti ti-trash me-1" aria-hidden="true"></i>Hapus
+                        </button>
                     </div>
                 </form>
             </div>
@@ -603,31 +474,34 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     </div>
     <?php endif; ?>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Detail Modal
+    (function () {
+        function formatRp(n) {
+            n = Math.max(0, Math.floor(Number(n) || 0));
+            return 'Rp ' + n.toLocaleString('id-ID');
+        }
+
         var detailModal = document.getElementById('detailModal');
         detailModal.addEventListener('show.bs.modal', function (event) {
             var button = event.relatedTarget;
-            document.getElementById('detail_kode').textContent = button.getAttribute('data-kode');
-            document.getElementById('detail_nama').textContent = button.getAttribute('data-nama');
-            document.getElementById('detail_kode_anggota').textContent = button.getAttribute('data-kode_anggota');
-            document.getElementById('detail_jenis').textContent = button.getAttribute('data-jenis');
-            document.getElementById('detail_jumlah').textContent = 'Rp ' + Number(button.getAttribute('data-jumlah')).toLocaleString('id-ID');
-            document.getElementById('detail_tenor').textContent = button.getAttribute('data-tenor') + ' bulan';
-            document.getElementById('detail_bunga').textContent = button.getAttribute('data-bunga');
-            
-            var status = button.getAttribute('data-status');
-            var statusClass = {
-                'menunggu': 'warning',
-                'disetujui': 'success',
-                'ditolak': 'danger'
-            };
-            document.getElementById('detail_status').innerHTML = '<span class="badge bg-' + statusClass[status] + '">' + status.charAt(0).toUpperCase() + status.slice(1) + '</span>';
-            
-            document.getElementById('detail_tujuan').textContent = button.getAttribute('data-tujuan') || '-';
-            document.getElementById('detail_tanggal').textContent = button.getAttribute('data-tanggal');
-            document.getElementById('detail_catatan').textContent = button.getAttribute('data-catatan') || '-';
+            if (!button) return;
+            document.getElementById('detail_kode').textContent = button.getAttribute('data-kode') || '—';
+            document.getElementById('detail_nama').textContent = button.getAttribute('data-nama') || '—';
+            document.getElementById('detail_kode_anggota').textContent = button.getAttribute('data-kode_anggota') || '—';
+            document.getElementById('detail_jenis').textContent = button.getAttribute('data-jenis') || '—';
+            document.getElementById('detail_jumlah').textContent = formatRp(button.getAttribute('data-jumlah'));
+            document.getElementById('detail_tenor').textContent = (button.getAttribute('data-tenor') || '—') + ' bulan';
+            document.getElementById('detail_bunga').textContent = button.getAttribute('data-bunga') || '—';
+
+            var status = button.getAttribute('data-status') || '-';
+            var statusClass = { menunggu: 'warning text-dark', disetujui: 'success', ditolak: 'danger', batal_cair: 'secondary', dicairkan: 'info' };
+            var statusLabel = String(status).replace(/_/g, ' ');
+            document.getElementById('detail_status').innerHTML = '<span class="badge bg-' + (statusClass[status] || 'secondary') + '">' +
+                statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1) + '</span>';
+
+            document.getElementById('detail_tujuan').textContent = button.getAttribute('data-tujuan') || '—';
+            document.getElementById('detail_tanggal').textContent = button.getAttribute('data-tanggal') || '—';
+            document.getElementById('detail_catatan').textContent = button.getAttribute('data-catatan') || '—';
 
             var denganJaminan = button.getAttribute('data-jaminan') === '1';
             var dokumen = {};
@@ -644,9 +518,9 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 var kolom = document.createElement('div');
                 kolom.className = 'col-md-' + (daftar.length === 1 ? '12' : '4');
                 var kartu = document.createElement('div');
-                kartu.className = 'document-card';
+                kartu.className = 'ui-ps-doc';
                 var judul = document.createElement('div');
-                judul.className = 'fw-semibold mb-2';
+                judul.className = 'ui-ps-doc-title';
                 judul.textContent = item[1];
                 kartu.appendChild(judul);
                 if (url) {
@@ -654,15 +528,17 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                     tautan.href = url;
                     tautan.target = '_blank';
                     tautan.rel = 'noopener noreferrer';
+                    tautan.className = 'ui-ps-doc-link';
                     var gambar = document.createElement('img');
                     gambar.src = url;
                     gambar.alt = item[1];
+                    gambar.className = 'ui-ps-doc-img';
                     tautan.appendChild(gambar);
                     kartu.appendChild(tautan);
                 } else {
                     var kosong = document.createElement('div');
-                    kosong.className = 'document-empty';
-                    kosong.textContent = item[1] + ' belum tersedia';
+                    kosong.className = 'ui-ps-doc-empty';
+                    kosong.innerHTML = '<i class="ti ti-photo-off" aria-hidden="true"></i><span>' + item[1] + ' belum tersedia</span>';
                     kartu.appendChild(kosong);
                 }
                 kolom.appendChild(kartu);
@@ -670,36 +546,43 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
             });
             document.getElementById('detail_dokumen_info').textContent = denganJaminan
                 ? 'Pinjaman dengan jaminan: dokumen wajib berupa KTP.'
-                : 'Pinjaman tanpa jaminan: dokumen wajib berupa KTP, KK, dan KTP suami/istri.';
+                : 'Pinjaman tanpa jaminan: dokumen wajib KTP, KK, dan KTP suami/istri.';
             var statusDokumen = document.getElementById('detail_dokumen_status');
             statusDokumen.className = 'badge bg-' + (lengkap ? 'success' : 'danger');
             statusDokumen.textContent = lengkap ? 'Dokumen lengkap' : 'Dokumen belum lengkap';
         });
 
-        // Approve / Reject / Delete (Admin only — elemen mungkin tidak ada untuk Teller)
         var approveModal = document.getElementById('approveModal');
         if (approveModal) approveModal.addEventListener('show.bs.modal', function (event) {
             var button = event.relatedTarget;
-            document.getElementById('approve_id').value = button.getAttribute('data-id');
-            document.getElementById('approve_nama').textContent = button.getAttribute('data-nama');
-            document.getElementById('approve_kode').textContent = button.getAttribute('data-kode');
+            if (!button) return;
+            document.getElementById('approve_id').value = button.getAttribute('data-id') || '';
+            document.getElementById('approve_nama').textContent = button.getAttribute('data-nama') || '—';
+            document.getElementById('approve_kode').textContent = button.getAttribute('data-kode') || '—';
+            var cat = document.getElementById('approve_catatan');
+            if (cat) cat.value = '';
         });
 
         var rejectModal = document.getElementById('rejectModal');
         if (rejectModal) rejectModal.addEventListener('show.bs.modal', function (event) {
             var button = event.relatedTarget;
-            document.getElementById('reject_id').value = button.getAttribute('data-id');
-            document.getElementById('reject_nama').textContent = button.getAttribute('data-nama');
-            document.getElementById('reject_kode').textContent = button.getAttribute('data-kode');
+            if (!button) return;
+            document.getElementById('reject_id').value = button.getAttribute('data-id') || '';
+            document.getElementById('reject_nama').textContent = button.getAttribute('data-nama') || '—';
+            document.getElementById('reject_kode').textContent = button.getAttribute('data-kode') || '—';
+            var cat = document.getElementById('reject_catatan');
+            if (cat) cat.value = '';
         });
 
         var deleteModal = document.getElementById('deleteModal');
         if (deleteModal) deleteModal.addEventListener('show.bs.modal', function (event) {
             var button = event.relatedTarget;
-            document.getElementById('delete_id').value = button.getAttribute('data-id');
-            document.getElementById('delete_nama').textContent = button.getAttribute('data-nama');
-            document.getElementById('delete_kode').textContent = button.getAttribute('data-kode');
+            if (!button) return;
+            document.getElementById('delete_id').value = button.getAttribute('data-id') || '';
+            document.getElementById('delete_nama').textContent = button.getAttribute('data-nama') || '—';
+            document.getElementById('delete_kode').textContent = button.getAttribute('data-kode') || '—';
         });
+    })();
     </script>
 </body>
 </html>

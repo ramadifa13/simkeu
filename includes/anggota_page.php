@@ -393,659 +393,297 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Anggota - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <?php $uiAssetPrefix = '../'; include __DIR__ . '/layout/assets.php'; ?>
-    <style>
-        :root {
-            --primary: #2c3e50;
-            --secondary: #3498db;
-            --success: #27ae60;
-            --warning: #f39c12;
-            --danger: #e74c3c;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            background-color: #f8f9fa;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            overflow-x: hidden;
-        }
-        
-        .container-fluid {
-            padding-left: 0;
-            padding-right: 0;
-        }
-        
-        @media (max-width: 767.98px) {
-            main {
-                margin-left: 0 !important;
-                padding: 10px 12px !important;
-                width: 100%;
-                margin-top: 60px !important;
-            }
-            
-            .row {
-                margin-left: -5px;
-                margin-right: -5px;
-            }
-            
-            .col-md-3, .col-md-4, .col-md-6 {
-                padding-left: 5px;
-                padding-right: 5px;
-            }
-            
-            .stat-card .card-body {
-                padding: 12px 10px;
-            }
-            
-            .stat-card h4 {
-                font-size: 1.2rem;
-            }
-            
-            .stat-card p {
-                font-size: 0.8rem;
-                margin-bottom: 0;
-            }
-            
-            .filter-card {
-                padding: 1rem !important;
-            }
-            
-            .card-header {
-                flex-direction: column;
-                align-items: flex-start !important;
-                gap: 10px;
-            }
-            
-            .table-responsive {
-                margin-bottom: 0;
-            }
-            
-            .table td, .table th {
-                padding: 0.5rem 0.3rem;
-                font-size: 0.75rem;
-                white-space: nowrap;
-            }
-            
-            .table-actions {
-                display: flex;
-                gap: 2px;
-            }
-            
-            .table-actions .btn-sm {
-                padding: 0.2rem 0.4rem;
-                font-size: 0.7rem;
-            }
-            
-            .avatar {
-                width: 30px !important;
-                height: 30px !important;
-                font-size: 0.8rem !important;
-                margin-right: 0.5rem !important;
-            }
-            
-            @media (max-width: 575.98px) {
-                .table th:nth-child(6),
-                .table td:nth-child(6),
-                .table th:nth-child(7),
-                .table td:nth-child(7) {
-                    display: none;
-                }
-            }
-            
-            @media (max-width: 480px) {
-                .table th:nth-child(5),
-                .table td:nth-child(5) {
-                    display: none;
-                }
-            }
-        }
-        
-        @media (min-width: 768px) and (max-width: 991.98px) {
-            main {
-                margin-left: 0 !important;
-                padding: 15px 20px !important;
-            }
-        }
-        
-        @media (min-width: 992px) {
-            main {
-                margin-left: 0 !important; /* densify: shell owns sidebar */
-                padding: 10px 20px !important;
-            }
-        }
-        
-        .stat-card {
-            border: none;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            transition: all 0.3s ease;
-            background: white;
-            height: 100%;
-            margin-bottom: 10px;
-            overflow: hidden;
-        }
-        
-        .stat-card.bg-primary { background: linear-gradient(135deg, #2c3e50, #3498db) !important; }
-        .stat-card.bg-success { background: linear-gradient(135deg, #27ae60, #2ecc71) !important; }
-        .stat-card.bg-warning { background: linear-gradient(135deg, #f39c12, #f1c40f) !important; }
-        .stat-card.bg-info { background: linear-gradient(135deg, #17a2b8, #3498db) !important; }
-        
-        .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-        }
-        
-        .filter-card {
-            background: white;
-            border-radius: 10px;
-            padding: 14px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            border: 1px solid rgba(0,0,0,0.03);
-        }
-        
-        .card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            overflow: hidden;
-            margin-bottom: 20px;
-        }
-        
-        .card-header {
-            background-color: white;
-            border-bottom: 1px solid #f0f0f0;
-            padding: 1rem 1.25rem;
-        }
-        
-        .card-body {
-            padding: 1.25rem;
-        }
-        
-        @media (max-width: 767.98px) {
-            .card-body {
-                padding: 0.75rem;
-            }
-        }
-        
-        .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 1rem;
-            flex-shrink: 0;
-        }
-        
-        .table {
-            margin-bottom: 0;
-        }
-        
-        .table th {
-            border-top: none;
-            font-weight: 600;
-            color: #7f8c8d;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            border-bottom: 1px solid #dee2e6;
-            background-color: #f8f9fa;
-        }
-        
-        .table td {
-            font-size: 0.8rem;
-            vertical-align: middle;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .table-actions {
-            white-space: nowrap;
-            display: flex;
-            gap: 4px;
-        }
-        
-        .badge {
-            padding: 0.4rem 0.6rem;
-            font-weight: 500;
-            font-size: 0.7rem;
-            border-radius: 10px;
-        }
-        
-        .btn-sm {
-            padding: 0.3rem 0.6rem;
-            font-size: 0.75rem;
-            border-radius: 6px;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border: none;
-        }
-        
-        .modal-content {
-            border: none;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        
-        /* Form berada di antara .modal-content dan body/footer: tanpa ini footer (tombol
-           Simpan/Update) terpotong saat isi modal tinggi di modal-dialog-scrollable */
-        .modal-dialog-scrollable .modal-content > form {
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            max-height: 100%;
-            overflow: hidden;
-        }
-        
-        .modal-header {
-            background: linear-gradient(135deg, #2c3e50, #3498db);
-            color: white;
-            border-bottom: none;
-            padding: 1.2rem 1.5rem;
-        }
-        
-        .modal-header .btn-close {
-            filter: brightness(0) invert(1);
-        }
-        
-        .modal-footer {
-            border-top: 1px solid #f0f0f0;
-            padding: 1rem 1.5rem;
-        }
-        
-        .form-label {
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: #495057;
-            margin-bottom: 0.3rem;
-        }
-        
-        .form-control, .form-select {
-            font-size: 0.9rem;
-            padding: 0.6rem 0.75rem;
-            border: 1px solid #e0e0e0;
-            border-radius: 10px;
-        }
-        
-        @media (max-width: 767.98px) {
-            .form-control, .form-select {
-                font-size: 0.85rem;
-                padding: 0.5rem 0.65rem;
-            }
-            
-            .modal-dialog {
-                margin: 0.5rem;
-            }
-            
-            .modal-body {
-                padding: 1rem;
-            }
-        }
-        
-        .empty-state {
-            text-align: center;
-            padding: 22px 20px;
-            color: #95a5a6;
-        }
-        
-        .empty-state i {
-            font-size: 1.6rem;
-            margin-bottom: 1rem;
-            color: #bdc3c7;
-        }
-        
-        @media (max-width: 767.98px) {
-            .empty-state {
-                padding: 30px 15px;
-            }
-            
-            .empty-state i {
-                font-size: 1.4rem;
-            }
-        }
-        
-        .btn:active {
-            transform: scale(0.98);
-        }
-        
-        @media screen and (-webkit-min-device-pixel-ratio:0) { 
-            select:focus,
-            textarea:focus,
-            input:focus {
-                font-size: 16px;
-            }
-        }
-    </style>
 </head>
 <body>
-    <?php include __DIR__ . '/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include __DIR__ . '/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <?php ui_page_header([
-                    'title' => 'Data Anggota',
-                    'icon' => 'fas fa-users',
-                    'subtitle' => 'Kelola data dan status anggota koperasi',
-                    'actions' => '<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal"><i class="fas fa-plus"></i> <span class="d-none d-sm-inline">Tambah Anggota</span><span class="d-sm-none">Tambah</span></button>',
-                ]); ?>
+<?php include __DIR__ . '/layout/shell_start.php'; ?>
+            <div class="ui-members-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon" aria-hidden="true"><i class="ti ti-users"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Master data</p>
+                        <h1 class="ui-dash-title">Data Anggota</h1>
+                        <p class="ui-dash-meta mb-0">Kelola data, status, dan dokumen anggota koperasi</p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <button type="button" class="btn ui-dash-btn-add" data-bs-toggle="modal" data-bs-target="#addModal">
+                            <i class="ti ti-plus me-1"></i><span class="d-none d-sm-inline">Tambah Anggota</span><span class="d-sm-none">Tambah</span>
+                        </button>
+                    </div>
+                </header>
+
                 <?php ui_flash(); ?>
 
-                <?php ui_stat_grid([
-                    ['label' => 'Total anggota', 'value' => (int)$stats['total_anggota'], 'tone' => 'primary', 'icon' => 'fas fa-users', 'hint' => 'Semua status'],
-                    ['label' => 'Aktif', 'value' => (int)$stats['aktif'], 'tone' => 'success', 'icon' => 'fas fa-check-circle', 'hint' => 'Dapat transaksi'],
-                    ['label' => 'Nonaktif', 'value' => (int)$stats['nonaktif'], 'tone' => 'warning', 'icon' => 'fas fa-times-circle', 'hint' => 'Ditangguhkan'],
-                    ['label' => 'Hasil filter', 'value' => (int)$pager['total'], 'tone' => 'info', 'icon' => 'fas fa-filter', 'hint' => 'Halaman ini'],
-                ]); ?>
-
-                <div class="card filter-card mb-4">
-                    <div class="card-body">
-                        <?php
-                        ui_table_toolbar([
-                            'action' => 'anggota.php',
-                            'q' => $filter_search,
-                            'placeholder' => 'Cari kode, nama, telepon, KTP…',
-                            'per_page' => $pager['per_page'],
-                            'reset_href' => 'anggota.php',
-                            'filters' => [[
-                                'name' => 'status',
-                                'label' => 'Status',
-                                'type' => 'select',
-                                'value' => $filter_status,
-                                'options' => ['' => 'Semua Status', 'aktif' => 'Aktif', 'nonaktif' => 'Nonaktif'],
-                            ]],
-                        ]);
-                        ?>
-                    </div>
-                </div>
-
-                <!-- Members Table -->
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-list me-2"></i>Daftar Anggota
-                        </h5>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="text-muted small d-none d-sm-inline">
-                                <?php echo (int)$pager['total']; ?> data
-                            </span>
+                <div class="card ui-members-table-card ui-dash-panel mb-0">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-list" aria-hidden="true"></i>Daftar Anggota</span>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="badge bg-primary-lt"><?php echo (int)$stats['total_anggota']; ?> total</span>
+                            <span class="badge bg-success-lt"><?php echo (int)$stats['aktif']; ?> aktif</span>
+                            <span class="badge bg-warning-lt"><?php echo (int)$stats['nonaktif']; ?> nonaktif</span>
                             <?php if (isAdmin()): ?>
-                            <a href="export_anggota.php?<?php echo http_build_query(array_filter(['q' => $filter_search, 'search' => $filter_search, 'status' => $filter_status])); ?>" class="btn btn-success btn-sm">
-                                <i class="fas fa-file-excel me-1"></i> 
-                                <span class="d-none d-sm-inline">Export</span>
+                            <a href="export_anggota.php" class="ui-dash-sec-link">
+                                <i class="ti ti-file-spreadsheet me-1"></i>Export
                             </a>
                             <?php endif; ?>
                         </div>
                     </div>
-                    <div class="card-body p-0 p-md-3">
-                        <?php if (!empty($anggota_list)): ?>
-                        <div class="ui-members-cards ui-mobile-cards">
-                            <?php foreach ($anggota_list as $anggota):
-                                $editBtnIdM = 'editBtn' . (int)$anggota['id'];
-                                $delBtnIdM = 'delBtn' . (int)$anggota['id'];
-                                $menuAnggotaM = [
-                                    ['label' => 'Detail', 'icon' => 'fas fa-eye', 'href' => 'detail_anggota.php?id=' . (int)$anggota['id']],
-                                    ['label' => 'Edit', 'icon' => 'fas fa-edit', 'onclick' => "document.getElementById('{$editBtnIdM}').click()"],
-                                    ['label' => 'Reset password', 'icon' => 'fas fa-key', 'onclick' => "if(confirm('Reset password ke 123456?')) document.getElementById('resetForm" . (int)$anggota['id'] . "').submit()"],
-                                ];
-                                if (!empty($bolehHapusAnggota)) {
-                                    $menuAnggotaM[] = ['divider' => true];
-                                    $menuAnggotaM[] = ['label' => 'Hapus', 'icon' => 'fas fa-trash', 'class' => 'text-danger', 'onclick' => "document.getElementById('{$delBtnIdM}').click()"];
-                                }
-                            ?>
-                            <div class="ui-mobile-card">
-                                <div class="ui-mobile-card-row">
-                                    <div class="min-w-0">
-                                        <div class="ui-mobile-card-title"><?php echo htmlspecialchars($anggota['nama_lengkap']); ?></div>
-                                        <div class="ui-mobile-card-meta"><?php echo htmlspecialchars($anggota['kode_anggota']); ?> · <?php echo htmlspecialchars($anggota['telepon'] ?: '-'); ?></div>
-                                    </div>
-                                    <span class="badge bg-<?php echo $anggota['status'] == 'aktif' ? 'success' : 'danger'; ?>"><?php echo ucfirst($anggota['status']); ?></span>
-                                </div>
-                                <div class="ui-mobile-card-actions">
-                                    <?php echo tombolWhatsApp($anggota['telepon']); ?>
-                                    <?php echo ui_action_menu($menuAnggotaM); ?>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <?php endif; ?>
-                        <div class="table-responsive ui-table-scroll ui-members-table-wrap">
-                            <table class="table table-hover align-middle mb-0 ui-members-table">
+                    <div class="card-body p-0">
+                        <div class="table-responsive ui-table-scroll">
+                            <table class="table table-hover align-middle mb-0 js-datatable" data-dt-order="0,asc" data-dt-nosort="3,6">
                                 <thead>
                                     <tr>
-                                        <th>#</th>
-                                        <th>Kode</th>
-                                        <th>Nama Lengkap</th>
+                                        <th>Anggota</th>
+                                        <th>Kontak</th>
                                         <th>Peran SHU</th>
-                                        <th>Telepon</th>
-                                        <th class="mobile-hide">Dokumen</th>
-                                        <th class="mobile-hide">Rekening</th>
+                                        <th class="no-sort">Dokumen</th>
                                         <th>Status</th>
-                                        <th class="mobile-hide">Tgl Daftar</th>
-                                        <th class="text-end">Aksi</th>
+                                        <th>Tgl daftar</th>
+                                        <th class="text-end no-sort">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (empty($anggota_list)): ?>
                                     <tr>
-                                        <td colspan="10" class="text-center text-muted py-5">
-                                            <div class="empty-state">
-                                                <i class="fas fa-users mb-3"></i>
-                                                <p class="mb-3">Tidak ada data anggota</p>
+                                        <td colspan="7">
+                                            <div class="ui-members-empty">
+                                                <i class="ti ti-users" aria-hidden="true"></i>
+                                                <div class="fw-semibold text-dark">Belum ada data anggota</div>
+                                                <p class="mb-0 small">Tambahkan anggota pertama untuk mulai mengelola simpanan dan pinjaman.</p>
                                                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
-                                                    <i class="fas fa-plus me-1"></i> Tambah Anggota Pertama
+                                                    <i class="ti ti-plus me-1"></i>Tambah Anggota Pertama
                                                 </button>
                                             </div>
                                         </td>
                                     </tr>
-                                    <?php else: ?>
-                                        <?php foreach ($anggota_list as $index => $anggota):
-                                            $dok_url = array_filter(array_map('urlDokumenAnggota', array_intersect_key($anggota, daftarDokumenAnggota())));
-                                            $editBtnId = 'editBtn' . (int)$anggota['id'];
-                                            $delBtnId = 'delBtn' . (int)$anggota['id'];
-                                            ?>
-                                        <tr>
-                                            <td><?php echo $pager['offset'] + $index + 1; ?></td>
-                                            <td>
-                                                <span class="fw-semibold"><?php echo htmlspecialchars($anggota['kode_anggota']); ?></span>
-                                                <?php if (!empty($anggota['kode_anggota_jaminan'])): ?>
-                                                    <br><span class="badge bg-warning text-dark">Gadai: <?php echo htmlspecialchars($anggota['kode_anggota_jaminan']); ?></span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><?= ui_cell_ellipsis($anggota['nama_lengkap'], 28) ?></td>
-                                            <td><?php if(strpos($anggota['kode_anggota'],'AGTJ')===0): ?><span class="text-muted">Tidak berlaku</span><?php else: ?><span class="badge <?= ($anggota['kategori_shu'] ?? 'anggota')==='ketua_kelompok'?'bg-primary':'bg-secondary' ?>"><?= ($anggota['kategori_shu'] ?? 'anggota')==='ketua_kelompok'?'Ketua Kelompok':'Anggota' ?></span><?php endif; ?></td>
-                                            <td class="d-none d-sm-table-cell"><?php echo layananEscape($anggota['telepon'] ?: '-'); ?><br><?php echo tombolWhatsApp($anggota['telepon']); ?></td>
-                                            <td class="mobile-hide">
-                                                <?php if (!empty($dok_url)): ?>
-                                                    <button type="button" class="btn btn-sm btn-outline-info"
-                                                            onclick="lihatDokumenAnggota(<?php echo htmlspecialchars(json_encode($anggota['nama_lengkap']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode((object) $dok_url), ENT_QUOTES); ?>)"
-                                                            title="Lihat dokumen">
-                                                        <i class="fas fa-eye"></i> <span class="badge bg-info"><?php echo count($dok_url); ?></span>
-                                                    </button>
-                                                <?php else: ?>
-                                                    <span class="text-muted">-</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td class="mobile-hide"><?= ui_cell_ellipsis($anggota['rekening_bank'] ?: '-', 16) ?></td>
-                                            <td>
-                                                <span class="badge bg-<?php echo $anggota['status'] == 'aktif' ? 'success' : 'danger'; ?>">
-                                                    <?php echo ucfirst($anggota['status']); ?>
+                                    <?php else: foreach ($anggota_list as $anggota):
+                                        $dok_url = array_filter(array_map('urlDokumenAnggota', array_intersect_key($anggota, daftarDokumenAnggota())));
+                                        $editBtnId = 'editBtn' . (int)$anggota['id'];
+                                        $delBtnId = 'delBtn' . (int)$anggota['id'];
+                                        $initials = function_exists('getInitials') ? getInitials($anggota['nama_lengkap']) : strtoupper(substr($anggota['nama_lengkap'], 0, 1));
+                                        $isJaminan = strpos($anggota['kode_anggota'], 'AGTJ') === 0;
+                                    ?>
+                                    <tr>
+                                        <td>
+                                            <div class="ui-members-person">
+                                                <span class="ui-members-avatar" aria-hidden="true"><?php echo htmlspecialchars($initials); ?></span>
+                                                <div class="ui-members-person-meta">
+                                                    <div class="ui-members-person-name"><?php echo htmlspecialchars($anggota['nama_lengkap']); ?></div>
+                                                    <div class="ui-members-person-code">
+                                                        <code><?php echo htmlspecialchars($anggota['kode_anggota']); ?></code>
+                                                        <?php if (!empty($anggota['kode_anggota_jaminan'])): ?>
+                                                            <span class="badge bg-warning-lt">Gadai: <?php echo htmlspecialchars($anggota['kode_anggota_jaminan']); ?></span>
+                                                        <?php elseif ($isJaminan): ?>
+                                                            <span class="badge bg-warning-lt">Jaminan</span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="ui-members-contact">
+                                                <span class="ui-members-phone"><?php echo layananEscape($anggota['telepon'] ?: '—'); ?></span>
+                                                <?php echo tombolWhatsApp($anggota['telepon'], '', ''); ?>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <?php if ($isJaminan): ?>
+                                                <span class="text-muted small">Tidak berlaku</span>
+                                            <?php else: ?>
+                                                <span class="badge <?php echo ($anggota['kategori_shu'] ?? 'anggota') === 'ketua_kelompok' ? 'bg-primary-lt' : 'bg-secondary-lt'; ?>">
+                                                    <?php echo ($anggota['kategori_shu'] ?? 'anggota') === 'ketua_kelompok' ? 'Ketua' : 'Anggota'; ?>
                                                 </span>
-                                            </td>
-                                            <td class="mobile-hide"><?php echo formatTanggalUi($anggota['tanggal_daftar']); ?></td>
-                                            <td class="text-end">
-                                                <button type="button" id="<?= $editBtnId ?>" class="d-none"
-                                                        data-bs-toggle="modal"
-                                                        data-bs-target="#editModal"
-                                                        data-id="<?php echo $anggota['id']; ?>"
-                                                        data-kode="<?php echo htmlspecialchars($anggota['kode_anggota']); ?>"
-                                                        data-nama="<?php echo htmlspecialchars($anggota['nama_lengkap']); ?>"
-                                                        data-alamat="<?php echo htmlspecialchars($anggota['alamat']); ?>"
-                                                        data-telepon="<?php echo htmlspecialchars($anggota['telepon']); ?>"
-                                                        data-email="<?php echo htmlspecialchars($anggota['email']); ?>"
-                                                        data-tempat_lahir="<?php echo htmlspecialchars($anggota['tempat_lahir']); ?>"
-                                                        data-tanggal_lahir="<?php echo $anggota['tanggal_lahir']; ?>"
-                                                        data-jenis_kelamin="<?php echo $anggota['jenis_kelamin']; ?>"
-                                                        data-pekerjaan="<?php echo htmlspecialchars($anggota['pekerjaan']); ?>"
-                                                        data-ktp="<?php echo htmlspecialchars($anggota['ktp']); ?>"
-                                                        data-dokumen="<?php echo htmlspecialchars(json_encode(array_map('urlDokumenAnggota', array_intersect_key($anggota, daftarDokumenAnggota()))), ENT_QUOTES); ?>"
-                                                        data-rekening_bank="<?php echo htmlspecialchars($anggota['rekening_bank']); ?>"
-                                                        data-status="<?php echo $anggota['status']; ?>"
-                                                        data-tanggal_daftar="<?php echo $anggota['tanggal_daftar']; ?>"
-                                                        data-kategori_shu="<?= htmlspecialchars($anggota['kategori_shu'] ?? 'anggota') ?>"
-                                                        data-ketua_kelompok_id="<?= (int)($anggota['ketua_kelompok_id'] ?? 0) ?>"></button>
-                                                <?php if ($bolehHapusAnggota): ?>
-                                                <button type="button" id="<?= $delBtnId ?>" class="d-none"
-                                                        data-bs-toggle="modal"
-                                                        data-bs-target="#deleteModal"
-                                                        data-id="<?php echo $anggota['id']; ?>"
-                                                        data-nama="<?php echo htmlspecialchars($anggota['nama_lengkap']); ?>"></button>
-                                                <?php endif; ?>
-                                                <form method="POST" id="resetForm<?= (int)$anggota['id'] ?>" class="d-none"><?php echo layananToken(); ?>
-                                                    <input type="hidden" name="id" value="<?php echo $anggota['id']; ?>">
-                                                    <input type="hidden" name="reset_password" value="1">
-                                                </form>
-                                                <?php
-                                                $menuAnggota = [
-                                                    ['label' => 'Detail', 'icon' => 'fas fa-eye', 'href' => 'detail_anggota.php?id=' . (int)$anggota['id']],
-                                                    ['label' => 'Edit', 'icon' => 'fas fa-edit', 'onclick' => "document.getElementById('{$editBtnId}').click()"],
-                                                    ['label' => 'Reset password', 'icon' => 'fas fa-key', 'onclick' => "if(confirm('Reset password ke 123456?')) document.getElementById('resetForm" . (int)$anggota['id'] . "').submit()"],
-                                                ];
-                                                if ($bolehHapusAnggota) {
-                                                    $menuAnggota[] = ['divider' => true];
-                                                    $menuAnggota[] = ['label' => 'Hapus', 'icon' => 'fas fa-trash', 'class' => 'text-danger', 'onclick' => "document.getElementById('{$delBtnId}').click()"];
-                                                }
-                                                echo ui_action_menu($menuAnggota);
-                                                ?>
-                                            </td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if (!empty($dok_url)): ?>
+                                                <button type="button" class="ui-members-doc"
+                                                    onclick="lihatDokumenAnggota(<?php echo htmlspecialchars(json_encode($anggota['nama_lengkap']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode((object) $dok_url), ENT_QUOTES); ?>)">
+                                                    <i class="ti ti-paperclip" aria-hidden="true"></i><?php echo count($dok_url); ?> file
+                                                </button>
+                                            <?php else: ?>
+                                                <span class="text-muted small">Belum ada</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-<?php echo $anggota['status'] === 'aktif' ? 'success-lt' : 'danger-lt'; ?>">
+                                                <?php echo ucfirst($anggota['status']); ?>
+                                            </span>
+                                        </td>
+                                        <td><span class="text-nowrap"><?php echo formatTanggalUi($anggota['tanggal_daftar'], false, true); ?></span></td>
+                                        <td class="text-end">
+                                            <button type="button" id="<?= $editBtnId ?>" class="d-none"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#editModal"
+                                                    data-id="<?php echo $anggota['id']; ?>"
+                                                    data-kode="<?php echo htmlspecialchars($anggota['kode_anggota']); ?>"
+                                                    data-nama="<?php echo htmlspecialchars($anggota['nama_lengkap']); ?>"
+                                                    data-alamat="<?php echo htmlspecialchars($anggota['alamat']); ?>"
+                                                    data-telepon="<?php echo htmlspecialchars($anggota['telepon']); ?>"
+                                                    data-email="<?php echo htmlspecialchars($anggota['email']); ?>"
+                                                    data-tempat_lahir="<?php echo htmlspecialchars($anggota['tempat_lahir']); ?>"
+                                                    data-tanggal_lahir="<?php echo $anggota['tanggal_lahir']; ?>"
+                                                    data-jenis_kelamin="<?php echo $anggota['jenis_kelamin']; ?>"
+                                                    data-pekerjaan="<?php echo htmlspecialchars($anggota['pekerjaan']); ?>"
+                                                    data-ktp="<?php echo htmlspecialchars($anggota['ktp']); ?>"
+                                                    data-dokumen="<?php echo htmlspecialchars(json_encode(array_map('urlDokumenAnggota', array_intersect_key($anggota, daftarDokumenAnggota()))), ENT_QUOTES); ?>"
+                                                    data-rekening_bank="<?php echo htmlspecialchars($anggota['rekening_bank']); ?>"
+                                                    data-status="<?php echo $anggota['status']; ?>"
+                                                    data-tanggal_daftar="<?php echo $anggota['tanggal_daftar']; ?>"
+                                                    data-kategori_shu="<?= htmlspecialchars($anggota['kategori_shu'] ?? 'anggota') ?>"
+                                                    data-ketua_kelompok_id="<?= (int)($anggota['ketua_kelompok_id'] ?? 0) ?>"></button>
+                                            <?php if ($bolehHapusAnggota): ?>
+                                            <button type="button" id="<?= $delBtnId ?>" class="d-none"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#deleteModal"
+                                                    data-id="<?php echo $anggota['id']; ?>"
+                                                    data-nama="<?php echo htmlspecialchars($anggota['nama_lengkap']); ?>"></button>
+                                            <?php endif; ?>
+                                            <form method="POST" id="resetForm<?= (int)$anggota['id'] ?>" class="d-none"><?php echo layananToken(); ?>
+                                                <input type="hidden" name="id" value="<?php echo $anggota['id']; ?>">
+                                                <input type="hidden" name="reset_password" value="1">
+                                            </form>
+                                            <?php
+                                            $menuAnggota = [
+                                                ['label' => 'Detail', 'icon' => 'ti ti-eye', 'href' => 'detail_anggota.php?id=' . (int)$anggota['id']],
+                                                ['label' => 'Edit', 'icon' => 'ti ti-edit', 'onclick' => "document.getElementById('{$editBtnId}').click()"],
+                                                ['label' => 'Reset password', 'icon' => 'ti ti-key', 'onclick' => "if(confirm('Reset password ke 123456?')) document.getElementById('resetForm" . (int)$anggota['id'] . "').submit()"],
+                                            ];
+                                            if ($bolehHapusAnggota) {
+                                                $menuAnggota[] = ['divider' => true];
+                                                $menuAnggota[] = ['label' => 'Hapus', 'icon' => 'ti ti-trash', 'class' => 'text-danger', 'onclick' => "document.getElementById('{$delBtnId}').click()"];
+                                            }
+                                            echo ui_action_menu($menuAnggota);
+                                            ?>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; endif; ?>
                                 </tbody>
                             </table>
                         </div>
-                        <?php ui_pagination($pager, 'anggota.php'); ?>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
+            </div>
+<?php include __DIR__ . '/layout/shell_end.php'; ?>
 
     <!-- Add Modal -->
     <div class="modal fade" id="addModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down ui-members-modal">
             <div class="modal-content">
                 <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
                     <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-user-plus me-2"></i>Tambah Anggota Baru
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title"><i class="ti ti-user-plus me-2"></i>Tambah Anggota Baru</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Kategori Anggota <span class="text-danger">*</span></label>
-                            <select name="kategori_anggota" class="form-select kategori-anggota" required>
-                                <option value="biasa">Anggota Biasa (kode AGT)</option>
-                                <option value="jaminan">Anggota Jaminan/Gadai (kode AGTJ)</option>
-                            </select>
-                            <small class="text-muted">Akun login dibuat satu kali menggunakan kode saat pertama didaftarkan.</small>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Kode Anggota <span class="text-danger">*</span></label>
-                                    <input type="text" name="kode_anggota" id="add_kode" class="form-control" required readonly
-                                           value="<?php echo htmlspecialchars($kode_otomatis); ?>">
-                                    <small class="text-muted">Dibuat otomatis oleh sistem</small>
-                                </div>
-                                <div class="mb-3">
+                        <section class="ui-form-section">
+                            <h6 class="ui-form-section-title"><i class="ti ti-id" aria-hidden="true"></i>Kategori &amp; kode</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Kategori Anggota <span class="text-danger">*</span></label>
+                                <select name="kategori_anggota" class="form-select kategori-anggota" required>
+                                    <option value="biasa">Anggota Biasa (kode AGT)</option>
+                                    <option value="jaminan">Anggota Jaminan/Gadai (kode AGTJ)</option>
+                                </select>
+                                <small class="text-muted">Akun login dibuat sekali memakai kode saat pertama didaftarkan.</small>
+                            </div>
+                            <div class="mb-0">
+                                <label class="form-label">Kode Anggota <span class="text-danger">*</span></label>
+                                <input type="text" name="kode_anggota" id="add_kode" class="form-control" required readonly
+                                       value="<?php echo htmlspecialchars($kode_otomatis); ?>">
+                                <small class="text-muted">Dibuat otomatis oleh sistem</small>
+                            </div>
+                            <div class="alert alert-info mt-3 mb-0 py-2">
+                                <i class="ti ti-info-circle me-1"></i>Password default login: <strong>123456</strong>
+                            </div>
+                        </section>
+
+                        <section class="ui-form-section">
+                            <h6 class="ui-form-section-title"><i class="ti ti-user" aria-hidden="true"></i>Identitas</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
                                     <label class="form-label">Nama Lengkap <span class="text-danger">*</span></label>
                                     <input type="text" name="nama_lengkap" class="form-control" required>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Alamat</label>
-                                    <textarea name="alamat" class="form-control" rows="2" placeholder="Alamat lengkap"></textarea>
+                                <div class="col-md-6">
+                                    <label class="form-label">No. KTP <span class="text-danger">*</span></label>
+                                    <input type="text" name="ktp" class="form-control" required placeholder="16 digit nomor KTP" maxlength="16">
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Telepon</label>
-                                    <input type="tel" name="telepon" class="form-control" placeholder="08xxxxxxxxxx">
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
+                                <div class="col-md-6">
                                     <label class="form-label">Tempat Lahir</label>
                                     <input type="text" name="tempat_lahir" class="form-control">
                                 </div>
-                                <div class="mb-3">
+                                <div class="col-md-6">
                                     <label class="form-label">Tanggal Lahir</label>
                                     <input type="date" name="tanggal_lahir" class="form-control">
                                 </div>
-                                <div class="mb-3">
+                                <div class="col-md-6">
                                     <label class="form-label">Jenis Kelamin</label>
                                     <select name="jenis_kelamin" class="form-select">
                                         <option value="L">Laki-laki</option>
                                         <option value="P">Perempuan</option>
                                     </select>
                                 </div>
-                                <div class="mb-3">
+                                <div class="col-md-6">
                                     <label class="form-label">Pekerjaan</label>
                                     <input type="text" name="pekerjaan" class="form-control">
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label">No. KTP <span class="text-danger">*</span></label>
-                                    <input type="text" name="ktp" class="form-control" required
-                                           placeholder="16 digit nomor KTP" maxlength="16">
-                                </div>
                             </div>
-                        </div>
-                        <div class="row">
-                        </div>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6 shu-role-wrap"><label class="form-label">Peran SHU *</label><select name="kategori_shu" id="add_kategori_shu" class="form-select shu-role" required><option value="anggota">Anggota (1%)</option><option value="ketua_kelompok">Ketua Kelompok (2%)</option></select></div>
-                            <div class="col-md-6 shu-leader-wrap"><label class="form-label">Ketua yang mengajak</label><select name="ketua_kelompok_id" class="form-select shu-leader"><option value="">Tidak ada</option><?php foreach($ketua_shu_list as $k): ?><option value="<?= (int)$k['id'] ?>"><?= htmlspecialchars($k['nama_lengkap'].' · '.$k['kode_anggota']) ?></option><?php endforeach; ?></select></div>
-                        </div>
-                        <?php $dok_prefix = 'add'; $dok_anggota = null; include __DIR__ . '/form_dokumen_anggota.php'; ?>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
+                        </section>
+
+                        <section class="ui-form-section">
+                            <h6 class="ui-form-section-title"><i class="ti ti-map-pin" aria-hidden="true"></i>Kontak</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Telepon</label>
+                                    <input type="tel" name="telepon" class="form-control" placeholder="08xxxxxxxxxx">
+                                </div>
+                                <div class="col-md-6">
                                     <label class="form-label">No. Rekening Bank</label>
-                                    <input type="text" name="rekening_bank" class="form-control"
-                                           placeholder="Nomor rekening bank">
+                                    <input type="text" name="rekening_bank" class="form-control" placeholder="Nomor rekening bank">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Alamat</label>
+                                    <textarea name="alamat" class="form-control" rows="2" placeholder="Alamat lengkap"></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Tanggal Daftar <span class="text-danger">*</span></label>
+                                    <input type="date" name="tanggal_daftar" class="form-control" required value="<?php echo date('Y-m-d'); ?>">
                                 </div>
                             </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Tanggal Daftar <span class="text-danger">*</span></label>
-                            <input type="date" name="tanggal_daftar" class="form-control" required 
-                                   value="<?php echo date('Y-m-d'); ?>">
-                        </div>
-                        <div class="alert alert-info mb-0">
-                            <i class="fas fa-info-circle me-2"></i>
-                            Password default untuk login: <strong>123456</strong>
-                        </div>
+                        </section>
+
+                        <section class="ui-form-section">
+                            <h6 class="ui-form-section-title"><i class="ti ti-percentage" aria-hidden="true"></i>Peran SHU</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6 shu-role-wrap">
+                                    <label class="form-label">Peran SHU *</label>
+                                    <select name="kategori_shu" id="add_kategori_shu" class="form-select shu-role" required>
+                                        <option value="anggota">Anggota (1%)</option>
+                                        <option value="ketua_kelompok">Ketua Kelompok (2%)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 shu-leader-wrap">
+                                    <label class="form-label">Ketua yang mengajak</label>
+                                    <select name="ketua_kelompok_id" class="form-select shu-leader">
+                                        <option value="">Tidak ada</option>
+                                        <?php foreach ($ketua_shu_list as $k): ?>
+                                            <option value="<?= (int)$k['id'] ?>"><?= htmlspecialchars($k['nama_lengkap'] . ' · ' . $k['kode_anggota']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="ui-form-section mb-0">
+                            <h6 class="ui-form-section-title"><i class="ti ti-photo" aria-hidden="true"></i>Dokumen</h6>
+                            <?php $dok_prefix = 'add'; $dok_anggota = null; include __DIR__ . '/form_dokumen_anggota.php'; ?>
+                        </section>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="add" class="btn btn-primary">
-                            <i class="fas fa-save me-2"></i>Simpan
-                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" name="add" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Simpan</button>
                     </div>
                 </form>
             </div>
@@ -1054,103 +692,116 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
 
     <!-- Edit Modal -->
     <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down ui-members-modal">
             <div class="modal-content">
                 <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
                     <input type="hidden" name="aksi" value="edit">
                     <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-edit me-2"></i>Edit Data Anggota
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title"><i class="ti ti-edit me-2"></i>Edit Data Anggota</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="id" id="edit_id">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Kode Anggota <span class="text-danger">*</span></label>
-                                    <input type="text" name="kode_anggota" id="edit_kode" class="form-control" readonly
-                                           style="background-color:#e9ecef">
-                                    <small class="text-muted">Kode anggota digenerate otomatis dan tidak bisa diubah</small>
-                                </div>
-                                <div class="mb-3">
+
+                        <section class="ui-form-section">
+                            <h6 class="ui-form-section-title"><i class="ti ti-id" aria-hidden="true"></i>Kode anggota</h6>
+                            <label class="form-label">Kode Anggota <span class="text-danger">*</span></label>
+                            <input type="text" name="kode_anggota" id="edit_kode" class="form-control" readonly style="background-color:#e9ecef">
+                            <small class="text-muted">Kode digenerate otomatis dan tidak bisa diubah</small>
+                        </section>
+
+                        <section class="ui-form-section">
+                            <h6 class="ui-form-section-title"><i class="ti ti-user" aria-hidden="true"></i>Identitas</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
                                     <label class="form-label">Nama Lengkap <span class="text-danger">*</span></label>
                                     <input type="text" name="nama_lengkap" id="edit_nama" class="form-control" required>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Alamat</label>
-                                    <textarea name="alamat" id="edit_alamat" class="form-control" rows="2"></textarea>
+                                <div class="col-md-6">
+                                    <label class="form-label">No. KTP <span class="text-danger">*</span></label>
+                                    <input type="text" name="ktp" id="edit_ktp" class="form-control" required>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Telepon</label>
-                                    <input type="text" name="telepon" id="edit_telepon" class="form-control">
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
+                                <div class="col-md-6">
                                     <label class="form-label">Tempat Lahir</label>
                                     <input type="text" name="tempat_lahir" id="edit_tempat_lahir" class="form-control">
                                 </div>
-                                <div class="mb-3">
+                                <div class="col-md-6">
                                     <label class="form-label">Tanggal Lahir</label>
                                     <input type="date" name="tanggal_lahir" id="edit_tanggal_lahir" class="form-control">
                                 </div>
-                                <div class="mb-3">
+                                <div class="col-md-6">
                                     <label class="form-label">Jenis Kelamin</label>
                                     <select name="jenis_kelamin" id="edit_jenis_kelamin" class="form-select">
                                         <option value="L">Laki-laki</option>
                                         <option value="P">Perempuan</option>
                                     </select>
                                 </div>
-                                <div class="mb-3">
+                                <div class="col-md-6">
                                     <label class="form-label">Pekerjaan</label>
                                     <input type="text" name="pekerjaan" id="edit_pekerjaan" class="form-control">
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label">No. KTP <span class="text-danger">*</span></label>
-                                    <input type="text" name="ktp" id="edit_ktp" class="form-control" required>
-                                </div>
                             </div>
-                        </div>
-                        <div class="row">
-                        </div>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6 shu-role-wrap"><label class="form-label">Peran SHU *</label><select name="kategori_shu" id="edit_kategori_shu" class="form-select shu-role" required><option value="anggota">Anggota (1%)</option><option value="ketua_kelompok">Ketua Kelompok (2%)</option></select></div>
-                            <div class="col-md-6 shu-leader-wrap"><label class="form-label">Ketua yang mengajak</label><select name="ketua_kelompok_id" id="edit_ketua_kelompok_id" class="form-select shu-leader"><option value="">Tidak ada</option><?php foreach($ketua_shu_list as $k): ?><option value="<?= (int)$k['id'] ?>"><?= htmlspecialchars($k['nama_lengkap'].' · '.$k['kode_anggota']) ?></option><?php endforeach; ?></select></div>
-                        </div>
-                        <?php $dok_prefix = 'edit'; $dok_anggota = null; include __DIR__ . '/form_dokumen_anggota.php'; ?>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
+                        </section>
+
+                        <section class="ui-form-section">
+                            <h6 class="ui-form-section-title"><i class="ti ti-map-pin" aria-hidden="true"></i>Kontak &amp; status</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Telepon</label>
+                                    <input type="text" name="telepon" id="edit_telepon" class="form-control">
+                                </div>
+                                <div class="col-md-6">
                                     <label class="form-label">No. Rekening Bank</label>
                                     <input type="text" name="rekening_bank" id="edit_rekening_bank" class="form-control">
                                 </div>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
+                                <div class="col-12">
+                                    <label class="form-label">Alamat</label>
+                                    <textarea name="alamat" id="edit_alamat" class="form-control" rows="2"></textarea>
+                                </div>
+                                <div class="col-md-6">
                                     <label class="form-label">Status</label>
                                     <select name="status" id="edit_status" class="form-select">
                                         <option value="aktif">Aktif</option>
                                         <option value="nonaktif">Nonaktif</option>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
+                                <div class="col-md-6">
                                     <label class="form-label">Tanggal Daftar</label>
                                     <input type="date" name="tanggal_daftar" id="edit_tanggal_daftar" class="form-control" readonly>
                                 </div>
                             </div>
-                        </div>
+                        </section>
+
+                        <section class="ui-form-section">
+                            <h6 class="ui-form-section-title"><i class="ti ti-percentage" aria-hidden="true"></i>Peran SHU</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6 shu-role-wrap">
+                                    <label class="form-label">Peran SHU *</label>
+                                    <select name="kategori_shu" id="edit_kategori_shu" class="form-select shu-role" required>
+                                        <option value="anggota">Anggota (1%)</option>
+                                        <option value="ketua_kelompok">Ketua Kelompok (2%)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 shu-leader-wrap">
+                                    <label class="form-label">Ketua yang mengajak</label>
+                                    <select name="ketua_kelompok_id" id="edit_ketua_kelompok_id" class="form-select shu-leader">
+                                        <option value="">Tidak ada</option>
+                                        <?php foreach ($ketua_shu_list as $k): ?>
+                                            <option value="<?= (int)$k['id'] ?>"><?= htmlspecialchars($k['nama_lengkap'] . ' · ' . $k['kode_anggota']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="ui-form-section mb-0">
+                            <h6 class="ui-form-section-title"><i class="ti ti-photo" aria-hidden="true"></i>Dokumen</h6>
+                            <?php $dok_prefix = 'edit'; $dok_anggota = null; include __DIR__ . '/form_dokumen_anggota.php'; ?>
+                        </section>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="edit" class="btn btn-primary">
-                            <i class="fas fa-save me-2"></i>Update
-                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" name="edit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Update</button>
                     </div>
                 </form>
             </div>
@@ -1158,31 +809,26 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     </div>
 
     <?php if ($bolehHapusAnggota): ?>
-    <!-- Delete Confirmation Modal -->
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog ui-members-modal ui-members-modal-danger">
             <div class="modal-content">
                 <form method="POST"><?php echo layananToken(); ?>
-                    <div class="modal-header bg-danger text-white">
-                        <h5 class="modal-title">
-                            <i class="fas fa-exclamation-triangle me-2"></i>Konfirmasi Hapus
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="ti ti-alert-triangle me-2"></i>Konfirmasi Hapus</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="id" id="delete_id">
                         <p class="mb-3">Apakah Anda yakin ingin menghapus anggota:</p>
                         <p class="fw-bold text-center p-3 bg-light rounded" id="delete_nama"></p>
                         <div class="alert alert-warning mb-0">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <i class="ti ti-alert-triangle me-2"></i>
                             Data yang dihapus tidak dapat dikembalikan. Hanya anggota berstatus Nonaktif tanpa pinjaman aktif, macet, atau pengajuan berjalan yang dapat dihapus. Riwayat pinjaman lunas, angsuran, laporan, transaksi, dan kas anggota ini ikut dihapus.
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="delete" class="btn btn-danger">
-                            <i class="fas fa-trash me-2"></i>Hapus
-                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" name="delete" class="btn btn-danger"><i class="ti ti-trash me-1"></i>Hapus</button>
                     </div>
                 </form>
             </div>
@@ -1190,9 +836,9 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     </div>
     <?php endif; ?>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <?php include __DIR__ . '/modal_dokumen.php'; ?>
-    <script>var DOKUMEN_LABEL = <?php echo json_encode(daftarDokumenAnggota()); ?>;</script>
+
+<script>var DOKUMEN_LABEL = <?php echo json_encode(daftarDokumenAnggota()); ?>;</script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var kategori = document.querySelector('#addModal .kategori-anggota');

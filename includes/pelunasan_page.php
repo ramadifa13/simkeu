@@ -123,399 +123,462 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pelunasan Pinjaman - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <?php $uiAssetPrefix = '../'; include __DIR__ . '/layout/assets.php'; ?>
-    <style>
-        .stat-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .table-actions {
-            white-space: nowrap;
-        }
-        .status-badge {
-            font-size: 0.75rem;
-            padding: 0.5rem 0.75rem;
-        }
-        .filter-card {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 14px;
-        }
-        .progress {
-            height: 8px;
-        }
-        /* Area TTD harus menangkap sapuan jari, bukan menggeser modal di HP/tablet. */
-        #lunaskanModal .signature-canvas-wrap {
-            position: relative;
-            overflow: hidden;
-            border: 1px dashed #b9cdd2;
-            border-radius: .5rem;
-            background: repeating-linear-gradient(0deg, #fff, #fff 31px, #f5f9fa 32px);
-        }
-        #lunaskanModal canvas.signature {
-            display: block;
-            width: 100%;
-            height: 220px !important;
-            max-width: 100%;
-            background: transparent;
-            cursor: crosshair;
-            touch-action: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        @media (max-width: 576px) {
-            #lunaskanModal canvas.signature { height: 200px !important; }
-        }
-    </style>
 </head>
 <body>
-    <?php include __DIR__ . '/header.php'; ?>
+    <?php include __DIR__ . '/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-pelunasan" aria-hidden="true"><i class="ti ti-flag-check"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Pinjaman</p>
+                        <h1 class="ui-dash-title">Pelunasan Pinjaman</h1>
+                        <p class="ui-dash-meta mb-0">Lunasi sisa pinjaman aktif — kas &amp; jadwal angsuran diperbarui otomatis</p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <a href="angsuran.php" class="btn ui-tx-btn-pelunasan-ghost">
+                            <i class="ti ti-calendar-check me-1" aria-hidden="true"></i>
+                            <span class="d-none d-sm-inline">Angsuran</span>
+                        </a>
+                    </div>
+                </header>
 
-    <div class="container-fluid">
-        <div class="row">
-            <?php include __DIR__ . '/sidebar.php'; ?>
-
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <?php ui_page_header([
-                    'title' => 'Pelunasan Pinjaman',
-                    'icon' => 'fas fa-flag-checkered text-primary',
-                    'subtitle' => 'Lunasi sisa pinjaman anggota',
-                ]); ?>
                 <?php ui_flash(); ?>
 
-                <?php ui_stat_grid([
-                    ['label' => 'Total pinjaman', 'value' => (int)$stats['total_pinjaman'], 'tone' => 'primary', 'icon' => 'fas fa-hand-holding-usd', 'hint' => 'Semua'],
-                    ['label' => 'Aktif', 'value' => (int)$stats['aktif'], 'tone' => 'success', 'icon' => 'fas fa-play-circle', 'hint' => 'Dapat dilunasi'],
-                    ['label' => 'Lunas', 'value' => (int)$stats['lunas'], 'tone' => 'info', 'icon' => 'fas fa-flag-checkered', 'hint' => 'Selesai'],
-                    ['label' => 'Sisa pokok', 'value' => formatRupiah($stats['total_sisa_pokok']), 'tone' => 'warning', 'icon' => 'fas fa-money-bill-wave', 'hint' => 'Outstanding'],
-                ]); ?>
+                <div class="alert alert-info ui-pl-info" role="status" data-ui-toast-skip>
+                    <i class="ti ti-info-circle me-1" aria-hidden="true"></i>
+                    Pelunasan menutup semua cicilan tersisa. Bila ada sisa denda, lunasi denda dulu lewat menu Denda.
+                    <?php if ($bolehJaminanLangsung): ?>
+                    Untuk gadai, Anda dapat menyerahkan barang jaminan bersamaan dengan TTD &amp; foto di form pelunasan.
+                    <?php endif; ?>
+                </div>
 
-                <!-- Pinjaman Table -->
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-list me-2"></i>Daftar Pinjaman yang Dapat Dilunaskan
-                        </h5>
-                        <div>
-                            <span class="text-muted me-2">
-                                <?php echo (int)$pager['total']; ?> data ditemukan
-                            </span>
-                        </div>
+                <div class="ui-pl-kpi">
+                <?php ui_stat_grid([
+                    ['label' => 'Total pinjaman', 'value' => (int)$stats['total_pinjaman'], 'tone' => 'primary', 'icon' => 'ti ti-moneybag', 'hint' => 'Semua'],
+                    ['label' => 'Aktif', 'value' => (int)$stats['aktif'], 'tone' => 'success', 'icon' => 'ti ti-player-play', 'hint' => 'Dapat dilunasi'],
+                    ['label' => 'Lunas', 'value' => (int)$stats['lunas'], 'tone' => 'info', 'icon' => 'ti ti-flag-check', 'hint' => 'Selesai'],
+                    ['label' => 'Sisa pokok', 'value' => formatRupiah($stats['total_sisa_pokok']), 'tone' => 'warning', 'icon' => 'ti ti-cash', 'hint' => 'Outstanding'],
+                ]); ?>
+                </div>
+
+                <div class="card mt-3 ui-pl-daftar">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-list-check" aria-hidden="true"></i>Daftar pinjaman dapat dilunaskan</span>
+                        <span class="ui-dash-sec-note"><?php echo (int)$pager['total']; ?> data</span>
                     </div>
-                    <div class="card-body">
-                        <?php include __DIR__ . '/filter_pelunasan.php'; ?>
+                    <div class="card-body p-0">
                         <?php if (empty($pinjaman_list)): ?>
-                        <div class="text-center py-5">
-                            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
-                            <h5 class="text-muted">Tidak ada pinjaman yang dapat dilunaskan</h5>
-                            <p class="text-muted">Semua pinjaman telah lunas atau belum ada pinjaman aktif.</p>
+                        <div class="ui-pl-empty">
+                            <i class="ti ti-circle-check" aria-hidden="true"></i>
+                            <strong>Tidak ada pinjaman aktif</strong>
+                            <p>Semua pinjaman telah lunas atau belum ada pinjaman aktif.</p>
                         </div>
                         <?php else: ?>
-                        <div class="table-responsive ui-table-scroll">
-                            <table class="table table-striped table-hover">
+                        <div class="ui-mobile-cards d-md-none p-3">
+                            <?php foreach ($pinjaman_list as $pinjaman):
+                                $progress = $pinjaman['jumlah_pinjaman'] > 0
+                                    ? (($pinjaman['jumlah_pinjaman'] - $pinjaman['sisa_pokok']) / $pinjaman['jumlah_pinjaman']) * 100
+                                    : 0;
+                                $dataGadai = $bolehJaminanLangsung && !empty($pinjaman['memerlukan_jaminan']) ? '1' : '0';
+                                $detailAttrs = [
+                                    'data-bs-toggle' => 'modal',
+                                    'data-bs-target' => '#detailModal',
+                                    'data-kode' => $pinjaman['kode_pinjaman'],
+                                    'data-nama' => $pinjaman['nama_lengkap'],
+                                    'data-telepon' => $pinjaman['telepon'] ?? '',
+                                    'data-gadai' => $dataGadai,
+                                    'data-jaminan-jenis' => $pinjaman['jenis_barang'] ?? '',
+                                    'data-jaminan-identitas' => $pinjaman['identitas_barang'] ?? '',
+                                    'data-jaminan-deskripsi' => $pinjaman['deskripsi_barang'] ?? '',
+                                    'data-jaminan-foto' => urlFoto($pinjaman['foto_barang'] ?? ''),
+                                    'data-kode_anggota' => $pinjaman['kode_anggota'],
+                                    'data-jenis' => $pinjaman['nama_jenis'],
+                                    'data-jumlah_pinjaman' => $pinjaman['jumlah_pinjaman'],
+                                    'data-sisa_pokok' => $pinjaman['sisa_pokok'],
+                                    'data-sisa_angsuran' => $pinjaman['sisa_angsuran'],
+                                    'data-total_sisa_bayar' => $pinjaman['total_sisa_bayar'],
+                                    'data-progress' => round($progress, 1),
+                                    'data-tanggal_pencairan' => formatTanggalUi($pinjaman['tanggal_pencairan']),
+                                    'data-jatuh_tempo' => formatTanggalUi($pinjaman['jatuh_tempo']),
+                                ];
+                                $lunaskanAttrs = [
+                                    'data-bs-toggle' => 'modal',
+                                    'data-bs-target' => '#lunaskanModal',
+                                    'data-id' => (int)$pinjaman['id'],
+                                    'data-kode' => $pinjaman['kode_pinjaman'],
+                                    'data-nama' => $pinjaman['nama_lengkap'],
+                                    'data-telepon' => $pinjaman['telepon'] ?? '',
+                                    'data-gadai' => $dataGadai,
+                                    'data-jaminan-jenis' => $pinjaman['jenis_barang'] ?? '',
+                                    'data-jaminan-identitas' => $pinjaman['identitas_barang'] ?? '',
+                                    'data-jaminan-deskripsi' => $pinjaman['deskripsi_barang'] ?? '',
+                                    'data-jaminan-foto' => urlFoto($pinjaman['foto_barang'] ?? ''),
+                                    'data-sisa_pokok' => $pinjaman['sisa_pokok'],
+                                    'data-total_sisa_bayar' => $pinjaman['total_sisa_bayar'],
+                                ];
+                            ?>
+                            <div class="ui-mobile-card ui-pl-mobile-card">
+                                <div class="ui-mobile-card-row">
+                                    <div class="min-w-0">
+                                        <div class="ui-mobile-card-title"><?php echo htmlspecialchars($pinjaman['nama_lengkap']); ?></div>
+                                        <div class="ui-mobile-card-meta"><code><?php echo htmlspecialchars($pinjaman['kode_pinjaman']); ?></code> · <?php echo htmlspecialchars($pinjaman['kode_anggota']); ?></div>
+                                    </div>
+                                    <span class="badge <?php echo !empty($pinjaman['memerlukan_jaminan']) ? 'bg-warning text-dark' : 'bg-secondary-subtle text-secondary'; ?>"><?php echo !empty($pinjaman['memerlukan_jaminan']) ? 'Gadai' : 'AGT'; ?></span>
+                                </div>
+                                <div class="ui-pl-mobile-stats">
+                                    <div><span>Sisa bayar</span><strong><?php echo formatRupiah($pinjaman['total_sisa_bayar']); ?></strong></div>
+                                    <div><span>Sisa pokok</span><strong><?php echo formatRupiah($pinjaman['sisa_pokok']); ?></strong></div>
+                                </div>
+                                <div class="progress ui-pl-progress mb-2"><div class="progress-bar" style="width:<?php echo max(0, min(100, $progress)); ?>%"></div></div>
+                                <div class="ui-mobile-card-actions">
+                                    <?php echo ui_action_menu([
+                                        ['label' => 'Detail', 'icon' => 'ti ti-eye', 'attrs' => $detailAttrs],
+                                        ['label' => 'Lunaskan', 'icon' => 'ti ti-flag-check', 'class' => 'text-success', 'attrs' => $lunaskanAttrs],
+                                    ]); ?>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <div class="table-responsive ui-table-scroll d-none d-md-block">
+                            <table class="table table-hover align-middle mb-0 js-datatable"
+                                   data-dt-page-length="10"
+                                   data-dt-order="0,asc;7,desc"
+                                   data-dt-filter="3"
+                                   data-dt-date-col="8">
                                 <thead>
                                     <tr>
-                                        <th>Kode Pinjaman</th>
+                                        <th class="dt-prio">Prio</th>
+                                        <th>Pinjaman</th>
                                         <th>Anggota</th>
-                                        <th>Jenis Pinjaman</th>
-                                        <th>Jumlah Pinjaman</th>
-                                        <th>Sisa Pokok</th>
-                                        <th>Sisa Angsuran</th>
-                                        <th>Total Sisa Bayar</th>
+                                        <th>Jenis</th>
+                                        <th class="text-end">Plafon</th>
+                                        <th class="text-end">Sisa pokok</th>
+                                        <th class="text-end">Sisa bayar</th>
                                         <th>Progress</th>
-                                        <th>Aksi</th>
+                                        <th class="d-none">Pencairan</th>
+                                        <th class="text-end">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($pinjaman_list as $pinjaman):
-                                        $progress = (($pinjaman['jumlah_pinjaman'] - $pinjaman['sisa_pokok']) / $pinjaman['jumlah_pinjaman']) * 100;
+                                        $progress = $pinjaman['jumlah_pinjaman'] > 0
+                                            ? (($pinjaman['jumlah_pinjaman'] - $pinjaman['sisa_pokok']) / $pinjaman['jumlah_pinjaman']) * 100
+                                            : 0;
                                         $dataGadai = $bolehJaminanLangsung && !empty($pinjaman['memerlukan_jaminan']) ? '1' : '0';
+                                        $isGadai = !empty($pinjaman['memerlukan_jaminan']);
+                                        $prio = $isGadai ? 1 : 2;
+                                        $jenisFilter = $isGadai ? 'Gadai' : 'Tanpa jaminan';
+                                        $detailAttrs = [
+                                            'data-bs-toggle' => 'modal',
+                                            'data-bs-target' => '#detailModal',
+                                            'data-kode' => $pinjaman['kode_pinjaman'],
+                                            'data-nama' => $pinjaman['nama_lengkap'],
+                                            'data-telepon' => $pinjaman['telepon'] ?? '',
+                                            'data-gadai' => $dataGadai,
+                                            'data-jaminan-jenis' => $pinjaman['jenis_barang'] ?? '',
+                                            'data-jaminan-identitas' => $pinjaman['identitas_barang'] ?? '',
+                                            'data-jaminan-deskripsi' => $pinjaman['deskripsi_barang'] ?? '',
+                                            'data-jaminan-foto' => urlFoto($pinjaman['foto_barang'] ?? ''),
+                                            'data-kode_anggota' => $pinjaman['kode_anggota'],
+                                            'data-jenis' => $pinjaman['nama_jenis'],
+                                            'data-jumlah_pinjaman' => $pinjaman['jumlah_pinjaman'],
+                                            'data-sisa_pokok' => $pinjaman['sisa_pokok'],
+                                            'data-sisa_angsuran' => $pinjaman['sisa_angsuran'],
+                                            'data-total_sisa_bayar' => $pinjaman['total_sisa_bayar'],
+                                            'data-progress' => round($progress, 1),
+                                            'data-tanggal_pencairan' => formatTanggalUi($pinjaman['tanggal_pencairan']),
+                                            'data-jatuh_tempo' => formatTanggalUi($pinjaman['jatuh_tempo']),
+                                        ];
+                                        $lunaskanAttrs = [
+                                            'data-bs-toggle' => 'modal',
+                                            'data-bs-target' => '#lunaskanModal',
+                                            'data-id' => (int)$pinjaman['id'],
+                                            'data-kode' => $pinjaman['kode_pinjaman'],
+                                            'data-nama' => $pinjaman['nama_lengkap'],
+                                            'data-telepon' => $pinjaman['telepon'] ?? '',
+                                            'data-gadai' => $dataGadai,
+                                            'data-jaminan-jenis' => $pinjaman['jenis_barang'] ?? '',
+                                            'data-jaminan-identitas' => $pinjaman['identitas_barang'] ?? '',
+                                            'data-jaminan-deskripsi' => $pinjaman['deskripsi_barang'] ?? '',
+                                            'data-jaminan-foto' => urlFoto($pinjaman['foto_barang'] ?? ''),
+                                            'data-sisa_pokok' => $pinjaman['sisa_pokok'],
+                                            'data-total_sisa_bayar' => $pinjaman['total_sisa_bayar'],
+                                        ];
                                     ?>
-                                    <tr>
+                                    <tr class="ui-row-action">
+                                        <td><?php echo (int)$prio; ?></td>
                                         <td>
-                                            <strong><?php echo $pinjaman['kode_pinjaman']; ?></strong>
+                                            <div class="fw-bold"><?php echo htmlspecialchars($pinjaman['kode_pinjaman']); ?></div>
+                                            <small class="text-muted"><?php echo (int)$pinjaman['sisa_angsuran']; ?> angsuran tersisa</small>
                                         </td>
                                         <td>
-                                            <div class="fw-semibold"><?php echo $pinjaman['nama_lengkap']; ?></div>
-                                            <small class="text-muted"><?php echo $pinjaman['kode_anggota']; ?></small>
+                                            <div class="fw-semibold"><?php echo htmlspecialchars($pinjaman['nama_lengkap']); ?></div>
+                                            <small class="text-muted"><?php echo htmlspecialchars($pinjaman['kode_anggota']); ?></small>
                                         </td>
-                                        <td>
-                                            <div><?php echo $pinjaman['nama_jenis']; ?></div>
+                                        <td data-filter="<?php echo htmlspecialchars($jenisFilter); ?>">
+                                            <div><?php echo htmlspecialchars($pinjaman['nama_jenis']); ?></div>
+                                            <span class="ui-pl-tag <?php echo $isGadai ? 'is-gadai' : 'is-agt'; ?>"><?php echo $isGadai ? 'AGTJ · Gadai' : 'AGT'; ?></span>
                                         </td>
-                                        <td>
-                                            <div class="fw-bold text-primary"><?php echo formatRupiah($pinjaman['jumlah_pinjaman']); ?></div>
-                                        </td>
-                                        <td>
-                                            <div class="fw-bold text-warning"><?php echo formatRupiah($pinjaman['sisa_pokok']); ?></div>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-info"><?php echo $pinjaman['sisa_angsuran']; ?> angsuran</span>
-                                        </td>
-                                        <td>
-                                            <div class="fw-bold text-danger"><?php echo formatRupiah($pinjaman['total_sisa_bayar']); ?></div>
-                                        </td>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="progress flex-grow-1 me-2" style="height: 8px;">
-                                                    <div class="progress-bar bg-success" role="progressbar"
-                                                         style="width: <?php echo $progress; ?>%"
-                                                         aria-valuenow="<?php echo $progress; ?>"
-                                                         aria-valuemin="0" aria-valuemax="100"></div>
-                                                </div>
-                                                <small class="text-muted"><?php echo round($progress, 1); ?>%</small>
+                                        <td class="text-end fw-semibold"><?php echo formatRupiah($pinjaman['jumlah_pinjaman']); ?></td>
+                                        <td class="text-end fw-semibold text-warning"><?php echo formatRupiah($pinjaman['sisa_pokok']); ?></td>
+                                        <td class="text-end fw-bold text-danger"><?php echo formatRupiah($pinjaman['total_sisa_bayar']); ?></td>
+                                        <td data-order="<?php echo (int)round($progress); ?>">
+                                            <div class="ui-pl-progress-cell">
+                                                <div class="progress ui-pl-progress"><div class="progress-bar" style="width:<?php echo max(0, min(100, $progress)); ?>%"></div></div>
+                                                <small><?php echo round($progress, 1); ?>%</small>
                                             </div>
                                         </td>
+                                        <td class="d-none" data-order="<?php echo htmlspecialchars($pinjaman['tanggal_pencairan'] . ' 00:00:00'); ?>" data-date="<?php echo htmlspecialchars(substr((string)$pinjaman['tanggal_pencairan'], 0, 10)); ?>"><?php echo htmlspecialchars($pinjaman['tanggal_pencairan']); ?></td>
                                         <td class="table-actions text-end">
-                                            <?php
-                                            echo ui_action_menu([
-                                                [
-                                                    'label' => 'Detail',
-                                                    'icon' => 'fas fa-eye',
-                                                    'attrs' => [
-                                                        'data-bs-toggle' => 'modal',
-                                                        'data-bs-target' => '#detailModal',
-                                                        'data-kode' => $pinjaman['kode_pinjaman'],
-                                                        'data-nama' => $pinjaman['nama_lengkap'],
-                                                        'data-telepon' => $pinjaman['telepon'] ?? '',
-                                                        'data-gadai' => $dataGadai,
-                                                        'data-jaminan-jenis' => $pinjaman['jenis_barang'] ?? '',
-                                                        'data-jaminan-identitas' => $pinjaman['identitas_barang'] ?? '',
-                                                        'data-jaminan-deskripsi' => $pinjaman['deskripsi_barang'] ?? '',
-                                                        'data-jaminan-foto' => urlFoto($pinjaman['foto_barang'] ?? ''),
-                                                        'data-kode_anggota' => $pinjaman['kode_anggota'],
-                                                        'data-jenis' => $pinjaman['nama_jenis'],
-                                                        'data-jumlah_pinjaman' => $pinjaman['jumlah_pinjaman'],
-                                                        'data-sisa_pokok' => $pinjaman['sisa_pokok'],
-                                                        'data-sisa_angsuran' => $pinjaman['sisa_angsuran'],
-                                                        'data-total_sisa_bayar' => $pinjaman['total_sisa_bayar'],
-                                                        'data-progress' => round($progress, 1),
-                                                        'data-tanggal_pencairan' => formatTanggalUi($pinjaman['tanggal_pencairan']),
-                                                        'data-jatuh_tempo' => formatTanggalUi($pinjaman['jatuh_tempo']),
-                                                    ],
-                                                ],
-                                                [
-                                                    'label' => 'Lunaskan',
-                                                    'icon' => 'fas fa-flag-checkered',
-                                                    'class' => 'text-success',
-                                                    'attrs' => [
-                                                        'data-bs-toggle' => 'modal',
-                                                        'data-bs-target' => '#lunaskanModal',
-                                                        'data-id' => (int)$pinjaman['id'],
-                                                        'data-kode' => $pinjaman['kode_pinjaman'],
-                                                        'data-nama' => $pinjaman['nama_lengkap'],
-                                                        'data-telepon' => $pinjaman['telepon'] ?? '',
-                                                        'data-gadai' => $dataGadai,
-                                                        'data-jaminan-jenis' => $pinjaman['jenis_barang'] ?? '',
-                                                        'data-jaminan-identitas' => $pinjaman['identitas_barang'] ?? '',
-                                                        'data-jaminan-deskripsi' => $pinjaman['deskripsi_barang'] ?? '',
-                                                        'data-jaminan-foto' => urlFoto($pinjaman['foto_barang'] ?? ''),
-                                                        'data-sisa_pokok' => $pinjaman['sisa_pokok'],
-                                                        'data-total_sisa_bayar' => $pinjaman['total_sisa_bayar'],
-                                                    ],
-                                                ],
-                                            ]);
-                                            ?>
+                                            <?php echo ui_action_menu([
+                                                ['label' => 'Detail', 'icon' => 'ti ti-eye', 'attrs' => $detailAttrs],
+                                                ['label' => 'Lunaskan', 'icon' => 'ti ti-flag-check', 'class' => 'text-success', 'attrs' => $lunaskanAttrs],
+                                            ]); ?>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
-                        <?php ui_pagination($pager, 'pelunasan.php'); ?>
+                        <div class="px-3 pb-3"><?php ui_pagination($pager, 'pelunasan.php'); ?></div>
                         <?php endif; ?>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
+            </div>
+    <?php include __DIR__ . '/layout/shell_end.php'; ?>
 
-    <!-- Detail Modal -->
-    <div class="modal fade" id="detailModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+    <div class="modal fade ui-tx-modal ui-tx-modal-pelunasan" id="detailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Detail Pinjaman</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title">Detail pinjaman</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <table class="table table-borderless">
-                                <tr>
-                                    <th width="40%">Kode Pinjaman</th>
-                                    <td id="detail_kode"></td>
-                                </tr>
-                                <tr>
-                                    <th>Nama Anggota</th>
-                                    <td id="detail_nama"></td>
-                                </tr>
-                                <tr>
-                                    <th>Kode Anggota</th>
-                                    <td id="detail_kode_anggota"></td>
-                                </tr>
-                                <tr>
-                                    <th>Jenis Pinjaman</th>
-                                    <td id="detail_jenis"></td>
-                                </tr>
-                            </table>
+                <div class="modal-body ui-pj-detail">
+                    <div class="ui-pj-detail-hero">
+                        <div class="min-w-0">
+                            <div class="ui-pj-detail-kode" id="detail_kode"></div>
+                            <div class="ui-pj-detail-nama" id="detail_nama"></div>
+                            <div class="ui-pj-detail-meta"><span id="detail_kode_anggota"></span> · <span id="detail_jenis"></span></div>
                         </div>
-                        <div class="col-md-6">
-                            <table class="table table-borderless">
-                                <tr>
-                                    <th width="40%">Tanggal Pencairan</th>
-                                    <td id="detail_tanggal_pencairan"></td>
-                                </tr>
-                                <tr>
-                                    <th>Jatuh Tempo</th>
-                                    <td id="detail_jatuh_tempo"></td>
-                                </tr>
-                                <tr>
-                                    <th>Progress</th>
-                                    <td id="detail_progress"></td>
-                                </tr>
-                                <tr>
-                                    <th>Sisa Angsuran</th>
-                                    <td id="detail_sisa_angsuran"></td>
-                                </tr>
-                            </table>
+                        <div class="ui-pj-detail-hero-status">
+                            <span class="badge bg-success" id="detail_progress"></span>
                         </div>
                     </div>
-                    <div class="row mt-3">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Jumlah Pinjaman</label>
-                                <div id="detail_jumlah_pinjaman" class="p-2 bg-light rounded fw-bold text-primary"></div>
-                            </div>
+                    <div class="ui-pj-detail-amount">
+                        <div class="ui-pj-detail-amount-item">
+                            <span class="ui-pj-detail-amount-label">Plafon</span>
+                            <span class="ui-pj-detail-amount-value" id="detail_jumlah_pinjaman"></span>
                         </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Sisa Pokok</label>
-                                <div id="detail_sisa_pokok" class="p-2 bg-light rounded fw-bold text-warning"></div>
-                            </div>
+                        <div class="ui-pj-detail-amount-item">
+                            <span class="ui-pj-detail-amount-label">Sisa pokok</span>
+                            <span class="ui-pj-detail-amount-sub" id="detail_sisa_pokok"></span>
                         </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Total Sisa Bayar</label>
-                                <div id="detail_total_sisa_bayar" class="p-2 bg-light rounded fw-bold text-danger"></div>
-                            </div>
+                    </div>
+                    <div class="ui-pj-detail-grid mt-3">
+                        <div class="ui-pj-detail-card">
+                            <h6 class="ui-pj-detail-card-title"><i class="ti ti-calendar" aria-hidden="true"></i>Jadwal</h6>
+                            <dl class="ui-pj-detail-dl">
+                                <div><dt>Pencairan</dt><dd id="detail_tanggal_pencairan"></dd></div>
+                                <div><dt>Jatuh tempo</dt><dd id="detail_jatuh_tempo"></dd></div>
+                                <div><dt>Sisa angsuran</dt><dd id="detail_sisa_angsuran"></dd></div>
+                            </dl>
+                        </div>
+                        <div class="ui-pj-detail-card">
+                            <h6 class="ui-pj-detail-card-title"><i class="ti ti-cash" aria-hidden="true"></i>Tagihan</h6>
+                            <dl class="ui-pj-detail-dl">
+                                <div><dt>Total sisa bayar</dt><dd id="detail_total_sisa_bayar" class="text-danger fw-bold"></dd></div>
+                            </dl>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Lunaskan Modal -->
-    <div class="modal fade" id="lunaskanModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade ui-tx-modal ui-tx-modal-pelunasan" id="lunaskanModal" tabindex="-1" aria-labelledby="lunaskanModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" enctype="multipart/form-data" id="formPelunasan">
-                    <div class="modal-header border-0 pb-0">
-                        <div>
-                            <div class="text-uppercase small text-muted fw-semibold">Pelunasan</div>
-                            <h5 class="modal-title mb-0 text-success">Lunaskan pinjaman</h5>
+                    <div class="modal-header">
+                        <div class="min-w-0">
+                            <h2 class="modal-title h5 mb-0" id="lunaskanModalLabel"><i class="ti ti-flag-check me-1" aria-hidden="true"></i>Form Pelunasan</h2>
+                            <p class="ui-pl-modal-sub mb-0">Konfirmasi nominal, metode, lalu lunaskan pinjaman</p>
                         </div>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body">
-                        <div id="pelunasanFeedback" class="alert d-none" role="alert" aria-live="polite"></div>
-                        <?= layananToken() ?>
-                        <input type="hidden" name="id" id="lunaskan_id">
-                        <div class="ui-detail-panel mb-3">
-                            <div class="ui-detail-label">Nasabah</div>
-                            <div class="fw-semibold" id="lunaskan_nama">—</div>
-                            <div class="small text-muted mt-1">Kode: <span id="lunaskan_kode">—</span></div>
-                        </div>
-                        <label class="form-label">Metode pembayaran</label>
-                        <select name="metode" class="form-select mb-3"><option value="cash">Cash</option><option value="transfer">Transfer</option></select>
+                        <div class="ui-pl-form">
+                            <div id="pelunasanFeedback" class="alert d-none" role="alert" aria-live="polite"></div>
+                            <?= layananToken() ?>
+                            <input type="hidden" name="id" id="lunaskan_id">
 
-                        <div class="alert alert-info">
-                            <div class="fw-semibold mb-2">Ringkasan pelunasan</div>
-                            <p class="mb-1">Sisa pokok: <span id="lunaskan_sisa_pokok" class="fw-bold"></span></p>
-                            <p class="mb-0">Total sisa bayar: <span id="lunaskan_total_sisa_bayar" class="fw-bold text-danger"></span></p>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="lunaskan_jumlah" class="form-label">Jumlah Pelunasan *</label>
-                            <input type="number" class="form-control" id="lunaskan_jumlah" name="jumlah_pelunasan" min="0" step="0.01" readonly required>
-                            <div class="form-text">Total dihitung dari sisa tagihan setelah pembayaran denda dan kredit yang telah tercatat.</div>
-                        </div>
-
-                        <?php if ($bolehJaminanLangsung): ?>
-                        <div id="konfirmasiJaminanPelunasan" class="border rounded p-3 mb-3 bg-light d-none">
-                            <label class="form-check d-flex gap-2 align-items-start mb-3"><input class="form-check-input mt-1" type="checkbox" name="ambil_jaminan_langsung" id="ambilJaminanLangsung"><span><strong>Barang jaminan diambil sekarang</strong><br><small class="text-muted">Pilih hanya jika nasabah mengambil barang bersamaan dengan pelunasan.</small></span></label>
-                            <div id="detailPengambilanJaminan" class="d-none">
-                            <h6 class="text-success"><i class="fas fa-box-open me-1"></i>Konfirmasi Barang Jaminan</h6>
-                            <p class="small mb-2" id="detailJaminanPelunasan"></p><img id="fotoJaminanPelunasan" class="img-fluid rounded border mb-3 d-none" style="max-height:180px;object-fit:contain" alt="Foto barang jaminan">
-                            <label class="form-check d-flex gap-2 align-items-start mb-3"><input class="form-check-input mt-1" type="checkbox" name="cek_jaminan_nasabah" id="cekJaminanNasabah"><span>Saya sudah mengecek barang jaminan secara keseluruhan dan menyatakan barang dalam kondisi normal/tidak rusak.</span></label>
-                            <div class="signature-field mb-2">
-                                <div class="signature-field-head"><div><span class="signature-field-title">TTD Nasabah sebagai bukti pemeriksaan *</span><small class="signature-field-help">Goreskan pada area putih; tepi aman agar tidak terpotong.</small></div><span class="signature-status"><i class="fas fa-pen-nib"></i> Belum diisi</span></div>
-                                <div class="signature-canvas-wrap"><canvas id="ttdJaminanPelunasan" class="signature" data-target="ttd_jaminan_nasabah" data-required="1" width="700" height="220"></canvas></div>
-                                <input type="hidden" name="ttd_jaminan_nasabah" id="ttdJaminanNasabah">
-                                <div class="signature-field-foot"><span class="signature-field-note">Wajib sebelum konfirmasi.</span><button type="button" class="btn btn-sm btn-outline-danger clear-sign reset-ttd" data-canvas="ttdJaminanPelunasan"><i class="fas fa-eraser me-1"></i>Reset TTD Nasabah</button></div>
+                            <div class="ui-pl-hero">
+                                <div class="ui-pl-hero-main min-w-0">
+                                    <div class="ui-pl-hero-label">Nasabah</div>
+                                    <div class="ui-pl-hero-nama text-truncate" id="lunaskan_nama">—</div>
+                                    <div class="ui-pl-hero-meta">Kode <code id="lunaskan_kode">—</code></div>
+                                </div>
+                                <div class="ui-pl-hero-amount">
+                                    <div class="ui-pl-hero-label">Total sisa bayar</div>
+                                    <div class="ui-pl-hero-value" id="lunaskan_total_sisa_bayar">—</div>
+                                    <div class="ui-pl-hero-meta">Sisa pokok <span id="lunaskan_sisa_pokok">—</span></div>
+                                </div>
                             </div>
-                            <div class="signature-field mb-2">
-                                <div class="signature-field-head"><div><span class="signature-field-title">TTD Teller / petugas penyerahan *</span><small class="signature-field-help">Goreskan pada area putih.</small></div><span class="signature-status"><i class="fas fa-pen-nib"></i> Belum diisi</span></div>
-                                <div class="signature-canvas-wrap"><canvas id="ttdJaminanTellerCanvas" class="signature" data-target="ttd_jaminan_teller" data-required="1" width="700" height="220"></canvas></div>
-                                <input type="hidden" name="ttd_jaminan_teller" id="ttdJaminanTeller">
-                                <div class="signature-field-foot"><span class="signature-field-note">Wajib sebelum konfirmasi.</span><button type="button" class="btn btn-sm btn-outline-danger clear-sign reset-ttd" data-canvas="ttdJaminanTellerCanvas"><i class="fas fa-eraser me-1"></i>Reset TTD Teller</button></div>
-                            </div>
-                            <small class="text-muted d-block mt-2">Tanda tangan nasabah dan Teller dicetak pada akad serah terima barang.</small>
-                            <div class="mt-3"><label for="fotoSerahTerimaJaminan" class="form-label">Foto penyerahan barang jaminan *</label><input type="file" class="form-control" name="foto_serah_terima_jaminan" id="fotoSerahTerimaJaminan" accept="image/jpeg,image/png,image/webp"><div class="form-text">Foto kondisi barang saat diserahkan kepada nasabah. Maksimal 1 MB; otomatis dikompres sebelum dikirim.</div></div>
-                            <div class="mt-3 pt-3 border-top"><label class="form-label fw-bold mb-2">Cetak akad serah terima</label><label class="form-check"><input class="form-check-input" type="radio" name="mode_cetak_akad" value="otomatis" checked> Otomatis — akad langsung terbuka dengan data, foto, dan TTD terisi.</label><label class="form-check mt-1"><input class="form-check-input" type="radio" name="mode_cetak_akad" value="manual"> Manual — formulir kosong dicetak dari Laporan Pelunasan.</label></div>
-                            </div>
-                        </div>
-                        <?php endif; ?>
 
-                        <div class="mb-3">
-                            <label for="lunaskan_keterangan" class="form-label">Keterangan (Opsional)</label>
-                            <textarea class="form-control" id="lunaskan_keterangan" name="keterangan" rows="3" placeholder="Catatan pelunasan..."></textarea>
-                        </div>
+                            <section class="ui-form-section ui-pj-section ui-pl-section">
+                                <h6 class="ui-form-section-title"><i class="ti ti-cash" aria-hidden="true"></i>1. Pembayaran</h6>
+                                <p class="ui-pj-section-note mb-3">Nominal dihitung otomatis dari sisa tagihan (setelah denda &amp; kredit tercatat).</p>
+                                <div class="row g-3">
+                                    <div class="col-lg-7">
+                                        <label class="form-label d-block">Metode pembayaran</label>
+                                        <div class="ui-pl-metode" role="group" aria-label="Metode pembayaran">
+                                            <label class="ui-pl-metode-opt">
+                                                <input type="radio" name="metode" value="cash" checked>
+                                                <span><i class="ti ti-cash" aria-hidden="true"></i>Cash</span>
+                                            </label>
+                                            <label class="ui-pl-metode-opt">
+                                                <input type="radio" name="metode" value="transfer">
+                                                <span><i class="ti ti-building-bank" aria-hidden="true"></i>Transfer</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-5">
+                                        <label for="lunaskan_jumlah" class="form-label">Jumlah pelunasan *</label>
+                                        <div class="ui-pl-money">
+                                            <span class="ui-pl-money-prefix">Rp</span>
+                                            <input type="number" class="form-control" id="lunaskan_jumlah" name="jumlah_pelunasan" min="0" step="0.01" readonly required>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
 
-                        <div class="alert alert-warning">
-                            <small>
-                                <i class="fas fa-exclamation-triangle me-1"></i>
-                                Dengan melunaskan, semua angsuran yang tersisa akan ditandai sebagai lunas.
-                            </small>
+                            <?php if ($bolehJaminanLangsung): ?>
+                            <section class="ui-form-section ui-pj-section ui-pl-section" id="blokJaminanWrap">
+                                <h6 class="ui-form-section-title"><i class="ti ti-package" aria-hidden="true"></i>2. Serah terima jaminan</h6>
+                                <div id="konfirmasiJaminanPelunasan" class="d-none">
+                                    <p class="ui-pj-section-note mb-3">Hanya untuk pinjaman gadai. Lewati bila barang tidak diambil sekarang.</p>
+                                    <label class="ui-pl-toggle">
+                                        <input class="form-check-input" type="checkbox" name="ambil_jaminan_langsung" id="ambilJaminanLangsung">
+                                        <span class="ui-pl-toggle-body">
+                                            <strong>Barang jaminan diambil sekarang</strong>
+                                            <small>TTD, cek kondisi, dan foto penyerahan wajib jika dicentang.</small>
+                                        </span>
+                                    </label>
+                                    <div id="detailPengambilanJaminan" class="ui-pl-jaminan-panel d-none">
+                                        <div class="ui-pl-jaminan-card">
+                                            <div class="ui-pl-jaminan-card-label">Detail barang</div>
+                                            <p class="mb-2" id="detailJaminanPelunasan"></p>
+                                            <img id="fotoJaminanPelunasan" class="img-fluid rounded border d-none ui-pl-jaminan-foto" alt="Foto barang jaminan">
+                                        </div>
+                                        <label class="ui-pl-toggle is-check mt-3">
+                                            <input class="form-check-input" type="checkbox" name="cek_jaminan_nasabah" id="cekJaminanNasabah">
+                                            <span class="ui-pl-toggle-body">
+                                                <strong>Barang sudah dicek</strong>
+                                                <small>Kondisi normal / tidak rusak saat diserahkan ke nasabah.</small>
+                                            </span>
+                                        </label>
+                                        <div class="row g-3 mt-1">
+                                            <div class="col-md-6">
+                                                <div class="signature-field mb-0 ui-pl-sign">
+                                                    <div class="signature-field-head">
+                                                        <div>
+                                                            <span class="signature-field-title">TTD Nasabah *</span>
+                                                            <small class="signature-field-help">Bukti pemeriksaan barang</small>
+                                                        </div>
+                                                        <span class="signature-status"><i class="ti ti-signature"></i> Belum</span>
+                                                    </div>
+                                                    <div class="signature-canvas-wrap"><canvas id="ttdJaminanPelunasan" class="signature" data-target="ttd_jaminan_nasabah" data-required="1" width="700" height="220"></canvas></div>
+                                                    <input type="hidden" name="ttd_jaminan_nasabah" id="ttdJaminanNasabah">
+                                                    <div class="signature-field-foot">
+                                                        <span class="signature-field-note">Wajib</span>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger clear-sign reset-ttd" data-canvas="ttdJaminanPelunasan"><i class="ti ti-eraser me-1"></i>Hapus</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="signature-field mb-0 ui-pl-sign">
+                                                    <div class="signature-field-head">
+                                                        <div>
+                                                            <span class="signature-field-title">TTD Teller *</span>
+                                                            <small class="signature-field-help">Petugas penyerahan</small>
+                                                        </div>
+                                                        <span class="signature-status"><i class="ti ti-signature"></i> Belum</span>
+                                                    </div>
+                                                    <div class="signature-canvas-wrap"><canvas id="ttdJaminanTellerCanvas" class="signature" data-target="ttd_jaminan_teller" data-required="1" width="700" height="220"></canvas></div>
+                                                    <input type="hidden" name="ttd_jaminan_teller" id="ttdJaminanTeller">
+                                                    <div class="signature-field-foot">
+                                                        <span class="signature-field-note">Wajib</span>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger clear-sign reset-ttd" data-canvas="ttdJaminanTellerCanvas"><i class="ti ti-eraser me-1"></i>Hapus</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="ui-pc-upload mt-3">
+                                            <label for="fotoSerahTerimaJaminan" class="form-label">Foto penyerahan barang *</label>
+                                            <input type="file" class="form-control form-control-sm" name="foto_serah_terima_jaminan" id="fotoSerahTerimaJaminan" accept="image/jpeg,image/png,image/webp">
+                                            <div class="form-text">Otomatis dikompres ke maksimal 1 MB.</div>
+                                        </div>
+                                        <div class="ui-pl-cetak mt-3">
+                                            <div class="ui-pl-cetak-label">Cetak akad serah terima</div>
+                                            <label class="ui-pl-cetak-opt">
+                                                <input class="form-check-input" type="radio" name="mode_cetak_akad" value="otomatis" checked>
+                                                <span><strong>Otomatis</strong> — akad terbuka dengan data, foto, dan TTD</span>
+                                            </label>
+                                            <label class="ui-pl-cetak-opt">
+                                                <input class="form-check-input" type="radio" name="mode_cetak_akad" value="manual">
+                                                <span><strong>Manual</strong> — formulir kosong dari Laporan Pelunasan</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="konfirmasiJaminanKosong" class="ui-pl-jaminan-skip text-muted small d-none">Pinjaman ini tanpa jaminan / bukan gadai — langkah ini dilewati.</div>
+                            </section>
+                            <?php endif; ?>
+
+                            <section class="ui-form-section ui-pj-section ui-pl-section">
+                                <h6 class="ui-form-section-title"><i class="ti ti-notes" aria-hidden="true"></i><?php echo $bolehJaminanLangsung ? '3' : '2'; ?>. Keterangan</h6>
+                                <label for="lunaskan_keterangan" class="form-label">Catatan (opsional)</label>
+                                <textarea class="form-control" id="lunaskan_keterangan" name="keterangan" rows="2" placeholder="Catatan pelunasan…"></textarea>
+                                <div class="alert alert-warning ui-pl-info mt-3 mb-0">
+                                    <small><i class="ti ti-alert-triangle me-1"></i>Semua angsuran tersisa akan ditandai lunas dan kas diperbarui.</small>
+                                </div>
+                            </section>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <a href="#" id="waPelunasan" class="btn btn-outline-success d-none" target="_blank" rel="noopener"><i class="fab fa-whatsapp me-1"></i>Cek WhatsApp</a>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="lunaskan" id="submitPelunasan" class="btn btn-success"><span class="submit-label">Konfirmasi Pelunasan</span></button>
+                    <div class="modal-footer ui-pl-footer flex-wrap">
+                        <a href="#" id="waPelunasan" class="btn btn-outline-success d-none me-auto" target="_blank" rel="noopener"><i class="ti ti-brand-whatsapp me-1"></i>WhatsApp</a>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" name="lunaskan" id="submitPelunasan" class="btn btn-success px-4"><i class="ti ti-flag-check me-1" aria-hidden="true"></i><span class="submit-label">Konfirmasi Pelunasan</span></button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Detail Modal
         var detailModal = document.getElementById('detailModal');
         detailModal.addEventListener('show.bs.modal', function (event) {
             var button = event.relatedTarget;
+            if (!button) return;
             document.getElementById('detail_kode').textContent = button.getAttribute('data-kode');
             document.getElementById('detail_nama').textContent = button.getAttribute('data-nama');
             document.getElementById('detail_kode_anggota').textContent = button.getAttribute('data-kode_anggota');
             document.getElementById('detail_jenis').textContent = button.getAttribute('data-jenis');
             document.getElementById('detail_tanggal_pencairan').textContent = button.getAttribute('data-tanggal_pencairan');
             document.getElementById('detail_jatuh_tempo').textContent = button.getAttribute('data-jatuh_tempo');
-            document.getElementById('detail_progress').innerHTML = '<span class="badge bg-success">' + button.getAttribute('data-progress') + '%</span>';
-            document.getElementById('detail_sisa_angsuran').innerHTML = '<span class="badge bg-info">' + button.getAttribute('data-sisa_angsuran') + ' angsuran</span>';
-
+            document.getElementById('detail_progress').textContent = button.getAttribute('data-progress') + '%';
+            document.getElementById('detail_sisa_angsuran').textContent = button.getAttribute('data-sisa_angsuran') + ' angsuran';
             document.getElementById('detail_jumlah_pinjaman').textContent = 'Rp ' + Number(button.getAttribute('data-jumlah_pinjaman')).toLocaleString('id-ID');
             document.getElementById('detail_sisa_pokok').textContent = 'Rp ' + Number(button.getAttribute('data-sisa_pokok')).toLocaleString('id-ID');
             document.getElementById('detail_total_sisa_bayar').textContent = 'Rp ' + Number(button.getAttribute('data-total_sisa_bayar')).toLocaleString('id-ID');
         });
 
-        // Lunaskan Modal — TTD via SimkeuSignaturePad (assets/js/tanda-tangan-layanan.js)
         function resetSemuaTtdJaminan(){
             ['ttdJaminanPelunasan','ttdJaminanTellerCanvas'].forEach(function(id){
                 var c=document.getElementById(id);
@@ -549,6 +612,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         });
         lunaskanModal.addEventListener('show.bs.modal', function (event) {
             var button = event.relatedTarget;
+            if (!button) return;
             feedbackPelunasan.classList.add('d-none'); submitPelunasan.disabled=false; submitPelunasan.querySelector('.submit-label').textContent='Konfirmasi Pelunasan';
             document.getElementById('lunaskan_id').value = button.getAttribute('data-id');
             document.getElementById('lunaskan_nama').textContent = button.getAttribute('data-nama');
@@ -581,7 +645,23 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 ambilJaminan.onchange = aturPengambilanJaminan;
                 aturPengambilanJaminan();
             }
-            if (blokJaminan) { blokJaminan.classList.toggle('d-none', !isGadai); var fotoJaminan=document.getElementById('fotoJaminanPelunasan'); if (!isGadai) { if (cekJaminan) cekJaminan.checked=false; if (ttdJaminan) ttdJaminan.value=''; if (fotoJaminan) fotoJaminan.classList.add('d-none'); } else if (detailJaminan) { detailJaminan.textContent = [button.getAttribute('data-jaminan-jenis'), button.getAttribute('data-jaminan-identitas'), button.getAttribute('data-jaminan-deskripsi')].filter(Boolean).join(' · ') || 'Detail barang jaminan belum tersedia'; var foto=button.getAttribute('data-jaminan-foto')||''; if (fotoJaminan) { fotoJaminan.src=foto; fotoJaminan.classList.toggle('d-none',!foto); } } }
+            var skipJaminan = document.getElementById('konfirmasiJaminanKosong');
+            if (blokJaminan) {
+                blokJaminan.classList.toggle('d-none', !isGadai);
+                if (skipJaminan) skipJaminan.classList.toggle('d-none', isGadai);
+                var fotoJaminan = document.getElementById('fotoJaminanPelunasan');
+                if (!isGadai) {
+                    if (cekJaminan) cekJaminan.checked = false;
+                    if (ttdJaminan) ttdJaminan.value = '';
+                    if (fotoJaminan) fotoJaminan.classList.add('d-none');
+                } else if (detailJaminan) {
+                    detailJaminan.textContent = [button.getAttribute('data-jaminan-jenis'), button.getAttribute('data-jaminan-identitas'), button.getAttribute('data-jaminan-deskripsi')].filter(Boolean).join(' · ') || 'Detail barang jaminan belum tersedia';
+                    var foto = button.getAttribute('data-jaminan-foto') || '';
+                    if (fotoJaminan) { fotoJaminan.src = foto; fotoJaminan.classList.toggle('d-none', !foto); }
+                }
+            } else if (skipJaminan) {
+                skipJaminan.classList.add('d-none');
+            }
         });
     </script>
 </body>

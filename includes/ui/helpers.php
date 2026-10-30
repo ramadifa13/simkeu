@@ -81,8 +81,10 @@ if (!function_exists('ui_paginate')) {
      */
     function ui_paginate(int $total, int $page, int $perPage): array
     {
-        $pages = max(1, (int)ceil($total / max(1, $perPage)));
-        $page = min(max(1, $page), $pages);
+        // Paginasi ditangani DataTables (client-side): server mengirim seluruh baris yang lolos filter.
+        $perPage = max(1, $total);
+        $pages = 1;
+        $page = 1;
         $offset = ($page - 1) * $perPage;
         return [
             'offset' => $offset,
@@ -133,7 +135,9 @@ if (!function_exists('ui_action_menu')) {
                     $out .= ' ' . $name;
                     continue;
                 }
-                $out .= ' ' . $name . '="' . htmlspecialchars((string)$av, ENT_QUOTES, 'UTF-8') . '"';
+                // Newline/tab di atribut merusak parsing HTML → item menu jadi tidak bisa diklik
+                $val = preg_replace('/[\r\n\t]+/', ' ', (string)$av);
+                $out .= ' ' . $name . '="' . htmlspecialchars($val, ENT_QUOTES, 'UTF-8') . '"';
             }
             return $out;
         };
@@ -144,7 +148,7 @@ if (!function_exists('ui_action_menu')) {
             . ' data-bs-toggle="dropdown" data-bs-boundary="viewport" data-bs-popper-config=\'{"strategy":"fixed"}\''
             . ' aria-expanded="false" aria-label="' . htmlspecialchars($ariaLabel, ENT_QUOTES, 'UTF-8') . '"'
             . ' title="' . htmlspecialchars($ariaLabel, ENT_QUOTES, 'UTF-8') . '">';
-        $html .= '<i class="fas fa-ellipsis-v" aria-hidden="true"></i><span class="visually-hidden">Aksi</span>';
+        $html .= '<i class="ti ti-dots-vertical" aria-hidden="true"></i><span class="visually-hidden">Aksi</span>';
         $html .= '</button><ul class="dropdown-menu dropdown-menu-end shadow" id="' . $id . '">';
         foreach ($items as $it) {
             if (!empty($it['divider'])) {
@@ -153,9 +157,9 @@ if (!function_exists('ui_action_menu')) {
             }
             $label = htmlspecialchars((string)($it['label'] ?? 'Aksi'), ENT_QUOTES, 'UTF-8');
             // Standar item ⋮: selalu ikon + teks
-            $iconClass = trim((string)($it['icon'] ?? 'fas fa-circle'));
+            $iconClass = trim((string)($it['icon'] ?? 'ti ti-circle'));
             if ($iconClass === '') {
-                $iconClass = 'fas fa-circle';
+                $iconClass = 'ti ti-circle';
             }
             $icon = '<i class="' . htmlspecialchars($iconClass, ENT_QUOTES, 'UTF-8') . '" aria-hidden="true"></i><span>' . $label . '</span>';
             $cls = trim('ui-action-item ' . (string)($it['class'] ?? ''));
@@ -231,12 +235,17 @@ if (!function_exists('ui_table_toolbar')) {
         }
         $filters = $opts['filters'] ?? [];
         $extraHidden = $opts['hidden'] ?? [];
+        // Pencarian & per-halaman dipindah ke DataTables; form hanya dipakai bila ada filter server (tanggal/status/dll).
+        if (!$filters) {
+            return;
+        }
         echo '<form method="get" action="' . htmlspecialchars($action, ENT_QUOTES, 'UTF-8') . '" class="ui-table-toolbar row g-2 align-items-end mb-3">';
         foreach ($extraHidden as $hk => $hv) {
             echo '<input type="hidden" name="' . htmlspecialchars($hk, ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars((string)$hv, ENT_QUOTES, 'UTF-8') . '">';
         }
-        echo '<div class="col-12 col-md-4"><label class="form-label">Cari</label>';
-        echo '<input type="search" name="q" class="form-control" value="' . htmlspecialchars($q, ENT_QUOTES, 'UTF-8') . '" placeholder="' . htmlspecialchars($placeholder, ENT_QUOTES, 'UTF-8') . '"></div>';
+        if ($q !== '') {
+            echo '<input type="hidden" name="q" value="' . htmlspecialchars($q, ENT_QUOTES, 'UTF-8') . '">';
+        }
         foreach ($filters as $f) {
             $name = htmlspecialchars((string)$f['name'], ENT_QUOTES, 'UTF-8');
             $label = htmlspecialchars((string)($f['label'] ?? $name), ENT_QUOTES, 'UTF-8');
@@ -257,15 +266,8 @@ if (!function_exists('ui_table_toolbar')) {
             }
             echo '</div>';
         }
-        echo '<div class="col-6 col-md-2"><label class="form-label">Per halaman</label>';
-        echo '<select name="per_page" class="form-select">';
-        foreach ([10, 20, 50] as $n) {
-            $sel = $perPage === $n ? ' selected' : '';
-            echo '<option value="' . $n . '"' . $sel . '>' . $n . '</option>';
-        }
-        echo '</select></div>';
         echo '<div class="col-12 col-md-auto d-flex gap-2">';
-        echo '<button type="submit" class="btn btn-primary"><i class="fas fa-search me-1"></i>Terapkan</button>';
+        echo '<button type="submit" class="btn btn-primary"><i class="ti ti-search me-1"></i>Terapkan</button>';
         $resetHref = $opts['reset_href'] ?? strtok($_SERVER['REQUEST_URI'] ?? '', '?');
         echo '<a class="btn btn-outline-secondary" href="' . htmlspecialchars((string)$resetHref, ENT_QUOTES, 'UTF-8') . '">Reset</a>';
         echo '</div></form>';
@@ -275,6 +277,7 @@ if (!function_exists('ui_table_toolbar')) {
 if (!function_exists('ui_pagination')) {
     function ui_pagination(array $pager, string $basePath = '', string $pageKey = 'page'): void
     {
+        return; // DataTables menampilkan paginasi sendiri.
         $page = (int)$pager['page'];
         $pages = (int)$pager['pages'];
         $total = (int)$pager['total'];

@@ -110,7 +110,7 @@ if (!function_exists('renderModalLengkapiFotoPencairan')) {
                         <input type="hidden" name="lengkapi_foto_pencairan" value="1">
                         <input type="hidden" name="pinjaman_id" id="lengkapi_pinjaman_id" value="">
                         <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title"><i class="fas fa-camera me-2"></i>Lengkapi foto pencairan</h5>
+                            <h5 class="modal-title"><i class="ti ti-camera me-2"></i>Lengkapi foto pencairan</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
                         </div>
                         <div class="modal-body">
@@ -134,7 +134,7 @@ if (!function_exists('renderModalLengkapiFotoPencairan')) {
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Simpan foto</button>
+                            <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Simpan foto</button>
                         </div>
                     </form>
                 </div>

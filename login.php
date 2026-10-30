@@ -45,42 +45,47 @@ $namaKop = htmlspecialchars((string)($koperasi['nama'] ?? APP_NAME), ENT_QUOTES,
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - <?= $namaKop ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/public-ui.css?v=20261029-login6">
+    <?php $uiAssetPrefix = ''; include __DIR__ . '/includes/layout/assets.php'; ?>
+    <link rel="stylesheet" href="assets/css/public-theme.css?v=<?= filemtime(__DIR__ . '/assets/css/public-theme.css') ?>">
     <script src="assets/js/brand.js?v=20261019-6" defer></script>
 </head>
-<body class="role-unified">
-<div class="login-layout">
-    <aside class="login-intro" aria-label="Pengantar">
-        <a class="login-home" href="index.php"><i class="fas fa-hand-holding-usd" aria-hidden="true"></i> <?= $namaKop ?></a>
-        <span class="login-eyebrow">LAYANAN KOPERASI</span>
-        <h1>Satu ruang kerja untuk melayani anggota.</h1>
-        <p>Masuk dengan akun Anda. Menu dan dashboard menyesuaikan peran Admin, Teller, atau Anggota.</p>
-        <div class="login-intro-items">
-            <span><i class="fas fa-users" aria-hidden="true"></i> Data anggota tersusun</span>
-            <span><i class="fas fa-receipt" aria-hidden="true"></i> Transaksi &amp; bukti pembayaran</span>
-            <span><i class="fas fa-chart-line" aria-hidden="true"></i> Pemantauan tagihan</span>
+<body class="sk-auth">
+<a class="visually-hidden-focusable" href="#loginForm">Lewati ke formulir masuk</a>
+<div class="sk-auth-layout">
+    <aside class="sk-auth-intro" aria-label="Pengantar">
+        <div class="sk-auth-intro-inner">
+            <a class="sk-auth-home" href="index.php">
+                <span class="sk-auth-home-logo"><?= brandLogo($koperasi['logo'] ?? '') ?></span>
+                <span><?= $namaKop ?></span>
+            </a>
+            <span class="sk-eyebrow">LAYANAN KOPERASI</span>
+            <h1>Satu ruang kerja untuk melayani anggota.</h1>
+            <p>Masuk sekali — Admin, Teller, dan Anggota memakai halaman login yang sama. Setelah masuk, navbar dan sidebar menyesuaikan peran Anda.</p>
+            <ul class="sk-auth-points">
+                <li><i class="ti ti-shield-lock" aria-hidden="true"></i> Satu login untuk semua peran</li>
+                <li><i class="ti ti-layout-sidebar" aria-hidden="true"></i> Menu &amp; dashboard per peran</li>
+                <li><i class="ti ti-receipt-2" aria-hidden="true"></i> Transaksi &amp; bukti pembayaran</li>
+            </ul>
+            <small>Akses hanya untuk pengguna yang terdaftar.</small>
         </div>
-        <small>Akses hanya untuk pengguna yang terdaftar.</small>
     </aside>
-    <div class="login-container">
-        <div class="login-card">
-            <div class="login-header">
-                <div class="logo-container"><?= brandLogo($koperasi['logo'] ?? '') ?></div>
-                <div class="koperasi-name"><?= $namaKop ?></div>
-                <div class="sub-title"><i class="fas fa-lock me-1" aria-hidden="true"></i> Masuk ke akun</div>
-            </div>
-            <div class="login-body">
+    <main class="sk-auth-main">
+        <div class="card sk-auth-card">
+            <div class="card-body p-4 p-md-5">
+                <div class="text-center mb-4">
+                    <div class="sk-auth-logo mx-auto mb-2"><?= brandLogo($koperasi['logo'] ?? '') ?></div>
+                    <h2 class="h3 mb-1"><?= $namaKop ?></h2>
+                    <div class="text-secondary"><i class="ti ti-lock me-1" aria-hidden="true"></i>Masuk ke akun</div>
+                </div>
                 <?php if ($error !== ''): ?>
-                <div class="alert alert-danger login-alert" role="alert">
-                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                <div class="alert alert-danger d-flex align-items-start gap-2" role="alert">
+                    <i class="ti ti-alert-circle fs-2" aria-hidden="true"></i>
                     <div><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
                 </div>
                 <?php endif; ?>
                 <?php if ($success !== ''): ?>
-                <div class="alert alert-success login-alert" role="status">
-                    <i class="fas fa-check-circle" aria-hidden="true"></i>
+                <div class="alert alert-success d-flex align-items-start gap-2" role="status">
+                    <i class="ti ti-circle-check fs-2" aria-hidden="true"></i>
                     <div><?= htmlspecialchars($success, ENT_QUOTES, 'UTF-8') ?></div>
                 </div>
                 <?php endif; ?>
@@ -89,36 +94,36 @@ $namaKop = htmlspecialchars((string)($koperasi['nama'] ?? APP_NAME), ENT_QUOTES,
                     <input type="hidden" name="login_csrf" value="<?= htmlspecialchars($_SESSION['login_csrf'], ENT_QUOTES) ?>">
                     <div class="mb-3">
                         <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control login-input" id="username" name="username" autocomplete="username"
-                               placeholder="Masukkan username" required autofocus>
-                    </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <div class="login-password-wrap">
-                            <input type="password" class="form-control login-input" id="password" name="password" autocomplete="current-password"
-                                   placeholder="Masukkan password" required>
-                            <button type="button" class="password-toggle" onclick="togglePassword()" aria-label="Tampilkan password" aria-pressed="false">
-                                <i class="fas fa-eye" id="passwordIcon" aria-hidden="true"></i>
-                            </button>
+                        <div class="input-icon">
+                            <span class="input-icon-addon"><i class="ti ti-user"></i></span>
+                            <input type="text" class="form-control form-control-lg" id="username" name="username" autocomplete="username" placeholder="Masukkan username" required autofocus>
                         </div>
                     </div>
-                    <button type="submit" name="login" class="btn btn-login text-white w-100" id="loginButton">
-                        <i class="fas fa-sign-in-alt me-2" aria-hidden="true"></i><span id="loginText">Masuk</span>
+                    <div class="mb-4">
+                        <label for="password" class="form-label">Password</label>
+                        <div class="input-group input-group-flat">
+                            <input type="password" class="form-control form-control-lg" id="password" name="password" autocomplete="current-password" placeholder="Masukkan password" required>
+                            <span class="input-group-text">
+                                <button type="button" class="link-secondary border-0 bg-transparent p-0 password-toggle" onclick="togglePassword()" aria-label="Tampilkan password" aria-pressed="false">
+                                    <i class="ti ti-eye fs-3" id="passwordIcon" aria-hidden="true"></i>
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+                    <button type="submit" name="login" class="btn btn-primary btn-lg w-100" id="loginButton">
+                        <i class="ti ti-login me-2" aria-hidden="true"></i><span id="loginText">Masuk</span>
                     </button>
                 </form>
 
-                <div class="support-info">
-                    <i class="fas fa-headset" aria-hidden="true"></i>
-                    <span>Butuh bantuan? Hubungi pengurus koperasi.</span>
-                </div>
+                <div class="text-secondary small text-center mt-4"><i class="ti ti-headset me-1" aria-hidden="true"></i>Butuh bantuan? Hubungi pengurus koperasi.</div>
                 <div class="text-center mt-3">
-                    <a href="index.php" class="back-link"><i class="fas fa-arrow-left me-1" aria-hidden="true"></i>Kembali ke Beranda</a>
+                    <a href="index.php"><i class="ti ti-arrow-left me-1" aria-hidden="true"></i>Kembali ke Beranda</a>
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="assets/vendor/tabler/tabler.min.js"></script>
 <script>
 function togglePassword() {
     var input = document.getElementById('password');
@@ -128,8 +133,8 @@ function togglePassword() {
     input.type = show ? 'text' : 'password';
     btn.setAttribute('aria-label', show ? 'Sembunyikan password' : 'Tampilkan password');
     btn.setAttribute('aria-pressed', show ? 'true' : 'false');
-    icon.classList.toggle('fa-eye', !show);
-    icon.classList.toggle('fa-eye-slash', show);
+    icon.classList.toggle('ti-eye', !show);
+    icon.classList.toggle('ti-eye-off', show);
 }
 document.getElementById('loginForm').addEventListener('submit', function () {
     var button = document.getElementById('loginButton');

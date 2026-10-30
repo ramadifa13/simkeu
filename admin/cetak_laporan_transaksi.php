@@ -61,8 +61,8 @@ foreach ($transaksi as $t) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laporan Transaksi - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="../assets/vendor/tabler/tabler.min.css" rel="stylesheet">
+    <link href="../assets/vendor/icons/tabler-icons.min.css" rel="stylesheet">
     <style>
         @media print {
             @page {
@@ -206,13 +206,13 @@ foreach ($transaksi as $t) {
     <!-- Print Button (only visible when not printing) -->
     <div class="no-print text-center mt-3">
         <button onclick="window.print()" class="btn btn-primary">
-            <i class="fas fa-print"></i> Cetak Laporan
+            <i class="ti ti-printer"></i> Cetak Laporan
         </button>
         <button onclick="window.close()" class="btn btn-secondary">
-            <i class="fas fa-times"></i> Tutup
+            <i class="ti ti-x"></i> Tutup
         </button>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/tabler/tabler.min.js"></script>
 </body>
 </html>

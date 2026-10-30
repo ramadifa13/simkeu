@@ -5,7 +5,7 @@
  */
 ?>
 <style>
-    .thumb-dokumen { max-height: 110px; cursor: zoom-in; object-fit: cover; }
+.thumb-dokumen { max-height: 110px; cursor: zoom-in; object-fit: cover; }
 </style>
 <div class="modal fade" id="modalDokumen" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered">
@@ -19,7 +19,7 @@
             </div>
             <div class="modal-footer">
                 <a id="modalDokumenBuka" href="#" target="_blank" rel="noopener" class="btn btn-outline-secondary">
-                    <i class="fas fa-external-link-alt me-1"></i> Buka di tab baru
+                    <i class="ti ti-external-link me-1"></i> Buka di tab baru
                 </a>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
             </div>
@@ -30,7 +30,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-id-card me-2"></i>Dokumen <span id="modalDokumenAnggotaNama"></span></h5>
+                <h5 class="modal-title"><i class="ti ti-id me-2"></i>Dokumen <span id="modalDokumenAnggotaNama"></span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">

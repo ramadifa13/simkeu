@@ -6,11 +6,12 @@
  */
 function ui_riwayat_transaksi(PDO $db, string $jenisTransaksi, array $opts = []): array
 {
+    $client = !empty($opts['client']); // DataTables client-side: tanpa filter/pager server
     $ui = ui_query_params(['jenis_id', 'mulai', 'sampai']);
-    $q = $ui['q'];
-    $jenisId = (int)($ui['filters']['jenis_id'] ?? 0);
-    $mulai = $ui['filters']['mulai'] ?? '';
-    $sampai = $ui['filters']['sampai'] ?? '';
+    $q = $client ? '' : $ui['q'];
+    $jenisId = $client ? 0 : (int)($ui['filters']['jenis_id'] ?? 0);
+    $mulai = $client ? '' : ($ui['filters']['mulai'] ?? '');
+    $sampai = $client ? '' : ($ui['filters']['sampai'] ?? '');
     $exclude = $opts['exclude_kode'] ?? ['ANG', 'BONUS', 'SHU'];
 
     $where = " WHERE t.jenis_transaksi = :jenis AND j.kode_jenis NOT IN ('" . implode("','", array_map('addslashes', $exclude)) . "')";
@@ -43,7 +44,14 @@ function ui_riwayat_transaksi(PDO $db, string $jenisTransaksi, array $opts = [])
         $count->bindValue($k, $v);
     }
     $count->execute();
-    $pager = ui_paginate((int)$count->fetchColumn(), $ui['page'], $ui['per_page']);
+    $total = (int)$count->fetchColumn();
+
+    if ($client) {
+        $limit = max(1, min(2000, (int)($opts['limit'] ?? 1000)));
+        $pager = ui_paginate($total, 1, $limit);
+    } else {
+        $pager = ui_paginate($total, $ui['page'], $ui['per_page']);
+    }
 
     $sql = "SELECT t.*, a.nama_lengkap, a.kode_anggota, j.nama_jenis, u.nama_lengkap AS petugas
             $from
@@ -64,18 +72,21 @@ function ui_riwayat_transaksi(PDO $db, string $jenisTransaksi, array $opts = [])
             'mulai' => $mulai,
             'sampai' => $sampai,
         ],
+        'client' => $client,
     ];
 }
 
 /**
  * Riwayat waserda/pembelian dengan search + pagination.
+ * @param array{client?:bool,limit?:int} $opts
  */
-function ui_riwayat_waserda(PDO $db): array
+function ui_riwayat_waserda(PDO $db, array $opts = []): array
 {
+    $client = !empty($opts['client']);
     $ui = ui_query_params(['mulai', 'sampai']);
-    $q = $ui['q'];
-    $mulai = $ui['filters']['mulai'] ?? '';
-    $sampai = $ui['filters']['sampai'] ?? '';
+    $q = $client ? '' : $ui['q'];
+    $mulai = $client ? '' : ($ui['filters']['mulai'] ?? '');
+    $sampai = $client ? '' : ($ui['filters']['sampai'] ?? '');
     $where = ' WHERE 1=1';
     $params = [];
     if ($q !== '') {
@@ -99,7 +110,13 @@ function ui_riwayat_waserda(PDO $db): array
         $count->bindValue($k, $v);
     }
     $count->execute();
-    $pager = ui_paginate((int)$count->fetchColumn(), $ui['page'], $ui['per_page']);
+    $total = (int)$count->fetchColumn();
+    if ($client) {
+        $limit = max(1, min(2000, (int)($opts['limit'] ?? 1000)));
+        $pager = ui_paginate($total, 1, $limit);
+    } else {
+        $pager = ui_paginate($total, $ui['page'], $ui['per_page']);
+    }
     $sql = "SELECT w.*, a.nama_lengkap, a.kode_anggota, u.nama_lengkap AS petugas
             $from ORDER BY w.created_at DESC
             LIMIT {$pager['per_page']} OFFSET {$pager['offset']}";
@@ -114,5 +131,6 @@ function ui_riwayat_waserda(PDO $db): array
         'pager' => $pager,
         'q' => $q,
         'filters' => ['mulai' => $mulai, 'sampai' => $sampai],
+        'client' => $client,
     ];
 }

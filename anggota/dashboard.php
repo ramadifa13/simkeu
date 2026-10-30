@@ -151,25 +151,24 @@ foreach ($jadwal_angsuran as $jadwalRows) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
 </head>
 <body>
-<?php include '../includes/header.php'; ?>
-<div class="container-fluid">
-    <div class="row">
-        <?php include '../includes/sidebar.php'; ?>
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-            <div class="ui-dash-header">
-                <h2 class="page-title"><i class="ti ti-dashboard me-1"></i>Dashboard Saya</h2>
-                <p class="ui-dash-meta mb-0">
-                    <span>Halo, <?php echo htmlspecialchars($nama_lengkap); ?></span>
-                    <span>· <?php echo htmlspecialchars($anggota_data['kode_anggota']); ?></span>
-                    <span class="badge bg-success"><?php echo htmlspecialchars(ucfirst($anggota_data['status'])); ?></span>
-                    <span>· <?php echo formatTanggalUi(date('Y-m-d')); ?></span>
-                </p>
-            </div>
+<?php include __DIR__ . '/../includes/layout/shell_start.php'; ?>
+            <div class="ui-dash-page">
+            <header class="ui-dash-header">
+                <div class="ui-dash-header-icon" aria-hidden="true"><i class="ti ti-dashboard"></i></div>
+                <div class="ui-dash-header-copy">
+                    <p class="ui-dash-eyebrow mb-0">Akun anggota</p>
+                    <h1 class="ui-dash-title">Dashboard Saya</h1>
+                    <p class="ui-dash-meta mb-0">
+                        <span>Halo, <?php echo htmlspecialchars($nama_lengkap); ?></span>
+                        <span>· <?php echo htmlspecialchars($anggota_data['kode_anggota']); ?></span>
+                        <span class="badge bg-success"><?php echo htmlspecialchars(ucfirst($anggota_data['status'])); ?></span>
+                        <span>· <?php echo formatTanggalUi(date('Y-m-d')); ?></span>
+                    </p>
+                </div>
+            </header>
 
             <section class="ui-status-hero" aria-label="Status keuangan">
                 <div class="ui-status-hero-card tone-success">
@@ -227,26 +226,27 @@ foreach ($jadwal_angsuran as $jadwalRows) {
                 </div>
             </div>
 
-            <div class="card ui-dash-panel">
-                <div class="card-body py-2">
-                    <h3 class="h6 mb-2"><i class="ti ti-bolt me-1"></i>Aksi cepat</h3>
-                    <div class="ui-dash-actions">
-                        <a class="btn btn-sm btn-primary" href="simpanan.php"><i class="ti ti-pig-money me-1"></i>Simpanan</a>
-                        <a class="btn btn-sm btn-outline-warning" href="pinjaman.php"><i class="ti ti-cash me-1"></i>Pinjaman</a>
-                        <a class="btn btn-sm btn-outline-success" href="waserda.php"><i class="ti ti-building-store me-1"></i>Waserda</a>
-                        <a class="btn btn-sm btn-outline-info" href="riwayat_simpanan.php"><i class="ti ti-history me-1"></i>Riwayat</a>
-                        <a class="btn btn-sm btn-outline-secondary" href="shu_saya.php"><i class="ti ti-calculator me-1"></i>SHU</a>
-                        <a class="btn btn-sm btn-outline-secondary" href="profil.php"><i class="ti ti-user me-1"></i>Profil</a>
-                    </div>
+            <section class="ui-dash-panel" aria-label="Aksi cepat">
+                <div class="ui-dash-sec">
+                    <h3 class="ui-dash-sec-title"><i class="ti ti-bolt" aria-hidden="true"></i>Aksi cepat</h3>
+                    <span class="ui-dash-sec-note">Pintasan akun</span>
                 </div>
-            </div>
+                <div class="ui-dash-actions" data-count="6">
+                    <a class="ui-dash-action tone-primary is-primary" href="simpanan.php"><span class="ui-dash-action-icon"><i class="ti ti-pig-money" aria-hidden="true"></i></span><span class="ui-dash-action-label">Simpanan</span></a>
+                    <a class="ui-dash-action tone-warning" href="pinjaman.php"><span class="ui-dash-action-icon"><i class="ti ti-cash" aria-hidden="true"></i></span><span class="ui-dash-action-label">Pinjaman</span></a>
+                    <a class="ui-dash-action tone-success" href="waserda.php"><span class="ui-dash-action-icon"><i class="ti ti-building-store" aria-hidden="true"></i></span><span class="ui-dash-action-label">Waserda</span></a>
+                    <a class="ui-dash-action tone-info" href="riwayat_simpanan.php"><span class="ui-dash-action-icon"><i class="ti ti-history" aria-hidden="true"></i></span><span class="ui-dash-action-label">Riwayat</span></a>
+                    <a class="ui-dash-action tone-secondary" href="shu_saya.php"><span class="ui-dash-action-icon"><i class="ti ti-calculator" aria-hidden="true"></i></span><span class="ui-dash-action-label">SHU</span></a>
+                    <a class="ui-dash-action tone-secondary" href="profil.php"><span class="ui-dash-action-icon"><i class="ti ti-user" aria-hidden="true"></i></span><span class="ui-dash-action-label">Profil</span></a>
+                </div>
+            </section>
 
             <div class="row g-2 mb-3">
                 <div class="col-lg-6">
                     <div class="card h-100">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span>Transaksi simpanan</span>
-                            <a href="riwayat_simpanan.php" class="small">Lihat semua</a>
+                        <div class="card-header ui-dash-sec">
+                            <span class="ui-dash-sec-title"><i class="ti ti-exchange" aria-hidden="true"></i>Transaksi simpanan</span>
+                            <a href="riwayat_simpanan.php" class="ui-dash-sec-link">Lihat semua</a>
                         </div>
                         <div class="list-group list-group-flush ui-dash-list">
                             <?php if (empty($transaksi_terbaru)): ?>
@@ -269,9 +269,9 @@ foreach ($jadwal_angsuran as $jadwalRows) {
                 </div>
                 <div class="col-lg-6">
                     <div class="card h-100">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span>Transaksi waserda</span>
-                            <a href="waserda.php" class="small">Lihat semua</a>
+                        <div class="card-header ui-dash-sec">
+                            <span class="ui-dash-sec-title"><i class="ti ti-building-store" aria-hidden="true"></i>Transaksi waserda</span>
+                            <a href="waserda.php" class="ui-dash-sec-link">Lihat semua</a>
                         </div>
                         <div class="list-group list-group-flush ui-dash-list">
                             <?php if (empty($waserda_terbaru)): ?>
@@ -295,7 +295,7 @@ foreach ($jadwal_angsuran as $jadwalRows) {
             <div class="row g-2 mb-3">
                 <div class="col-lg-5">
                     <div class="card h-100">
-                        <div class="card-header">Jenis simpanan</div>
+                        <div class="card-header ui-dash-sec"><span class="ui-dash-sec-title"><i class="ti ti-wallet" aria-hidden="true"></i>Jenis simpanan</span></div>
                         <div class="list-group list-group-flush ui-dash-list">
                             <?php if (empty($jenis_simpanan)): ?>
                                 <div class="ui-dash-empty"><i class="ti ti-wallet"></i>Belum ada simpanan</div>
@@ -313,7 +313,7 @@ foreach ($jadwal_angsuran as $jadwalRows) {
                 </div>
                 <div class="col-lg-7">
                     <div class="card h-100">
-                        <div class="card-header">Jadwal angsuran aktif</div>
+                        <div class="card-header ui-dash-sec"><span class="ui-dash-sec-title"><i class="ti ti-calendar-due" aria-hidden="true"></i>Jadwal angsuran aktif</span></div>
                         <div class="card-body p-0">
                             <?php if (empty($jadwal_angsuran)): ?>
                                 <div class="ui-dash-empty"><i class="ti ti-calendar-check"></i>Tidak ada pinjaman aktif</div>
@@ -324,7 +324,7 @@ foreach ($jadwal_angsuran as $jadwalRows) {
                                         <span class="text-muted">· <?php echo htmlspecialchars(labelTenorRow($info)); ?></span>
                                     </div>
                                     <div class="table-responsive ui-table-scroll mb-2">
-                                        <table class="table table-sm table-striped mb-0">
+                                        <table class="table table-sm table-striped mb-0 js-datatable" data-dt-plain>
                                             <thead>
                                                 <tr>
                                                     <th>Ke</th>
@@ -359,9 +359,7 @@ foreach ($jadwal_angsuran as $jadwalRows) {
                     </div>
                 </div>
             </div>
-        </main>
-    </div>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+            </div>
+        <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
 </body>
 </html>

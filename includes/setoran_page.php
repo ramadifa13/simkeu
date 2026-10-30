@@ -15,12 +15,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proses_setoran'])) {
     
     $anggota_id = $_POST['anggota_id'] ?? '';
     $jenis_simpanan_id = $_POST['jenis_simpanan_id'] ?? '';
-    $jumlah = $_POST['jumlah'] ?? 0;
-    $keterangan = $_POST['keterangan'] ?? '';
+    $jumlahRaw = preg_replace('/[^\d]/', '', (string)($_POST['jumlah'] ?? ''));
+    $jumlah = $jumlahRaw !== '' ? $jumlahRaw : '0';
+    $keterangan = trim((string)($_POST['keterangan'] ?? ''));
     $user_id = $_SESSION['user_id'];
     
     // Validasi dasar
-    if (empty($anggota_id) || empty($jenis_simpanan_id) || empty($jumlah) || $jumlah <= 0) {
+    if (empty($anggota_id) || empty($jenis_simpanan_id) || (float)$jumlah <= 0) {
         $_SESSION['error'] = "Data tidak lengkap. Pastikan semua field diisi dengan benar.";
         header("Location: setoran.php");
         exit();
@@ -28,9 +29,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proses_setoran'])) {
     
     try {
         $db->beginTransaction();
-        if (!is_scalar($jumlah) || !preg_match('/^\d+(?:\.\d{1,2})?$/D', (string)$jumlah) || !is_finite((float)$jumlah) || (float)$jumlah <= 0 || (float)$jumlah > 999999999999) {
+        if (!preg_match('/^\d+$/D', (string)$jumlah) || !is_finite((float)$jumlah) || (float)$jumlah <= 0 || (float)$jumlah > 999999999999) {
             throw new Exception('Nominal harus berupa angka positif yang valid.');
         }
+        $jumlah = (float)$jumlah;
         $db->query('SELECT id FROM koperasi WHERE id=1 FOR UPDATE')->fetchColumn();
         $lockMember=$db->prepare("SELECT id FROM anggota WHERE id=? AND status='aktif' FOR UPDATE");
         $lockMember->execute([$anggota_id]);
@@ -155,8 +157,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proses_setoran'])) {
         }
         
         $db->commit();
-        $_SESSION['success'] = "Setoran berhasil dilakukan. Kode Transaksi: " . $kode_transaksi;
-        header("Location: setoran.php");
+        $_SESSION['success'] = 'Setoran berhasil.';
+        header('Location: setoran.php');
         exit();
         
     } catch (Exception $e) {
@@ -185,12 +187,9 @@ $stmt_jenis = $db->prepare($query_jenis);
 $stmt_jenis->execute();
 $jenis_simpanan = $stmt_jenis->fetchAll(PDO::FETCH_ASSOC);
 
-$riwayat = ui_riwayat_transaksi($db, 'setoran');
-$recent_setoran = array_slice($riwayat['rows'], 0, 5);
-$jenisOptions = ['' => 'Semua jenis'];
-foreach ($jenis_simpanan as $j) {
-    $jenisOptions[(string)$j['id']] = $j['nama_jenis'];
-}
+$riwayat = ui_riwayat_transaksi($db, 'setoran', ['client' => true]);
+$prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']) ? (int)$_GET['anggota_id'] : 0;
+$quickAmounts = [50000, 100000, 250000, 500000];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -198,106 +197,67 @@ foreach ($jenis_simpanan as $j) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Setoran Tabungan - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <?php $uiAssetPrefix = '../'; include __DIR__ . '/layout/assets.php'; ?>
-    <style>
-        .transaction-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .amount-display {
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
-        .sidebar {
-            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%) !important;
-            min-height: calc(100vh - 56px);
-        }
-        main {
-            background-color: #f8f9fa;
-            min-height: calc(100vh - 56px);
-        }
-        .form-control:focus, .form-select:focus {
-            border-color: #28a745;
-            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
-        }
-        .saldo-info {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 8px;
-            padding: 1rem;
-        }
-        .badge-tabungan {
-            background-color: #28a745;
-            color: white;
-            font-size: 0.8rem;
-            padding: 5px 10px;
-            border-radius: 20px;
-        }
-        .tabungan-badge {
-            background-color: #e8f5e9;
-            color: #2e7d32;
-            font-size: 0.7rem;
-            padding: 2px 8px;
-            border-radius: 12px;
-        }
-    </style>
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <?php ui_page_header([
-                    'title' => 'Setoran Tabungan',
-                    'icon' => 'fas fa-plus-circle text-success',
-                    'subtitle' => 'Proses setoran simpanan anggota',
-                    'actions' => '<span class="badge bg-success"><i class="fas fa-piggy-bank me-1"></i>Tabungan</span>',
-                ]); ?>
+    <?php include __DIR__ . '/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon" aria-hidden="true"><i class="ti ti-circle-plus"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Transaksi</p>
+                        <h1 class="ui-dash-title">Setoran Tabungan</h1>
+                        <p class="ui-dash-meta mb-0">Proses setoran simpanan pokok, wajib, sukarela, dan lainnya</p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <button type="button" class="btn ui-dash-btn-add" data-bs-toggle="modal" data-bs-target="#modalSetoran">
+                            <i class="ti ti-plus me-1" aria-hidden="true"></i>
+                            <span class="d-none d-sm-inline">Setoran baru</span><span class="d-sm-none">Baru</span>
+                        </button>
+                    </div>
+                </header>
+
                 <?php ui_flash(); ?>
 
-                <div class="row">
-                    <!-- Form Setoran -->
-                    <div class="col-lg-8 mb-4">
-                        <div class="card transaction-card">
-                            <div class="card-header bg-success text-white">
-                                <h5 class="card-title mb-0">
-                                    <i class="fas fa-money-bill-wave me-2"></i>Form Setoran Tabungan
-                                </h5>
-                                <small class="text-white-50">Setoran untuk simpanan pokok, wajib, sukarela, dll.</small>
+                <?php
+                $riwayatTitle = 'Riwayat Setoran';
+                include __DIR__ . '/ui/partial_riwayat_transaksi.php';
+                ?>
+            </div>
+            <?php include __DIR__ . '/layout/shell_end.php'; ?>
+
+    <div class="modal fade ui-tx-modal" id="modalSetoran" tabindex="-1" aria-labelledby="modalSetoranLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="modalSetoranLabel">Setoran baru</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                             </div>
-                            <div class="card-body">
-                                <form method="POST" id="formSetoran"><?php echo layananToken(); ?>
-                                    <div class="row">
+                <form method="POST" id="formSetoran" novalidate>
+                    <?php echo layananToken(); ?>
+                    <div class="modal-body">
+                        <div class="row g-3">
                                         <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">Pilih Anggota *</label>
-                                                <select name="anggota_id" class="form-select" required id="anggotaSelect">
-                                                    <option value="">-- Pilih Anggota --</option>
+                                <label class="form-label" for="anggotaSelect">Anggota *</label>
+                                <select name="anggota_id" class="form-select" required id="anggotaSelect" data-prefill="<?php echo (int)$prefillAnggotaId; ?>">
+                                    <option value="">-- Pilih anggota --</option>
                                                     <?php foreach ($anggota_list as $anggota): ?>
-                                                    <option value="<?php echo $anggota['id']; ?>">
-                                                        <?php echo $anggota['kode_anggota'] . ' - ' . $anggota['nama_lengkap']; ?>
+                                    <option value="<?php echo (int)$anggota['id']; ?>">
+                                        <?php echo htmlspecialchars($anggota['kode_anggota'] . ' - ' . $anggota['nama_lengkap']); ?>
                                                     </option>
                                                     <?php endforeach; ?>
                                                 </select>
-                                            </div>
                                         </div>
                                         <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">Jenis Tabungan *</label>
+                                <label class="form-label" for="jenisSimpananSelect">Jenis tabungan *</label>
                                                 <select name="jenis_simpanan_id" class="form-select" required id="jenisSimpananSelect">
-                                                    <option value="">-- Pilih Jenis Tabungan --</option>
+                                    <option value="">-- Pilih jenis --</option>
                                                     <?php foreach ($jenis_simpanan as $jenis): ?>
-                                                    <option value="<?php echo $jenis['id']; ?>" 
-                                                            data-minimum="<?php echo $jenis['minimum']; ?>"
-                                                            data-maksimum="<?php echo $jenis['maksimum']; ?>"
-                                                            data-kode="<?php echo $jenis['kode_jenis']; ?>">
-                                                        <?php echo $jenis['nama_jenis']; ?>
+                                    <option value="<?php echo (int)$jenis['id']; ?>"
+                                            data-minimum="<?php echo htmlspecialchars((string)$jenis['minimum']); ?>"
+                                            data-maksimum="<?php echo htmlspecialchars((string)$jenis['maksimum']); ?>"
+                                            data-kode="<?php echo htmlspecialchars($jenis['kode_jenis']); ?>">
+                                        <?php echo htmlspecialchars($jenis['nama_jenis']); ?>
                                                         <?php if ($jenis['minimum'] > 0): ?>
                                                             (Min: <?php echo formatRupiah($jenis['minimum']); ?>)
                                                         <?php endif; ?>
@@ -306,49 +266,62 @@ foreach ($jenis_simpanan as $j) {
                                                 </select>
                                                 <small class="text-muted" id="minimumInfo"></small>
                                             </div>
+
+                            <div class="col-12">
+                                <div class="ui-tx-saldo-box" id="saldoInfo" aria-live="polite">
+                                    <div class="text-muted small">Pilih anggota dan jenis untuk melihat saldo</div>
                                         </div>
                                     </div>
                                     
-                                    <div class="mb-3">
-                                        <label class="form-label">Jumlah Setoran (Rp) *</label>
-                                        <input type="number" name="jumlah" class="form-control"
-                                               required step="1000" min="0" id="jumlahSetoran"
-                                               placeholder="Masukkan jumlah setoran">
-                                        <small class="text-muted" id="validationInfo"></small>
-                                    </div>
+                            <div class="col-12">
+                                <label class="form-label" for="jumlahSetoranDisplay">Jumlah setoran (Rp) *</label>
+                                <input type="text" class="form-control form-control-lg" id="jumlahSetoranDisplay"
+                                       inputmode="numeric" autocomplete="off" placeholder="Contoh: 100.000" required>
+                                <input type="hidden" name="jumlah" id="jumlahSetoran" value="">
+                                <div class="ui-tx-chips" id="quickAmounts" hidden>
+                                    <?php foreach ($quickAmounts as $qa): ?>
+                                    <button type="button" class="ui-tx-chip" data-amount="<?php echo (int)$qa; ?>"><?php echo formatRupiah($qa); ?></button>
+                                    <?php endforeach; ?>
+                                    <button type="button" class="ui-tx-chip" id="chipMin" data-amount="0" hidden>Pakai minimum</button>
+                                </div>
+                                <small class="text-muted d-block mt-1" id="validationInfo"></small>
+                            </div>
 
-                                    <div class="mb-3">
-                                        <div class="alert alert-info mb-0 py-2">
-                                            <div class="row text-center g-2">
-                                                <div class="col-4">
-                                                    <small>Jenis</small>
-                                                    <div class="fw-bold" id="infoJenis">-</div>
+                            <div class="col-12">
+                                <div class="ui-tx-preview" id="saldoPreview" aria-live="polite">
+                                    <div class="ui-tx-preview-cell">
+                                        <span class="ui-tx-preview-label">Saldo sekarang</span>
+                                        <div class="ui-tx-preview-value" id="previewSebelum">Rp 0</div>
+                                    </div>
+                                    <span class="ui-tx-preview-arrow" aria-hidden="true"><i class="ti ti-plus"></i></span>
+                                    <div class="ui-tx-preview-cell">
+                                        <span class="ui-tx-preview-label">Setoran</span>
+                                        <div class="ui-tx-preview-value is-add" id="previewJumlah">Rp 0</div>
                                                 </div>
-                                                <div class="col-4">
-                                                    <small>Jumlah</small>
-                                                    <div class="amount-display text-success" id="displayJumlah">Rp 0</div>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small>Petugas</small>
-                                                    <div class="fw-bold"><?php echo htmlspecialchars($_SESSION['nama_lengkap']); ?></div>
-                                                </div>
+                                    <span class="ui-tx-preview-arrow" aria-hidden="true"><i class="ti ti-arrow-right"></i></span>
+                                    <div class="ui-tx-preview-cell">
+                                        <span class="ui-tx-preview-label">Saldo sesudah</span>
+                                        <div class="ui-tx-preview-value is-after" id="previewSesudah">Rp 0</div>
                                             </div>
                                         </div>
                                     </div>
 
+                            <div class="col-12">
                                     <details class="ui-form-more">
                                         <summary>Keterangan (opsional)</summary>
                                         <div class="ui-form-more-body">
                                             <label class="form-label" for="keterangan">Keterangan</label>
                                             <input type="text" name="keterangan" class="form-control"
-                                                   placeholder="Contoh: Setoran bulanan"
-                                                   id="keterangan">
+                                               placeholder="Contoh: Setoran bulanan" id="keterangan">
                                         </div>
                                     </details>
-
-                                    <div class="d-grid">
-                                        <button type="submit" name="proses_setoran" class="btn btn-primary" onclick="return confirmSubmit()">
-                                            <i class="fas fa-check-circle me-2"></i> Proses Setoran
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" name="proses_setoran" value="1" class="btn btn-success" id="btnAjukanSetoran">
+                            <i class="ti ti-circle-check me-1" aria-hidden="true"></i>Lanjut konfirmasi
                                         </button>
                                     </div>
                                 </form>
@@ -356,346 +329,283 @@ foreach ($jenis_simpanan as $j) {
                         </div>
                     </div>
 
-                    <!-- Informasi & Riwayat -->
-                    <div class="col-lg-4">
-                        <!-- Informasi Saldo -->
-                        <div class="card transaction-card mb-4">
-                            <div class="card-header bg-primary text-white">
-                                <h6 class="card-title mb-0">
-                                    <i class="fas fa-info-circle me-2"></i>Informasi Saldo Tabungan
-                                </h6>
+    <div class="modal fade" id="modalKonfirmasiSetoran" tabindex="-1" aria-labelledby="modalKonfirmasiSetoranLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="modalKonfirmasiSetoranLabel">Konfirmasi setoran</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="ui-tx-confirm-dl">
+                        <div><dt>Anggota</dt><dd id="cfmAnggota">—</dd></div>
+                        <div><dt>Jenis</dt><dd id="cfmJenis">—</dd></div>
+                        <div><dt>Jumlah</dt><dd id="cfmJumlah">—</dd></div>
+                        <div><dt>Saldo sesudah</dt><dd id="cfmSesudah">—</dd></div>
+                        <div><dt>Keterangan</dt><dd id="cfmKet">—</dd></div>
+                    </dl>
                             </div>
-                            <div class="card-body">
-                                <div id="saldoInfo">
-                                    <div class="text-center py-3">
-                                        <i class="fas fa-user fa-2x text-muted mb-2"></i>
-                                        <p class="text-muted mb-0">Pilih anggota dan jenis tabungan</p>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Periksa lagi</button>
+                    <button type="button" class="btn btn-success" id="btnKonfirmasiSetoran">
+                        <i class="ti ti-check me-1" aria-hidden="true"></i>Ya, proses
+                    </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Setoran Tabungan Terbaru -->
-                        <div class="card transaction-card">
-                            <div class="card-header bg-warning text-dark">
-                                <h6 class="card-title mb-0">
-                                    <i class="fas fa-history me-2"></i>Setoran Tabungan Terbaru
-                                </h6>
-                                <small class="text-muted">10 transaksi terakhir</small>
-                            </div>
-                            <div class="card-body p-0">
-                                <?php if (!empty($recent_setoran)): ?>
-                                    <div class="list-group list-group-flush">
-                                        <?php foreach ($recent_setoran as $setoran): ?>
-                                        <div class="list-group-item">
-                                            <div class="d-flex w-100 justify-content-between align-items-start">
-                                                <div class="flex-grow-1">
-                                                    <h6 class="mb-1"><?php echo $setoran['nama_lengkap']; ?></h6>
-                                                    <small class="text-muted">
-                                                        <span class="tabungan-badge">
-                                                            <?php echo $setoran['nama_jenis']; ?>
-                                                        </span>
-                                                    </small>
-                                                    <br>
-                                                    <small class="text-muted">
-                                                        <i class="fas fa-user me-1"></i><?php echo $setoran['teller']; ?>
-                                                    </small>
-                                                </div>
-                                                <div class="text-end">
-                                                    <span class="badge bg-success rounded-pill">
-                                                        <?php echo formatRupiah($setoran['jumlah']); ?>
-                                                    </span>
-                                                    <br>
-                                                    <small class="text-muted">
-                                                        <?php echo formatTanggalUi($setoran['tanggal_transaksi'], true); ?>
-                                                    </small>
-                                                </div>
-                                            </div>
-                                            <?php if (!empty($setoran['keterangan'])): ?>
-                                            <small class="text-muted d-block mt-1">
-                                                <i class="fas fa-comment me-1"></i><?php echo $setoran['keterangan']; ?>
-                                            </small>
-                                            <?php endif; ?>
-                                        </div>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="text-center py-4">
-                                        <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
-                                        <p class="text-muted mb-0">Belum ada setoran tabungan</p>
-                                        <small class="text-muted">Lakukan setoran pertama sekarang</small>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <?php
-                $riwayatTitle = 'Riwayat Setoran';
-                $riwayatAction = 'setoran.php';
-                include '../includes/ui/partial_riwayat_transaksi.php';
-                ?>
-            </main>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Fungsi untuk validasi dan konfirmasi sebelum submit
-        function confirmSubmit() {
-            // Validasi form terlebih dahulu
+    (function () {
+        const form = document.getElementById('formSetoran');
             const anggotaSelect = document.getElementById('anggotaSelect');
             const jenisSelect = document.getElementById('jenisSimpananSelect');
-            const jumlahInput = document.getElementById('jumlahSetoran');
-            
-            if (!anggotaSelect.value) {
-                alert('Pilih anggota terlebih dahulu');
-                anggotaSelect.focus();
-                return false;
-            }
-            
-            if (!jenisSelect.value) {
-                alert('Pilih jenis tabungan terlebih dahulu');
-                jenisSelect.focus();
-                return false;
-            }
-            
-            const jumlah = parseInt(jumlahInput.value);
-            if (!jumlah || jumlah <= 0) {
-                alert('Jumlah setoran harus lebih dari 0');
-                jumlahInput.focus();
-                return false;
-            }
-            
-            const selectedOption = jenisSelect.options[jenisSelect.selectedIndex];
-            const minimum = parseInt(selectedOption.getAttribute('data-minimum')) || 0;
-            const maksimum = parseInt(selectedOption.getAttribute('data-maksimum')) || 0;
-            
-            if (minimum > 0 && jumlah < minimum) {
-                alert('Jumlah setoran harus minimal Rp ' + minimum.toLocaleString('id-ID'));
-                jumlahInput.focus();
-                return false;
-            }
-            
-            if (maksimum > 0 && jumlah > maksimum) {
-                alert('Jumlah setoran tidak boleh melebihi Rp ' + maksimum.toLocaleString('id-ID'));
-                jumlahInput.focus();
-                return false;
-            }
-            
-            // Tampilkan konfirmasi
-            const anggotaNama = anggotaSelect.options[anggotaSelect.selectedIndex].text;
-            const jenisNama = selectedOption.text.split('(')[0].trim();
-            const keterangan = document.getElementById('keterangan').value || '-';
-            
-            const confirmMessage = 
-                'Apakah Anda yakin ingin memproses setoran ini?\n\n' +
-                'Anggota: ' + anggotaNama + '\n' +
-                'Jenis Tabungan: ' + jenisNama + '\n' +
-                'Jumlah: Rp ' + jumlah.toLocaleString('id-ID') + '\n' +
-                'Keterangan: ' + keterangan;
-            
-            return confirm(confirmMessage);
+        const jumlahDisplay = document.getElementById('jumlahSetoranDisplay');
+        const jumlahHidden = document.getElementById('jumlahSetoran');
+        const chipsWrap = document.getElementById('quickAmounts');
+        const chipMin = document.getElementById('chipMin');
+        const saldoInfo = document.getElementById('saldoInfo');
+        let currentSaldo = 0;
+        let allowSubmit = false;
+
+        function formatRp(n) {
+            n = Math.max(0, Math.floor(Number(n) || 0));
+            return 'Rp ' + n.toLocaleString('id-ID');
         }
-
-        // Update amount display
-        document.getElementById('jumlahSetoran').addEventListener('input', function() {
-            const amount = this.value ? parseInt(this.value) : 0;
-            document.getElementById('displayJumlah').textContent = 'Rp ' + amount.toLocaleString('id-ID');
-            validateAmount(amount);
-        });
-
-        // Update info jenis
-        document.getElementById('jenisSimpananSelect').addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            if (selectedOption && selectedOption.value) {
-                document.getElementById('infoJenis').textContent = selectedOption.text.split('(')[0].trim();
-            } else {
-                document.getElementById('infoJenis').textContent = '-';
-            }
-        });
-
-        // Update minimum info dan validasi
-        document.getElementById('jenisSimpananSelect').addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            const minimum = selectedOption.getAttribute('data-minimum');
-            const maksimum = selectedOption.getAttribute('data-maksimum');
-            const infoElement = document.getElementById('minimumInfo');
-            const jumlahInput = document.getElementById('jumlahSetoran');
-            
-            let infoText = '';
-            if (minimum > 0) {
-                infoText += 'Minimum: Rp ' + parseInt(minimum).toLocaleString('id-ID');
-            }
-            if (maksimum > 0) {
-                if (infoText) infoText += ' | ';
-                infoText += 'Maksimum: Rp ' + parseInt(maksimum).toLocaleString('id-ID');
-            }
-            if (!infoText) {
-                infoText = 'Tidak ada batasan setoran';
-            }
-            
-            infoElement.textContent = infoText;
-            
-            // Set min dan max value untuk input
-            if (minimum > 0) {
-                jumlahInput.min = minimum;
-            } else {
-                jumlahInput.min = 0;
-            }
-            if (maksimum > 0) {
-                jumlahInput.max = maksimum;
-            } else {
-                jumlahInput.max = '';
-            }
-            
-            // Validasi ulang jumlah yang sudah diinput
-            if (jumlahInput.value) {
-                validateAmount(parseInt(jumlahInput.value));
-            }
-            
-            updateSaldoInfo();
-        });
-
-        // Validasi jumlah setoran
+        function parseRp(str) {
+            return parseInt(String(str || '').replace(/\D/g, ''), 10) || 0;
+        }
+        function selectedJenis() {
+            return jenisSelect.options[jenisSelect.selectedIndex] || null;
+        }
+        function selectedAnggotaLabel() {
+            const o = anggotaSelect.options[anggotaSelect.selectedIndex];
+            return o && o.value ? o.textContent.trim() : '—';
+        }
+        function syncDisplayFromHidden() {
+            const n = parseRp(jumlahHidden.value);
+            jumlahDisplay.value = n ? n.toLocaleString('id-ID') : '';
+            updatePreview();
+            validateAmount(n);
+        }
+        function setAmount(n) {
+            n = Math.max(0, Math.floor(Number(n) || 0));
+            jumlahHidden.value = n > 0 ? String(n) : '';
+            syncDisplayFromHidden();
+            chipsWrap.querySelectorAll('.ui-tx-chip').forEach(function (btn) {
+                btn.classList.toggle('is-active', parseInt(btn.getAttribute('data-amount'), 10) === n && n > 0);
+            });
+        }
+        function updatePreview() {
+            const amount = parseRp(jumlahHidden.value);
+            document.getElementById('previewSebelum').textContent = formatRp(currentSaldo);
+            document.getElementById('previewJumlah').textContent = formatRp(amount);
+            document.getElementById('previewSesudah').textContent = formatRp(currentSaldo + amount);
+        }
         function validateAmount(amount) {
-            const selectedOption = document.getElementById('jenisSimpananSelect').options[document.getElementById('jenisSimpananSelect').selectedIndex];
-            const minimum = selectedOption ? parseInt(selectedOption.getAttribute('data-minimum')) : 0;
-            const maksimum = selectedOption ? parseInt(selectedOption.getAttribute('data-maksimum')) : 0;
-            const validationInfo = document.getElementById('validationInfo');
-            
-            if (!selectedOption || !selectedOption.value) {
-                validationInfo.innerHTML = '';
+            const opt = selectedJenis();
+            const el = document.getElementById('validationInfo');
+            if (!opt || !opt.value) { el.innerHTML = ''; return true; }
+            const minimum = parseInt(opt.getAttribute('data-minimum'), 10) || 0;
+            const maksimum = parseInt(opt.getAttribute('data-maksimum'), 10) || 0;
+            if (minimum > 0 && amount > 0 && amount < minimum) {
+                el.innerHTML = '<span class="text-danger"><i class="ti ti-alert-triangle me-1"></i>Kurang dari minimum ' + formatRp(minimum) + '</span>';
+                return false;
+            }
+            if (maksimum > 0 && amount > maksimum) {
+                el.innerHTML = '<span class="text-danger"><i class="ti ti-alert-triangle me-1"></i>Melebihi maksimum ' + formatRp(maksimum) + '</span>';
+                return false;
+            }
+            if (amount > 0) {
+                el.innerHTML = '<span class="text-success"><i class="ti ti-circle-check me-1"></i>Jumlah valid</span>';
+                return true;
+            }
+            el.innerHTML = '';
+                return false;
+        }
+        function syncJenisMeta() {
+            const opt = selectedJenis();
+            const info = document.getElementById('minimumInfo');
+            const minimum = opt ? parseInt(opt.getAttribute('data-minimum'), 10) || 0 : 0;
+            const maksimum = opt ? parseInt(opt.getAttribute('data-maksimum'), 10) || 0 : 0;
+            let text = '';
+            if (minimum > 0) text += 'Minimum ' + formatRp(minimum);
+            if (maksimum > 0) text += (text ? ' · ' : '') + 'Maksimum ' + formatRp(maksimum);
+            info.textContent = text || (opt && opt.value ? 'Tidak ada batasan setoran' : '');
+            chipsWrap.hidden = !(opt && opt.value);
+            if (minimum > 0) {
+                chipMin.hidden = false;
+                chipMin.setAttribute('data-amount', String(minimum));
+                chipMin.textContent = 'Min ' + formatRp(minimum);
+            } else {
+                chipMin.hidden = true;
+            }
+            validateAmount(parseRp(jumlahHidden.value));
+            updateSaldoInfo();
+        }
+        function renderSaldoBox(data) {
+            if (!data || !data.success) {
+                saldoInfo.innerHTML = '<div class="text-danger small">' + ((data && data.message) || 'Gagal memuat saldo') + '</div>';
+                currentSaldo = 0;
+                updatePreview();
                 return;
             }
-            
-            if (minimum > 0 && amount < minimum) {
-                validationInfo.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Jumlah kurang dari minimum</span>';
-            } else if (maksimum > 0 && amount > maksimum) {
-                validationInfo.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Jumlah melebihi maksimum</span>';
-            } else if (amount > 0) {
-                validationInfo.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Jumlah valid</span>';
-            } else {
-                validationInfo.innerHTML = '';
-            }
+            currentSaldo = Number(data.saldo) || 0;
+            const detailHref = anggotaSelect.value ? ('detail_anggota.php?id=' + encodeURIComponent(anggotaSelect.value)) : '#';
+            saldoInfo.innerHTML =
+                '<div class="ui-tx-saldo-row">' +
+                '<div class="min-w-0">' +
+                '<div class="fw-semibold text-truncate">' + (data.nama_anggota || 'Anggota') + '</div>' +
+                '<div class="ui-tx-saldo-meta">' + (data.kode_anggota || '') + (data.jenis_simpanan ? ' · ' + data.jenis_simpanan : '') + '</div>' +
+                '</div>' +
+                '<div class="ui-tx-saldo-amount">' + (data.saldo_formatted || formatRp(currentSaldo)) + '</div>' +
+                '</div>' +
+                '<div class="ui-tx-saldo-meta d-flex flex-wrap gap-2 align-items-center mt-2">' +
+                (data.no_record ? '<span class="badge bg-secondary-lt">Tabungan baru</span>' : '<span class="badge bg-success-lt">Aktif</span>') +
+                (data.last_update && !data.no_record ? '<span>Update: ' + data.last_update + '</span>' : '') +
+                '<a class="ms-auto small fw-semibold" href="' + detailHref + '">Detail anggota</a>' +
+                '</div>';
+            updatePreview();
         }
-
-        // Update saldo info when anggota or jenis changes
-        document.getElementById('anggotaSelect').addEventListener('change', updateSaldoInfo);
-        document.getElementById('jenisSimpananSelect').addEventListener('change', updateSaldoInfo);
-
         function updateSaldoInfo() {
-            const anggotaId = document.getElementById('anggotaSelect').value;
-            const jenisId = document.getElementById('jenisSimpananSelect').value;
-            const saldoInfo = document.getElementById('saldoInfo');
-            
-            if (anggotaId && jenisId) {
-                // Show loading
-                saldoInfo.innerHTML = `
-                    <div class="text-center py-3">
-                        <div class="spinner-border spinner-border-sm text-primary me-2"></div>
-                        <span class="text-muted">Memuat informasi saldo...</span>
-                    </div>
-                `;
-                
-                // Coba beberapa path yang mungkin untuk get_saldo.php
-                const possiblePaths = [
-                    'get_saldo.php',
-                    '../admin/get_saldo.php',
-                    './get_saldo.php'
-                ];
-                
-                let currentPathIndex = 0;
-                
-                function tryNextPath() {
-                    if (currentPathIndex >= possiblePaths.length) {
-                        // Semua path gagal, tampilkan error
-                        saldoInfo.innerHTML = `
-                            <div class="text-center text-danger py-3">
-                                <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
-                                <p class="mb-0">File get_saldo.php tidak ditemukan</p>
-                                <small class="text-muted">Pastikan file get_saldo.php ada di folder teller atau admin</small>
-                            </div>
-                        `;
+            const anggotaId = anggotaSelect.value;
+            const jenisId = jenisSelect.value;
+            if (!anggotaId || !jenisId) {
+                currentSaldo = 0;
+                saldoInfo.innerHTML = '<div class="text-muted small">Pilih anggota dan jenis untuk melihat saldo</div>';
+                updatePreview();
                         return;
                     }
-                    
-                    const currentPath = possiblePaths[currentPathIndex];
-                    
-                    fetch(`${currentPath}?anggota_id=${anggotaId}&jenis_id=${jenisId}`)
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error('Network response was not ok');
-                            }
-                            return response.json();
-                        })
-                        .then(data => {
-                            if (data.success) {
-                                if (data.no_record) {
-                                    saldoInfo.innerHTML = `
-                                        <div class="text-center">
-                                            <i class="fas fa-wallet fa-2x text-muted mb-2"></i>
-                                            <small class="text-muted d-block">Saldo Saat Ini</small>
-                                            <div class="h5 text-primary fw-bold my-2">Rp 0</div>
-                                            <small class="text-muted d-block">Belum ada transaksi</small>
-                                            <div class="mt-2">
-                                                <span class="badge bg-light text-dark">
-                                                    <i class="fas fa-info-circle me-1"></i>Tabungan Baru
-                                                </span>
-                                            </div>
-                                        </div>
-                                    `;
-                                } else {
-                                    saldoInfo.innerHTML = `
-                                        <div class="text-center">
-                                            <small class="text-muted d-block">${data.kode_anggota}</small>
-                                            <small class="text-muted d-block">${data.nama_anggota}</small>
-                                            <hr class="my-2">
-                                            <small class="text-muted d-block">Saldo Saat Ini</small>
-                                            <div class="h4 text-primary fw-bold my-2">${data.saldo_formatted}</div>
-                                            <small class="text-muted d-block">${data.jenis_simpanan}</small>
-                                            <small class="text-muted d-block">Update: ${data.last_update}</small>
-                                            <div class="mt-2">
-                                                <span class="badge bg-success">
-                                                    <i class="fas fa-piggy-bank me-1"></i>Aktif
-                                                </span>
-                                            </div>
-                                        </div>
-                                    `;
-                                }
-                            } else {
-                                saldoInfo.innerHTML = `
-                                    <div class="text-center text-danger py-3">
-                                        <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
-                                        <p class="mb-0">${data.message}</p>
-                                    </div>
-                                `;
-                            }
-                        })
-                        .catch(error => {
-                            console.error(`Error dengan path ${currentPath}:`, error);
-                            currentPathIndex++;
-                            tryNextPath();
-                        });
-                }
-                
-                // Mulai mencoba path pertama
-                tryNextPath();
-                
-            } else {
-                saldoInfo.innerHTML = `
-                    <div class="text-center py-3">
-                        <i class="fas fa-user fa-2x text-muted mb-2"></i>
-                        <p class="text-muted mb-0">Pilih anggota dan jenis tabungan</p>
-                    </div>
-                `;
-            }
+            saldoInfo.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Memuat saldo…</div>';
+            fetch('get_saldo.php?anggota_id=' + encodeURIComponent(anggotaId) + '&jenis_id=' + encodeURIComponent(jenisId))
+                .then(function (r) { if (!r.ok) throw new Error('fail'); return r.json(); })
+                .then(renderSaldoBox)
+                .catch(function () {
+                    currentSaldo = 0;
+                    saldoInfo.innerHTML = '<div class="text-danger small">Tidak dapat memuat saldo</div>';
+                    updatePreview();
+                });
+        }
+        function validateForm() {
+            if (!anggotaSelect.value) { window.uiToast && uiToast('warning', 'Pilih anggota terlebih dahulu'); return false; }
+            if (!jenisSelect.value) { window.uiToast && uiToast('warning', 'Pilih jenis tabungan terlebih dahulu'); return false; }
+            const amount = parseRp(jumlahHidden.value);
+            if (amount <= 0) { window.uiToast && uiToast('warning', 'Jumlah setoran harus lebih dari 0'); jumlahDisplay.focus(); return false; }
+            if (!validateAmount(amount)) { jumlahDisplay.focus(); return false; }
+            return true;
+        }
+        function openConfirm() {
+            if (!validateForm()) return;
+            const opt = selectedJenis();
+            const amount = parseRp(jumlahHidden.value);
+            document.getElementById('cfmAnggota').textContent = selectedAnggotaLabel();
+            document.getElementById('cfmJenis').textContent = opt ? opt.textContent.split('(')[0].trim() : '—';
+            document.getElementById('cfmJumlah').textContent = formatRp(amount);
+            document.getElementById('cfmSesudah').textContent = formatRp(currentSaldo + amount);
+            document.getElementById('cfmKet').textContent = (document.getElementById('keterangan').value || '').trim() || '—';
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('modalKonfirmasiSetoran')).show();
         }
 
-        // Auto-focus on first input
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('anggotaSelect').focus();
+        jumlahDisplay.addEventListener('input', function () {
+            setAmount(parseRp(this.value));
         });
+        chipsWrap.addEventListener('click', function (e) {
+            const btn = e.target.closest('.ui-tx-chip');
+            if (!btn) return;
+            setAmount(btn.getAttribute('data-amount'));
+            jumlahDisplay.focus();
+        });
+        anggotaSelect.addEventListener('change', updateSaldoInfo);
+        jenisSelect.addEventListener('change', syncJenisMeta);
+
+        form.addEventListener('submit', function (e) {
+            if (allowSubmit) return;
+            e.preventDefault();
+            openConfirm();
+        });
+        document.getElementById('btnKonfirmasiSetoran').addEventListener('click', function () {
+            allowSubmit = true;
+            const confirmModal = bootstrap.Modal.getInstance(document.getElementById('modalKonfirmasiSetoran'));
+            if (confirmModal) confirmModal.hide();
+            if (!form.querySelector('input[name="proses_setoran"][type="hidden"]')) {
+                const h = document.createElement('input');
+                h.type = 'hidden'; h.name = 'proses_setoran'; h.value = '1';
+                form.appendChild(h);
+            }
+            if (form.requestSubmit) form.requestSubmit();
+            else form.submit();
+        });
+
+        // Enter di field jumlah → konfirmasi
+        jumlahDisplay.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                openConfirm();
+            }
+        });
+
+        function syncComboboxLabel(sel) {
+            const box = sel.closest('.ui-combobox');
+            if (!box) return;
+            const input = box.querySelector('.ui-combobox-input');
+            const opt = sel.options[sel.selectedIndex];
+            if (input) input.value = opt && opt.value ? opt.textContent.trim() : '';
+        }
+        function clearSelect(sel) {
+            sel.value = '';
+            Array.prototype.forEach.call(sel.options, function (o) { o.selected = false; });
+            if (sel.options[0]) sel.options[0].selected = true;
+            syncComboboxLabel(sel);
+        }
+        function resetSetoranForm() {
+            allowSubmit = false;
+            clearSelect(anggotaSelect);
+            clearSelect(jenisSelect);
+            jumlahHidden.value = '';
+            jumlahDisplay.value = '';
+            const ket = document.getElementById('keterangan');
+            if (ket) ket.value = '';
+            document.getElementById('validationInfo').innerHTML = '';
+            document.getElementById('minimumInfo').textContent = '';
+            chipsWrap.hidden = true;
+            chipsWrap.querySelectorAll('.ui-tx-chip').forEach(function (btn) { btn.classList.remove('is-active'); });
+            currentSaldo = 0;
+            saldoInfo.innerHTML = '<div class="text-muted small">Pilih anggota dan jenis untuk melihat saldo</div>';
+            updatePreview();
+            const details = form.querySelector('details.ui-form-more');
+            if (details) details.open = false;
+            const hiddenProses = form.querySelector('input[name="proses_setoran"][type="hidden"]');
+            if (hiddenProses) hiddenProses.remove();
+        }
+
+        let prefillAnggota = anggotaSelect.getAttribute('data-prefill') || '';
+        const modalEl = document.getElementById('modalSetoran');
+        modalEl.addEventListener('show.bs.modal', function () {
+            if (prefillAnggota) {
+                anggotaSelect.value = prefillAnggota;
+                syncComboboxLabel(anggotaSelect);
+                prefillAnggota = '';
+                anggotaSelect.removeAttribute('data-prefill');
+            }
+        });
+        modalEl.addEventListener('shown.bs.modal', function () {
+            syncJenisMeta();
+            const comboAnggota = anggotaSelect.closest('.ui-combobox');
+            const comboJenis = jenisSelect.closest('.ui-combobox');
+            let focusEl;
+            if (anggotaSelect.value) {
+                focusEl = comboJenis ? comboJenis.querySelector('.ui-combobox-input') : jenisSelect;
+            } else {
+                focusEl = comboAnggota ? comboAnggota.querySelector('.ui-combobox-input') : anggotaSelect;
+            }
+            if (focusEl && focusEl.focus) focusEl.focus();
+        });
+        modalEl.addEventListener('hidden.bs.modal', resetSetoranForm);
+
+        document.addEventListener('DOMContentLoaded', function () {
+            resetSetoranForm();
+        });
+    })();
     </script>
 </body>
 </html>

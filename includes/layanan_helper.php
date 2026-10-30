@@ -11,7 +11,14 @@ function nomorWhatsApp($nomor) {
 function tombolWhatsApp($nomor, $pesan = '', $label = 'WhatsApp') {
     $nomor = nomorWhatsApp($nomor);
     if (!$nomor) return '';
-    return '<a class="btn btn-sm btn-outline-success mt-1 service-wa-button" target="_blank" rel="noopener noreferrer" href="https://wa.me/' . $nomor . '?text=' . rawurlencode($pesan) . '"><i class="fab fa-whatsapp me-1"></i> ' . layananEscape($label) . '</a>';
+    $iconOnly = trim((string)$label) === '';
+    $class = $iconOnly
+        ? 'btn btn-sm btn-outline-success service-wa-button ui-wa-icon'
+        : 'btn btn-sm btn-outline-success mt-1 service-wa-button';
+    $inner = $iconOnly
+        ? '<i class="ti ti-brand-whatsapp" aria-hidden="true"></i><span class="visually-hidden">WhatsApp</span>'
+        : '<i class="ti ti-brand-whatsapp me-1" aria-hidden="true"></i>' . layananEscape($label);
+    return '<a class="' . $class . '" target="_blank" rel="noopener noreferrer" title="WhatsApp" aria-label="WhatsApp" href="https://wa.me/' . $nomor . '?text=' . rawurlencode($pesan) . '">' . $inner . '</a>';
 }
 function statusKolektibilitas($hari) {
     $hari = max(0, (int) $hari);
@@ -38,7 +45,20 @@ function layananValidasiToken() {
     }
 }
 function sinkronkanProteksiUpload() {
-    $root = realpath(__DIR__ . '/..') . '/uploads';
+    if (function_exists('pastikanFolderUpload')) {
+        foreach (['anggota', 'jaminan_kembali', 'pembayaran', 'jaminan', 'pencairan', 'perjanjian', 'profil', 'logo'] as $sub) {
+            try {
+                pastikanFolderUpload($sub);
+            } catch (Exception $e) {
+                // Jangan gagalkan halaman layanan hanya karena folder belum bisa dibuat.
+            }
+        }
+        return;
+    }
+    $root = dirname(__DIR__) . '/uploads';
+    if (!is_dir($root) && !@mkdir($root, 0755, true) && !is_dir($root)) {
+        return;
+    }
     $template = $root . '/anggota/.htaccess';
     if (!file_exists($template)) return;
     foreach (['jaminan_kembali', 'pembayaran', 'jaminan', 'pencairan'] as $sub) {
@@ -167,18 +187,10 @@ function layananLabelKetepatanCicilan(array $angsuran, int $hariTelat): array {
     return [$hariTelat . ' hari terlambat', 'danger'];
 }
 function layananSimpanFoto($foto, $folder) {
-    if (!in_array($folder,['pembayaran','jaminan_kembali'],true)) throw new Exception('Folder bukti tidak valid.');
-    $dir=__DIR__.'/../uploads/'.$folder;
-    if (!is_dir($dir) && !mkdir($dir,0755,true)) throw new Exception('Folder bukti tidak dapat dibuat.');
-    $htaccessFile = $dir.'/.htaccess';
-    $root = realpath(__DIR__ . '/..') . '/uploads';
-    if (file_exists($root . '/anggota/.htaccess')) {
-        $kontenHt = @file_get_contents($htaccessFile);
-        if (!$kontenHt || (strpos($kontenHt, 'Require all denied') !== false && strpos($kontenHt, 'FilesMatch') === false)) {
-            @copy($root . '/anggota/.htaccess', $htaccessFile);
-        }
+    if (!in_array($folder, ['pembayaran', 'jaminan_kembali'], true)) {
+        throw new Exception('Folder bukti tidak valid.');
     }
-    return simpanFotoUpload($foto,$folder);
+    return simpanFotoUpload($foto, $folder);
 }
 function layananPrioritasLayak($db,$anggota) {
     $s=$db->prepare("SELECT p.id, (SELECT COUNT(*) FROM angsuran a WHERE a.pinjaman_id=p.id AND (a.status<>'lunas' OR a.tanggal_bayar IS NULL OR DATE(a.tanggal_bayar)>a.tanggal_jatuh_tempo)) telat FROM pinjaman p WHERE p.anggota_id=? AND p.status='lunas' AND EXISTS(SELECT 1 FROM angsuran ax WHERE ax.pinjaman_id=p.id) ORDER BY p.tanggal_lunas DESC,p.id DESC LIMIT 2");

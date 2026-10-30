@@ -2,108 +2,116 @@
 require_once '../includes/auth.php';
 checkAnggota();
 
-// Profil anggota HANYA-LIHAT (revisi tahap 2, poin D). Anggota tidak bisa mengubah data apa pun
-// dari sini; data diubah oleh Admin/Teller. Aksi ubah profil/upload KTP lewat POST ditolak.
 if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'HEAD') {
     http_response_code(403);
-    $_SESSION['error'] = "Profil anggota tidak dapat diubah dari sini. Hubungi Admin/Teller.";
-    header("Location: profil.php");
+    $_SESSION['error'] = 'Profil anggota tidak dapat diubah dari sini. Hubungi Admin/Teller.';
+    header('Location: profil.php');
     exit();
 }
 
-$stmt = $db->prepare("SELECT a.*, u.username
-                      FROM anggota a
-                      JOIN users u ON a.user_id = u.id
-                      WHERE a.user_id = ?");
+$stmt = $db->prepare(
+    'SELECT a.*, u.username
+     FROM anggota a
+     JOIN users u ON a.user_id = u.id
+     WHERE a.user_id = ?'
+);
 $stmt->execute([$_SESSION['user_id']]);
 $anggota_data = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$anggota_data) {
     $anggota_data = [
-        'id' => 0, 'kode_anggota' => '-', 'nama_lengkap' => $_SESSION['nama_lengkap'],
-        'status' => 'aktif', 'tanggal_daftar' => null,
+        'id' => 0,
+        'kode_anggota' => '-',
+        'nama_lengkap' => $_SESSION['nama_lengkap'] ?? 'Anggota',
+        'status' => 'aktif',
+        'tanggal_daftar' => null,
+        'username' => '',
+        'alamat' => '',
+        'telepon' => '',
     ];
 }
 $foto_nasabah = $anggota_data['id'] ? fotoNasabahAnggota($db, $anggota_data['id']) : '';
+$statusAktif = ($anggota_data['status'] ?? '') === 'aktif';
+$inisial = getInitials($anggota_data['nama_lengkap'] ?? 'A');
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profil Saya - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .main-content { margin-left: 0; /* densify: shell owns sidebar */ margin-top: 10px; padding: 15px; }
-        .page-header { padding-top: 5px; padding-bottom: 10px; margin-bottom: 15px; }
-        .profile-card { border: none; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .foto-profil { width: 160px; height: 160px; object-fit: cover; border-radius: 50%; border: 4px solid #e9ecef; }
-        .avatar-inisial { width: 160px; height: 160px; border-radius: 50%; display: inline-flex; align-items: center;
-                          justify-content: center; font-size: 1.5rem; font-weight: 600; color: #fff;
-                          background: linear-gradient(135deg,#123d47,#087f83); }
-    </style>
+    <title>Profil Saya - <?php echo htmlspecialchars(APP_NAME); ?></title>
+    <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
+    <?php include __DIR__ . '/../includes/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-agtprof" aria-hidden="true"><i class="ti ti-user"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Akun anggota</p>
+                        <h1 class="ui-dash-title">Profil Saya</h1>
+                        <p class="ui-dash-meta mb-0">Data keanggotaan bersifat hanya-lihat · ubah lewat Admin/Teller</p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <a href="ganti_password.php" class="btn btn-sm ui-set-btn-ghost">
+                            <i class="ti ti-lock me-1" aria-hidden="true"></i>Ganti password
+                        </a>
+                    </div>
+                </header>
 
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-                <?php ui_page_header([
-                    'title' => 'Profil Saya',
-                    'icon' => 'fas fa-user text-primary',
-                    'subtitle' => 'Data diri dan status keanggotaan',
-                ]); ?>
                 <?php ui_flash(); ?>
 
-                <div class="row justify-content-center">
-                    <div class="col-lg-6">
-                        <div class="card profile-card">
-                            <div class="card-body p-4 text-center">
-                                <?php if ($foto_nasabah): ?>
-                                    <img src="<?php echo htmlspecialchars(urlFoto($foto_nasabah)); ?>" class="foto-profil mb-3" alt="Foto nasabah">
-                                <?php else: ?>
-                                    <div class="avatar-inisial mb-3"><?php echo htmlspecialchars(getInitials($anggota_data['nama_lengkap'])); ?></div>
-                                <?php endif; ?>
-                                <h4 class="mb-1"><?php echo htmlspecialchars($anggota_data['nama_lengkap']); ?></h4>
-                                <div class="mb-3">
-                                    <span class="badge bg-<?php echo $anggota_data['status'] === 'aktif' ? 'success' : 'secondary'; ?>">
-                                        <?php echo ucfirst($anggota_data['status']); ?>
-                                    </span>
-                                </div>
+                <section class="ui-agt-profile-hero mb-3" aria-label="Identitas anggota">
+                    <div class="ui-agt-profile-avatar" aria-hidden="true">
+                        <?php if ($foto_nasabah): ?>
+                            <img src="<?php echo htmlspecialchars(urlFoto($foto_nasabah)); ?>" alt="">
+                        <?php else: ?>
+                            <span><?php echo htmlspecialchars($inisial); ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="ui-agt-profile-copy">
+                        <p class="ui-agt-profile-eyebrow mb-0">Anggota koperasi</p>
+                        <h2 class="ui-agt-profile-name"><?php echo htmlspecialchars($anggota_data['nama_lengkap']); ?></h2>
+                        <div class="ui-agt-profile-chips">
+                            <span class="ui-agt-profile-chip"><i class="ti ti-id" aria-hidden="true"></i><?php echo htmlspecialchars($anggota_data['kode_anggota']); ?></span>
+                            <?php if (!empty($anggota_data['username'])): ?>
+                            <span class="ui-agt-profile-chip"><i class="ti ti-at" aria-hidden="true"></i><?php echo htmlspecialchars($anggota_data['username']); ?></span>
+                            <?php endif; ?>
+                            <span class="ui-agt-profile-chip <?php echo $statusAktif ? 'is-ok' : 'is-off'; ?>">
+                                <?php echo htmlspecialchars(ucfirst((string) $anggota_data['status'])); ?>
+                            </span>
+                        </div>
+                        <?php if (!$foto_nasabah): ?>
+                        <p class="ui-agt-profile-hint mb-0">Foto tampil setelah pinjaman Anda dicairkan.</p>
+                        <?php endif; ?>
+                    </div>
+                </section>
 
-                                <table class="table table-sm table-borderless text-start mb-0">
-                                    <tr>
-                                        <td width="40%" class="text-muted">Kode Anggota</td>
-                                        <td class="fw-semibold"><?php echo htmlspecialchars($anggota_data['kode_anggota']); ?></td>
-                                    </tr>
-                                    <tr>
-                                        <td class="text-muted">Tanggal Daftar</td>
-                                        <td class="fw-semibold"><?php echo $anggota_data['tanggal_daftar'] ? htmlspecialchars(formatTanggalUi($anggota_data['tanggal_daftar'])) : '-'; ?></td>
-                                    </tr>
-                                    <tr>
-                                        <td class="text-muted">Status</td>
-                                        <td class="fw-semibold"><?php echo ucfirst($anggota_data['status']); ?></td>
-                                    </tr>
-                                </table>
-                                <?php if (!$foto_nasabah): ?>
-                                    <p class="text-muted small mt-3 mb-0">Foto akan tampil setelah pinjaman Anda dicairkan.</p>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <div class="text-center mt-3">
-                            <a href="ganti_password.php" class="btn btn-outline-secondary btn-sm">
-                                <i class="fas fa-key me-1"></i> Ganti Password
-                            </a>
-                        </div>
+                <div class="card ui-agt-daftar mb-3">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-id-badge" aria-hidden="true"></i>Data keanggotaan</span>
+                        <span class="ui-dash-sec-note">Hanya lihat</span>
+                    </div>
+                    <div class="card-body">
+                        <dl class="ui-agt-dl">
+                            <div><dt>Kode anggota</dt><dd><code><?php echo htmlspecialchars($anggota_data['kode_anggota']); ?></code></dd></div>
+                            <div><dt>Nama lengkap</dt><dd><?php echo htmlspecialchars($anggota_data['nama_lengkap']); ?></dd></div>
+                            <div><dt>Username</dt><dd><?php echo htmlspecialchars($anggota_data['username'] ?: '—'); ?></dd></div>
+                            <div><dt>Status</dt><dd><?php echo htmlspecialchars(ucfirst((string) $anggota_data['status'])); ?></dd></div>
+                            <div><dt>Tanggal daftar</dt><dd><?php echo !empty($anggota_data['tanggal_daftar']) ? htmlspecialchars(formatTanggalUi($anggota_data['tanggal_daftar'])) : '—'; ?></dd></div>
+                            <div><dt>Telepon</dt><dd><?php echo htmlspecialchars($anggota_data['telepon'] ?? '—'); ?></dd></div>
+                            <div class="is-full"><dt>Alamat</dt><dd><?php echo htmlspecialchars($anggota_data['alamat'] ?? '—'); ?></dd></div>
+                        </dl>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+                <div class="ui-agt-note" role="note">
+                    <i class="ti ti-shield-lock" aria-hidden="true"></i>
+                    <div>
+                        <strong>Perubahan data</strong>
+                        <span>Untuk memperbarui data diri atau dokumen, hubungi Admin/Teller koperasi.</span>
+                    </div>
+                </div>
+            </div>
+    <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
 </body>
 </html>

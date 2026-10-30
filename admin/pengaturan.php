@@ -80,26 +80,55 @@ if ($_POST && isset($_POST['update_koperasi'])) {
 }
 
 // Handle logo upload
-if ($_POST && isset($_POST['upload_logo']) && isset($_FILES['logo'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_logo'])) {
     try {
         $logo = validasiFotoUpload('logo', 'Logo koperasi', 1024 * 1024, true);
-        $upload_dir = '../uploads/logo/';
-        if (!is_dir($upload_dir) && !mkdir($upload_dir, 0755, true)) throw new Exception('Folder logo tidak dapat dibuat.');
-        $filename = 'logo_' . time() . '.' . $logo['ext'];
+        if (!$logo) {
+            throw new Exception('Logo koperasi wajib diunggah');
+        }
+
+        $upload_dir = pastikanFolderUpload('logo') . DIRECTORY_SEPARATOR;
+        $filename = 'logo_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $logo['ext'];
         $upload_path = $upload_dir . $filename;
-        if (!kompresDanSimpanGambar($logo['tmp'], $upload_path, $logo['ext'])) throw new Exception('Gagal menyimpan logo.');
-        $old_logo_stmt = $db->prepare("SELECT logo FROM koperasi WHERE id = 1");
-        $old_logo_stmt->execute();
-        $old_logo = $old_logo_stmt->fetch(PDO::FETCH_ASSOC);
-        if ($old_logo && $old_logo['logo'] && file_exists($upload_dir . $old_logo['logo'])) unlink($upload_dir . $old_logo['logo']);
-        $logo_stmt = $db->prepare("UPDATE koperasi SET logo = :logo WHERE id = 1");
-        $logo_stmt->execute([':logo' => $filename]);
-        $_SESSION['success'] = "Logo berhasil diupload!";
+        if (!kompresDanSimpanGambar($logo['tmp'], $upload_path, $logo['ext'])) {
+            throw new Exception('Gagal menyimpan logo (hasil akhir maksimal 1 MB).');
+        }
+        // kompres bisa mengubah ekstensi (mis. PNG → JPG); simpan nama file aktual.
+        $filename = basename($upload_path);
+        if (!is_file($upload_path)) {
+            throw new Exception('File logo tidak tersimpan di server.');
+        }
+
+        $exists = (int)$db->query('SELECT COUNT(*) FROM koperasi WHERE id = 1')->fetchColumn();
+        if ($exists === 0) {
+            $db->prepare(
+                'INSERT INTO koperasi (id, nama, alamat, telepon, email, rekening_bank, logo)
+                 VALUES (1, :nama, \'\', \'\', \'\', \'\', :logo)'
+            )->execute([
+                ':nama' => defined('APP_NAME') ? APP_NAME : 'Koperasi',
+                ':logo' => $filename,
+            ]);
+        } else {
+            $old_logo_stmt = $db->prepare('SELECT logo FROM koperasi WHERE id = 1');
+            $old_logo_stmt->execute();
+            $old_logo = $old_logo_stmt->fetch(PDO::FETCH_ASSOC);
+            if (!empty($old_logo['logo'])) {
+                $oldName = basename((string) $old_logo['logo']);
+                $oldPath = $upload_dir . $oldName;
+                if (is_file($oldPath) && $oldName !== $filename) {
+                    @unlink($oldPath);
+                }
+            }
+            $logo_stmt = $db->prepare('UPDATE koperasi SET logo = :logo WHERE id = 1');
+            $logo_stmt->execute([':logo' => $filename]);
+        }
+
+        $_SESSION['success'] = 'Logo berhasil diupload!';
     } catch (Exception $e) {
         $_SESSION['error'] = 'Gagal mengunggah logo: ' . $e->getMessage();
     }
-    
-    header("Location: pengaturan.php");
+
+    header('Location: pengaturan.php');
     exit();
 }
 
@@ -187,220 +216,208 @@ $admin_stmt->bindParam(':id', $_SESSION['user_id']);
 $admin_stmt->execute();
 $admin = $admin_stmt->fetch(PDO::FETCH_ASSOC);
 
+$logoPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'logo' . DIRECTORY_SEPARATOR . basename((string)($koperasi['logo'] ?? ''));
+$logoAda = !empty($koperasi['logo']) && is_file($logoPath);
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pengaturan - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .stats-card{border-left:3px solid #087f83}
-    </style>
+    <title>Profil Koperasi - <?php echo htmlspecialchars(APP_NAME); ?></title>
+    <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
+    <link rel="stylesheet" href="../assets/css/tanda-tangan.css?v=20261029-2">
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <?php ui_page_header([
-                    'title' => 'Pengaturan Sistem',
-                    'icon' => 'fas fa-cog text-primary',
-                    'subtitle' => 'Konfigurasi aplikasi dan akun admin',
-                    'actions' => '<span class="badge bg-primary"><i class="fas fa-user-shield me-1"></i>' . htmlspecialchars($admin['nama_lengkap']) . '</span>',
-                ]); ?>
+    <?php include __DIR__ . '/../includes/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-set" aria-hidden="true"><i class="ti ti-building-bank"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Pengaturan</p>
+                        <h1 class="ui-dash-title">Profil Koperasi</h1>
+                        <p class="ui-dash-meta mb-0">Identitas, logo, surat perjanjian, dan akun admin</p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <span class="badge bg-primary"><i class="ti ti-user-shield me-1" aria-hidden="true"></i><?php echo htmlspecialchars($admin['nama_lengkap']); ?></span>
+                    </div>
+                </header>
+
                 <?php ui_flash(); ?>
 
-                <div class="row">
-                    <!-- System Statistics -->
-                    <div class="col-lg-3 mb-4">
-                        <div class="card settings-card stats-card">
-                            <div class="card-header bg-white">
-                                <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Statistik Sistem</h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="mb-3">
-                                    <small class="text-muted">Total Anggota Aktif</small>
-                                    <div class="h5 text-primary"><?php echo number_format($stats['total_anggota']); ?></div>
-                                </div>
-                                <div class="mb-3">
-                                    <small class="text-muted">Total Pengguna (Admin/Teller)</small>
-                                    <div class="h5 text-info"><?php echo number_format($stats['total_users']); ?></div>
-                                </div>
-                                <div class="mb-3">
-                                    <small class="text-muted">Total Simpanan</small>
-                                    <div class="h5 text-success"><?php echo formatRupiah($stats['total_simpanan']); ?></div>
-                                </div>
-                                <div class="mb-3">
-                                    <small class="text-muted">Pinjaman Aktif</small>
-                                    <div class="h5 text-warning"><?php echo number_format($stats['total_pinjaman_aktif']); ?></div>
-                                </div>
-                                <div>
-                                    <small class="text-muted">Total Piutang</small>
-                                    <div class="h5 text-danger"><?php echo formatRupiah($stats['total_pinjaman_berjalan']); ?></div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Change Password -->
-                        <div class="card settings-card mt-4">
-                            <div class="card-header bg-white">
-                                <h6 class="mb-0"><i class="fas fa-key me-2"></i>Ubah Password</h6>
-                            </div>
-                            <div class="card-body">
-                                <form method="POST"><?php echo layananToken(); ?>
-                                    <div class="mb-3">
-                                        <label class="form-label">Password Saat Ini</label>
-                                        <input type="password" name="current_password" class="form-control" required>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label">Password Baru</label>
-                                        <input type="password" name="new_password" class="form-control" 
-                                               placeholder="Minimal 6 karakter" required>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label">Konfirmasi Password Baru</label>
-                                        <input type="password" name="confirm_password" class="form-control" required>
-                                    </div>
-                                    
-                                    <button type="submit" name="change_password" class="btn btn-warning w-100">
-                                        <i class="fas fa-save me-2"></i>Ubah Password
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Koperasi Profile Settings -->
-                    <div class="col-lg-9">
-                        <div class="card settings-card mb-4">
-                            <div class="card-header bg-white">
-                                <h6 class="mb-0"><i class="fas fa-building me-2"></i>Profil Koperasi</h6>
-                            </div>
-                            <div class="card-body">
-                                <form method="POST"><?php echo layananToken(); ?>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">Nama Koperasi <span class="text-danger">*</span></label>
-                                                <input type="text" name="nama" class="form-control" 
-                                                       value="<?php echo htmlspecialchars($koperasi['nama']); ?>" required>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">Telepon</label>
-                                                <input type="text" name="telepon" class="form-control" 
-                                                       value="<?php echo htmlspecialchars($koperasi['telepon']); ?>">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label">Alamat</label>
-                                        <textarea name="alamat" class="form-control" rows="3"><?php echo htmlspecialchars($koperasi['alamat']); ?></textarea>
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">Email</label>
-                                                <input type="email" name="email" class="form-control" 
-                                                       value="<?php echo htmlspecialchars($koperasi['email']); ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">Rekening Bank</label>
-                                                <input type="text" name="rekening_bank" class="form-control" 
-                                                       value="<?php echo htmlspecialchars($koperasi['rekening_bank']); ?>">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <button type="submit" name="update_koperasi" class="btn btn-success">
-                                        <i class="fas fa-save me-2"></i>Simpan Perubahan
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-
-                        <div class="card settings-card mb-4">
-                            <div class="card-header bg-white"><h6 class="mb-0"><i class="fas fa-file-signature me-2"></i>Surat Perjanjian & TTD Admin</h6></div>
-                            <div class="card-body">
-                                <div class="alert alert-info">Pengaturan ini berlaku untuk surat baru. Surat yang sudah ditandatangani tetap memakai data saat transaksi.</div>
-                                <form method="POST" enctype="multipart/form-data" id="formPerjanjian"><?php echo layananToken(); ?>
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3"><label class="form-label">Nama Pihak Pertama *</label><input class="form-control" name="nama_pihak_pertama" required value="<?php echo htmlspecialchars($pengaturan_perjanjian['nama_pihak_pertama'] ?: $koperasi['nama']); ?>"></div>
-                                        <div class="col-md-6 mb-3"><label class="form-label">NIK Pihak Pertama</label><input class="form-control" name="nik_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['nik_pihak_pertama'] ?? ''); ?>"></div>
-                                        <div class="col-md-8 mb-3"><label class="form-label">Alamat Pihak Pertama</label><input class="form-control" name="alamat_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['alamat_pihak_pertama'] ?? ''); ?>"><small class="text-muted">Boleh dikosongkan.</small></div>
-                                        <div class="col-md-4 mb-3"><label class="form-label">No. HP Pihak Pertama</label><input class="form-control" name="telepon_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['telepon_pihak_pertama'] ?? ''); ?>"><small class="text-muted">Boleh dikosongkan.</small></div>
-                                        <div class="col-md-6 mb-3"><label class="form-label">Jabatan penandatangan Admin</label><input class="form-control" name="jabatan_admin" required value="<?php echo htmlspecialchars($pengaturan_perjanjian['jabatan_admin']); ?>"></div>
-                                        <div class="col-md-6 mb-3"><label class="form-label">Versi Surat</label><input class="form-control" value="Lengkap" readonly><input type="hidden" name="template_default" value="lengkap"></div>
-                                    </div>
-                                    <div class="mb-3"><label class="form-label">Isi Surat Perjanjian Lengkap</label><textarea class="form-control" rows="14" name="isi_lengkap" required><?php echo htmlspecialchars($pengaturan_perjanjian['isi_lengkap']); ?></textarea></div>
-                                    <div class="signature-field"><div class="signature-field-head"><div><label class="signature-field-title mb-0">TTD Admin</label><small class="signature-field-help">Gambar langsung menggunakan mouse atau layar sentuh.</small></div><span class="signature-status" id="ttdAdminStatus"><i class="fas fa-pen-nib"></i> Belum diisi</span></div><div class="signature-canvas-wrap"><canvas id="ttdAdminCanvas" class="signature" data-target="ttd_admin" width="700" height="220"></canvas></div>
-                                    <input type="hidden" name="ttd_admin" id="ttd_admin" value="<?php echo htmlspecialchars((string)($pengaturan_perjanjian['ttd_admin'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
-                                    <div class="signature-field-foot"><span class="signature-field-note">Tanda tangan tersimpan bersama pengaturan surat.</span><button type="button" class="signature-clear clear-sign btn btn-outline-danger btn-sm" id="hapusTtdAdmin"><i class="fas fa-eraser me-1"></i>Hapus / gambar ulang</button></div></div><div class="mt-2"><button type="submit" name="update_perjanjian" class="btn btn-primary"><i class="fas fa-save me-1"></i>Simpan Pengaturan</button></div>
-                                </form>
-                            </div>
-                        </div>
-
-                        <!-- Logo Upload -->
-                        <div class="card settings-card">
-                            <div class="card-header bg-white">
-                                <h6 class="mb-0"><i class="fas fa-image me-2"></i>Logo Koperasi</h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-4">
-                                        <?php if ($koperasi['logo'] && file_exists('../uploads/logo/' . $koperasi['logo'])): ?>
-                                            <div class="text-center mb-3">
-                                                <img src="../uploads/logo/<?php echo $koperasi['logo']; ?>" 
-                                                     alt="Logo Koperasi" class="img-thumbnail" style="max-height: 150px;">
-                                                <div class="mt-2">
-                                                    <small class="text-muted">Logo Saat Ini</small>
-                                                </div>
-                                            </div>
-                                        <?php else: ?>
-                                            <div class="text-center text-muted mb-3">
-                                                <i class="fas fa-image fa-3x mb-2"></i>
-                                                <div>Belum ada logo</div>
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="col-md-8">
-                                        <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
-                                            <div class="mb-3">
-                                                <label class="form-label">Upload Logo Baru</label>
-                                                <input type="file" name="logo" class="form-control" accept="image/jpeg,image/png,image/webp" required>
-                                                <div class="form-text">
-                                                    Format: JPEG, PNG, WEBP. Maksimal: 1 MB; otomatis dikompres sebelum dikirim.
-                                                </div>
-                                            </div>
-                                            <button type="submit" name="upload_logo" class="btn btn-info">
-                                                <i class="fas fa-upload me-2"></i>Upload Logo
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="ui-set-kpi">
+                <?php ui_stat_grid([
+                    ['label' => 'Anggota aktif', 'value' => number_format((int)$stats['total_anggota']), 'tone' => 'primary', 'icon' => 'ti ti-users', 'hint' => 'Status aktif'],
+                    ['label' => 'Staff login', 'value' => number_format((int)$stats['total_users']), 'tone' => 'info', 'icon' => 'ti ti-user-star', 'hint' => 'Admin & teller'],
+                    ['label' => 'Total simpanan', 'value' => formatRupiah($stats['total_simpanan']), 'tone' => 'success', 'icon' => 'ti ti-pig-money', 'hint' => 'Tanpa ANG/BONUS/SHU'],
+                    ['label' => 'Piutang aktif', 'value' => formatRupiah($stats['total_pinjaman_berjalan']), 'tone' => 'warning', 'icon' => 'ti ti-report-money', 'hint' => number_format((int)$stats['total_pinjaman_aktif']) . ' pinjaman'],
+                ]); ?>
                 </div>
-            </main>
-        </div>
-    </div>
 
-    <link rel="stylesheet" href="../assets/css/tanda-tangan.css?v=20261029-2">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+                <div class="ui-set-grid">
+                    <div class="ui-set-main">
+                        <div class="card ui-set-card mb-3">
+                            <div class="card-header ui-dash-sec">
+                                <span class="ui-dash-sec-title"><i class="ti ti-building" aria-hidden="true"></i>Profil koperasi</span>
+                                <span class="ui-dash-sec-note">Ditampilkan di surat &amp; kwitansi</span>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" class="ui-set-form"><?php echo layananToken(); ?>
+                                    <div class="ui-set-fields">
+                                        <div class="ui-set-field">
+                                            <label class="form-label" for="kop_nama">Nama koperasi <span class="text-danger">*</span></label>
+                                            <input type="text" id="kop_nama" name="nama" class="form-control" value="<?php echo htmlspecialchars($koperasi['nama']); ?>" required>
+                                        </div>
+                                        <div class="ui-set-field">
+                                            <label class="form-label" for="kop_telp">Telepon</label>
+                                            <input type="text" id="kop_telp" name="telepon" class="form-control" value="<?php echo htmlspecialchars($koperasi['telepon']); ?>">
+                                        </div>
+                                        <div class="ui-set-field ui-set-field-full">
+                                            <label class="form-label" for="kop_alamat">Alamat</label>
+                                            <textarea id="kop_alamat" name="alamat" class="form-control" rows="3"><?php echo htmlspecialchars($koperasi['alamat']); ?></textarea>
+                                        </div>
+                                        <div class="ui-set-field">
+                                            <label class="form-label" for="kop_email">Email</label>
+                                            <input type="email" id="kop_email" name="email" class="form-control" value="<?php echo htmlspecialchars($koperasi['email']); ?>">
+                                        </div>
+                                        <div class="ui-set-field">
+                                            <label class="form-label" for="kop_rek">Rekening bank</label>
+                                            <input type="text" id="kop_rek" name="rekening_bank" class="form-control" value="<?php echo htmlspecialchars($koperasi['rekening_bank']); ?>">
+                                        </div>
+                                    </div>
+                                    <div class="ui-set-actions">
+                                        <button type="submit" name="update_koperasi" class="btn btn-primary">
+                                            <i class="ti ti-device-floppy me-1" aria-hidden="true"></i>Simpan profil
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="card ui-set-card mb-3">
+                            <div class="card-header ui-dash-sec">
+                                <span class="ui-dash-sec-title"><i class="ti ti-file-pencil" aria-hidden="true"></i>Surat perjanjian &amp; TTD admin</span>
+                                <span class="ui-dash-sec-note">Berlaku untuk surat baru</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info ui-set-info mb-3" role="status" data-ui-toast-skip>
+                                    Surat yang sudah ditandatangani tetap memakai data saat transaksi.
+                                </div>
+                                <form method="POST" enctype="multipart/form-data" id="formPerjanjian" class="ui-set-form"><?php echo layananToken(); ?>
+                                    <div class="ui-set-fields">
+                                        <div class="ui-set-field">
+                                            <label class="form-label">Nama pihak pertama *</label>
+                                            <input class="form-control" name="nama_pihak_pertama" required value="<?php echo htmlspecialchars($pengaturan_perjanjian['nama_pihak_pertama'] ?: $koperasi['nama']); ?>">
+                                        </div>
+                                        <div class="ui-set-field">
+                                            <label class="form-label">NIK pihak pertama</label>
+                                            <input class="form-control" name="nik_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['nik_pihak_pertama'] ?? ''); ?>">
+                                        </div>
+                                        <div class="ui-set-field ui-set-field-wide">
+                                            <label class="form-label">Alamat pihak pertama</label>
+                                            <input class="form-control" name="alamat_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['alamat_pihak_pertama'] ?? ''); ?>">
+                                            <div class="form-text">Boleh dikosongkan</div>
+                                        </div>
+                                        <div class="ui-set-field">
+                                            <label class="form-label">No. HP pihak pertama</label>
+                                            <input class="form-control" name="telepon_pihak_pertama" value="<?php echo htmlspecialchars($pengaturan_perjanjian['telepon_pihak_pertama'] ?? ''); ?>">
+                                            <div class="form-text">Boleh dikosongkan</div>
+                                        </div>
+                                        <div class="ui-set-field">
+                                            <label class="form-label">Jabatan penandatangan</label>
+                                            <input class="form-control" name="jabatan_admin" required value="<?php echo htmlspecialchars($pengaturan_perjanjian['jabatan_admin']); ?>">
+                                        </div>
+                                        <div class="ui-set-field">
+                                            <label class="form-label">Versi surat</label>
+                                            <input class="form-control" value="Lengkap" readonly>
+                                            <input type="hidden" name="template_default" value="lengkap">
+                                        </div>
+                                        <div class="ui-set-field ui-set-field-full">
+                                            <label class="form-label">Isi surat perjanjian lengkap</label>
+                                            <textarea class="form-control" rows="12" name="isi_lengkap" required><?php echo htmlspecialchars($pengaturan_perjanjian['isi_lengkap']); ?></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="signature-field mt-2">
+                                        <div class="signature-field-head">
+                                            <div>
+                                                <label class="signature-field-title mb-0">TTD Admin</label>
+                                                <small class="signature-field-help">Gambar langsung dengan mouse / layar sentuh</small>
+                                            </div>
+                                            <span class="signature-status" id="ttdAdminStatus"><i class="ti ti-signature"></i> Belum diisi</span>
+                                        </div>
+                                        <div class="signature-canvas-wrap">
+                                            <canvas id="ttdAdminCanvas" class="signature" data-target="ttd_admin" width="700" height="220"></canvas>
+                                        </div>
+                                        <input type="hidden" name="ttd_admin" id="ttd_admin" value="<?php echo htmlspecialchars((string)($pengaturan_perjanjian['ttd_admin'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+                                        <div class="signature-field-foot">
+                                            <span class="signature-field-note">Tanda tangan tersimpan bersama pengaturan surat.</span>
+                                            <button type="button" class="signature-clear clear-sign btn btn-outline-danger btn-sm" id="hapusTtdAdmin"><i class="ti ti-eraser me-1"></i>Hapus / gambar ulang</button>
+                                        </div>
+                                    </div>
+                                    <div class="ui-set-actions mt-3">
+                                        <button type="submit" name="update_perjanjian" class="btn btn-primary">
+                                            <i class="ti ti-device-floppy me-1" aria-hidden="true"></i>Simpan perjanjian
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <aside class="ui-set-side">
+                        <div class="card ui-set-card mb-3">
+                            <div class="card-header ui-dash-sec">
+                                <span class="ui-dash-sec-title"><i class="ti ti-photo" aria-hidden="true"></i>Logo</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="ui-set-logo-preview">
+                                    <?php if ($logoAda): ?>
+                                    <img src="<?= htmlspecialchars(urlLogoKoperasi($koperasi['logo'], '../') ?: ('../uploads/logo/' . basename((string)$koperasi['logo']))) ?>" alt="Logo koperasi">
+                                    <small>Logo saat ini</small>
+                                    <?php else: ?>
+                                    <div class="ui-set-logo-empty"><i class="ti ti-photo" aria-hidden="true"></i><span>Belum ada logo</span></div>
+                                    <?php endif; ?>
+                                </div>
+                                <form method="POST" enctype="multipart/form-data" action="pengaturan.php" class="mt-3"><?php echo layananToken(); ?>
+                                    <input type="hidden" name="upload_logo" value="1">
+                                    <label class="form-label" for="kop_logo">Upload logo baru</label>
+                                    <input type="file" id="kop_logo" name="logo" class="form-control" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" required>
+                                    <div class="form-text mb-3">JPEG / PNG / WEBP · hasil akhir dikompres maks. 1 MB</div>
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="ti ti-upload me-1" aria-hidden="true"></i>Upload logo
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="card ui-set-card">
+                            <div class="card-header ui-dash-sec">
+                                <span class="ui-dash-sec-title"><i class="ti ti-key" aria-hidden="true"></i>Ubah password</span>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST"><?php echo layananToken(); ?>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="pw_cur">Password saat ini</label>
+                                        <input type="password" id="pw_cur" name="current_password" class="form-control" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="pw_new">Password baru</label>
+                                        <input type="password" id="pw_new" name="new_password" class="form-control" placeholder="Minimal 6 karakter" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="pw_conf">Konfirmasi password</label>
+                                        <input type="password" id="pw_conf" name="confirm_password" class="form-control" required>
+                                    </div>
+                                    <button type="submit" name="change_password" class="btn btn-warning w-100">
+                                        <i class="ti ti-device-floppy me-1" aria-hidden="true"></i>Ubah password
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+    <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
     <script src="../assets/js/tanda-tangan-layanan.js?v=20261029-2"></script>
     <script>
     (function(){
@@ -441,3 +458,4 @@ $admin = $admin_stmt->fetch(PDO::FETCH_ASSOC);
     </script>
 </body>
 </html>
+

@@ -363,212 +363,180 @@ $db_size = $size_stmt->fetch(PDO::FETCH_ASSOC);
 // Get database config
 $db_host = defined('DB_HOST') ? DB_HOST : 'localhost';
 $db_user = defined('DB_USER') ? DB_USER : 'root';
+$total_size = 0;
+foreach ($backups as $b) {
+    $total_size += $b['size'];
+}
+$countSql = count(array_filter($backups, static function ($b) { return ($b['type'] ?? '') === 'sql'; }));
+$countXlsx = count(array_filter($backups, static function ($b) { return ($b['type'] ?? '') === 'xlsx'; }));
+$countZip = count(array_filter($backups, static function ($b) { return ($b['type'] ?? '') === 'zip'; }));
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Backup & Reset - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .danger-zone{border:1px solid #e8b4b4;border-left:3px solid #c0392b;border-radius:10px}
-    </style>
+    <title>Backup &amp; Reset - <?php echo htmlspecialchars(APP_NAME); ?></title>
+    <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <?php ui_page_header([
-                    'title' => 'Backup & Reset Data',
-                    'icon' => 'fas fa-database text-primary',
-                    'subtitle' => 'Cadangkan database dan kelola reset data',
-                ]); ?>
+    <?php include __DIR__ . '/../includes/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-backup" aria-hidden="true"><i class="ti ti-database-export"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Pengaturan</p>
+                        <h1 class="ui-dash-title">Backup &amp; Reset</h1>
+                        <p class="ui-dash-meta mb-0">Cadangkan data dan siapkan migrasi</p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <a href="import_migrasi.php" class="btn btn-sm ui-set-btn-ghost is-import">
+                            <i class="ti ti-file-import me-1" aria-hidden="true"></i><span class="d-none d-sm-inline">Import migrasi</span>
+                        </a>
+                    </div>
+                </header>
+
                 <?php ui_flash(); ?>
 
-                <div class="row">
-                    <!-- Database Information -->
-                    <div class="col-lg-4 mb-4">
-                        <div class="card backup-card">
-                            <div class="card-header bg-white">
-                                <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informasi Database</h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="mb-3">
-                                    <small class="text-muted">Nama Database</small>
-                                    <div class="h6"><?php echo htmlspecialchars($db_name); ?></div>
-                                </div>
-                                <div class="mb-3">
-                                    <small class="text-muted">Ukuran Database</small>
-                                    <div class="h6"><?php echo $db_size['size_mb'] ?? '0'; ?> MB</div>
-                                </div>
-                                <div class="mb-3">
-                                    <small class="text-muted">Jumlah Backup</small>
-                                    <div class="h6"><?php echo count($backups); ?> file</div>
-                                </div>
-                                <div class="mb-3">
-                                    <small class="text-muted">Total Ukuran Backup</small>
-                                    <?php 
-                                    $total_size = 0;
-                                    foreach ($backups as $b) {
-                                        $total_size += $b['size'];
-                                    }
-                                    ?>
-                                    <div class="h6"><?php echo round($total_size / 1024 / 1024, 2); ?> MB</div>
-                                </div>
-                                <div>
-                                    <small class="text-muted">Server</small>
-                                    <div class="h6"><?php echo htmlspecialchars($db_host); ?></div>
-                                </div>
-                            </div>
-                        </div>
+                <div class="ui-set-kpi">
+                <?php ui_stat_grid([
+                    ['label' => 'Ukuran DB', 'value' => ($db_size['size_mb'] ?? '0') . ' MB', 'tone' => 'primary', 'icon' => 'ti ti-database', 'hint' => htmlspecialchars((string)$db_name)],
+                    ['label' => 'File backup', 'value' => count($backups), 'tone' => 'info', 'icon' => 'ti ti-files', 'hint' => round($total_size / 1048576, 2) . ' MB total'],
+                    ['label' => 'SQL / Excel / ZIP', 'value' => $countSql . ' / ' . $countXlsx . ' / ' . $countZip, 'tone' => 'success', 'icon' => 'ti ti-file-stack', 'hint' => 'Folder backups/'],
+                    ['label' => 'Server', 'value' => htmlspecialchars((string)$db_host), 'tone' => 'warning', 'icon' => 'ti ti-server', 'hint' => 'Host database'],
+                ]); ?>
+                </div>
 
-                        <!-- Info Backup -->
-                        <div class="card backup-card mt-4">
-                            <div class="card-header bg-white">
-                                <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informasi Backup</h6>
+                <div class="ui-set-split mb-3">
+                    <div class="card ui-set-card">
+                        <div class="card-header ui-dash-sec">
+                            <span class="ui-dash-sec-title"><i class="ti ti-download" aria-hidden="true"></i>Buat cadangan</span>
+                            <span class="ui-dash-sec-note">SQL · Excel · ZIP</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="ui-backup-actions">
+                                <form method="POST" class="ui-backup-action">
+                                    <?php echo layananToken(); ?>
+                                    <div class="ui-backup-action-icon is-sql"><i class="ti ti-file-database" aria-hidden="true"></i></div>
+                                    <div>
+                                        <strong>Backup SQL</strong>
+                                        <p>Struktur + seluruh data (PHP native, tanpa mysqldump)</p>
+                                    </div>
+                                    <button type="submit" name="backup_database" class="btn btn-success btn-sm">Buat SQL</button>
+                                </form>
+                                <form method="POST" class="ui-backup-action">
+                                    <?php echo layananToken(); ?>
+                                    <div class="ui-backup-action-icon is-xlsx"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i></div>
+                                    <div>
+                                        <strong>Backup Excel migrasi</strong>
+                                        <p>Nasabah, pinjaman, angsuran, master — siap di-import ulang</p>
+                                    </div>
+                                    <button type="submit" name="backup_excel_migrasi" class="btn btn-outline-success btn-sm">Buat Excel</button>
+                                </form>
+                                <form method="POST" class="ui-backup-action">
+                                    <?php echo layananToken(); ?>
+                                    <div class="ui-backup-action-icon is-zip"><i class="ti ti-archive" aria-hidden="true"></i></div>
+                                    <div>
+                                        <strong>Backup ZIP lengkap</strong>
+                                        <p>Excel + folder <code>uploads/</code> — disarankan pindah hosting</p>
+                                    </div>
+                                    <button type="submit" name="backup_zip_lengkap" class="btn btn-primary btn-sm">Buat ZIP</button>
+                                </form>
                             </div>
-                            <div class="card-body">
-                                <p class="small text-muted mb-2">
-                                    <i class="fas fa-check-circle text-success me-1"></i>
-                                    Backup dibuat menggunakan PHP native (tanpa mysqldump)
-                                </p>
-                                <p class="small text-muted mb-2">
-                                    <i class="fas fa-database me-1"></i>
-                                    Semua tabel akan dibackup termasuk struktur dan data
-                                </p>
-                                <p class="small text-muted">
-                                    <i class="fas fa-exclamation-triangle text-warning me-1"></i>
-                                    File backup disimpan di folder <code>backups/</code>
-                                </p>
-                            </div>
+                            <p class="ui-set-hint mb-0 mt-3">
+                                <i class="ti ti-info-circle" aria-hidden="true"></i>
+                                File disimpan di <code>backups/</code>. Import Excel lewat menu Import Migrasi.
+                            </p>
                         </div>
                     </div>
 
-                    <!-- Backup Database -->
-                    <div class="col-lg-8">
-                        <div class="card backup-card mb-4">
-                            <div class="card-header bg-white">
-                                <h6 class="mb-0"><i class="fas fa-download me-2"></i>Backup Database</h6>
-                            </div>
-                            <div class="card-body">
-                                <p class="text-muted">
-                                    Buat backup database untuk keamanan data. Tersedia format SQL (restore penuh)
-                                    dan Excel format migrasi (bisa diedit lalu di-import ulang lewat Import Migrasi).
-                                </p>
-                                
-                                <form method="POST"><?php echo layananToken(); ?>
-                                    <div class="alert alert-info">
-                                        <small>
-                                            <i class="fas fa-info-circle me-2"></i>
-                                            <strong>Database:</strong> <?php echo htmlspecialchars($db_name); ?><br>
-                                            <strong>Metode:</strong> Backup PHP Native (tanpa mysqldump)
-                                        </small>
-                                    </div>
-                                    
-                                    <button type="submit" name="backup_database" class="btn btn-success">
-                                        <i class="fas fa-download me-2"></i>Backup SQL
-                                    </button>
-                                </form>
-                                <form method="POST" class="mt-3"><?php echo layananToken(); ?>
-                                    <div class="alert alert-success mb-2">
-                                        <small>
-                                            <i class="fas fa-file-excel me-2"></i>
-                                            Excel berisi Nasabah (foto KTP/KK/pasangan), Pinjaman (foto pencairan), Angsuran_Historis, master, Dapin, kas, dan konfigurasi.
-                                            ZIP lengkap = Excel + seluruh folder <code>uploads/</code> (disarankan untuk pindah hosting).
-                                        </small>
-                                    </div>
-                                    <button type="submit" name="backup_excel_migrasi" class="btn btn-outline-success">
-                                        <i class="fas fa-file-excel me-2"></i>Backup Excel (format migrasi)
-                                    </button>
-                                    <button type="submit" name="backup_zip_lengkap" class="btn btn-success">
-                                        <i class="fas fa-file-archive me-2"></i>Backup ZIP lengkap (Excel + uploads)
-                                    </button>
-                                    <a href="import_migrasi.php" class="btn btn-link">Buka Import Migrasi</a>
-                                </form>
-                                <hr class="my-4">
-                                <h6 class="text-danger">Reset Total untuk Migrasi</h6>
-                                <p class="small text-muted mb-2">Menghapus transaksi &amp; master. <strong>Akun Admin &amp; Teller tetap dipertahankan</strong>. Sebelum hapus, sistem <strong>mencadangkan semua foto &amp; TTD</strong>. Setelah import dengan kode sama, foto nasabah, foto pencairan, dan TTD perjanjian otomatis kembali. Folder uploads/ tidak dihapus.</p>
-                                <form method="POST" id="resetTotalForm"><?php echo layananToken(); ?>
-                                    <div class="mb-3"><label class="form-label text-danger">Ketik <strong>RESET TOTAL</strong></label>
-                                        <input type="text" name="confirmation_total" class="form-control" placeholder="RESET TOTAL" required pattern="RESET TOTAL"></div>
-                                    <button type="submit" name="reset_total_migrasi" class="btn btn-outline-danger" onclick="return confirmResetTotal()"><i class="fas fa-skull-crossbones me-2"></i>Reset Total untuk Migrasi</button>
-                                </form>
-                            </div>
+                    <div class="card ui-set-card ui-set-danger">
+                        <div class="card-header ui-dash-sec">
+                            <span class="ui-dash-sec-title text-danger"><i class="ti ti-alert-octagon" aria-hidden="true"></i>Reset total migrasi</span>
+                            <span class="ui-dash-sec-note">Berbahaya</span>
                         </div>
-
-                        <!-- Existing Backups -->
-                        <div class="card backup-card mb-4">
-                            <div class="card-header bg-white">
-                                <h6 class="mb-0"><i class="fas fa-history me-2"></i>Backup Tersimpan</h6>
-                            </div>
-                            <div class="card-body">
-                                <?php if (!empty($backups)): ?>
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-hover">
-                                            <thead>
-                                                <tr>
-                                                    <th>Nama File</th>
-                                                    <th>Ukuran</th>
-                                                    <th>Tanggal</th>
-                                                    <th>Aksi</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($backups as $backup): ?>
-                                                <tr>
-                                                    <td>
-                                                        <i class="fas <?php echo (($backup['type'] ?? '') === 'xlsx') ? 'fa-file-excel text-success' : 'fa-file-alt text-muted'; ?> me-2"></i>
-                                                        <?php echo htmlspecialchars($backup['name']); ?>
-                                                        <small class="text-muted">(<?php echo strtoupper($backup['type'] ?? 'sql'); ?>)</small>
-                                                    </td>
-                                                    <td><?php echo round($backup['size'] / 1024, 2); ?> KB</td>
-                                                    <td><?php echo date('d/m/Y H:i', $backup['modified']); ?></td>
-                                                    <td>
-                                                        <a href="?download=<?php echo urlencode($backup['name']); ?>" 
-                                                           class="btn btn-sm btn-outline-primary" title="Download">
-                                                            <i class="fas fa-download"></i>
-                                                        </a>
-                                                        <form method="post" class="d-inline" onsubmit="return confirm('Hapus backup ini?')"><?= layananToken() ?><button class="btn btn-sm btn-danger" type="submit" name="delete" value="<?= htmlspecialchars($backup['name'], ENT_QUOTES, 'UTF-8') ?>" aria-label="Hapus backup"><i class="fas fa-trash"></i></button></form>
-                                                    </td>
-                                                </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="text-center py-4">
-                                        <i class="fas fa-database fa-3x text-muted mb-3"></i>
-                                        <p class="text-muted mb-0">Belum ada backup</p>
-                                        <small class="text-muted">Buat backup pertama Anda sekarang</small>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
+                        <div class="card-body">
+                            <p class="small text-muted mb-3">
+                                Menghapus transaksi &amp; master. <strong>Admin &amp; Teller tetap ada</strong>.
+                                Foto/TTD dicadangkan dulu; setelah import (kode sama) dokumen dipulihkan.
+                                Folder <code>uploads/</code> tidak dihapus.
+                            </p>
+                            <form method="POST" id="resetTotalForm"><?php echo layananToken(); ?>
+                                <label class="form-label text-danger" for="confirm_total">Ketik <strong>RESET TOTAL</strong></label>
+                                <input type="text" id="confirm_total" name="confirmation_total" class="form-control mb-3" placeholder="RESET TOTAL" required pattern="RESET TOTAL" autocomplete="off">
+                                <button type="submit" name="reset_total_migrasi" class="btn btn-outline-danger" onclick="return confirmResetTotal()">
+                                    <i class="ti ti-skull me-1" aria-hidden="true"></i>Reset total untuk migrasi
+                                </button>
+                            </form>
                         </div>
-
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+                <div class="card ui-set-card">
+                    <div class="card-header ui-dash-sec">
+                        <span class="ui-dash-sec-title"><i class="ti ti-history" aria-hidden="true"></i>Backup tersimpan</span>
+                        <span class="ui-dash-sec-note"><?php echo count($backups); ?> file</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <?php if (!empty($backups)): ?>
+                        <div class="table-responsive ui-table-scroll">
+                            <table class="table table-hover table-sm align-middle mb-0 js-datatable"
+                                   data-dt-page-length="10"
+                                   data-dt-order="2,desc"
+                                   data-dt-filter="1"
+                                   data-empty-message="Belum ada backup.">
+                                <thead>
+                                    <tr>
+                                        <th>Nama file</th>
+                                        <th>Tipe</th>
+                                        <th>Tanggal</th>
+                                        <th class="text-end">Ukuran</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($backups as $backup):
+                                        $type = strtolower((string)($backup['type'] ?? 'sql'));
+                                        $icon = $type === 'xlsx' ? 'ti-file-spreadsheet text-success' : ($type === 'zip' ? 'ti-archive text-primary' : 'ti-file-database text-muted');
+                                    ?>
+                                    <tr>
+                                        <td>
+                                            <i class="ti <?php echo $icon; ?> me-1" aria-hidden="true"></i>
+                                            <code class="ui-set-kode"><?php echo htmlspecialchars($backup['name']); ?></code>
+                                        </td>
+                                        <td data-filter="<?php echo htmlspecialchars(strtoupper($type)); ?>">
+                                            <span class="ui-backup-type is-<?php echo htmlspecialchars($type); ?>"><?php echo htmlspecialchars(strtoupper($type)); ?></span>
+                                        </td>
+                                        <td data-order="<?php echo (int)$backup['modified']; ?>"><?php echo date('d/m/Y H:i', $backup['modified']); ?></td>
+                                        <td class="text-end"><?php echo $backup['size'] >= 1048576 ? round($backup['size'] / 1048576, 2) . ' MB' : round($backup['size'] / 1024, 1) . ' KB'; ?></td>
+                                        <td>
+                                            <a href="?download=<?php echo urlencode($backup['name']); ?>" class="btn btn-sm btn-outline-primary" title="Download"><i class="ti ti-download"></i></a>
+                                            <form method="post" class="d-inline" onsubmit="return confirm('Hapus backup ini?')">
+                                                <?= layananToken() ?>
+                                                <button class="btn btn-sm btn-outline-danger" type="submit" name="delete" value="<?= htmlspecialchars($backup['name'], ENT_QUOTES, 'UTF-8') ?>" aria-label="Hapus backup"><i class="ti ti-trash"></i></button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <?php else: ?>
+                        <div class="ui-set-empty">
+                            <i class="ti ti-database-off" aria-hidden="true"></i>
+                            <strong>Belum ada backup</strong>
+                            <span>Buat cadangan SQL, Excel, atau ZIP di atas</span>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+    <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
     <script>
-        function confirmReset() {
-            return confirm('⚠️ PERINGATAN!\n\nTindakan ini akan menghapus SEMUA data transaksi, simpanan, pinjaman, riwayat, dan WASERDA.\n\nPastikan Anda sudah membuat backup sebelum melanjutkan!\n\nApakah Anda yakin ingin melanjutkan?');
-        }
         function confirmResetTotal() {
             return confirm('PERINGATAN KERAS!\n\nTransaksi dan master akan dihapus. Dipertahankan: Admin aktif, anggota+foto, uploads/, koperasi, TTD Admin.\n\nBuat Backup ZIP lengkap dulu. Lanjutkan?');
-        }
-        
-        function confirmDelete(filename) {
-            return confirm('Hapus backup ' + filename + '?\n\nTindakan ini tidak dapat dibatalkan.');
         }
     </script>
 </body>
 </html>
+

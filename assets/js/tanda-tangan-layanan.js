@@ -53,7 +53,7 @@
             wrap && wrap.classList.add('has-signature');
             if (status) {
                 status.classList.add('is-ready');
-                status.innerHTML = '<i class="fas fa-check-circle"></i> Siap disimpan';
+                status.innerHTML = '<i class="ti ti-circle-check"></i> Siap disimpan';
             }
         } else {
             if (field) {
@@ -62,7 +62,7 @@
             wrap && wrap.classList.remove('has-signature');
             if (status) {
                 status.classList.remove('is-ready');
-                status.innerHTML = '<i class="fas fa-pen-nib"></i> Belum diisi';
+                status.innerHTML = '<i class="ti ti-signature"></i> Belum diisi';
             }
         }
     }
@@ -102,12 +102,13 @@
         if (field && field.value && field.value.indexOf('data:image') === 0) {
             var preload = new Image();
             preload.onload = function () {
-                state.ctx.drawImage(preload, 0, 0, canvas.width, canvas.height);
+                if (!state.ctx) { syncSize(canvas, state); }
+                if (state.ctx) { state.ctx.drawImage(preload, 0, 0, canvas.width, canvas.height); }
                 state.dirty = true;
                 wrap && wrap.classList.add('has-signature');
                 if (status) {
                     status.classList.add('is-ready');
-                    status.innerHTML = '<i class="fas fa-check-circle"></i> Siap disimpan';
+                    status.innerHTML = '<i class="ti ti-circle-check"></i> Siap disimpan';
                 }
             };
             preload.src = field.value;

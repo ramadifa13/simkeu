@@ -99,160 +99,155 @@ $db->exec("CREATE TABLE IF NOT EXISTS settings (
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pengaturan Pinjaman & Tabungan - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Pengaturan Pinjaman - <?php echo htmlspecialchars(APP_NAME); ?></title>
+    <?php $uiAssetPrefix = '../'; include __DIR__ . '/../includes/layout/assets.php'; ?>
 </head>
 <body>
-    <?php include '../includes/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include '../includes/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <?php ui_page_header([
-                    'title' => 'Pengaturan Pinjaman & Tabungan',
-                    'icon' => 'fas fa-cog text-primary',
-                    'subtitle' => 'Bagi hasil tabungan dan parameter pinjaman',
-                ]); ?>
+    <?php include __DIR__ . '/../includes/layout/shell_start.php'; ?>
+            <div class="ui-tx-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon ui-tx-icon-setpin" aria-hidden="true"><i class="ti ti-settings-dollar"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Pengaturan</p>
+                        <h1 class="ui-dash-title">Pinjaman &amp; Tabungan</h1>
+                        <p class="ui-dash-meta mb-0">Bagi hasil simpanan dan tarif denda per hari</p>
+                    </div>
+                </header>
+
                 <?php ui_flash(); ?>
 
-                <div class="row">
-                    <!-- Bagi Hasil Tabungan -->
-                    <div class="col-md-6 mb-4">
-                        <div class="card">
-                            <div class="card-header bg-primary text-white">
-                                <h5 class="card-title mb-0">
-                                    <i class="fas fa-percentage me-2"></i>Bagi Hasil Tabungan
-                                </h5>
-                            </div>
-                            <div class="card-body">
-                                <form method="POST"><?php echo layananToken(); ?>
-                                    <table class="table table-striped">
+                <div class="ui-set-kpi">
+                <?php ui_stat_grid([
+                    ['label' => 'Jenis simpanan', 'value' => count($jenis_simpanan), 'tone' => 'primary', 'icon' => 'ti ti-stack-2', 'hint' => 'Aktif'],
+                    ['label' => 'Tingkat denda', 'value' => count($tarif_denda), 'tone' => 'warning', 'icon' => 'ti ti-alert-triangle', 'hint' => 'Tarif tersimpan'],
+                    ['label' => 'Denda terendah', 'value' => !empty($tarif_denda) ? formatRupiah(min(array_column($tarif_denda, 'denda_per_hari'))) : '—', 'tone' => 'danger', 'icon' => 'ti ti-coin', 'hint' => 'Per hari'],
+                    ['label' => 'Denda tertinggi', 'value' => !empty($tarif_denda) ? formatRupiah(max(array_column($tarif_denda, 'denda_per_hari'))) : '—', 'tone' => 'info', 'icon' => 'ti ti-coin', 'hint' => 'Per hari'],
+                ]); ?>
+                </div>
+
+                <div class="ui-set-split mb-3">
+                    <div class="card ui-set-card">
+                        <div class="card-header ui-dash-sec">
+                            <span class="ui-dash-sec-title"><i class="ti ti-percentage" aria-hidden="true"></i>Bagi hasil tabungan</span>
+                            <span class="ui-dash-sec-note">% per jenis</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <form method="POST"><?php echo layananToken(); ?>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm align-middle mb-0">
                                         <thead>
                                             <tr>
-                                                <th>Jenis Simpanan</th>
-                                                <th>Bagi Hasil (%)</th>
+                                                <th>Jenis simpanan</th>
+                                                <th class="text-end" style="width:9rem">Bagi hasil (%)</th>
                                             </tr>
                                         </thead>
                                         <tbody>
+                                            <?php if (!$jenis_simpanan): ?>
+                                            <tr><td colspan="2" class="text-center text-muted py-4">Belum ada jenis simpanan aktif.</td></tr>
+                                            <?php endif; ?>
                                             <?php foreach ($jenis_simpanan as $jenis): ?>
                                             <tr>
-                                                <td><?php echo $jenis['nama_jenis']; ?></td>
                                                 <td>
-                                                    <input type="number" name="bagi_hasil[<?php echo $jenis['id']; ?>]" 
-                                                           class="form-control form-control-sm" 
-                                                           value="<?php echo $jenis['bagi_hasil']; ?>" 
-                                                           step="0.01" min="0" max="100">
+                                                    <strong class="ui-set-name"><?php echo htmlspecialchars($jenis['nama_jenis']); ?></strong>
+                                                    <small class="ui-set-meta"><?php echo htmlspecialchars($jenis['kode_jenis'] ?? ''); ?></small>
+                                                </td>
+                                                <td>
+                                                    <input type="number" name="bagi_hasil[<?php echo (int)$jenis['id']; ?>]"
+                                                           class="form-control form-control-sm text-end"
+                                                           value="<?php echo htmlspecialchars((string)$jenis['bagi_hasil']); ?>"
+                                                           step="0.01" min="0" max="100" aria-label="Bagi hasil <?php echo htmlspecialchars($jenis['nama_jenis']); ?>">
                                                 </td>
                                             </tr>
                                             <?php endforeach; ?>
                                         </tbody>
                                     </table>
-                                    <div class="text-end">
-                                        <button type="submit" name="update_bagi_hasil" class="btn btn-primary">
-                                            <i class="fas fa-save me-1"></i> Update Bagi Hasil
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
+                                </div>
+                                <div class="ui-set-card-foot">
+                                    <button type="submit" name="update_bagi_hasil" class="btn btn-primary">
+                                        <i class="ti ti-device-floppy me-1" aria-hidden="true"></i>Update bagi hasil
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
 
-                    <!-- Tarif Denda per Hari -->
-                    <div class="col-md-6 mb-4">
-                        <div class="card">
-                            <div class="card-header bg-warning text-dark">
-                                <h5 class="card-title mb-0">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>Tarif Denda per Hari
-                                </h5>
-                            </div>
-                            <div class="card-body">
-                                <form method="POST" id="formTarifDenda"><?php echo layananToken(); ?>
-                                    <table class="table table-sm align-middle mb-2">
+                    <div class="card ui-set-card">
+                        <div class="card-header ui-dash-sec">
+                            <span class="ui-dash-sec-title"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Tarif denda per hari</span>
+                            <span class="ui-dash-sec-note">Menurut pokok pinjaman</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <form method="POST" id="formTarifDenda"><?php echo layananToken(); ?>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm align-middle mb-0">
                                         <thead>
-                                            <tr><th>Jumlah Pinjaman (Rp)</th><th>Denda per Hari (Rp)</th><th></th></tr>
+                                            <tr>
+                                                <th>Jumlah pinjaman (Rp)</th>
+                                                <th>Denda / hari (Rp)</th>
+                                                <th style="width:3rem"></th>
+                                            </tr>
                                         </thead>
                                         <tbody id="tarifDendaRows">
+                                            <?php if (empty($tarif_denda)): ?>
+                                            <tr>
+                                                <td><input type="number" name="tarif_jumlah[]" class="form-control form-control-sm" min="1" step="1" required></td>
+                                                <td><input type="number" name="tarif_denda[]" class="form-control form-control-sm" min="1" step="1" required></td>
+                                                <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="hapusBarisDenda(this)" aria-label="Hapus baris"><i class="ti ti-x"></i></button></td>
+                                            </tr>
+                                            <?php endif; ?>
                                             <?php foreach ($tarif_denda as $t): ?>
                                             <tr>
-                                                <td><input type="number" name="tarif_jumlah[]" class="form-control form-control-sm" min="1" step="1" required value="<?php echo (int) $t['jumlah_pinjaman']; ?>"></td>
-                                                <td><input type="number" name="tarif_denda[]" class="form-control form-control-sm" min="1" step="1" required value="<?php echo (int) $t['denda_per_hari']; ?>"></td>
-                                                <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="hapusBarisDenda(this)"><i class="fas fa-times"></i></button></td>
+                                                <td><input type="number" name="tarif_jumlah[]" class="form-control form-control-sm" min="1" step="1" required value="<?php echo (int)$t['jumlah_pinjaman']; ?>"></td>
+                                                <td><input type="number" name="tarif_denda[]" class="form-control form-control-sm" min="1" step="1" required value="<?php echo (int)$t['denda_per_hari']; ?>"></td>
+                                                <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="hapusBarisDenda(this)" aria-label="Hapus baris"><i class="ti ti-x"></i></button></td>
                                             </tr>
                                             <?php endforeach; ?>
                                         </tbody>
                                     </table>
-                                    <button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="tambahBarisDenda()">
-                                        <i class="fas fa-plus me-1"></i> Tambah Tingkat
-                                    </button>
-                                    <small class="text-muted d-block mb-3">
-                                        Denda dihitung <strong>per hari</strong> mulai sehari setelah jatuh tempo, sampai jatuh tempo
-                                        cicilan berikutnya. Pinjaman di antara dua tingkat memakai tingkat di bawahnya.
-                                        Denda yang diinput manual tidak berubah.
-                                    </small>
-                                    <div class="text-end">
-                                        <button type="submit" name="simpan_tarif_denda" class="btn btn-warning">
-                                            <i class="fas fa-save me-1"></i> Simpan Tarif Denda
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Informasi Sistem -->
-                <div class="row">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-info text-white">
-                                <h5 class="card-title mb-0">
-                                    <i class="fas fa-info-circle me-2"></i>Informasi Sistem
-                                </h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <h6>Bagi Hasil Tabungan:</h6>
-                                        <ul>
-                                            <li>Bagi hasil dihitung per bulan</li>
-                                            <li>Persentase berdasarkan saldo rata-rata</li>
-                                            <li>Pembayaran bagi hasil setiap akhir bulan</li>
-                                        </ul>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <h6>Ketentuan Denda:</h6>
-                                        <ul>
-                                            <li>Denda nominal tetap per hari menurut besar pinjaman (lihat Tarif Denda per Hari)</li>
-                                            <li>Dihitung mulai sehari setelah jatuh tempo sampai jatuh tempo cicilan berikutnya</li>
-                                            <li>Otomatis tiap hari; petugas bisa mengisi manual saat pembayaran</li>
-                                        </ul>
-                                    </div>
                                 </div>
-                            </div>
+                                <div class="ui-set-card-foot ui-set-card-foot-between">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="tambahBarisDenda()">
+                                        <i class="ti ti-plus me-1" aria-hidden="true"></i>Tambah tingkat
+                                    </button>
+                                    <button type="submit" name="simpan_tarif_denda" class="btn btn-warning">
+                                        <i class="ti ti-device-floppy me-1" aria-hidden="true"></i>Simpan tarif
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+                <div class="ui-set-notes">
+                    <article class="ui-set-note">
+                        <strong>Bagi hasil</strong>
+                        <ul>
+                            <li>Dihitung per bulan dari saldo rata-rata</li>
+                            <li>Pembayaran biasanya di akhir bulan</li>
+                        </ul>
+                    </article>
+                    <article class="ui-set-note">
+                        <strong>Denda</strong>
+                        <ul>
+                            <li>Mulai sehari setelah jatuh tempo sampai jatuh tempo berikutnya</li>
+                            <li>Pinjaman di antara dua tingkat memakai tingkat di bawahnya</li>
+                            <li>Denda manual tidak berubah saat tarif diupdate</li>
+                        </ul>
+                    </article>
+                </div>
+            </div>
+    <?php include __DIR__ . '/../includes/layout/shell_end.php'; ?>
 <script>
 function tambahBarisDenda() {
     var tr = document.createElement('tr');
     tr.innerHTML = '<td><input type="number" name="tarif_jumlah[]" class="form-control form-control-sm" min="1" step="1" required></td>' +
                    '<td><input type="number" name="tarif_denda[]" class="form-control form-control-sm" min="1" step="1" required></td>' +
-                   '<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="hapusBarisDenda(this)"><i class="fas fa-times"></i></button></td>';
+                   '<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="hapusBarisDenda(this)" aria-label="Hapus baris"><i class="ti ti-x"></i></button></td>';
     document.getElementById('tarifDendaRows').appendChild(tr);
 }
 function hapusBarisDenda(btn) {
     var tbody = document.getElementById('tarifDendaRows');
-    if (tbody.rows.length > 1) {
-        btn.closest('tr').remove();
-    }
+    if (tbody.rows.length > 1) btn.closest('tr').remove();
 }
 </script>
 </body>

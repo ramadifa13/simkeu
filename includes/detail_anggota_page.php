@@ -224,6 +224,17 @@ $stmt_total_waserda->bindParam(':id', $id);
 $stmt_total_waserda->execute();
 $total_waserda = $stmt_total_waserda->fetch(PDO::FETCH_ASSOC);
 
+$statusAnggota = strtolower((string)($member['status'] ?? ''));
+$statusBadgeClass = $statusAnggota === 'aktif' ? 'bg-success-lt' : ($statusAnggota === 'nonaktif' || $statusAnggota === 'keluar' ? 'bg-danger-lt' : 'bg-secondary-lt');
+$inisial = strtoupper(substr((string)$member['nama_lengkap'], 0, 1));
+$shuLabel = (($member['kategori_shu'] ?? 'anggota') === 'ketua_kelompok') ? 'Ketua Kelompok' : 'Anggota';
+$shuBadge = (($member['kategori_shu'] ?? 'anggota') === 'ketua_kelompok') ? 'bg-primary-lt' : 'bg-secondary-lt';
+$aksiCepat = [
+    ['href' => 'setoran.php?anggota_id=' . (int)$id, 'icon' => 'ti ti-plus', 'label' => 'Setor', 'tone' => 'success', 'primary' => true],
+    ['href' => 'penarikan.php?anggota_id=' . (int)$id, 'icon' => 'ti ti-minus', 'label' => 'Tarik', 'tone' => 'info', 'primary' => false],
+    ['href' => 'pengajuan.php?anggota_id=' . (int)$id, 'icon' => 'ti ti-moneybag', 'label' => 'Pinjaman', 'tone' => 'warning', 'primary' => false],
+    ['href' => 'pembelian.php?anggota_id=' . (int)$id, 'icon' => 'ti ti-shopping-cart', 'label' => 'Waserda', 'tone' => 'primary', 'primary' => false],
+];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -231,314 +242,295 @@ $total_waserda = $stmt_total_waserda->fetch(PDO::FETCH_ASSOC);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detail Anggota - <?php echo APP_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <?php $uiAssetPrefix = '../'; include __DIR__ . '/layout/assets.php'; ?>
-    <style>
-        .member-avatar {
-            background: linear-gradient(135deg, #123d47 0%, #087f83 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-        }
-        .savings-card {
-            border-left: 4px solid #28a745;
-        }
-        .loan-card {
-            border-left: 4px solid #ffc107;
-        }
-        .waserda-card {
-            border-left: 4px solid #17a2b8;
-        }
-        .transaction-positive {
-            border-left: 3px solid #28a745;
-        }
-        .transaction-negative {
-            border-left: 3px solid #dc3545;
-        }
-        .transaction-waserda {
-            border-left: 3px solid #17a2b8;
-            background-color: #f0f9ff;
-        }
-        .waserda-badge {
-            background-color: #17a2b8;
-            color: white;
-            font-size: 0.7rem;
-            padding: 2px 6px;
-            border-radius: 10px;
-        }
-        .loan-detail {
-            font-size: 0.8rem;
-            color: #666;
-        }
-    </style>
 </head>
-<body style="background-color: #f8f9fa;">
-    <?php include __DIR__ . '/header.php'; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <?php include __DIR__ . '/sidebar.php'; ?>
-            
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <?php
-                $detailActions = '<a href="anggota.php" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Kembali</a>'
-                    . '<a href="setoran.php?anggota_id=' . (int)$id . '" class="btn btn-success"><i class="fas fa-plus me-1"></i>Setor</a>'
-                    . '<a href="penarikan.php?anggota_id=' . (int)$id . '" class="btn btn-outline-primary"><i class="fas fa-minus me-1"></i>Tarik</a>'
-                    . '<a href="pengajuan.php?anggota_id=' . (int)$id . '" class="btn btn-outline-warning"><i class="fas fa-hand-holding-usd me-1"></i>Pinjaman</a>'
-                    . '<a href="pembelian.php?anggota_id=' . (int)$id . '" class="btn btn-outline-success"><i class="fas fa-shopping-cart me-1"></i>Waserda</a>';
-                if (isAdmin()) {
-                    $detailActions .= '<a href="laporan_anggota.php?id=' . (int)$id . '" class="btn btn-outline-secondary"><i class="fas fa-print me-1"></i>Cetak</a>';
-                }
-                ui_page_header([
-                    'title' => 'Detail Anggota',
-                    'icon' => 'fas fa-user text-primary',
-                    'subtitle' => (string)($member['nama_lengkap'] ?? '') . ' · ' . (string)($member['kode_anggota'] ?? ''),
-                    'actions' => $detailActions,
-                ]);
-                ?>
+<body>
+    <?php include __DIR__ . '/layout/shell_start.php'; ?>
+            <div class="ui-member-detail-page">
+                <header class="ui-dash-header">
+                    <div class="ui-dash-header-icon" aria-hidden="true"><i class="ti ti-user"></i></div>
+                    <div class="ui-dash-header-copy">
+                        <p class="ui-dash-eyebrow mb-0">Master data</p>
+                        <h1 class="ui-dash-title">Detail Anggota</h1>
+                        <p class="ui-dash-meta mb-0">
+                            <?php echo htmlspecialchars($member['nama_lengkap']); ?>
+                            · <?php echo htmlspecialchars($member['kode_anggota']); ?>
+                            <span class="badge <?php echo $statusBadgeClass; ?> ms-1"><?php echo htmlspecialchars(ucfirst($member['status'])); ?></span>
+                        </p>
+                    </div>
+                    <div class="ui-dash-header-actions">
+                        <a href="anggota.php" class="btn ui-member-detail-btn-back">
+                            <i class="ti ti-arrow-left" aria-hidden="true"></i>
+                            <span>Kembali</span>
+                        </a>
+                        <?php if (isAdmin()): ?>
+                        <a href="laporan_anggota.php?id=<?php echo (int)$id; ?>" class="btn ui-member-detail-btn-print">
+                            <i class="ti ti-printer" aria-hidden="true"></i>
+                            <span class="d-none d-sm-inline">Cetak</span>
+                        </a>
+                        <?php endif; ?>
+                    </div>
+                </header>
 
-                <!-- Member Profile -->
-                <div class="row">
+                <?php ui_flash(); ?>
+
+                <div class="ui-stat-grid" data-count="3">
+                    <div class="stat-card tone-success">
+                        <div class="card-body d-flex justify-content-between align-items-start gap-2">
+                            <div class="min-w-0">
+                                <p class="mb-0 text-muted small text-uppercase">Total Simpanan</p>
+                                <h4 class="mb-0"><?php echo formatRupiah($total_simpanan); ?></h4>
+                                <small class="text-muted">Saldo seluruh jenis</small>
+                            </div>
+                            <span class="stat-icon"><i class="ti ti-pig-money"></i></span>
+                        </div>
+                    </div>
+                    <div class="stat-card tone-warning">
+                        <div class="card-body d-flex justify-content-between align-items-start gap-2">
+                            <div class="min-w-0">
+                                <p class="mb-0 text-muted small text-uppercase">Sisa Pokok</p>
+                                <h4 class="mb-0"><?php echo formatRupiah($loan_summary['total_sisa']); ?></h4>
+                                <small class="text-muted"><?php echo (int)$loan_summary['total_pinjaman']; ?> pinjaman aktif</small>
+                            </div>
+                            <span class="stat-icon"><i class="ti ti-moneybag"></i></span>
+                        </div>
+                    </div>
+                    <div class="stat-card tone-info">
+                        <div class="card-body d-flex justify-content-between align-items-start gap-2">
+                            <div class="min-w-0">
+                                <p class="mb-0 text-muted small text-uppercase">Waserda</p>
+                                <h4 class="mb-0"><?php echo formatRupiah($total_waserda['total_bayar']); ?></h4>
+                                <small class="text-muted"><?php echo (int)$total_waserda['total']; ?> transaksi</small>
+                            </div>
+                            <span class="stat-icon"><i class="ti ti-building-store"></i></span>
+                        </div>
+                    </div>
+                </div>
+
+                <section class="ui-dash-panel" aria-label="Aksi cepat">
+                    <div class="ui-dash-sec">
+                        <h3 class="ui-dash-sec-title"><i class="ti ti-bolt" aria-hidden="true"></i>Aksi cepat</h3>
+                        <span class="ui-dash-sec-note">Transaksi untuk anggota ini</span>
+                    </div>
+                    <div class="ui-dash-actions" data-count="<?php echo count($aksiCepat); ?>">
+                        <?php foreach ($aksiCepat as $act): ?>
+                        <a class="ui-dash-action tone-<?php echo $act['tone']; ?><?php echo !empty($act['primary']) ? ' is-primary' : ''; ?>" href="<?php echo htmlspecialchars($act['href']); ?>">
+                            <span class="ui-dash-action-icon"><i class="<?php echo htmlspecialchars($act['icon']); ?>" aria-hidden="true"></i></span>
+                            <span class="ui-dash-action-label"><?php echo htmlspecialchars($act['label']); ?></span>
+                        </a>
+                        <?php endforeach; ?>
+                    </div>
+                </section>
+
+                <div class="row g-3">
                     <div class="col-lg-4">
-                        <div class="card mb-4">
-                            <div class="card-body text-center">
-                                <div class="member-avatar mx-auto mb-3" style="width: 80px; height: 80px; font-size: 1.15rem;">
-                                    <?php echo strtoupper(substr($member['nama_lengkap'], 0, 1)); ?>
+                        <div class="card mb-3">
+                            <div class="ui-member-profile">
+                                <div class="ui-member-profile-avatar" aria-hidden="true"><?php echo htmlspecialchars($inisial); ?></div>
+                                <h2 class="ui-member-profile-name"><?php echo htmlspecialchars($member['nama_lengkap']); ?></h2>
+                                <div class="ui-member-profile-code">
+                                    <span><?php echo htmlspecialchars($member['kode_anggota']); ?></span>
+                                    <span class="badge <?php echo $statusBadgeClass; ?>"><?php echo htmlspecialchars(ucfirst($member['status'])); ?></span>
+                                    <span class="badge <?php echo $shuBadge; ?>"><?php echo htmlspecialchars($shuLabel); ?></span>
                                 </div>
-                                <h5 class="card-title"><?php echo htmlspecialchars($member['nama_lengkap']); ?></h5>
-                                <p class="text-muted mb-1"><?php echo $member['kode_anggota']; ?></p>
-                                <span class="badge bg-success"><?php echo ucfirst($member['status']); ?></span>
-                                
-                                <div class="mt-3">
-                                    <small class="text-muted">
-                                        <i class="fas fa-calendar me-1"></i>
-                                        Bergabung sejak <?php echo formatTanggalUi($member['tanggal_daftar']); ?>
-                                    </small>
+                                <div class="ui-member-profile-contact">
+                                    <?php if (!empty($member['telepon'])): ?>
+                                        <span class="ui-members-phone"><?php echo htmlspecialchars($member['telepon']); ?></span>
+                                        <?php echo tombolWhatsApp($member['telepon'], '', ''); ?>
+                                    <?php else: ?>
+                                        <span class="text-muted small">Telepon belum diisi</span>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="ui-member-profile-meta">
+                                    <span><i class="ti ti-calendar me-1" aria-hidden="true"></i>Bergabung <?php echo formatTanggalUi($member['tanggal_daftar'], false, true); ?></span>
+                                    <?php if (!empty($member['username'])): ?>
+                                    <span><i class="ti ti-user me-1" aria-hidden="true"></i><?php echo htmlspecialchars($member['username']); ?></span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
                         
                         <?php include __DIR__ . '/kartu_dokumen_anggota.php'; ?>
                         
-                        <!-- Savings Summary -->
-                        <div class="card mb-4 savings-card">
-                            <div class="card-header bg-success text-white">
-                                <h6 class="mb-0"><i class="fas fa-piggy-bank me-2"></i>Ringkasan Simpanan</h6>
+                        <div class="card mb-3">
+                            <div class="card-header ui-dash-sec">
+                                <span class="ui-dash-sec-title"><i class="ti ti-pig-money" aria-hidden="true"></i>Ringkasan Simpanan</span>
                             </div>
                             <div class="card-body">
-                                <div class="mb-2 d-flex justify-content-between">
-                                    <span>Simpanan Pokok:</span>
-                                    <strong class="text-primary"><?php echo formatRupiah($simpanan_pokok); ?></strong>
+                                <div class="ui-member-kv">
+                                    <div class="ui-member-kv-row">
+                                        <span class="ui-member-kv-label">Pokok</span>
+                                        <span class="ui-member-kv-value"><?php echo formatRupiah($simpanan_pokok); ?></span>
                                 </div>
-                                <div class="mb-2 d-flex justify-content-between">
-                                    <span>Simpanan Wajib:</span>
-                                    <strong class="text-primary"><?php echo formatRupiah($simpanan_wajib); ?></strong>
+                                    <div class="ui-member-kv-row">
+                                        <span class="ui-member-kv-label">Wajib</span>
+                                        <span class="ui-member-kv-value"><?php echo formatRupiah($simpanan_wajib); ?></span>
                                 </div>
-                                <div class="mb-2 d-flex justify-content-between">
-                                    <span>Simpanan Sukarela:</span>
-                                    <strong class="text-primary"><?php echo formatRupiah($simpanan_sukarela); ?></strong>
+                                    <div class="ui-member-kv-row">
+                                        <span class="ui-member-kv-label">Sukarela</span>
+                                        <span class="ui-member-kv-value"><?php echo formatRupiah($simpanan_sukarela); ?></span>
                                 </div>
-                                
                                 <?php foreach ($simpanan_lainnya as $lainnya): ?>
-                                <div class="mb-2 d-flex justify-content-between">
-                                    <span><?php echo $lainnya['nama']; ?>:</span>
-                                    <strong class="text-info"><?php echo formatRupiah($lainnya['saldo']); ?></strong>
+                                    <div class="ui-member-kv-row">
+                                        <span class="ui-member-kv-label"><?php echo htmlspecialchars($lainnya['nama']); ?></span>
+                                        <span class="ui-member-kv-value"><?php echo formatRupiah($lainnya['saldo']); ?></span>
+                                    </div>
+                                    <?php endforeach; ?>
                                 </div>
-                                <?php endforeach; ?>
-                                
-                                <hr>
-                                <div class="d-flex justify-content-between fw-bold">
-                                    <span>Total Simpanan:</span>
-                                    <span class="text-success"><?php echo formatRupiah($total_simpanan); ?></span>
+                                <div class="ui-member-kv-total">
+                                    <span>Total</span>
+                                    <span class="ui-member-kv-value"><?php echo formatRupiah($total_simpanan); ?></span>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- Loan Summary (DENGAN BUNGA) -->
-                        <div class="card mb-4 loan-card">
-                            <div class="card-header bg-warning text-dark">
-                                <h6 class="mb-0"><i class="fas fa-hand-holding-usd me-2"></i>Ringkasan Pinjaman</h6>
+                        <div class="card mb-3">
+                            <div class="card-header ui-dash-sec">
+                                <span class="ui-dash-sec-title"><i class="ti ti-moneybag" aria-hidden="true"></i>Ringkasan Pinjaman</span>
                             </div>
                             <div class="card-body">
-                                <div class="mb-2 d-flex justify-content-between">
-                                    <span>Total Pinjaman Aktif:</span>
-                                    <strong><?php echo $loan_summary['total_pinjaman']; ?></strong>
+                                <div class="ui-member-kv">
+                                    <div class="ui-member-kv-row">
+                                        <span class="ui-member-kv-label">Aktif</span>
+                                        <span class="ui-member-kv-value"><?php echo (int)$loan_summary['total_pinjaman']; ?></span>
+                                    </div>
+                                    <div class="ui-member-kv-row">
+                                        <span class="ui-member-kv-label">Pokok</span>
+                                        <span class="ui-member-kv-value"><?php echo formatRupiah($loan_summary['total_jumlah']); ?></span>
                                 </div>
-                                <div class="mb-2 d-flex justify-content-between">
-                                    <span>Pokok Pinjaman:</span>
-                                    <strong class="text-warning"><?php echo formatRupiah($loan_summary['total_jumlah']); ?></strong>
+                                    <div class="ui-member-kv-row">
+                                        <span class="ui-member-kv-label">Bunga</span>
+                                        <span class="ui-member-kv-value"><?php echo formatRupiah($loan_summary['total_bunga']); ?></span>
                                 </div>
-                                <div class="mb-2 d-flex justify-content-between">
-                                    <span>Total Bunga:</span>
-                                    <strong class="text-info"><?php echo formatRupiah($loan_summary['total_bunga']); ?></strong>
+                                    <div class="ui-member-kv-row">
+                                        <span class="ui-member-kv-label">Total + bunga</span>
+                                        <span class="ui-member-kv-value"><?php echo formatRupiah($total_harus_dibayar); ?></span>
                                 </div>
-                                <div class="mb-2 d-flex justify-content-between">
-                                    <span>Total + Bunga:</span>
-                                    <strong class="text-danger"><?php echo formatRupiah($total_harus_dibayar); ?></strong>
+                                    <div class="ui-member-kv-row">
+                                        <span class="ui-member-kv-label">Sisa pokok</span>
+                                        <span class="ui-member-kv-value text-danger"><?php echo formatRupiah($loan_summary['total_sisa']); ?></span>
                                 </div>
-                                <div class="mb-2 d-flex justify-content-between">
-                                    <span>Sisa Pokok:</span>
-                                    <strong class="text-danger"><?php echo formatRupiah($loan_summary['total_sisa']); ?></strong>
                                 </div>
-                                
-                                <?php if ($loan_summary['total_pinjaman'] > 0): ?>
-                                <hr>
-                                <small class="text-muted">
-                                    <i class="fas fa-info-circle me-1"></i>
-                                    <?php echo $loan_summary['total_pinjaman']; ?> pinjaman aktif
-                                </small>
-                                <?php endif; ?>
                             </div>
                         </div>
                         
-                        <!-- Waserda Summary -->
-                        <div class="card waserda-card">
-                            <div class="card-header bg-info text-white">
-                                <h6 class="mb-0"><i class="fas fa-store me-2"></i>Ringkasan Waserda</h6>
+                        <div class="card mb-3 mb-lg-0">
+                            <div class="card-header ui-dash-sec">
+                                <span class="ui-dash-sec-title"><i class="ti ti-building-store" aria-hidden="true"></i>Ringkasan Waserda</span>
                             </div>
                             <div class="card-body">
-                                <div class="mb-2 d-flex justify-content-between">
-                                    <span>Total Transaksi:</span>
-                                    <strong><?php echo $total_waserda['total']; ?> transaksi</strong>
+                                <div class="ui-member-kv">
+                                    <div class="ui-member-kv-row">
+                                        <span class="ui-member-kv-label">Transaksi</span>
+                                        <span class="ui-member-kv-value"><?php echo (int)$total_waserda['total']; ?></span>
+                                    </div>
+                                    <div class="ui-member-kv-row">
+                                        <span class="ui-member-kv-label">Total pembelian</span>
+                                        <span class="ui-member-kv-value"><?php echo formatRupiah($total_waserda['total_bayar']); ?></span>
                                 </div>
-                                <div class="mb-2 d-flex justify-content-between">
-                                    <span>Total Pembelian:</span>
-                                    <strong class="text-info"><?php echo formatRupiah($total_waserda['total_bayar']); ?></strong>
                                 </div>
-                                <hr>
-                                <a href="pembelian.php?anggota_id=<?php echo $id; ?>" class="btn btn-info btn-sm w-100">
-                                    <i class="fas fa-shopping-cart me-1"></i>Lihat Transaksi Waserda
+                                <a href="pembelian.php?anggota_id=<?php echo (int)$id; ?>" class="btn btn-outline-primary btn-sm w-100 mt-2">
+                                    <i class="ti ti-shopping-cart me-1" aria-hidden="true"></i>Buka waserda
                                 </a>
                             </div>
                         </div>
                     </div>
                     
                     <div class="col-lg-8">
-                        <!-- Personal Information -->
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informasi Pribadi</h6>
+                        <div class="card mb-3">
+                            <div class="card-header ui-dash-sec">
+                                <span class="ui-dash-sec-title"><i class="ti ti-id" aria-hidden="true"></i>Informasi Pribadi</span>
                             </div>
                             <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <table class="table table-borderless">
-                                            <tr>
-                                                <td width="40%"><strong>Nama Lengkap</strong></td>
-                                                <td><?php echo htmlspecialchars($member['nama_lengkap']); ?></td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Jenis Kelamin</strong></td>
-                                                <td><?php echo $member['jenis_kelamin'] == 'L' ? 'Laki-laki' : 'Perempuan'; ?></td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Tempat Lahir</strong></td>
-                                                <td><?php echo $member['tempat_lahir'] ?: '-'; ?></td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Pekerjaan</strong></td>
-                                                <td><?php echo $member['pekerjaan'] ?: '-'; ?></td>
-                                            </tr>
-                                        </table>
+                                <div class="ui-member-info-grid">
+                                    <div class="ui-member-info-item">
+                                        <span class="ui-member-info-label">Nama lengkap</span>
+                                        <div class="ui-member-info-value"><?php echo htmlspecialchars($member['nama_lengkap']); ?></div>
                                     </div>
-                                    <div class="col-md-6">
-                                        <table class="table table-borderless">
-                                            <tr>
-                                                <td width="40%"><strong>Tanggal Lahir</strong></td>
-                                                <td><?php echo $member['tanggal_lahir'] ? formatTanggalUi($member['tanggal_lahir']) : '-'; ?></td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Telepon</strong></td>
-                                                <td><?php echo $member['telepon'] ?: '-'; ?></td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Email</strong></td>
-                                                <td><?php echo $member['email'] ?: '-'; ?></td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Username</strong></td>
-                                                <td><?php echo $member['username']; ?></td>
-                                            </tr>
-                                        </table>
+                                    <div class="ui-member-info-item">
+                                        <span class="ui-member-info-label">Jenis kelamin</span>
+                                        <div class="ui-member-info-value"><?php echo $member['jenis_kelamin'] == 'L' ? 'Laki-laki' : 'Perempuan'; ?></div>
                                     </div>
+                                    <div class="ui-member-info-item">
+                                        <span class="ui-member-info-label">Tempat lahir</span>
+                                        <div class="ui-member-info-value"><?php echo htmlspecialchars($member['tempat_lahir'] ?: '—'); ?></div>
+                                    </div>
+                                    <div class="ui-member-info-item">
+                                        <span class="ui-member-info-label">Tanggal lahir</span>
+                                        <div class="ui-member-info-value"><?php echo $member['tanggal_lahir'] ? formatTanggalUi($member['tanggal_lahir'], false, true) : '—'; ?></div>
+                                    </div>
+                                    <div class="ui-member-info-item">
+                                        <span class="ui-member-info-label">Pekerjaan</span>
+                                        <div class="ui-member-info-value"><?php echo htmlspecialchars($member['pekerjaan'] ?: '—'); ?></div>
+                                    </div>
+                                    <div class="ui-member-info-item">
+                                        <span class="ui-member-info-label">Telepon</span>
+                                        <div class="ui-member-info-value"><?php echo htmlspecialchars($member['telepon'] ?: '—'); ?></div>
+                                    </div>
+                                    <div class="ui-member-info-item">
+                                        <span class="ui-member-info-label">Email</span>
+                                        <div class="ui-member-info-value"><?php echo htmlspecialchars($member['email'] ?: '—'); ?></div>
+                                    </div>
+                                    <div class="ui-member-info-item">
+                                        <span class="ui-member-info-label">Username</span>
+                                        <div class="ui-member-info-value"><?php echo htmlspecialchars($member['username'] ?: '—'); ?></div>
                                 </div>
-                                
-                                <div class="row">
-                                    <div class="col-12">
-                                        <strong>Alamat:</strong>
-                                        <p class="mb-0"><?php echo nl2br(htmlspecialchars($member['alamat'])); ?></p>
+                                    <div class="ui-member-info-item is-full">
+                                        <span class="ui-member-info-label">Alamat</span>
+                                        <div class="ui-member-info-value"><?php echo nl2br(htmlspecialchars($member['alamat'] ?: '—')); ?></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Recent Transactions (Tabungan + Waserda) -->
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h6 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Transaksi Terakhir</h6>
+                        <div class="card mb-3">
+                            <div class="card-header ui-dash-sec">
+                                <span class="ui-dash-sec-title"><i class="ti ti-arrows-exchange" aria-hidden="true"></i>Transaksi terakhir</span>
+                                <span class="ui-dash-sec-note">Tabungan &amp; waserda</span>
                             </div>
-                            <div class="card-body">
                                 <?php if (!empty($recent_transactions)): ?>
                                     <div class="list-group list-group-flush">
                                         <?php foreach ($recent_transactions as $transaction): 
-                                            $transaction_class = '';
-                                            $icon = '';
-                                            
-                                            if ($transaction['sumber'] == 'Waserda') {
-                                                $transaction_class = 'transaction-waserda';
-                                                $icon = '<span class="waserda-badge ms-2">Waserda</span>';
-                                            } else {
-                                                $transaction_class = $transaction['jenis_transaksi'] == 'setoran' ? 'transaction-positive' : 'transaction-negative';
-                                            }
-                                        ?>
-                                        <div class="list-group-item px-0 <?php echo $transaction_class; ?>">
-                                            <div class="d-flex w-100 justify-content-between">
-                                                <div>
-                                                    <small class="fw-bold">
-                                                        <?php echo $transaction['kode_transaksi']; ?>
-                                                        <?php echo $icon; ?>
-                                                    </small>
-                                                    <br>
-                                                    <small class="text-muted"><?php echo $transaction['nama_jenis']; ?></small>
-                                                    <?php if ($transaction['sumber'] == 'Waserda' && isset($transaction['keterangan'])): ?>
-                                                        <br><small class="text-muted"><?php echo $transaction['keterangan']; ?></small>
+                                    $isWaserda = ($transaction['sumber'] ?? '') === 'Waserda';
+                                    $isSetoran = !$isWaserda && ($transaction['jenis_transaksi'] ?? '') === 'setoran';
+                                    $txClass = $isWaserda ? 'is-waserda' : ($isSetoran ? 'is-in' : 'is-out');
+                                    $amtClass = $txClass;
+                                    $prefix = $isWaserda || $isSetoran ? '+' : '−';
+                                ?>
+                                <div class="list-group-item ui-member-tx-item <?php echo $txClass; ?>">
+                                    <div class="min-w-0">
+                                        <div class="ui-member-tx-code">
+                                            <?php echo htmlspecialchars($transaction['kode_transaksi']); ?>
+                                            <?php if ($isWaserda): ?>
+                                                <span class="badge bg-info-lt ms-1">Waserda</span>
                                                     <?php endif; ?>
                                                 </div>
-                                                <div class="text-end">
-                                                    <?php if ($transaction['sumber'] == 'Waserda'): ?>
-                                                        <small class="text-info fw-bold">
-                                                            + <?php echo formatRupiah($transaction['jumlah']); ?>
-                                                        </small>
-                                                    <?php else: ?>
-                                                        <small class="<?php echo $transaction['jenis_transaksi'] == 'setoran' ? 'text-success' : 'text-danger'; ?> fw-bold">
-                                                            <?php echo $transaction['jenis_transaksi'] == 'setoran' ? '+' : '-'; ?>
-                                                            <?php echo formatRupiah($transaction['jumlah']); ?>
-                                                        </small>
+                                        <div class="ui-member-tx-sub">
+                                            <?php echo htmlspecialchars($transaction['nama_jenis']); ?>
+                                            <?php if ($isWaserda && !empty($transaction['keterangan'])): ?>
+                                                · <?php echo htmlspecialchars($transaction['keterangan']); ?>
                                                     <?php endif; ?>
-                                                    <br>
-                                                    <small class="text-muted">
-                                                        <?php echo formatTanggalUi($transaction['tanggal_transaksi'], true); ?>
-                                                    </small>
                                                 </div>
                                             </div>
+                                    <div class="text-end flex-shrink-0">
+                                        <div class="ui-member-tx-amt <?php echo $amtClass; ?>">
+                                            <?php echo $prefix; ?> <?php echo formatRupiah($transaction['jumlah']); ?>
                                         </div>
-                                        <?php endforeach; ?>
+                                        <span class="ui-member-tx-date"><?php echo formatTanggalUi($transaction['tanggal_transaksi'], true, true); ?></span>
                                     </div>
-                                <?php else: ?>
-                                    <p class="text-muted text-center mb-0">Belum ada transaksi</p>
-                                <?php endif; ?>
+                                </div>
+                                <?php endforeach; ?>
                             </div>
+                            <?php else: ?>
+                            <div class="ui-dash-empty"><i class="ti ti-inbox" aria-hidden="true"></i><span>Belum ada transaksi</span></div>
+                            <?php endif; ?>
                         </div>
 
-                        <!-- Active Loans (DENGAN BUNGA) -->
                         <?php if (!empty($active_loans)): ?>
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h6 class="mb-0"><i class="fas fa-list me-2"></i>Pinjaman Aktif</h6>
+                        <div class="card mb-0">
+                            <div class="card-header ui-dash-sec">
+                                <span class="ui-dash-sec-title"><i class="ti ti-list" aria-hidden="true"></i>Pinjaman aktif</span>
+                                <span class="ui-dash-sec-note"><?php echo count($active_loans); ?> kontrak</span>
                             </div>
                             <div class="card-body">
                                 <div class="list-group list-group-flush">
@@ -546,85 +538,34 @@ $total_waserda = $stmt_total_waserda->fetch(PDO::FETCH_ASSOC);
                                         $sisa_bunga = $loan['total_pinjaman'] - $loan['jumlah_pinjaman'];
                                         $total_sisa = $loan['sisa_pokok'] + $sisa_bunga;
                                     ?>
-                                    <div class="list-group-item px-0">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <div>
-                                                <small class="fw-bold"><?php echo $loan['kode_pinjaman']; ?></small>
+                                    <div class="list-group-item ui-member-loan-item">
+                                        <div class="min-w-0">
+                                            <div class="ui-member-loan-code"><?php echo htmlspecialchars($loan['kode_pinjaman']); ?></div>
+                                            <div class="ui-member-loan-meta">
+                                                <?php echo htmlspecialchars($loan['nama_jenis']); ?>
+                                                · <?php echo htmlspecialchars(labelBungaRow($loan)); ?>
                                                 <br>
-                                                <small class="text-muted"><?php echo $loan['nama_jenis']; ?> (<?php echo labelBungaRow($loan); ?>)</small>
-                                                <br>
-                                                <small class="loan-detail">
-                                                    Tenor: <?php echo labelTenorRow($loan); ?> | Jatuh tempo: <?php echo formatTanggalUi($loan['jatuh_tempo']); ?>
-                                                </small>
-                                            </div>
-                                            <div class="text-end">
-                                                <small class="text-warning fw-bold">
-                                                    <?php echo formatRupiah($loan['jumlah_pinjaman']); ?>
-                                                </small>
-                                                <br>
-                                                <small class="text-info">
-                                                    Bunga: <?php echo formatRupiah($sisa_bunga); ?>
-                                                </small>
-                                                <br>
-                                                <small class="text-danger">
-                                                    Sisa: <?php echo formatRupiah($total_sisa); ?>
-                                                </small>
+                                                Tenor <?php echo htmlspecialchars(labelTenorRow($loan)); ?>
+                                                · JT <?php echo formatTanggalUi($loan['jatuh_tempo'], false, true); ?>
+                                                · Cair <?php echo formatTanggalUi($loan['tanggal_pencairan'], false, true); ?>
                                             </div>
                                         </div>
-                                        <small class="text-muted">
-                                            Cair: <?php echo formatTanggalUi($loan['tanggal_pencairan']); ?>
-                                        </small>
+                                        <div class="ui-member-loan-figures flex-shrink-0">
+                                            <strong class="text-warning"><?php echo formatRupiah($loan['jumlah_pinjaman']); ?></strong>
+                                            <span class="text-muted">Bunga <?php echo formatRupiah($sisa_bunga); ?></span><br>
+                                            <span class="text-danger fw-semibold">Sisa <?php echo formatRupiah($total_sisa); ?></span>
+                                        </div>
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
                             </div>
                         </div>
                         <?php endif; ?>
-                        
-                        <!-- Quick Actions -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="mb-0"><i class="fas fa-bolt me-2"></i>Aksi Cepat</h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-3 mb-2">
-                                        <a href="setoran.php?anggota_id=<?php echo $id; ?>" class="btn btn-success btn-sm w-100">
-                                            <i class="fas fa-plus me-1"></i>Setor Simpanan
-                                        </a>
-                                    </div>
-                                    <div class="col-md-3 mb-2">
-                                        <a href="pengajuan.php?anggota_id=<?php echo $id; ?>" class="btn btn-warning btn-sm w-100">
-                                            <i class="fas fa-hand-holding-usd me-1"></i>Ajukan Pinjaman
-                                        </a>
-                                    </div>
-                                    <div class="col-md-3 mb-2">
-                                        <a href="penarikan.php?anggota_id=<?php echo $id; ?>" class="btn btn-info btn-sm w-100">
-                                            <i class="fas fa-minus me-1"></i>Penarikan Simpanan
-                                        </a>
-                                    </div>
-                                    <div class="col-md-3 mb-2">
-                                        <a href="pembelian.php?anggota_id=<?php echo $id; ?>" class="btn btn-primary btn-sm w-100">
-                                            <i class="fas fa-shopping-cart me-1"></i>Waserda
-                                        </a>
-                                    </div>
-                                    <?php if (isAdmin()): ?>
-                                    <div class="col-md-3 mb-2">
-                                        <a href="laporan_anggota.php?id=<?php echo $id; ?>" class="btn btn-secondary btn-sm w-100">
-                                            <i class="fas fa-print me-1"></i>Cetak Laporan
-                                        </a>
-                                    </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
+                    </div>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
+            <?php include __DIR__ . '/layout/shell_end.php'; ?>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <?php include __DIR__ . '/modal_dokumen.php'; ?>
 </body>
 </html>

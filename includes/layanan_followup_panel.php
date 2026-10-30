@@ -1,16 +1,79 @@
-<?php if(isAdmin()):
-$servicePending=[];$servicePendingCount=0;
-foreach(['layanan_pengajuan_hapus_denda'=>'Penghapusan denda','layanan_pelunasan'=>'Pelunasan dipercepat','layanan_jaminan_kembali'=>'Pengembalian jaminan','layanan_prioritas'=>'Anggota prioritas','layanan_laporan_macet'=>'Laporan macet'] as $serviceTable=>$serviceTitle){
-    $serviceItems=$db->query("SELECT l.pinjaman_id,a.nama_lengkap FROM $serviceTable l JOIN pinjaman p ON p.id=l.pinjaman_id JOIN anggota a ON a.id=p.anggota_id WHERE l.status='menunggu' ORDER BY l.id DESC")->fetchAll(PDO::FETCH_ASSOC);
-    $servicePending[]=['title'=>$serviceTitle,'items'=>$serviceItems,'tab'=>in_array($serviceTable,['layanan_jaminan_kembali','layanan_prioritas'],true)?'lunas':'macet'];$servicePendingCount+=count($serviceItems);
-}
+<?php
+/**
+ * Panel tindak lanjut di bawah daftar layanan.
+ * Inbox "Perlu ditinjau Admin" dihapus — sudah ada notifikasi di topbar.
+ */
+if (isAdmin() && $tab === 'lunas'):
+$repeatItems = array_values(array_filter($rows, function ($loan) {
+    return $loan['status'] === 'lunas'
+        && $loan['tanggal_lunas']
+        && $loan['tanggal_lunas'] <= date('Y-m-d', strtotime('-7 days'))
+        && !$loan['repeat_selesai'];
+}));
 ?>
-<section id="perlu-ditinjau" class="card service-section"><div class="card-header"><h2 class="h5 mb-0">Perlu ditinjau Admin</h2><span class="badge bg-<?= $servicePendingCount?'warning':'success' ?>"><?= $servicePendingCount ?> pengajuan</span></div><div class="card-body">
-<?php if(!$servicePendingCount): ?><div class="service-empty compact"><strong>Semua pengajuan sudah ditinjau</strong><p>Pengajuan baru dari Teller akan muncul di bagian ini.</p></div><?php else: ?><div class="service-pending-grid"><?php foreach($servicePending as $serviceGroup): if(!$serviceGroup['items'])continue; ?><div class="service-pending"><h3 class="h6"><?= layananEscape($serviceGroup['title']) ?> <span class="badge bg-warning"><?= count($serviceGroup['items']) ?></span></h3><?php foreach($serviceGroup['items'] as $item): ?><a class="d-block py-2" href="detail_layanan.php?tab=<?= $serviceGroup['tab'] ?>&amp;id=<?= (int)$item['pinjaman_id'] ?>"><?= layananEscape($item['nama_lengkap']) ?> <i class="fas fa-arrow-right ms-1" aria-hidden="true"></i></a><?php endforeach; ?></div><?php endforeach; ?></div><?php endif; ?></div></section>
-<?php if($tab==='lunas'):
-$repeatItems=array_values(array_filter($rows,function($loan){return $loan['status']==='lunas' && $loan['tanggal_lunas'] && $loan['tanggal_lunas']<=date('Y-m-d',strtotime('-7 days')) && !$loan['repeat_selesai'];})); ?>
-<section class="card service-section"><div class="card-header"><h2 class="h5 mb-0">Penawaran pinjaman ulang</h2><span class="badge bg-primary"><?= count($repeatItems) ?> perlu ditindaklanjuti</span></div><div class="card-body"><p class="text-muted small">Nasabah yang sudah lunas minimal 7 hari dan belum ditandai selesai ditindaklanjuti.</p><?php if(!$repeatItems): ?><div class="service-empty compact"><strong>Belum ada penawaran yang perlu ditindaklanjuti</strong><p>Pengingat akan muncul otomatis setelah 7 hari pelunasan.</p></div><?php else: foreach($repeatItems as $loan): ?><a class="btn btn-outline-primary m-1" href="detail_layanan.php?tab=lunas&id=<?= (int)$loan['id'] ?>"><?= layananEscape($loan['nama_lengkap']) ?> · <?= layananEscape($loan['tanggal_lunas']) ?></a><?php endforeach;endif; ?></div></section>
-<?php endif;endif;
-$nearlyPaid=array_values(array_filter($rows,function($loan){return (int)$loan['sisa_cicilan']===1 && $loan['terakhir']>=date('Y-m-d') && $loan['terakhir']<=date('Y-m-d',strtotime('+7 days'));})); ?>
-<section class="card service-section"><div class="card-header"><div><h2 class="h5 mb-1">Akan lunas dalam 7 hari</h2><p class="text-muted mb-0 small">Sisa satu cicilan. Periksa kesiapan jaminan sebelum diserahkan.</p></div><span class="badge bg-primary"><?= count($nearlyPaid) ?> pinjaman</span></div><div class="card-body">
-<?php if(!$nearlyPaid): ?><div class="service-empty compact"><strong>Belum ada cicilan terakhir yang jatuh tempo dalam 7 hari</strong><p>Daftar ini diperbarui otomatis berdasarkan jadwal angsuran.</p></div><?php else: ?><div class="table-responsive"><table class="table"><thead><tr><th>Nasabah</th><th>Sisa bayar</th><th>Jatuh tempo terakhir</th><th>Jaminan</th><th>Aksi</th></tr></thead><tbody><?php foreach($nearlyPaid as $loan): ?><tr><td><?= layananEscape($loan['nama_lengkap']) ?></td><td><?= formatRupiah($loan['sisa_tagihan']) ?></td><td><?= layananEscape($loan['terakhir']) ?></td><td><?= layananEscape($loan['status_jaminan'] ?: 'Tanpa jaminan') ?></td><td><a class="btn btn-sm btn-outline-primary" href="detail_layanan.php?tab=macet&id=<?= (int)$loan['id'] ?>">Periksa pinjaman</a></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?></div></section>
+<section class="card mt-3 ui-ly-follow">
+    <div class="card-header ui-dash-sec">
+        <div>
+            <span class="ui-dash-sec-title"><i class="ti ti-refresh" aria-hidden="true"></i>Penawaran pinjaman ulang</span>
+            <p class="text-muted small mb-0 mt-1">Lunas ≥ 7 hari dan belum ditandai selesai ditindaklanjuti.</p>
+        </div>
+        <span class="ui-dash-sec-note"><?= count($repeatItems) ?> nasabah</span>
+    </div>
+    <div class="card-body">
+        <?php if (!$repeatItems): ?>
+        <div class="ui-ly-empty compact"><i class="ti ti-mood-smile" aria-hidden="true"></i><div><strong>Belum ada penawaran</strong><p class="mb-0">Pengingat muncul otomatis setelah 7 hari pelunasan.</p></div></div>
+        <?php else: ?>
+        <div class="ui-ly-follow-grid">
+            <?php foreach ($repeatItems as $loan): ?>
+            <a class="ui-ly-follow-card" href="detail_layanan.php?tab=lunas&amp;id=<?= (int)$loan['id'] ?>">
+                <span class="ui-ly-follow-avatar" aria-hidden="true"><i class="ti ti-user"></i></span>
+                <span class="ui-ly-follow-copy">
+                    <strong><?= layananEscape($loan['nama_lengkap']) ?></strong>
+                    <small>Lunas <?= layananEscape(formatTanggalUi($loan['tanggal_lunas'])) ?></small>
+                </span>
+                <i class="ti ti-chevron-right ui-ly-follow-go" aria-hidden="true"></i>
+            </a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</section>
+<?php
+endif;
+
+$nearlyPaid = array_values(array_filter($rows, function ($loan) {
+    return (int)$loan['sisa_cicilan'] === 1
+        && $loan['terakhir'] >= date('Y-m-d')
+        && $loan['terakhir'] <= date('Y-m-d', strtotime('+7 days'));
+}));
+?>
+<section class="card mt-3 ui-ly-follow">
+    <div class="card-header ui-dash-sec">
+        <div>
+            <span class="ui-dash-sec-title"><i class="ti ti-calendar-event" aria-hidden="true"></i>Akan lunas dalam 7 hari</span>
+            <p class="text-muted small mb-0 mt-1">Sisa satu cicilan — siapkan pengembalian jaminan bila perlu.</p>
+        </div>
+        <span class="ui-dash-sec-note"><?= count($nearlyPaid) ?> pinjaman</span>
+    </div>
+    <div class="card-body<?= $nearlyPaid ? ' p-2' : '' ?>">
+        <?php if (!$nearlyPaid): ?>
+        <div class="ui-ly-empty compact"><i class="ti ti-calendar-check" aria-hidden="true"></i><div><strong>Tidak ada cicilan terakhir dalam 7 hari</strong><p class="mb-0">Daftar diperbarui otomatis dari jadwal angsuran.</p></div></div>
+        <?php else: ?>
+        <div class="ui-ly-follow-list">
+            <?php foreach ($nearlyPaid as $loan): ?>
+            <article class="ui-ly-follow-row">
+                <div class="ui-ly-follow-main">
+                    <strong class="ui-ly-member"><?= layananEscape($loan['nama_lengkap']) ?></strong>
+                    <small class="ui-ly-kode">JT terakhir <?= layananEscape(formatTanggalUi($loan['terakhir'])) ?> · <?= layananEscape($loan['status_jaminan'] ?: 'Tanpa jaminan') ?></small>
+                </div>
+                <div class="ui-ly-follow-amt">
+                    <span>Sisa bayar</span>
+                    <strong><?= formatRupiah($loan['sisa_tagihan']) ?></strong>
+                </div>
+                <a class="btn btn-sm btn-outline-primary" href="detail_layanan.php?tab=macet&amp;id=<?= (int)$loan['id'] ?>">Periksa</a>
+            </article>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</section>

@@ -1,36 +1,28 @@
 <?php
 /**
- * Shared front-end assets for app shell (Tabler icons + existing app theme).
- * Aman dipanggil berkali-kali (head halaman + header.php) tanpa dobel script/CSS.
+ * CSS bersama (Tabler UI, ikon, DataTables, tema SIMKEU) � semua aset lokal.
+ * Aman dipanggil berkali-kali (tanpa dobel link). $uiAssetPrefix: '../' (admin/teller/anggota) atau '' (root).
  */
 $uiAssetPrefix = $uiAssetPrefix ?? '../';
-$uiUseTablerCss = !empty($uiUseTablerCss);
-$uiAssetPrefixH = htmlspecialchars($uiAssetPrefix, ENT_QUOTES, 'UTF-8');
-
-if (empty($GLOBALS['simkeu_ui_css_core'])) {
-    $GLOBALS['simkeu_ui_css_core'] = true;
-    ?>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.12.0/dist/tabler-icons.min.css">
-<link rel="stylesheet" href="<?= $uiAssetPrefixH ?>assets/css/app-ui.css?v=20261029-ac1">
-<link rel="stylesheet" href="<?= $uiAssetPrefixH ?>assets/css/upload-foto.css?v=20261021-1">
-<link rel="stylesheet" href="<?= $uiAssetPrefixH ?>assets/css/tanda-tangan.css?v=20261029-2">
-    <?php
+if (!empty($GLOBALS['simkeu_ui_css_core'])) {
+    return;
 }
-
-if ($uiUseTablerCss && empty($GLOBALS['simkeu_tabler_css'])) {
-    $GLOBALS['simkeu_tabler_css'] = true;
-    ?>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css">
-<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/js/tabler.min.js" defer></script>
-    <?php
-}
-
-if (empty($GLOBALS['simkeu_ui_js_core'])) {
-    $GLOBALS['simkeu_ui_js_core'] = true;
-    ?>
-<script src="<?= $uiAssetPrefixH ?>assets/js/pilihan-foto.js?v=20261023-1" defer></script>
-<script src="<?= $uiAssetPrefixH ?>assets/js/brand.js?v=20261019-6" defer></script>
-<script src="<?= $uiAssetPrefixH ?>assets/js/app-ui.js?v=20261029-ac1" defer></script>
-<script src="<?= $uiAssetPrefixH ?>assets/js/tanda-tangan-layanan.js?v=20261029-2" defer></script>
-    <?php
-}
+$GLOBALS['simkeu_ui_css_core'] = true;
+$uiRoot = dirname(__DIR__, 2);
+$uiV = static function (string $rel) use ($uiRoot): string {
+    $f = $uiRoot . '/' . $rel;
+    return is_file($f) ? (string)filemtime($f) : '1';
+};
+$uiP = htmlspecialchars($uiAssetPrefix, ENT_QUOTES, 'UTF-8');
+foreach ([
+    'assets/vendor/tabler/tabler.min.css',
+    'assets/vendor/icons/tabler-icons.min.css',
+    'assets/vendor/datatables/dataTables.bootstrap5.min.css',
+    'assets/vendor/datatables/responsive.bootstrap5.min.css',
+    'assets/css/simkeu-components.css',
+    'assets/css/simkeu-theme.css',
+    'assets/css/upload-foto.css',
+    'assets/css/tanda-tangan.css',
+] as $rel): ?>
+<link rel="stylesheet" href="<?= $uiP . $rel ?>?v=<?= $uiV($rel) ?>">
+<?php endforeach; ?>
