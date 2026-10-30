@@ -1,5 +1,7 @@
 # Data pengguna dan berkas operasional (jangan unggah ke GitHub)
 /uploads/
+/uploads.zip
+/*.zip
 /assets/uploads/
 /backups/
 /*_db.sql

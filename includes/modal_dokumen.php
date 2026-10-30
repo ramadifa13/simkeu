@@ -81,9 +81,26 @@
 
     function lihatDokumen(url, label) {
         document.getElementById('modalDokumenJudul').textContent = label;
-        document.getElementById('modalDokumenGambar').src = url;
-        document.getElementById('modalDokumenGambar').alt = label;
-        document.getElementById('modalDokumenBuka').href = url;
+        var img = document.getElementById('modalDokumenGambar');
+        var buka = document.getElementById('modalDokumenBuka');
+        img.onerror = function () {
+            img.removeAttribute('src');
+            img.alt = 'File tidak ditemukan di server';
+            var body = img.parentElement;
+            if (body && !body.querySelector('.ui-dok-missing')) {
+                var tip = document.createElement('p');
+                tip.className = 'text-muted small mt-3 ui-dok-missing';
+                tip.textContent = 'File tidak ditemukan di folder uploads/. Unggah ulang lewat menu Lengkapi foto, atau salin ulang folder uploads/ dari backup ZIP.';
+                body.appendChild(tip);
+            }
+        };
+        img.onload = function () {
+            var tip = img.parentElement && img.parentElement.querySelector('.ui-dok-missing');
+            if (tip) tip.remove();
+        };
+        img.src = url;
+        img.alt = label;
+        buka.href = url;
         bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDokumen')).show();
     }
 

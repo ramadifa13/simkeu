@@ -285,8 +285,9 @@ if ($_POST && isset($_POST['reset_total_migrasi'])) {
             foreach ($target as $table) {
                 $db->exec('DELETE FROM `' . str_replace('`', '``', $table) . '`');
             }
-            // Pertahankan Admin yang login + seluruh akun Teller.
-            $hapusUser = $db->prepare("DELETE FROM users WHERE role='anggota' OR (role='admin' AND id<>?)");
+            // Pertahankan Admin yang login + teller yang masih aktif (mis. Maulana).
+            // Teller nonaktif (sisa akun lama) dibersihkan agar tidak numpuk di Data Teller.
+            $hapusUser = $db->prepare("DELETE FROM users WHERE role='anggota' OR (role='admin' AND id<>?) OR (role='teller' AND status='nonaktif')");
             $hapusUser->execute([$adminId]);
             $db->exec("UPDATE anggota SET user_id = NULL, status = 'nonaktif'");
             $db->exec('SET FOREIGN_KEY_CHECKS=1');

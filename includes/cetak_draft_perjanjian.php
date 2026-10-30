@@ -13,9 +13,9 @@ $stmt=$db->prepare("SELECT pp.*,jp.nama_jenis,jp.memerlukan_jaminan,a.nama_lengk
  j.jenis_barang,j.identitas_barang,j.deskripsi_barang
  FROM pengajuan_pinjaman pp JOIN jenis_pinjaman jp ON jp.id=pp.jenis_pinjaman_id JOIN anggota a ON a.id=pp.anggota_id
  LEFT JOIN jaminan_pinjaman j ON j.pengajuan_id=pp.id
- WHERE pp.id=? AND pp.status='disetujui'");
+ WHERE pp.id=? AND pp.status IN ('disetujui','dicairkan')");
 $stmt->execute([$id]);$p=$stmt->fetch(PDO::FETCH_ASSOC);
-if(!$p){http_response_code(404);exit('Pengajuan tidak ditemukan atau belum disetujui.');}
+if(!$p){http_response_code(404);exit('Pengajuan tidak ditemukan atau belum disetujui/dicairkan.');}
 $k=$db->query('SELECT * FROM koperasi WHERE id=1')->fetch(PDO::FETCH_ASSOC) ?: [];
 $aturan=pengaturanPerjanjian($db);$h=hitungDariPinjaman($p);$tgl=date('Y-m-d');
 $akhir=hitungJatuhTempo($tgl,$h['jumlah_cicilan'],$h['frekuensi']);

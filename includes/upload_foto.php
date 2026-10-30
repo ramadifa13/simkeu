@@ -367,6 +367,21 @@ if (!function_exists('urlFoto')) {
     }
 }
 
+if (!function_exists('fotoFileAda')) {
+    /** True bila path relatif uploads/ mengarah ke file gambar yang benar-benar ada di disk. */
+    function fotoFileAda($path) {
+        if ($path === null || $path === '' || strpos((string) $path, '..') !== false) {
+            return false;
+        }
+        $root = realpath(__DIR__ . '/../uploads');
+        if ($root === false) {
+            return false;
+        }
+        $file = realpath($root . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, (string) $path));
+        return $file && strpos($file, $root . DIRECTORY_SEPARATOR) === 0 && is_file($file);
+    }
+}
+
 if (!function_exists('fotoNasabahAnggota')) {
     /** Foto pinjaman berjalan pertama; bila semuanya lunas, gunakan pencairan terakhir. */
     function fotoNasabahAnggota($db, $anggota_id) {

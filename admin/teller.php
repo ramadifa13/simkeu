@@ -115,6 +115,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: teller.php');
         exit;
     }
+
+    if (isset($_POST['hapus'])) {
+        try {
+            layananValidasiToken();
+            $id = (int) ($_POST['id'] ?? 0);
+            if ($id < 1) {
+                throw new Exception('Teller tidak valid.');
+            }
+            $cek = $db->prepare("SELECT id, nama_lengkap, status FROM users WHERE id = ? AND role = 'teller'");
+            $cek->execute([$id]);
+            $row = $cek->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                throw new Exception('Teller tidak ditemukan.');
+            }
+            // Lindungi teller aktif terakhir agar aplikasi tidak kehilangan petugas.
+            if (($row['status'] ?? '') === 'aktif') {
+                $aktifLain = (int) $db->query(
+                    "SELECT COUNT(*) FROM users WHERE role = 'teller' AND status = 'aktif' AND id <> " . (int) $id
+                )->fetchColumn();
+                if ($aktifLain < 1) {
+                    throw new Exception('Tidak dapat menghapus teller aktif terakhir. Nonaktifkan dulu atau buat teller lain.');
+                }
+            }
+            $del = $db->prepare("DELETE FROM users WHERE id = ? AND role = 'teller'");
+            $del->execute([$id]);
+            if ($del->rowCount() < 1) {
+                throw new Exception('Gagal menghapus teller.');
+            }
+            $_SESSION['success'] = 'Teller "' . $row['nama_lengkap'] . '" berhasil dihapus.';
+        } catch (Exception $e) {
+            $_SESSION['error'] = $e->getMessage();
+        }
+        header('Location: teller.php');
+        exit;
+    }
 }
 
 $tellers = $db->query(
@@ -255,6 +290,18 @@ $page_title = 'Data Teller';
                                                         'data-bs-toggle' => 'modal',
                                                         'data-bs-target' => '#resetModal',
                                                         'data-id' => (int)$teller['id'],
+                                                        'data-nama' => $teller['nama_lengkap'],
+                                                        'data-username' => $teller['username'],
+                                                    ],
+                                                ],
+                                                [
+                                                    'label' => 'Hapus',
+                                                    'icon' => 'ti ti-trash',
+                                                    'class' => 'text-danger',
+                                                    'attrs' => [
+                                                        'data-bs-toggle' => 'modal',
+                                                        'data-bs-target' => '#hapusModal',
+                                                        'data-id' => (int) $teller['id'],
                                                         'data-nama' => $teller['nama_lengkap'],
                                                         'data-username' => $teller['username'],
                                                     ],
@@ -483,9 +530,36 @@ $page_title = 'Data Teller';
         </div>
     </div>
 
+    <div class="modal fade ui-tlr-modal" id="hapusModal" tabindex="-1" aria-labelledby="hapusModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST"><?php echo layananToken(); ?>
+                    <div class="modal-header">
+                        <h2 class="modal-title h5" id="hapusModalLabel">Hapus teller</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="id" id="hapus_id">
+                        <input type="hidden" name="hapus" value="1">
+                        <p class="mb-1">Hapus akun teller:</p>
+                        <strong id="hapus_nama"></strong>
+                        <code class="d-block mt-1" id="hapus_username"></code>
+                        <p class="text-muted small mb-0 mt-3">Akun yang dihapus tidak bisa login lagi. Teller aktif terakhir tidak dapat dihapus.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="ti ti-trash me-1" aria-hidden="true"></i>Hapus
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
     (function () {
-        ['addModal', 'editModal', 'resetModal'].forEach(function (id) {
+        ['addModal', 'editModal', 'resetModal', 'hapusModal'].forEach(function (id) {
             var el = document.getElementById(id);
             if (el && el.parentElement !== document.body) document.body.appendChild(el);
         });
@@ -581,6 +655,17 @@ $page_title = 'Data Teller';
                 document.getElementById('reset_id').value = button.getAttribute('data-id') || '';
                 document.getElementById('reset_nama').textContent = button.getAttribute('data-nama') || '';
                 document.getElementById('reset_username').textContent = '@' + (button.getAttribute('data-username') || '');
+            });
+        }
+
+        var hapusModal = document.getElementById('hapusModal');
+        if (hapusModal) {
+            hapusModal.addEventListener('show.bs.modal', function (event) {
+                var button = event.relatedTarget;
+                if (!button) return;
+                document.getElementById('hapus_id').value = button.getAttribute('data-id') || '';
+                document.getElementById('hapus_nama').textContent = button.getAttribute('data-nama') || '';
+                document.getElementById('hapus_username').textContent = '@' + (button.getAttribute('data-username') || '');
             });
         }
     })();

@@ -563,16 +563,22 @@ $statusClassMap = [
                                                 'title' => 'TC yang sudah ditolak tidak dapat diajukan ulang',
                                             ];
                                         }
-                                        if (!empty($pengajuan['foto_pencairan'])) {
+                                        $fotoPencairanAda = !empty($pengajuan['foto_pencairan']) && fotoFileAda($pengajuan['foto_pencairan']);
+                                        if ($fotoPencairanAda) {
                                             $menuItems[] = [
                                                 'label' => 'Foto nasabah',
                                                 'icon' => 'ti ti-camera',
                                                 'onclick' => 'lihatDokumen(' . json_encode(urlFoto($pengajuan['foto_pencairan']), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ', ' . json_encode('Foto nasabah - ' . $pengajuan['nama_lengkap'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) . ')',
                                             ];
                                         } elseif (!empty($pengajuan['pinjaman_id'])) {
+                                            // Path di DB ada tapi file hilang (sering setelah reset tanpa salin uploads/) → minta unggah ulang.
                                             $menuItems[] = [
-                                                'label' => 'Lengkapi foto',
+                                                'label' => !empty($pengajuan['foto_pencairan']) ? 'Lengkapi foto (file hilang)' : 'Lengkapi foto',
                                                 'icon' => 'ti ti-camera',
+                                                'class' => !empty($pengajuan['foto_pencairan']) ? 'text-warning' : '',
+                                                'title' => !empty($pengajuan['foto_pencairan'])
+                                                    ? 'Path foto ada di database, tetapi file tidak ditemukan di folder uploads/'
+                                                    : 'Foto pencairan belum diunggah',
                                                 'attrs' => [
                                                     'data-bs-toggle' => 'modal',
                                                     'data-bs-target' => '#lengkapiFotoModal',
@@ -613,11 +619,13 @@ $statusClassMap = [
                                                     'target' => '_blank',
                                                 ];
                                             } else {
+                                                // Migrasi / pencairan lama tanpa arsip TTD: tetap bisa cetak dari data pengajuan.
                                                 $menuItems[] = [
                                                     'label' => 'PDF perjanjian',
                                                     'icon' => 'ti ti-file-type-pdf',
-                                                    'disabled' => true,
-                                                    'title' => 'PDF tersedia setelah pencairan dan seluruh TTD disimpan',
+                                                    'href' => 'cetak_draft_perjanjian.php?id=' . (int)$pengajuan['id'],
+                                                    'target' => '_blank',
+                                                    'title' => 'Arsip TTD digital belum ada — cetak dari data pinjaman',
                                                 ];
                                             }
                                         }
