@@ -29,8 +29,9 @@ $nama = htmlspecialchars((string)($_SESSION['nama_lengkap'] ?? 'Pengguna'), ENT_
 $isAdmin = $dashRole === 'admin';
 $pageTitle = $isAdmin ? 'Dashboard Admin' : 'Dashboard Teller';
 
+$setoranScopeHint = $isAdmin ? 'semua teller' : 'input saya';
 $setoranHariIniHint = ((int)($d['setoran_hari_ini']['total_nasabah'] ?? 0)) . ' nasabah · '
-    . ((int)$d['setoran_hari_ini']['total_transaksi']) . ' trx (simpanan+angsuran)';
+    . ((int)$d['setoran_hari_ini']['total_transaksi']) . ' trx (' . $setoranScopeHint . ')';
 
 $primaryKpis = $isAdmin
     ? [
@@ -43,7 +44,7 @@ $primaryKpis = $isAdmin
         ['label' => 'Waserda', 'value' => formatRupiah($d['waserda_stats']['total_nominal']), 'hint' => (int)$d['waserda_stats']['total_transaksi'] . ' trx', 'icon' => 'ti ti-building-store', 'tone' => 'success'],
     ]
     : [
-        ['label' => 'Trx hari ini', 'value' => number_format((int)$d['transaksi_hari_ini']['total_transaksi']), 'hint' => 'Semua kas', 'icon' => 'ti ti-activity', 'tone' => 'primary'],
+        ['label' => 'Trx hari ini', 'value' => number_format((int)$d['transaksi_hari_ini']['total_transaksi']), 'hint' => 'Kas input saya', 'icon' => 'ti ti-activity', 'tone' => 'primary'],
         ['label' => 'Setoran hari ini', 'value' => formatRupiah($d['setoran_hari_ini']['total_setoran']), 'hint' => $setoranHariIniHint, 'icon' => 'ti ti-cash-banknote', 'tone' => 'success'],
         ['label' => 'Anggota aktif', 'value' => number_format((int)$d['stat_anggota']['aktif']), 'hint' => 'dari ' . number_format((int)$d['stat_anggota']['total']), 'icon' => 'ti ti-users', 'tone' => 'info'],
     ];

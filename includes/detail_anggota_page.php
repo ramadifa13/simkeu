@@ -226,7 +226,8 @@ $total_waserda = $stmt_total_waserda->fetch(PDO::FETCH_ASSOC);
 
 $statusAnggota = strtolower((string)($member['status'] ?? ''));
 $statusBadgeClass = $statusAnggota === 'aktif' ? 'bg-success-lt' : ($statusAnggota === 'nonaktif' || $statusAnggota === 'keluar' ? 'bg-danger-lt' : 'bg-secondary-lt');
-$inisial = strtoupper(substr((string)$member['nama_lengkap'], 0, 1));
+$inisial = function_exists('getInitials') ? getInitials($member['nama_lengkap']) : strtoupper(substr((string)$member['nama_lengkap'], 0, 1));
+$foto_nasabah = fotoNasabahAnggota($db, (int)$id);
 $shuLabel = (($member['kategori_shu'] ?? 'anggota') === 'ketua_kelompok') ? 'Ketua Kelompok' : 'Anggota';
 $shuBadge = (($member['kategori_shu'] ?? 'anggota') === 'ketua_kelompok') ? 'bg-primary-lt' : 'bg-secondary-lt';
 $aksiCepat = [
@@ -326,7 +327,13 @@ $aksiCepat = [
                     <div class="col-lg-4">
                         <div class="card mb-3">
                             <div class="ui-member-profile">
-                                <div class="ui-member-profile-avatar" aria-hidden="true"><?php echo htmlspecialchars($inisial); ?></div>
+                                <div class="ui-member-profile-avatar<?php echo $foto_nasabah !== '' ? ' has-photo' : ''; ?>" aria-hidden="true">
+                                    <?php if ($foto_nasabah !== ''): ?>
+                                        <img src="<?php echo htmlspecialchars(urlFoto($foto_nasabah)); ?>" alt="" loading="lazy" onerror="this.remove(); this.parentElement.classList.remove('has-photo'); this.parentElement.textContent=<?php echo json_encode($inisial, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;">
+                                    <?php else: ?>
+                                        <?php echo htmlspecialchars($inisial); ?>
+                                    <?php endif; ?>
+                                </div>
                                 <h2 class="ui-member-profile-name"><?php echo htmlspecialchars($member['nama_lengkap']); ?></h2>
                                 <div class="ui-member-profile-code">
                                     <span><?php echo htmlspecialchars($member['kode_anggota']); ?></span>

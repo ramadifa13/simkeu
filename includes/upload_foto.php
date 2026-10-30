@@ -385,23 +385,47 @@ if (!function_exists('fotoFileAda')) {
 if (!function_exists('fotoNasabahAnggota')) {
     /** Foto pinjaman berjalan pertama; bila semuanya lunas, gunakan pencairan terakhir. */
     function fotoNasabahAnggota($db, $anggota_id) {
-        if (!kolomAda($db, 'pinjaman', 'foto_pencairan')) {
-            return '';
+        $map = fotoNasabahAnggotaMap($db, [(int) $anggota_id]);
+        return (string) ($map[(int) $anggota_id] ?? '');
+    }
+}
+
+if (!function_exists('fotoNasabahAnggotaMap')) {
+    /**
+     * Peta anggota_id => path foto nasabah saat menerima uang (foto_pencairan).
+     * Prefer pinjaman berjalan (tertua); jika semua lunas, pakai pencairan terakhir yang punya foto.
+     *
+     * @param list<int|string> $anggotaIds
+     * @return array<int,string>
+     */
+    function fotoNasabahAnggotaMap($db, array $anggotaIds): array {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $anggotaIds))));
+        if ($ids === [] || !kolomAda($db, 'pinjaman', 'foto_pencairan')) {
+            return [];
         }
-        // Satu pinjaman berjalan memakai fotonya sendiri. Jika ada dua,
-        // pencairan kedua tidak mengganti foto dari pinjaman berjalan pertama.
-        $stmt = $db->prepare("SELECT foto_pencairan FROM pinjaman
-                              WHERE anggota_id = ? AND status <> 'lunas'
-                              ORDER BY tanggal_pencairan ASC, id ASC LIMIT 1");
-        $stmt->execute([$anggota_id]);
-        $berjalan = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($berjalan !== false) {
-            return (string) ($berjalan['foto_pencairan'] ?? '');
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $db->prepare("SELECT anggota_id, foto_pencairan, status, tanggal_pencairan, id
+            FROM pinjaman
+            WHERE anggota_id IN ($ph)
+              AND foto_pencairan IS NOT NULL AND foto_pencairan <> ''
+            ORDER BY anggota_id ASC,
+              CASE WHEN status <> 'lunas' THEN 0 ELSE 1 END ASC,
+              CASE WHEN status <> 'lunas' THEN tanggal_pencairan END ASC,
+              CASE WHEN status <> 'lunas' THEN id END ASC,
+              CASE WHEN status = 'lunas' THEN tanggal_pencairan END DESC,
+              CASE WHEN status = 'lunas' THEN id END DESC");
+        $stmt->execute($ids);
+        $map = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $aid = (int) $row['anggota_id'];
+            if (isset($map[$aid])) {
+                continue;
+            }
+            $path = trim((string) ($row['foto_pencairan'] ?? ''));
+            if ($path !== '') {
+                $map[$aid] = $path;
+            }
         }
-        $stmt = $db->prepare("SELECT foto_pencairan FROM pinjaman
-                              WHERE anggota_id = ? AND foto_pencairan IS NOT NULL AND foto_pencairan <> ''
-                              ORDER BY tanggal_pencairan DESC, id DESC LIMIT 1");
-        $stmt->execute([$anggota_id]);
-        return (string) $stmt->fetchColumn();
+        return $map;
     }
 }

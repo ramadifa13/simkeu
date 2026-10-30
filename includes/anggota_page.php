@@ -383,6 +383,7 @@ foreach ($params as $key => $value) {
 }
 $stmt->execute();
 $anggota_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$foto_nasabah_map = fotoNasabahAnggotaMap($db, array_column($anggota_list, 'id'));
 
 $ketua_shu_list = $db->query("SELECT id, kode_anggota, nama_lengkap FROM anggota WHERE kategori_shu = 'ketua_kelompok' AND status = 'aktif' ORDER BY nama_lengkap")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -471,11 +472,18 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                         $delBtnId = 'delBtn' . (int)$anggota['id'];
                                         $initials = function_exists('getInitials') ? getInitials($anggota['nama_lengkap']) : strtoupper(substr($anggota['nama_lengkap'], 0, 1));
                                         $isJaminan = strpos($anggota['kode_anggota'], 'AGTJ') === 0;
+                                        $fotoNasabah = $foto_nasabah_map[(int)$anggota['id']] ?? '';
                                     ?>
                                     <tr>
                                         <td>
                                             <div class="ui-members-person">
-                                                <span class="ui-members-avatar" aria-hidden="true"><?php echo htmlspecialchars($initials); ?></span>
+                                                <span class="ui-members-avatar<?php echo $fotoNasabah !== '' ? ' has-photo' : ''; ?>" aria-hidden="true">
+                                                    <?php if ($fotoNasabah !== ''): ?>
+                                                        <img src="<?php echo htmlspecialchars(urlFoto($fotoNasabah)); ?>" alt="" loading="lazy" onerror="this.remove(); this.parentElement.classList.remove('has-photo'); this.parentElement.textContent=<?php echo json_encode($initials, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;">
+                                                    <?php else: ?>
+                                                        <?php echo htmlspecialchars($initials); ?>
+                                                    <?php endif; ?>
+                                                </span>
                                                 <div class="ui-members-person-meta">
                                                     <div class="ui-members-person-name"><?php echo htmlspecialchars($anggota['nama_lengkap']); ?></div>
                                                     <div class="ui-members-person-code">

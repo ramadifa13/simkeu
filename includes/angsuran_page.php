@@ -852,10 +852,18 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                 $isGadai = !empty($pinjaman['memerlukan_jaminan']);
                                 $punyaPb = ($pinjaman['n_pb']['menunggu'] > 0)
                                     || (isTeller() && ($pinjaman['n_pb']['disetujui'] > 0 || $pinjaman['n_pb']['ditolak'] > 0));
+                                $fotoNasabah = trim((string)($pinjaman['foto_pencairan'] ?? ''));
+                                $inisialAvatar = $inisial !== '' ? $inisial : '?';
                             ?>
                             <div class="ui-ag-loan tone-<?php echo $statusTone; ?><?php echo $punyaPb ? ' has-alert' : ''; ?>" data-nik="<?php echo layananEscape($pinjaman['ktp']); ?>">
                                 <a href="detail_angsuran.php?pinjaman_id=<?php echo $pinjaman['id'] . $qs_filter; ?>" class="ui-ag-loan-link">
-                                    <div class="ui-ag-loan-avatar" aria-hidden="true"><?php echo htmlspecialchars($inisial !== '' ? $inisial : '?'); ?></div>
+                                    <div class="ui-ag-loan-avatar<?php echo $fotoNasabah !== '' ? ' has-photo' : ''; ?>" aria-hidden="true">
+                                        <?php if ($fotoNasabah !== ''): ?>
+                                            <img src="<?php echo htmlspecialchars(urlFoto($fotoNasabah)); ?>" alt="" loading="lazy" onerror="this.remove(); this.parentElement.classList.remove('has-photo'); this.parentElement.textContent=<?php echo json_encode($inisialAvatar, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;">
+                                        <?php else: ?>
+                                            <?php echo htmlspecialchars($inisialAvatar); ?>
+                                        <?php endif; ?>
+                                    </div>
                                     <div class="ui-ag-loan-main min-w-0">
                                         <div class="ui-ag-loan-top">
                                             <div class="min-w-0">

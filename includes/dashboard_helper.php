@@ -217,19 +217,34 @@ if (!function_exists('dashboardLoadStaffData')) {
             ORDER BY a.tanggal_bayar DESC, a.created_at DESC
             LIMIT 6");
 
+        // Teller: hanya transaksi yang diinput dirinya. Admin: gabungan semua input teller/admin.
+        $kasHariIniSql = 'SELECT COUNT(*) FROM kas k
+            LEFT JOIN transaksi t ON t.id = k.transaksi_id
+            WHERE DATE(k.tanggal) = ?';
+        $kasHariIniParams = [$today];
+        if (!$isAdmin) {
+            $kasHariIniSql .= ' AND t.user_id = ?';
+            $kasHariIniParams[] = $userId;
+        }
         $transaksiHariIni = [
-            'total_transaksi' => (int)dashboardFetchScalar($db, 'SELECT COUNT(*) FROM kas WHERE DATE(tanggal) = ?', [$today]),
+            'total_transaksi' => (int)dashboardFetchScalar($db, $kasHariIniSql, $kasHariIniParams),
         ];
-        // Setoran hari ini = kas masuk operasional (simpanan + angsuran/migrasi bayar).
-        // Waserda dikecualikan (ada KPI tersendiri). Label "setoran" harus mencerminkan uang masuk yang diinput teller/admin.
-        $setoranHariIni = dashboardFetchRow($db, "SELECT
+
+        // Setoran hari ini = kas masuk operasional (simpanan + angsuran). Waserda dikecualikan.
+        $setoranSql = "SELECT
                 COUNT(*) AS total_transaksi,
                 COALESCE(SUM(k.jumlah), 0) AS total_setoran,
                 COUNT(DISTINCT t.anggota_id) AS total_nasabah
             FROM kas k
-            LEFT JOIN transaksi t ON t.id = k.transaksi_id
+            INNER JOIN transaksi t ON t.id = k.transaksi_id
             WHERE k.jenis = 'masuk' AND DATE(k.tanggal) = ?
-              AND (k.keterangan IS NULL OR k.keterangan = '' OR k.keterangan NOT LIKE '%Waserda%')", [$today])
+              AND (k.keterangan IS NULL OR k.keterangan = '' OR k.keterangan NOT LIKE '%Waserda%')";
+        $setoranParams = [$today];
+        if (!$isAdmin) {
+            $setoranSql .= ' AND t.user_id = ?';
+            $setoranParams[] = $userId;
+        }
+        $setoranHariIni = dashboardFetchRow($db, $setoranSql, $setoranParams)
             ?: ['total_transaksi' => 0, 'total_setoran' => 0, 'total_nasabah' => 0];
 
         return [

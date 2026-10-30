@@ -559,7 +559,9 @@ table.dataTable tbody td{
 .simkeu-sidebar .dropdown-menu{margin:.1rem .75rem .35rem 1.55rem!important}
 .simkeu-sidebar .dropdown-item{margin:.1rem 0;font-size:.84rem;padding:.45rem .7rem}
 .sk-side-user{display:flex;padding:.7rem;gap:.65rem;align-items:center;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:.8rem;min-width:0}
-.sk-side-avatar{width:2.2rem;height:2.2rem;border-radius:50%;background:#6366f1;color:#fff;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.sk-side-avatar{width:2.2rem;height:2.2rem;border-radius:50%;background:#6366f1;color:#fff;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;overflow:hidden}
+.sk-side-avatar.has-photo{background:#334155;padding:0}
+.sk-side-avatar img{width:100%;height:100%;object-fit:cover;display:block}
 .sk-side-meta{display:flex;flex-direction:column;min-width:0;line-height:1.25}
 .sk-side-meta strong{color:#fff;font-size:.85rem}.sk-side-meta small{color:#c7d2fe;font-size:.72rem}
 
@@ -954,7 +956,10 @@ table.js-datatable{
   display:inline-flex;align-items:center;justify-content:center;
   background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;
   font-weight:700;font-size:.85rem;letter-spacing:.02em;
+  overflow:hidden;
 }
+.ui-members-avatar.has-photo{background:#e2e8f0;padding:0}
+.ui-members-avatar img{width:100%;height:100%;object-fit:cover;display:block}
 .ui-members-person-meta{min-width:0}
 .ui-members-person-name{font-weight:700;color:#0f172a;line-height:1.25;margin:0}
 .ui-members-person-code{font-size:.78rem;color:#64748b;display:flex;flex-wrap:wrap;align-items:center;gap:.35rem;margin-top:.1rem}
@@ -995,7 +1000,7 @@ table.js-datatable{
 .ui-members-modal .modal-footer{background:#fff;border-top:1px solid #eef2f7}
 .ui-members-modal-danger .modal-header{background:linear-gradient(135deg,#7f1d1d,#dc2626)}
 /* Data Anggota — density tabel */
-.ui-members-avatar{width:2rem;height:2rem;font-size:.75rem;border-radius:.55rem}
+.ui-members-avatar{width:2rem;height:2rem;font-size:.75rem;border-radius:.55rem;overflow:hidden}
 .ui-members-person{gap:.55rem}
 .ui-members-person-name{font-size:.9rem}
 .ui-members-contact{flex-direction:row;align-items:center;gap:.4rem;flex-wrap:nowrap}
@@ -1308,7 +1313,10 @@ button.ui-dash-btn-add:hover{
   background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;
   font-size:1.55rem;font-weight:800;letter-spacing:.02em;
   box-shadow:0 10px 24px rgba(67,56,202,.28);
+  overflow:hidden;
 }
+.ui-member-profile-avatar.has-photo{background:#e2e8f0;padding:0;box-shadow:0 8px 20px rgba(15,23,42,.12)}
+.ui-member-profile-avatar img{width:100%;height:100%;object-fit:cover;display:block}
 .ui-member-profile-name{
   margin:0;font-size:1.15rem;font-weight:800;color:#0f172a;line-height:1.25;
   word-break:break-word;
@@ -1823,7 +1831,12 @@ button.ui-dash-btn-add:hover{
   display:inline-flex;align-items:center;justify-content:center;
   background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1d4ed8;
   font-weight:800;font-size:1.05rem;letter-spacing:.02em;
+  overflow:hidden;
 }
+.ui-ag-loan-avatar.has-photo,
+.ui-ag-loan.tone-danger .ui-ag-loan-avatar.has-photo,
+.ui-ag-loan.tone-success .ui-ag-loan-avatar.has-photo{background:#e2e8f0;padding:0;color:transparent}
+.ui-ag-loan-avatar img{width:100%;height:100%;object-fit:cover;display:block}
 .ui-ag-loan.tone-danger .ui-ag-loan-avatar{
   background:linear-gradient(135deg,#fee2e2,#fecaca);color:#b91c1c;
 }

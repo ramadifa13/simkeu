@@ -119,7 +119,17 @@ if ($current_role === 'teller') {
                     </a>
                 </li>
             </ul>
-            <div class="sk-side-user d-none d-md-flex"><span class="sk-side-avatar"><?= htmlspecialchars(getInitials($_SESSION['nama_lengkap'] ?? 'U')) ?></span><span class="sk-side-meta"><strong class="text-truncate"><?= htmlspecialchars($_SESSION['nama_lengkap'] ?? 'Pengguna') ?></strong><small><?= htmlspecialchars(ucfirst($current_role)) ?> &middot; v<?= APP_VERSION ?></small></span></div>
+            <?php $sidebar_inisial = getInitials($_SESSION['nama_lengkap'] ?? 'U'); ?>
+            <div class="sk-side-user d-none d-md-flex">
+                <span class="sk-side-avatar<?= $sidebar_foto !== '' ? ' has-photo' : '' ?>">
+                    <?php if ($sidebar_foto !== ''): ?>
+                        <img src="<?= htmlspecialchars(urlFoto($sidebar_foto)) ?>" alt="" loading="lazy" onerror="this.remove(); this.parentElement.classList.remove('has-photo'); this.parentElement.textContent=<?= json_encode($sidebar_inisial, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;">
+                    <?php else: ?>
+                        <?= htmlspecialchars($sidebar_inisial) ?>
+                    <?php endif; ?>
+                </span>
+                <span class="sk-side-meta"><strong class="text-truncate"><?= htmlspecialchars($_SESSION['nama_lengkap'] ?? 'Pengguna') ?></strong><small><?= htmlspecialchars(ucfirst($current_role)) ?> &middot; v<?= APP_VERSION ?></small></span>
+            </div>
         </div>
     </div>
 </aside>
