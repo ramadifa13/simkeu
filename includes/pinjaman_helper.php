@@ -288,7 +288,9 @@ if (!function_exists('buatPinjamanDanJadwal')) {
         $hitung = hitungDariPinjaman($pengajuan);
         $n = $hitung['jumlah_cicilan'];
         $jatuh_tempo_akhir = hitungJatuhTempo($tanggal_mulai, $n, $hitung['frekuensi']);
-        $kode_pinjaman = 'PJN-' . date('Ymd') . '-' . str_pad($pengajuan['id'], 4, '0', STR_PAD_LEFT);
+        // Placeholder unik dulu; diganti ke kode berbasis pinjaman_id agar tidak bentrok
+        // dengan nomor perjanjian (dulu suffix = pengajuan_id → mudah salah cetak PDF).
+        $kode_sementara = 'PJN-' . date('Ymd') . '-TMP-' . bin2hex(random_bytes(4));
 
         $stmt = $db->prepare("INSERT INTO pinjaman
             (pengajuan_id, kode_pinjaman, anggota_id, jenis_pinjaman_id, jumlah_pinjaman, sisa_pokok,
@@ -296,13 +298,15 @@ if (!function_exists('buatPinjamanDanJadwal')) {
              tanggal_pencairan, jatuh_tempo, kategori_shu, ketua_kelompok_id, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'aktif')");
         $stmt->execute([
-            $pengajuan['id'], $kode_pinjaman, $pengajuan['anggota_id'], $pengajuan['jenis_pinjaman_id'],
+            $pengajuan['id'], $kode_sementara, $pengajuan['anggota_id'], $pengajuan['jenis_pinjaman_id'],
             $hitung['pokok'], $hitung['pokok'], $hitung['tenor'], $hitung['bunga_persen'],
             $hitung['skema'], $hitung['frekuensi'], $n, $hitung['total'], $hitung['angsuran'],
             $tanggal_pencairan, $jatuh_tempo_akhir,
             shuKategoriAnggota($pengajuan['kategori_shu'] ?? 'anggota'), $pengajuan['ketua_kelompok_id'] ?: null,
         ]);
-        $pinjaman_id = $db->lastInsertId();
+        $pinjaman_id = (int)$db->lastInsertId();
+        $kode_pinjaman = 'PJN-' . date('Ymd') . '-' . str_pad((string)$pinjaman_id, 4, '0', STR_PAD_LEFT);
+        $db->prepare('UPDATE pinjaman SET kode_pinjaman = ? WHERE id = ?')->execute([$kode_pinjaman, $pinjaman_id]);
 
         // Hubungkan data barang gadai dengan pinjaman yang baru dicairkan.
         // Pemeriksaan tabel menjaga kompatibilitas instalasi lama sebelum migrasi dijalankan.

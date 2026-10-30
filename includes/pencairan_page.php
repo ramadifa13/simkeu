@@ -323,7 +323,9 @@ $query = "SELECT pp.*, a.nama_lengkap,
           JOIN jenis_pinjaman jp ON pp.jenis_pinjaman_id = jp.id
           LEFT JOIN users u ON pp.admin_id = u.id
           LEFT JOIN jaminan_pinjaman j ON j.pengajuan_id = pp.id
-          LEFT JOIN pinjaman p ON pp.id = p.pengajuan_id
+          LEFT JOIN pinjaman p ON p.id = (
+              SELECT p2.id FROM pinjaman p2 WHERE p2.pengajuan_id = pp.id ORDER BY p2.id DESC LIMIT 1
+          )
           LEFT JOIN users uc ON p.dicairkan_oleh = uc.id
           LEFT JOIN perjanjian_pinjaman pr ON pr.pinjaman_id = p.id
           LEFT JOIN layanan_tunda_cair tc ON tc.pengajuan_id = pp.id
@@ -620,12 +622,14 @@ $statusClassMap = [
                                                 'href' => 'cetak_slip_pencairan.php?id=' . (int)$pengajuan['pinjaman_id'],
                                                 'target' => '_blank',
                                             ];
-                                            if (!empty($pengajuan['perjanjian_id'])) {
+                                            if (!empty($pengajuan['perjanjian_id']) && !empty($pengajuan['pinjaman_id'])) {
                                                 $menuItems[] = [
                                                     'label' => 'PDF perjanjian',
                                                     'icon' => 'ti ti-file-type-pdf',
-                                                    'href' => 'cetak_perjanjian.php?id=' . (int)$pengajuan['pinjaman_id'],
+                                                    'href' => 'cetak_perjanjian.php?id=' . (int)$pengajuan['pinjaman_id']
+                                                        . '&kode=' . rawurlencode((string)$pengajuan['kode_pinjaman']),
                                                     'target' => '_blank',
+                                                    'title' => 'PDF arsip untuk ' . (string)$pengajuan['kode_pinjaman'],
                                                 ];
                                             } else {
                                                 // Migrasi / pencairan lama tanpa arsip TTD: tetap bisa cetak dari data pengajuan.
