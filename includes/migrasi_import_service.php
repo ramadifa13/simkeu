@@ -2,6 +2,7 @@
 /** Mapper import final Excel. Satu file selalu atomik dan aman diulang. */
 require_once __DIR__ . '/migrasi_excel_helper.php';
 require_once __DIR__ . '/pinjaman_helper.php';
+require_once __DIR__ . '/denda_helper.php';
 require_once __DIR__ . '/migrasi_dokumen_cadangan.php';
 require_once __DIR__ . '/anggota_helper.php';
 
@@ -236,13 +237,24 @@ function migrasiImportFinal(PDO $db,$path,$userId=null){
             // Laporan Denda / sisa denda membaca layanan_bayar_denda — isi saat historis punya Denda.
             if ($denda > 0.005) {
                 try {
-                    $angQ = $db->prepare('SELECT id, denda FROM angsuran WHERE pinjaman_id=? AND angsuran_ke=? LIMIT 1');
+                    $angQ = $db->prepare('SELECT id, denda, tanggal_jatuh_tempo FROM angsuran WHERE pinjaman_id=? AND angsuran_ke=? LIMIT 1');
                     $angQ->execute([$loan, $ke]);
                     $angRow = $angQ->fetch(PDO::FETCH_ASSOC);
                     if ($angRow) {
                         $cekDenda = $db->prepare('SELECT id FROM layanan_bayar_denda WHERE angsuran_id=? AND transaksi_id=? LIMIT 1');
                         $cekDenda->execute([(int) $angRow['id'], (int) $trans]);
                         if (!$cekDenda->fetchColumn()) {
+                            $qPokok = $db->prepare('SELECT jumlah_pinjaman FROM pinjaman WHERE id=?');
+                            $qPokok->execute([$loan]);
+                            $pokokPinjaman = (float) $qPokok->fetchColumn();
+                            $qJaminan = $db->prepare('SELECT jp.memerlukan_jaminan FROM pinjaman p JOIN jenis_pinjaman jp ON jp.id=p.jenis_pinjaman_id WHERE p.id=?');
+                            $qJaminan->execute([$loan]);
+                            $tarif = function_exists('dendaPerHari')
+                                ? (float) dendaPerHari($db, $pokokPinjaman, (bool) $qJaminan->fetchColumn())
+                                : 0.0;
+                            // Historis migrasi: hari telat dari nominal/tarif (1500 @1500/hari = 1),
+                            // supaya cocok dengan keterangan Excel (bukan selisih ke jadwal yang bisa meleset).
+                            $hariTelat = ($tarif > 0.005) ? max(1, (int) round($denda / $tarif)) : 1;
                             $insDenda = $db->prepare(
                                 'INSERT INTO layanan_bayar_denda
                                  (angsuran_id,pinjaman_id,user_id,jumlah,metode,bukti,transaksi_id,approved_by,created_at,hari_telat,tarif,denda_awal,denda_akhir)
@@ -258,8 +270,8 @@ function migrasiImportFinal(PDO $db,$path,$userId=null){
                                 (int) $trans,
                                 (int) $userId,
                                 $date . ' 12:00:00',
-                                0,
-                                0,
+                                $hariTelat,
+                                $tarif,
                                 $denda,
                                 $denda,
                             ]);
@@ -314,6 +326,19 @@ function migrasiImportFinal(PDO $db,$path,$userId=null){
         foreach($data['Pendanaan_Dapin']??[] as $r){$code=trim((string)$r['ID Dapin*']);if($code==='')continue;migrasiKas($db,'dapin-'.$code,'masuk',migrasiUang($r['Modal Diterima (Rp)*']),migrasiTanggal($r['Tanggal Dana Diterima*'],'tanggal Dapin'),'Modal pendanaan Dapin '.$code);}
         // Status nasabah mengikuti sheet Nasabah (jangan timpa nonaktif yang disengaja).
         // Setelah Reset Total, isi Status=aktif di Excel untuk nasabah yang masih beroperasi.
+        // Cut-off migrasi: bekukan denda berjalan di cicilan belum lunas (0 + manual)
+        // supaya Laporan Denda hanya menampilkan riwayat historis yang diimpor
+        // (mis. Solikah 25/09 & Maslukah 15/10), bukan tagihan otomatis dari hari ini.
+        if (kolomAda($db, 'angsuran', 'denda_manual')) {
+            $db->exec(
+                "UPDATE angsuran
+                 SET denda = 0,
+                     keterlambatan_hari = 0,
+                     denda_manual = 1,
+                     status = CASE WHEN status = 'telat' THEN 'belum_bayar' ELSE status END
+                 WHERE status IN ('belum_bayar', 'telat')"
+            );
+        }
         migrasiRekalkulasiKas($db);
         return $n;
     });

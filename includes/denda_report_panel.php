@@ -21,12 +21,15 @@ $nasabahTelat = [];
 $cicilanBelumLunas = 0;
 foreach ($fineDueRows as $fd) {
     $calc = hitungDendaAngsuran($db, $fd, $fd['jumlah_pinjaman']);
-    $dendaTampil = max((float) $fd['denda'], (float) $calc['denda']);
+    // denda_manual=1 (termasuk cut-off migrasi) = pakai nilai tersimpan, jangan timpa hitungan otomatis.
+    $dendaTampil = !empty($fd['denda_manual'])
+        ? (float) $fd['denda']
+        : max((float) $fd['denda'], (float) $calc['denda']);
     $fineRemaining = max(0, $dendaTampil - (float) $fd['dibayar']);
     $fd['_calc'] = $calc;
     $fd['_denda_tampil'] = $dendaTampil;
     $fd['_sisa'] = $fineRemaining;
-    if ($hanyaSisa && $fineRemaining <= 0.005 && empty($fd['denda_manual'])) {
+    if ($hanyaSisa && $fineRemaining <= 0.005) {
         continue;
     }
     $fineDueVisible[] = $fd;
@@ -40,6 +43,7 @@ foreach ($fineDueRows as $fd) {
 $paymentScope = isAdmin() ? '' : ' AND b.user_id=' . (int)$_SESSION['user_id'];
 $fineHistory = $db->query(
     "SELECT b.*,ag.nama_lengkap,ag.telepon,u.nama_lengkap teller,a.status angsuran_status,a.denda denda_sekarang,
+     a.tanggal_jatuh_tempo,a.angsuran_ke,
      (SELECT COALESCE(SUM(x.jumlah),0) FROM layanan_bayar_denda x WHERE x.angsuran_id=b.angsuran_id) total_bayar
      FROM layanan_bayar_denda b JOIN pinjaman p ON p.id=b.pinjaman_id JOIN anggota ag ON ag.id=p.anggota_id
      JOIN angsuran a ON a.id=b.angsuran_id JOIN users u ON u.id=b.user_id
@@ -131,6 +135,7 @@ foreach ($fineDueVisible as $fd) {
 <thead>
 <tr>
     <th>Nasabah</th>
+    <th>Tanggal telat</th>
     <th>Telat</th>
     <th class="text-end">Dibayar</th>
     <th>Status</th>
@@ -159,11 +164,16 @@ foreach ($laporanRows as $fr):
         $aksiHtml = count($waItems) >= 2
             ? ui_action_menu($waItems)
             : '<a class="btn btn-sm btn-outline-primary" href="' . htmlspecialchars($waItems[0]['href'], ENT_QUOTES, 'UTF-8') . '"><i class="ti ti-eye me-1"></i>Detail</a>';
+        $tglTelatUnpaid = !empty($fd['tanggal_jatuh_tempo']) ? formatTanggalUi($fd['tanggal_jatuh_tempo']) : '—';
 ?>
 <tr>
     <td>
         <strong class="ui-ly-member"><?= layananEscape($fd['nama_lengkap']) ?></strong>
         <small class="ui-ly-kode">Belum ada pembayaran · sisa <?= formatRupiah($fd['_sisa']) ?></small>
+    </td>
+    <td>
+        <strong><?= layananEscape($tglTelatUnpaid) ?></strong>
+        <small class="ui-ly-kode d-block">Jatuh tempo cicilan <?= (int) $fd['angsuran_ke'] ?></small>
     </td>
     <td><?= (int)$calc['hari_telat'] ?> hari</td>
     <td class="text-end ui-ly-money">Rp 0</td>
@@ -189,11 +199,19 @@ foreach ($laporanRows as $fr):
     if ($waNomor) {
         $histItems[] = ['label' => 'WhatsApp', 'href' => 'https://wa.me/' . $waNomor . '?text=' . rawurlencode($fineMessage), 'icon' => 'ti ti-brand-whatsapp', 'target' => '_blank'];
     }
+    $tglTelat = !empty($fr['created_at']) ? formatTanggalUi($fr['created_at']) : '—';
+    $tglJt = !empty($fr['tanggal_jatuh_tempo']) ? formatTanggalUi($fr['tanggal_jatuh_tempo']) : '';
 ?>
 <tr>
     <td>
         <strong class="ui-ly-member"><?= layananEscape($fr['nama_lengkap']) ?></strong>
         <small class="ui-ly-kode"><?= layananEscape($fr['teller']) ?> · awal <?= formatRupiah($fr['denda_awal']) ?><?php if ($fr['denda_awal'] > $fr['denda_akhir']): ?> · diskon <?= formatRupiah($fr['denda_awal'] - $fr['denda_akhir']) ?><?php endif; ?></small>
+    </td>
+    <td>
+        <strong><?= layananEscape($tglTelat) ?></strong>
+        <?php if ($tglJt !== ''): ?>
+        <small class="ui-ly-kode d-block">Jatuh tempo <?= layananEscape($tglJt) ?><?php if (!empty($fr['angsuran_ke'])): ?> · cicilan <?= (int) $fr['angsuran_ke'] ?><?php endif; ?></small>
+        <?php endif; ?>
     </td>
     <td><?= (int)$fr['hari_telat'] ?> hari</td>
     <td class="text-end ui-ly-money"><?= formatRupiah($fr['jumlah']) ?></td>
