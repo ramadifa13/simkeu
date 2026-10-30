@@ -387,7 +387,7 @@ table.dataTable > tbody > tr.child ul.dtr-details { width: 100%; }
 .simkeu-sidebar .dropdown-toggle::after{opacity:.7}
 .simkeu-sidebar .text-secondary{color:#a5b4fc!important}
 .simkeu-sidebar .text-danger{color:#fca5a5!important}
-@media (max-width:991.98px){.simkeu-sidebar .sk-brand{width:auto;flex:1;padding:.5rem}.simkeu-sidebar .navbar-collapse{max-height:calc(100vh - 4rem);overflow-y:auto}.simkeu-sidebar .navbar-nav{padding-top:.5rem}}
+@media (max-width:767.98px){.simkeu-sidebar .sk-brand{width:auto;flex:1;padding:.5rem}.simkeu-sidebar .navbar-collapse{max-height:calc(100vh - 4rem);overflow-y:auto;-webkit-overflow-scrolling:touch}.simkeu-sidebar .navbar-nav{padding-top:.5rem}}
 
 /* --- Kontras warna (WCAG AA) --- */
 :root,[data-bs-theme=light]{
@@ -442,6 +442,8 @@ small:not([class]),span.small:not([class*=text-]){color:#4b5563}
 /* --- Responsif: scroll horizontal (bukan collapse kolom) --- */
 .page-wrapper,.page-body,main#konten-utama,.container-xl,.card,.card-body{min-width:0}
 .page-wrapper{overflow-x:clip}
+/* Anchor setelah redirect keranjang tidak tertutup topbar sticky */
+#keranjangAngsuran,#tabelJadwalAngsuran{scroll-margin-top:5.5rem}
 .dt-container{max-width:100%}
 .dt-container .dt-layout-cell.dt-layout-full{min-width:0;max-width:100%}
 .table-responsive,
@@ -483,9 +485,44 @@ table.dataTable tbody td{
 
 [data-notif-pinjaman].badge{background:#b45309!important;color:#fff!important}[data-notif-pinjaman=total].badge{background:#c62828!important}
 
-/* --- Sidebar v3 --- */
+/* --- Sidebar v3: tetap nempel saat scroll (tablet+), anti-jank --- */
 .simkeu-sidebar{box-shadow:4px 0 24px rgba(15,23,42,.18)}
-@media (min-width:992px){.simkeu-sidebar .navbar-collapse{display:flex;flex-direction:column;height:calc(100vh - 5rem);overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent}.simkeu-sidebar .navbar-nav{flex:1 0 auto}}
+@media (min-width:768px){
+  .simkeu-sidebar.navbar-vertical{
+    position:fixed!important;
+    top:0;left:0;bottom:0;
+    z-index:1030;
+    width:var(--tblr-navbar-width,15.5rem);
+    height:100vh;height:100dvh;
+    max-height:100vh;max-height:100dvh;
+    overflow:hidden!important; /* jangan scroll aside utuh — cegah menu "ikut hilang" */
+    overscroll-behavior:none;
+    -webkit-backface-visibility:hidden;
+    backface-visibility:hidden;
+    transform:translateZ(0); /* layer sendiri biar tidak telat paint saat scroll konten */
+    will-change:transform;
+  }
+  .simkeu-sidebar > .container-fluid{
+    display:flex;flex-direction:column;
+    height:100%;max-height:100%;
+    min-height:0;overflow:hidden;padding:0;
+  }
+  .simkeu-sidebar .navbar-collapse{
+    display:flex!important;flex-direction:column;
+    flex:1 1 auto;min-height:0;
+    height:auto!important;
+    max-height:none;
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+    scrollbar-color:rgba(255,255,255,.25) transparent;
+  }
+  .simkeu-sidebar .navbar-nav{flex:1 0 auto}
+  .simkeu-sidebar .sk-brand{flex:0 0 auto}
+  .page-wrapper{margin-left:var(--tblr-navbar-width,15.5rem)}
+}
 .simkeu-sidebar .sk-brand{border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:.5rem}
 .simkeu-sidebar .nav-link{margin:.15rem .75rem;padding:.6rem .8rem!important;border-radius:.7rem;gap:.15rem}
 .simkeu-sidebar .nav-item.active>.nav-link{background:linear-gradient(90deg,rgba(129,140,248,.38),rgba(129,140,248,.14));box-shadow:none;border:1px solid rgba(165,180,252,.25)}
@@ -493,7 +530,7 @@ table.dataTable tbody td{
 .simkeu-sidebar .nav-link:hover{transform:none;background:rgba(255,255,255,.08)}
 .simkeu-sidebar .dropdown-menu{margin:.1rem .75rem .35rem 1.55rem!important}
 .simkeu-sidebar .dropdown-item{margin:.1rem 0;font-size:.84rem;padding:.45rem .7rem}
-.sk-side-user{margin:auto .75rem .75rem;padding:.7rem;gap:.65rem;align-items:center;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:.8rem;min-width:0;position:sticky;bottom:.5rem}
+.sk-side-user{margin:auto .75rem .75rem;padding:.7rem;gap:.65rem;align-items:center;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:.8rem;min-width:0;position:sticky;bottom:.5rem;flex:0 0 auto}
 .sk-side-avatar{width:2.2rem;height:2.2rem;border-radius:50%;background:#6366f1;color:#fff;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
 .sk-side-meta{display:flex;flex-direction:column;min-width:0;line-height:1.25}
 .sk-side-meta strong{color:#fff;font-size:.85rem}.sk-side-meta small{color:#c7d2fe;font-size:.72rem}

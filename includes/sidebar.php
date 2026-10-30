@@ -59,7 +59,7 @@ if ($current_role === 'teller') {
     $brandSub = 'Portal Admin';
 }
 ?>
-<aside class="navbar navbar-vertical navbar-expand-lg d-print-none simkeu-sidebar" data-bs-theme="dark" role="navigation" aria-label="Menu utama">
+<aside class="navbar navbar-vertical navbar-expand-md d-print-none simkeu-sidebar" data-bs-theme="dark" role="navigation" aria-label="Menu utama">
     <div class="container-fluid">
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="Buka navigasi">
             <span class="navbar-toggler-icon"></span>
@@ -113,13 +113,13 @@ if ($current_role === 'teller') {
                 </li>
                     <?php endif; ?>
                 <?php endforeach; ?>
-                <li class="nav-item mt-2 d-lg-none">
+                <li class="nav-item mt-2 d-md-none">
                     <a class="nav-link text-danger" href="../logout.php" onclick="return confirm('Apakah Anda yakin ingin logout?')">
                         <span class="nav-link-icon"><i class="ti ti-logout"></i></span><span class="nav-link-title">Logout</span>
                     </a>
                 </li>
             </ul>
-            <div class="sk-side-user d-none d-lg-flex"><span class="sk-side-avatar"><?= htmlspecialchars(getInitials($_SESSION['nama_lengkap'] ?? 'U')) ?></span><span class="sk-side-meta"><strong class="text-truncate"><?= htmlspecialchars($_SESSION['nama_lengkap'] ?? 'Pengguna') ?></strong><small><?= htmlspecialchars(ucfirst($current_role)) ?> &middot; v<?= APP_VERSION ?></small></span></div>
+            <div class="sk-side-user d-none d-md-flex"><span class="sk-side-avatar"><?= htmlspecialchars(getInitials($_SESSION['nama_lengkap'] ?? 'U')) ?></span><span class="sk-side-meta"><strong class="text-truncate"><?= htmlspecialchars($_SESSION['nama_lengkap'] ?? 'Pengguna') ?></strong><small><?= htmlspecialchars(ucfirst($current_role)) ?> &middot; v<?= APP_VERSION ?></small></span></div>
         </div>
     </div>
 </aside>

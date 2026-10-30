@@ -108,6 +108,9 @@ if ($_POST) {
         : (isset($_POST['pinjaman_id']) && (int)$_POST['pinjaman_id'] > 0
             ? ('detail_angsuran.php?pinjaman_id=' . (int)$_POST['pinjaman_id'])
             : 'angsuran.php');
+    // Kembali ke jadwal/tabel agar sort DataTables (stateSave) tetap terlihat setelah reload.
+    $redirectAngsuranJadwal = $redirectAngsuran . '#tabelJadwalAngsuran';
+    $redirectAngsuranKeranjang = $redirectAngsuran . '#keranjangAngsuran';
     if (isset($_POST['tambah_keranjang']) || isset($_POST['bayar_langsung'])) {
         try {
             $id = (int)($_POST['id'] ?? 0); $metode = $_POST['metode'] ?? 'cash';
@@ -136,12 +139,12 @@ if ($_POST) {
             }
             $_SESSION['error'] = (isset($_POST['bayar_langsung']) ? 'Gagal memproses: ' : 'Gagal menambahkan: ') . $e->getMessage();
         }
-        header('Location: ' . $redirectAngsuran); exit;
+        header('Location: ' . (isset($_POST['tambah_keranjang']) ? $redirectAngsuranKeranjang : $redirectAngsuranJadwal)); exit;
     }
     if (isset($_POST['hapus_keranjang'])) {
         unset($_SESSION[$cartKey][(int)($_POST['id'] ?? 0)]);
         $_SESSION['success']='Item dihapus dari daftar pembayaran.';
-        header('Location: ' . $redirectAngsuran); exit;
+        header('Location: ' . $redirectAngsuranKeranjang); exit;
     }
     if (isset($_POST['checkout_keranjang'])) {
         try {
@@ -151,7 +154,7 @@ if ($_POST) {
             $db->commit(); $_SESSION[$cartKey]=[];
             $_SESSION['success']=count($hasil).' pembayaran berhasil diproses sekaligus. Total: '.formatRupiah(array_sum(array_column($hasil,'total')));
         } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); $_SESSION['error']='Checkout dibatalkan. Tidak ada pembayaran yang dicatat: '.$e->getMessage(); }
-        header('Location: ' . $redirectAngsuran); exit;
+        header('Location: ' . $redirectAngsuranKeranjang); exit;
     }
     // Koreksi langsung (HANYA Admin; fungsi memeriksa peran di server)
     if (isset($_POST['batalkan_bayar'])) {
@@ -1007,8 +1010,10 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                             <?php endforeach; ?>
                         </div>
 
-                        <div class="table-responsive ui-table-scroll d-none d-md-block">
+                        <div class="table-responsive ui-table-scroll d-none d-md-block" id="tabelJadwalAngsuran">
                             <table class="table table-hover align-middle mb-0 js-datatable"
+                                   id="dtJadwalAngsuran"
+                                   data-dt-state="jadwal-angsuran-<?= (int)($_GET['pinjaman_id'] ?? 0) ?>"
                                    data-dt-page-length="12"
                                    data-dt-order="0,asc;1,asc"
                                    data-dt-filter="7"

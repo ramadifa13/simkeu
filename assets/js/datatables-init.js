@@ -5,12 +5,21 @@
  *   data-dt-page-length="10"   data-dt-order="2,desc" | "0,asc;1,desc" (multi)
  *   data-dt-filter="3,4"       data-dt-nosort="0,5"     data-dt-no-search-box
  *   data-dt-ajax="url"         (server-side, kolom dari <th data-data="x">)
+ *   data-dt-no-state           matikan penyimpanan sort/filter/page (default: aktif)
+ *   data-dt-state="key"        kunci state custom (default: path + id/index tabel)
  * Kolom bernama "Aksi" otomatis tidak bisa disort/dicari. <th class="no-sort|dt-hidden"> juga dikenali.
  * Responsif: scroll horizontal (bukan collapse kolom).
  */
 (function () {
     'use strict';
     if (!window.DataTable || !window.jQuery) { return; }
+
+    function dtStateKey(table) {
+        var custom = table.getAttribute('data-dt-state');
+        if (custom) { return 'simkeu-dt:' + custom; }
+        var id = table.id || ('i' + Array.prototype.indexOf.call(document.querySelectorAll('table.js-datatable'), table));
+        return 'simkeu-dt:' + location.pathname + '#' + id;
+    }
 
     var LANG = {
         search: '', searchPlaceholder: 'Cari data...',
@@ -110,6 +119,8 @@
                 if (!isNaN(idx)) { order.push([idx, (p[1] || 'asc').trim()]); }
             });
         }
+        var useState = ds.dtPlain === undefined && ds.dtNoState === undefined;
+        var toolbarState = { filters: {}, from: '', to: '' };
         var opts = {
             language: LANG,
             responsive: false,
@@ -126,6 +137,44 @@
                 bottomEnd: 'paging'
             }
         };
+        if (useState) {
+            var stateKey = dtStateKey(table);
+            var saveCb = function (_settings, data) {
+                try { sessionStorage.setItem(stateKey, JSON.stringify(data)); } catch (e) { /* ignore */ }
+            };
+            var loadCb = function () {
+                try {
+                    var raw = sessionStorage.getItem(stateKey);
+                    return raw ? JSON.parse(raw) : null;
+                } catch (e) { return null; }
+            };
+            var saveParams = function (_settings, data) {
+                data.simkeuTb = {
+                    filters: toolbarState.filters,
+                    from: toolbarState.from,
+                    to: toolbarState.to
+                };
+            };
+            var loadParams = function (_settings, data) {
+                if (!data || !data.simkeuTb) { return; }
+                toolbarState.filters = data.simkeuTb.filters || {};
+                toolbarState.from = data.simkeuTb.from || '';
+                toolbarState.to = data.simkeuTb.to || '';
+            };
+            // CamelCase + Hungarian (kompatibel DataTables 1.x/2.x di vendor lokal)
+            opts.stateSave = true;
+            opts.bStateSave = true;
+            opts.stateDuration = 0;
+            opts.iStateDuration = 0;
+            opts.stateSaveCallback = saveCb;
+            opts.fnStateSaveCallback = saveCb;
+            opts.stateLoadCallback = loadCb;
+            opts.fnStateLoadCallback = loadCb;
+            opts.stateSaveParams = saveParams;
+            opts.fnStateSaveParams = saveParams;
+            opts.stateLoadParams = loadParams;
+            opts.fnStateLoadParams = loadParams;
+        }
         if (ds.dtPlain !== undefined) {
             opts.paging = false;
             opts.searching = false;
@@ -145,6 +194,7 @@
         var filterCols = csvInts(ds.dtFilter);
         var dateCol = ds.dtDateCol !== undefined && ds.dtDateCol !== '' ? parseInt(ds.dtDateCol, 10) : NaN;
         var needToolbar = (filterCols.length || !isNaN(dateCol)) && !ds.dtAjax && ds.dtPlain === undefined;
+        var toolbarNeedsRedraw = false;
         if (needToolbar) {
             var wrap = table.closest('.dt-container') || table.parentNode;
             var topRow = wrap.querySelector ? wrap.querySelector('.dt-layout-row') : null;
@@ -181,6 +231,14 @@
                 // Jangan pakai column().search() regex pada sel HTML (badge) —
                 // "Aktif" tidak match "<span>Aktif</span>" dan ikut kena "Nonaktif".
                 var activeVal = '';
+                var savedFilter = toolbarState.filters[String(ci)];
+                if (savedFilter) {
+                    sel.value = savedFilter;
+                    if (sel.value === savedFilter) {
+                        activeVal = savedFilter;
+                        toolbarNeedsRedraw = true;
+                    }
+                }
                 var filterFn = function (settings, _data, dataIndex) {
                     if (settings.nTable !== table) { return true; }
                     if (!activeVal) { return true; }
@@ -189,6 +247,7 @@
                 jQuery.fn.dataTable.ext.search.push(filterFn);
                 sel.addEventListener('change', function () {
                     activeVal = sel.value;
+                    toolbarState.filters[String(ci)] = activeVal;
                     dt.draw();
                 });
                 dt.on('destroy', function () {
@@ -215,6 +274,8 @@
                 clearBtn.title = 'Reset tanggal';
                 clearBtn.setAttribute('aria-label', 'Reset tanggal');
                 clearBtn.innerHTML = '<i class="ti ti-x" aria-hidden="true"></i>';
+                if (toolbarState.from) { from.value = toolbarState.from; toolbarNeedsRedraw = true; }
+                if (toolbarState.to) { to.value = toolbarState.to; toolbarNeedsRedraw = true; }
                 function cellDay(rowIdx) {
                     var node = dt.cell(rowIdx, dateCol).node();
                     if (node && node.getAttribute('data-date')) { return node.getAttribute('data-date'); }
@@ -230,7 +291,11 @@
                     return true;
                 };
                 jQuery.fn.dataTable.ext.search.push(searchFn);
-                function redraw() { dt.draw(); }
+                function redraw() {
+                    toolbarState.from = from.value;
+                    toolbarState.to = to.value;
+                    dt.draw();
+                }
                 from.addEventListener('change', redraw);
                 to.addEventListener('change', redraw);
                 clearBtn.addEventListener('click', function () {
@@ -246,6 +311,7 @@
                     if (idx > -1) { jQuery.fn.dataTable.ext.search.splice(idx, 1); }
                 });
             }
+            if (toolbarNeedsRedraw) { dt.draw(); }
 
             var searchEl = wrap.querySelector('.dt-search');
             var controlRow = (searchEl && searchEl.closest('.row, .dt-layout-row')) || topRow;
