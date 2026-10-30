@@ -199,14 +199,41 @@ function migrasiImportFinal(PDO $db,$path,$userId=null){
             $q=$db->prepare('INSERT INTO migrasi_pembayaran(source_key,pinjaman_id,transaksi_id,tanggal_bayar,angsuran_ke,jenis_pembayaran,pokok,bunga,denda,total_diterima,status,keterangan) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');
             $q->execute([$key,$loan,$trans,$date,$ke,$jenis,migrasiUang($r['Pokok (Rp)']??0),migrasiUang($r['Bunga (Rp)']??0),$denda,$total,migrasiNorm($r['Status*']),$r['Keterangan']??null]);
             migrasiSaveItem($db,'pembayaran',$key,$trans);
+            // denda_dibayar BUKAN kolom angsuran — denda dibayar dicatat di layanan_bayar_denda.
+            // UPDATE: status lunas + tanggal + cara_bayar; nilai denda historis di cicilan terkait.
+            $setDendaManual = ($denda > 0.005 && kolomAda($db, 'angsuran', 'denda_manual'))
+                ? ',denda_manual=CASE WHEN angsuran_ke=? THEN 1 ELSE denda_manual END'
+                : '';
             if ($lunasiSemua) {
-                $q=$db->prepare("UPDATE angsuran SET status='lunas',tanggal_bayar=?,cara_bayar='pelunasan',denda=CASE WHEN angsuran_ke=? THEN ? ELSE denda END,denda_dibayar=CASE WHEN angsuran_ke=? THEN GREATEST(COALESCE(denda_dibayar,0),?) ELSE denda_dibayar END WHERE pinjaman_id=? AND status<>'lunas'");
-                $q->execute([$date,$ke,$denda,$ke,$denda,$loan]);
+                $q=$db->prepare(
+                    "UPDATE angsuran SET status='lunas',tanggal_bayar=?,cara_bayar='pelunasan',"
+                    . "denda=CASE WHEN angsuran_ke=? THEN ? ELSE denda END"
+                    . $setDendaManual
+                    . " WHERE pinjaman_id=? AND status<>'lunas'"
+                );
+                $params=[$date,$ke,$denda];
+                if ($setDendaManual !== '') {
+                    $params[]=$ke;
+                }
+                $params[]=$loan;
+                $q->execute($params);
             } else {
-                $q=$db->prepare("UPDATE angsuran SET status='lunas',tanggal_bayar=?,denda=CASE WHEN angsuran_ke=? THEN ? ELSE denda END,denda_dibayar=CASE WHEN angsuran_ke=? THEN GREATEST(COALESCE(denda_dibayar,0),?) ELSE denda_dibayar END,cara_bayar=? WHERE pinjaman_id=? AND angsuran_ke<=? AND status<>'lunas'");
-                $q->execute([$date,$ke,$denda,$ke,$denda,$jenis,$loan,$ke]);
+                $q=$db->prepare(
+                    "UPDATE angsuran SET status='lunas',tanggal_bayar=?,"
+                    . "denda=CASE WHEN angsuran_ke=? THEN ? ELSE denda END"
+                    . $setDendaManual
+                    . ",cara_bayar=? WHERE pinjaman_id=? AND angsuran_ke<=? AND status<>'lunas'"
+                );
+                $params=[$date,$ke,$denda];
+                if ($setDendaManual !== '') {
+                    $params[]=$ke;
+                }
+                $params[]=$jenis;
+                $params[]=$loan;
+                $params[]=$ke;
+                $q->execute($params);
             }
-            // Laporan Denda membaca layanan_bayar_denda — isi saat historis punya kolom Denda.
+            // Laporan Denda / sisa denda membaca layanan_bayar_denda — isi saat historis punya Denda.
             if ($denda > 0.005) {
                 try {
                     $angQ = $db->prepare('SELECT id, denda FROM angsuran WHERE pinjaman_id=? AND angsuran_ke=? LIMIT 1');
