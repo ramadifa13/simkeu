@@ -130,14 +130,43 @@ if (!function_exists('cekPostMelebihiBatas')) {
      * Bila total upload > post_max_size, PHP mengosongkan $_POST dan $_FILES tanpa pesan.
      * Panggil di awal halaman form agar pengguna mendapat pesan yang jelas.
      */
-    function cekPostMelebihiBatas() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES)
-            && isset($_SERVER['CONTENT_LENGTH']) && (int) $_SERVER['CONTENT_LENGTH'] > 0) {
-            $_SESSION['error'] = 'Ukuran total file yang diunggah melebihi batas server (post_max_size = '
-                . ini_get('post_max_size') . '). Maksimal 10 MB per file.';
-            return true;
+    function cekPostMelebihiBatas($pesan = null) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            return false;
         }
-        return false;
+        if (!empty($_POST) || !empty($_FILES)) {
+            return false;
+        }
+        if (!isset($_SERVER['CONTENT_LENGTH']) || (int) $_SERVER['CONTENT_LENGTH'] <= 0) {
+            return false;
+        }
+        $ukuranMb = round(((int) $_SERVER['CONTENT_LENGTH']) / 1048576, 1);
+        $_SESSION['error'] = $pesan !== null && $pesan !== ''
+            ? $pesan
+            : ('Ukuran total unggahan (~' . $ukuranMb . ' MB) melebihi batas server (post_max_size = '
+                . ini_get('post_max_size') . '). Perkecil file (gambar maks. 10 MB per file) lalu coba lagi.');
+        return true;
+    }
+}
+
+if (!function_exists('redirectJikaPostMelebihiBatas')) {
+    /**
+     * Sama seperti cekPostMelebihiBatas(), lalu redirect agar tidak lanjut proses POST kosong
+     * (termasuk kegagalan CSRF yang menyesatkan).
+     */
+    function redirectJikaPostMelebihiBatas($lokasi = null, $pesan = null) {
+        if (!cekPostMelebihiBatas($pesan)) {
+            return false;
+        }
+        if ($lokasi === null || $lokasi === '') {
+            $back = (string) ($_SERVER['HTTP_REFERER'] ?? '');
+            $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
+            $lokasi = ($back !== '' && $host !== '' && stripos($back, $host) !== false)
+                ? $back
+                : basename((string) ($_SERVER['SCRIPT_NAME'] ?? 'index.php'));
+        }
+        header('Location: ' . $lokasi);
+        exit;
     }
 }
 

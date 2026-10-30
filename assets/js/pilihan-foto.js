@@ -4,6 +4,8 @@
     var BATAS_FOTO = 1024 * 1024;
     // Sisakan ruang agar hasil encoder tidak melewati batas server.
     var TARGET_FOTO = Math.floor(BATAS_FOTO * 0.92);
+    // Batas aman memori browser saat memproses foto kamera mentah (sebelum kompres).
+    var ASAL_MAKS_BYTE = 40 * 1024 * 1024;
 
     function formatUkuran(byte) {
         if (byte >= 1048576) return (byte / 1048576).toFixed(2) + ' MB';
@@ -23,6 +25,12 @@
     function kompresSatuFoto(file) {
         if (!file || !/^image\//i.test(file.type)) {
             return Promise.resolve(file);
+        }
+        if (file.size > ASAL_MAKS_BYTE) {
+            return Promise.reject(new Error(
+                'Foto terlalu besar untuk diproses di perangkat (' + formatUkuran(file.size)
+                + '). Pilih foto di bawah 40 MB.'
+            ));
         }
         // Sudah ≤ 1 MB — tidak perlu dikompres lagi di browser.
         if (file.size <= BATAS_FOTO) {

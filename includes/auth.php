@@ -165,18 +165,9 @@ if (PHP_SAPI !== 'cli') {
         $_SESSION['nama_lengkap']=$authAccount['nama_lengkap'];
         if(($_SERVER['REQUEST_METHOD'] ?? 'GET')==='POST') {
             // Upload > post_max_size: PHP mengosongkan $_POST (termasuk csrf).
-            // Jangan anggap CSRF gagal — beri pesan jelas lalu kembali ke halaman form.
-            if (empty($_POST) && empty($_FILES)
-                && isset($_SERVER['CONTENT_LENGTH']) && (int) $_SERVER['CONTENT_LENGTH'] > 0) {
-                $_SESSION['error'] = 'Ukuran total unggahan melebihi batas server (post_max_size = '
-                    . ini_get('post_max_size') . '). Perkecil foto (maks. 10 MB per file) lalu coba lagi.';
-                $back = $_SERVER['HTTP_REFERER'] ?? '';
-                if ($back !== '' && stripos($back, ($_SERVER['HTTP_HOST'] ?? '')) !== false) {
-                    header('Location: ' . $back);
-                } else {
-                    header('Location: ' . basename((string) ($_SERVER['SCRIPT_NAME'] ?? 'index.php')));
-                }
-                exit;
+            // Tangani dulu agar tidak terlihat seperti "formulir kedaluwarsa".
+            if (function_exists('redirectJikaPostMelebihiBatas')) {
+                redirectJikaPostMelebihiBatas();
             }
             try { layananValidasiToken(); }
             catch(Exception $e) {
@@ -184,11 +175,10 @@ if (PHP_SAPI !== 'cli') {
                 $back = $_SERVER['HTTP_REFERER'] ?? '';
                 if ($back !== '' && stripos($back, ($_SERVER['HTTP_HOST'] ?? '')) !== false) {
                     header('Location: ' . $back);
-                } else {
-                    http_response_code(403);
-                    exit('Formulir kedaluwarsa atau tidak valid. Muat ulang halaman sebelum mencoba kembali.');
+                    exit;
                 }
-                exit;
+                http_response_code(403);
+                exit('Formulir kedaluwarsa atau tidak valid. Muat ulang halaman sebelum mencoba kembali.');
             }
         }
     }

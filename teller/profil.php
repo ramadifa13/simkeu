@@ -19,10 +19,7 @@ if (!$user) {
     exit();
 }
 
-if (cekPostMelebihiBatas()) {
-    header('Location: profil.php');
-    exit();
-}
+redirectJikaPostMelebihiBatas('profil.php');
 
 // Deteksi submit lewat hidden field (lebih andal daripada name tombol saja).
 $submitProfil = $_SERVER['REQUEST_METHOD'] === 'POST'
@@ -347,11 +344,7 @@ $page_title = 'Profil Teller';
             this.value = '';
             return;
         }
-        if (f.size > 10 * 1024 * 1024) {
-            alert('File terlalu besar. Maksimal 10 MB sebelum dikompres.');
-            this.value = '';
-            return;
-        }
+        // Ukuran asal boleh besar; pilihan-foto.js mengompres ke ≤ 1 MB sebelum unggah.
         var url = URL.createObjectURL(f);
         preview.innerHTML = '<img src="' + url + '" alt="">';
     });

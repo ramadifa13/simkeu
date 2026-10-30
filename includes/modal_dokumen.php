@@ -127,7 +127,8 @@
         });
     }
 
-    // Validasi klien: tipe & ukuran (server tetap memvalidasi ulang dengan finfo)
+    // Validasi klien: tipe saja. Ukuran asal boleh besar — pilihan-foto.js
+    // mengompres ke ≤ 1 MB sebelum unggah. Server tetap memvalidasi ulang dengan finfo.
     document.addEventListener('change', function (e) {
         var input = e.target;
         if (!input.classList || !input.classList.contains('input-dokumen') || !input.files.length) return;
@@ -135,9 +136,6 @@
         var label = input.getAttribute('data-label');
         if (DOKUMEN_TIPE.indexOf(file.type) === -1) {
             alert(label + ' harus berupa gambar JPG, PNG, atau WEBP.');
-            input.value = '';
-        } else if (file.size > DOKUMEN_MAKS_BYTE) {
-            alert(label + ' melebihi 10 MB (' + (file.size / 1048576).toFixed(1) + ' MB).');
             input.value = '';
         }
     });

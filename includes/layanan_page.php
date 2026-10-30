@@ -62,6 +62,11 @@ if ($layananMode === 'detail' && $id <= 0) {
     header('Location: layanan.php?tab=' . rawurlencode($tab));
     exit;
 }
+redirectJikaPostMelebihiBatas(
+    ($layananMode === 'detail' && $id > 0)
+        ? ('detail_layanan.php?id=' . $id . '&tab=' . rawurlencode($tab))
+        : ('layanan.php?tab=' . rawurlencode($tab))
+);
 if ($_SERVER['REQUEST_METHOD']==='POST') {
     $files=[];
     try {

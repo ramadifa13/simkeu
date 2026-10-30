@@ -19,10 +19,7 @@ if (!isAdmin() && !isTeller()) {
 $bolehHapusAnggota = isAdmin();
 
 // Upload melebihi post_max_size membuat $_POST kosong; tampilkan pesan yang jelas
-if (cekPostMelebihiBatas()) {
-    header('Location: anggota.php');
-    exit;
-}
+redirectJikaPostMelebihiBatas('anggota.php');
 
 // Kode anggota berikutnya untuk form tambah
 $kode_otomatis = buatKodeAnggota($db);

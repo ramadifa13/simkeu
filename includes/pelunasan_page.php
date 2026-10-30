@@ -22,6 +22,7 @@ $bolehJaminanLangsung = isTeller();
 
 // Pertahankan tampilan pelunasan lama; pencatatan kas tetap melalui layanan bersama.
 require_once __DIR__ . '/layanan_actions.php';
+redirectJikaPostMelebihiBatas('pelunasan.php');
 // Halaman ini hanya memiliki satu formulir POST, yaitu pelunasan. Jangan
 // bergantung pada field tombol submit karena browser dapat menghilangkannya
 // saat tombol dinonaktifkan oleh indikator "Memproses".

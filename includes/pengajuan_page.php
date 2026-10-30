@@ -16,10 +16,11 @@ if (!isAdmin() && !isTeller()) {
     exit('Akses ditolak.');
 }
 
+// Upload terlalu besar → pesan jelas, jangan lanjut POST kosong
+redirectJikaPostMelebihiBatas('pengajuan.php');
+
 // Handle form submission untuk pengajuan baru
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && function_exists('cekPostMelebihiBatas') && cekPostMelebihiBatas()) {
-    // $_POST/$_FILES kosong karena melebihi post_max_size — pesan sudah di session
-} elseif ($_POST && isset($_POST['ajukan_pinjaman'])) {
+if ($_POST && isset($_POST['ajukan_pinjaman'])) {
     $anggota_id = $_POST['anggota_id'];
     $jenis_pinjaman_id = $_POST['jenis_pinjaman_id'];
     $jumlah_pinjaman = $_POST['jumlah_pinjaman'];
@@ -572,7 +573,7 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
 
                             <div id="dokumenAgtjAgt" class="ui-form-section ui-pj-section ui-pj-docs d-none">
                                 <h6 class="ui-form-section-title ui-pj-docs-title"><i class="ti ti-photo" aria-hidden="true"></i>Upload dokumen AGT</h6>
-                                <p class="ui-pj-section-note mb-3">Nasabah AGTJ belum punya dokumen lengkap. Unggah foto yang hilang sebelum pengajuan dikirim. Format JPG/PNG/WEBP · maks. 10 MB (otomatis dikompres di bawah 1 MB).</p>
+                                <p class="ui-pj-section-note mb-3">Nasabah AGTJ belum punya dokumen lengkap. Unggah foto yang hilang sebelum pengajuan dikirim. Format JPG/PNG/WEBP · otomatis dikompres di bawah 1 MB sebelum diunggah.</p>
                                 <div class="row g-3 dokumen-anggota" data-prefix="pengajuan">
                                     <div class="col-md-6 mb-0" id="wrapFotoKkPengajuan" hidden>
                                         <div class="ui-pj-upload">

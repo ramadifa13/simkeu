@@ -10,7 +10,7 @@ $dok_anggota = isset($dok_anggota) ? $dok_anggota : null;
 <div class="row dokumen-anggota" data-prefix="<?php echo $dok_prefix; ?>">
     <div class="col-12">
         <label class="form-label fw-semibold mb-1">Dokumen Anggota</label>
-        <div><small class="text-muted">Format JPG, JPEG, PNG, atau WEBP. File asal maks. 10 MB; otomatis dikompres ke maksimal 1 MB.</small></div>
+        <div><small class="text-muted">Format JPG, JPEG, PNG, atau WEBP. Foto dari kamera boleh besar; otomatis dikompres ke maksimal 1 MB sebelum diunggah.</small></div>
     </div>
     <?php foreach (daftarDokumenAnggota() as $field => $label):
         $wajib = dokumenWajib($field);

@@ -41,7 +41,7 @@ if (!$koperasi) {
 $aturan_perjanjian_form = pengaturanPerjanjian($db);
 
 // Upload melebihi post_max_size membuat $_POST kosong; tampilkan pesan yang jelas
-cekPostMelebihiBatas();
+redirectJikaPostMelebihiBatas('pencairan.php');
 
 // Keputusan TC: persetujuan = batal cair; penolakan membuka kembali pengajuan.
 if ($_POST && isset($_POST['keputusan_tc'])) {

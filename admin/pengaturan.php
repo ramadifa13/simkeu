@@ -9,6 +9,8 @@ if (!isAdmin()) {
     exit();
 }
 
+redirectJikaPostMelebihiBatas('pengaturan.php');
+
 if ($_POST && isset($_POST['update_perjanjian'])) {
     try {
         $jabatan = trim($_POST['jabatan_admin'] ?? '');

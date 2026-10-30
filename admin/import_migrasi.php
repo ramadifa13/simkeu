@@ -17,11 +17,12 @@ $pesanFormatMigrasi = 'Format tidak sesuai. Import migrasi hanya menerima file E
     . $batasMbMigrasi . ' MB. File ZIP, XLS, CSV, atau backup tidak didukung di halaman ini.';
 
 // Upload > post_max_size mengosongkan $_POST/$_FILES → token gagal ("formulir kedaluwarsa")
-if (cekPostMelebihiBatas()) {
-    $ukuranMb = round(((int)($_SERVER['CONTENT_LENGTH'] ?? 0)) / 1048576, 1);
-    $_SESSION['error'] = $pesanFormatMigrasi
-        . ' File yang diunggah (~' . $ukuranMb . ' MB) melebihi batas dan kemungkinan berupa ZIP/backup.';
-} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$ukuranMbMigrasi = round(((int) ($_SERVER['CONTENT_LENGTH'] ?? 0)) / 1048576, 1);
+redirectJikaPostMelebihiBatas(
+    'import_migrasi.php',
+    $pesanFormatMigrasi . ' File yang diunggah (~' . $ukuranMbMigrasi . ' MB) melebihi batas dan kemungkinan berupa ZIP/backup.'
+);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         layananValidasiToken();
         $file = $_FILES['file_migrasi'] ?? null;

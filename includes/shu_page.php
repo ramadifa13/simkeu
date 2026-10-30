@@ -20,6 +20,8 @@ if (!shuPinjamanSiap($db)) {
     exit('Modul SHU pinjaman memerlukan MIGRASI_UNIVERSAL.sql terbaru.');
 }
 
+redirectJikaPostMelebihiBatas('shu.php');
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $files = [];
     try {
