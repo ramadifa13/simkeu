@@ -185,10 +185,11 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         $ttd_saksi_2 = validasiTtdDataUrl(bacaTtdRequest('ttd_saksi_2', 'TTD saksi 2'), 'TTD saksi 2');
         $aturan_surat = pengaturanPerjanjian($db);
         $ttd_admin = validasiTtdDataUrl($aturan_surat['ttd_admin'] ?? '', 'TTD Admin pada menu Pengaturan');
-        $stmtAdmin = $db->prepare("SELECT nama_lengkap FROM users WHERE id = ?");
-        $stmtAdmin->execute([$aturan_surat['updated_by']]);
-        $nama_admin_ttd = $stmtAdmin->fetchColumn() ?: 'Administrator';
-
+        // Nama di bawah TTD pengurus = nama pihak pertama di pengaturan surat.
+        $nama_admin_ttd = trim((string)($aturan_surat['nama_pihak_pertama'] ?? ''));
+        if ($nama_admin_ttd === '') {
+            $nama_admin_ttd = trim((string)($koperasi['nama'] ?? 'Pengurus'));
+        }
         // Tanggal pencairan diisi Teller (boleh tanggal lampau untuk data lama, tidak boleh masa depan
         // dan tidak boleh sebelum tanggal pengajuan). Jatuh tempo dihitung dari tanggal ini.
         $tgl_cair = isset($_POST['tanggal_pencairan']) ? trim($_POST['tanggal_pencairan']) : '';

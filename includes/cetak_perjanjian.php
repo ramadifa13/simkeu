@@ -36,7 +36,7 @@ if (!is_array($data)) die('Arsip perjanjian tidak valid.');
 $e = function($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
 $rp = function($v){ return 'Rp ' . number_format((float)$v, 0, ',', '.'); };
 
-// Nama profil koperasi (tabel koperasi) — bukan nama pihak pertama di pengaturan surat.
+// Nama koperasi dari profil live; pihak pertama & TTD pengurus dari pengaturan surat.
 $profilKoperasi = [];
 try {
     $profilKoperasi = $db->query('SELECT nama, alamat, telepon FROM koperasi WHERE id = 1')->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -46,6 +46,22 @@ try {
 $namaKoperasi = trim((string)($profilKoperasi['nama'] ?? ''));
 if ($namaKoperasi === '') {
     $namaKoperasi = trim((string)($data['koperasi']['nama'] ?? 'Koperasi'));
+}
+
+$aturanSurat = pengaturanPerjanjian($db);
+$ppSnap = is_array($data['pihak_pertama'] ?? null) ? $data['pihak_pertama'] : [];
+$pp = [
+    'nama' => trim((string)($aturanSurat['nama_pihak_pertama'] ?? ''))
+        ?: trim((string)($ppSnap['nama'] ?? '')),
+    'nik' => trim((string)($aturanSurat['nik_pihak_pertama'] ?? ''))
+        ?: trim((string)($ppSnap['nik'] ?? '')),
+    'alamat' => trim((string)($aturanSurat['alamat_pihak_pertama'] ?? ''))
+        ?: trim((string)($ppSnap['alamat'] ?? '')),
+    'telepon' => trim((string)($aturanSurat['telepon_pihak_pertama'] ?? ''))
+        ?: trim((string)($ppSnap['telepon'] ?? '')),
+];
+if ($pp['nama'] === '') {
+    $pp['nama'] = $namaKoperasi;
 }
 
 // Identitas & rincian dari data pinjaman/anggota LIVE (sumber kebenaran),
@@ -86,12 +102,6 @@ if ($jadwalLive) {
     $data['jadwal_angsuran'] = $jadwalLive;
 }
 $k = $data['koperasi'] ?? [];
-$pp = $data['pihak_pertama'] ?? [
-    'nama' => $namaKoperasi,
-    'nik' => '',
-    'alamat' => $k['alamat'] ?? ($profilKoperasi['alamat'] ?? ''),
-    'telepon' => $k['telepon'] ?? ($profilKoperasi['telepon'] ?? ''),
-];
 $penandatangan = $data['penandatangan'] ?? [];
 $penandatangan['nasabah'] = $a['nama'];
 
@@ -103,9 +113,27 @@ if ($namaSaksi2 === '') $namaSaksi2 = trim((string)($penandatangan['saksi_2'] ??
 if ($namaSaksi1 === '') $namaSaksi1 = '...............................';
 if ($namaSaksi2 === '') $namaSaksi2 = '...............................';
 
-$jabatanAdmin = trim((string)($penandatangan['jabatan_admin'] ?? 'Pengurus'));
+$jabatanAdmin = trim((string)($aturanSurat['jabatan_admin'] ?? ''));
+if ($jabatanAdmin === '') {
+    $jabatanAdmin = trim((string)($penandatangan['jabatan_admin'] ?? 'Pengurus'));
+}
 if ($jabatanAdmin === '') $jabatanAdmin = 'Pengurus';
 
+// Nama di bawah TTD pengurus = nama pihak pertama (bukan nama koperasi).
+$namaPengurus = $pp['nama'];
+
+// TTD pengurus: utamakan TTD di pengaturan/profil surat; fallback arsip.
+$ttdAdminLive = trim((string)($aturanSurat['ttd_admin'] ?? ''));
+if ($ttdAdminLive !== '') {
+    $surat['ttd_admin'] = $ttdAdminLive;
+}
+
+// Lebar label tetap (mm) agar titik dua sejajar antar blok pihak/rincian.
+$labelW = 48;
+$nilaiW = 126;
+$barisPdf = function ($label, $nilai) use ($e, $labelW, $nilaiW) {
+    return '<tr><td width="' . $labelW . '">' . $e($label) . '</td><td width="' . $nilaiW . '">: ' . $nilai . '</td></tr>';
+};
 $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
 $pdf->SetCreator('SIMKEU');
 $pdf->SetAuthor($namaKoperasi);
@@ -122,30 +150,37 @@ $html = '<div style="text-align:center"><b style="font-size:15px">SURAT PERJANJI
     . '<br><small>No. ' . $e($surat['nomor_perjanjian']) . ' · Versi ' . ucfirst($e($surat['versi'])) . '</small></div><hr>';
 
 $html .= '<h4>PIHAK PERTAMA — PEMBERI PINJAMAN</h4>'
-    . '<table cellpadding="2">'
-    . '<tr><td width="25%">Nama / NIK</td><td width="75%">: ' . $e($pp['nama']) . ' / ' . $e($pp['nik'] ?? '') . '</td></tr>'
-    . '<tr><td>Alamat</td><td>: ' . $e($pp['alamat'] ?? '') . '</td></tr>'
-    . '<tr><td>No. HP</td><td>: ' . $e($pp['telepon'] ?? '') . '</td></tr>'
+    . '<table cellpadding="2" width="174">'
+    . $barisPdf('Nama', $e($pp['nama']))
+    . $barisPdf('NIK', $e($pp['nik'] ?? ''))
+    . $barisPdf('Alamat', $e($pp['alamat'] ?? ''))
+    . $barisPdf('No. HP', $e($pp['telepon'] ?? ''))
     . '</table>';
 
 $lahir = trim(($a['tempat_lahir'] ?? '') . (!empty($a['tanggal_lahir']) ? ', ' . date('d/m/Y', strtotime($a['tanggal_lahir'])) : ''));
 $html .= '<h4>PIHAK KEDUA — PENERIMA PINJAMAN</h4>'
-    . '<table cellpadding="2">'
-    . '<tr><td width="25%">Nama / Kode</td><td width="75%">: <b>' . $e($a['nama']) . '</b> / ' . $e($a['kode']) . '</td></tr>'
-    . '<tr><td>NIK / Tempat, Tgl Lahir</td><td>: ' . $e($a['nik']) . ' / ' . $e($lahir) . '</td></tr>'
-    . '<tr><td>Alamat</td><td>: ' . $e($a['alamat'] ?? '') . '</td></tr>'
-    . '<tr><td>No. HP</td><td>: ' . $e($a['telepon'] ?? '') . '</td></tr>'
+    . '<table cellpadding="2" width="174">'
+    . $barisPdf('Nama', '<b>' . $e($a['nama']) . '</b>')
+    . $barisPdf('Kode', $e($a['kode']))
+    . $barisPdf('NIK', $e($a['nik']))
+    . $barisPdf('Tempat, Tgl Lahir', $e($lahir))
+    . $barisPdf('Alamat', $e($a['alamat'] ?? ''))
+    . $barisPdf('No. HP', $e($a['telepon'] ?? ''))
     . '</table>';
 
 $html .= '<h4>RINCIAN PINJAMAN</h4>'
-    . '<table cellpadding="2">'
-    . '<tr><td width="30%">Jenis / Nilai Pinjaman</td><td width="70%">: ' . $e($p['jenis']) . ' / <b>' . $rp($p['jumlah']) . '</b></td></tr>'
-    . '<tr><td>Tujuan Pinjaman</td><td>: ' . $e($p['tujuan'] ?? '-') . '</td></tr>'
-    . '<tr><td>Tenor / Frekuensi</td><td>: ' . $e($p['tenor']) . ' bulan / ' . $e($p['frekuensi']) . ' (' . $e($p['jumlah_cicilan'] ?? '') . ' kali)</td></tr>'
-    . '<tr><td>Bunga / Total / Angsuran</td><td>: ' . $e($p['bunga']) . '% / ' . $rp($p['total']) . ' / ' . $rp($p['angsuran']) . '</td></tr>'
-    . '<tr><td>Pencairan / Jatuh Tempo</td><td>: ' . $e(date('d/m/Y', strtotime($p['tanggal_pencairan']))) . ' / <b>' . $e(date('d/m/Y', strtotime($p['jatuh_tempo']))) . '</b></td></tr>'
+    . '<table cellpadding="2" width="174">'
+    . $barisPdf('Jenis Pinjaman', $e($p['jenis']))
+    . $barisPdf('Nilai Pinjaman', '<b>' . $rp($p['jumlah']) . '</b>')
+    . $barisPdf('Tujuan Pinjaman', $e($p['tujuan'] ?? '-'))
+    . $barisPdf('Tenor', $e($p['tenor']) . ' bulan')
+    . $barisPdf('Frekuensi', $e($p['frekuensi']) . ' (' . $e($p['jumlah_cicilan'] ?? '') . ' kali)')
+    . $barisPdf('Bunga', $e($p['bunga']) . '%')
+    . $barisPdf('Total', $rp($p['total']))
+    . $barisPdf('Angsuran', $rp($p['angsuran']))
+    . $barisPdf('Pencairan', $e(date('d/m/Y', strtotime($p['tanggal_pencairan']))))
+    . $barisPdf('Jatuh Tempo', '<b>' . $e(date('d/m/Y', strtotime($p['jatuh_tempo']))) . '</b>')
     . '</table>';
-
 if (!empty($data['jaminan']['ada'])) {
     $html .= '<h4>PASAL 3 - JAMINAN</h4><p>Sebagai jaminan atas hutang tersebut, PIHAK KEDUA menyerahkan jaminan berupa:<br><b>Jenis:</b> '
         . $e($data['jaminan']['jenis']) . '<br>' . nl2br($e($data['jaminan']['detail']))
@@ -162,20 +197,19 @@ if ($tempatSurat === '') $tempatSurat = 'Mojokerto';
 $html .= '<p style="text-align:right">Dibuat di ' . $e($tempatSurat) . '<br>Pada tanggal: ' . $e($tanggalSurat) . '</p>';
 $pdf->writeHTML($html, true, false, true, false, '');
 
-// Blok tanda tangan: baris 1 nasabah/teller/pengurus, baris 2 saksi (nama dari pencairan).
-// Nama di bawah pengurus = nama profil koperasi (bukan nama orang / pihak pertama surat).
+// Blok tanda tangan: baris 1 nasabah/teller/pengurus, baris 2 saksi.
+// Nama & TTD pengurus = pihak pertama / TTD di pengaturan surat.
 $blokTtd = [
     [
         ['field' => 'ttd_nasabah', 'label' => 'Nasabah', 'name' => (string)($penandatangan['nasabah'] ?? $a['nama'] ?? ''), 'meterai' => true],
         ['field' => 'ttd_teller', 'label' => 'Teller', 'name' => (string)($penandatangan['teller'] ?? ''), 'meterai' => false],
-        ['field' => 'ttd_admin', 'label' => $jabatanAdmin, 'name' => $namaKoperasi, 'meterai' => false],
+        ['field' => 'ttd_admin', 'label' => $jabatanAdmin, 'name' => $namaPengurus, 'meterai' => false],
     ],
     [
         ['field' => 'ttd_saksi_1', 'label' => 'Saksi 1', 'name' => $namaSaksi1, 'meterai' => false],
         ['field' => 'ttd_saksi_2', 'label' => 'Saksi 2', 'name' => $namaSaksi2, 'meterai' => false],
     ],
 ];
-
 $temps = [];
 $y = $pdf->GetY() + 6;
 if ($y > 175) {

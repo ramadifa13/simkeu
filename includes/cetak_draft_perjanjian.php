@@ -9,7 +9,7 @@ if (!isset($db)) {
 }
 
 $id=(int)($_GET['id'] ?? 0);
-$stmt=$db->prepare("SELECT pp.*,jp.nama_jenis,jp.memerlukan_jaminan,a.nama_lengkap,a.ktp,a.tempat_lahir,a.tanggal_lahir,a.alamat,a.telepon,
+$stmt=$db->prepare("SELECT pp.*,jp.nama_jenis,jp.memerlukan_jaminan,a.nama_lengkap,a.kode_anggota,a.kode_anggota_jaminan,a.ktp,a.tempat_lahir,a.tanggal_lahir,a.alamat,a.telepon,
  j.jenis_barang,j.identitas_barang,j.deskripsi_barang
  FROM pengajuan_pinjaman pp JOIN jenis_pinjaman jp ON jp.id=pp.jenis_pinjaman_id JOIN anggota a ON a.id=pp.anggota_id
  LEFT JOIN jaminan_pinjaman j ON j.pengajuan_id=pp.id
@@ -31,7 +31,7 @@ $hari=(int)($p['hari_angsuran']??0);$namaHari=[1=>'Senin',2=>'Selasa',3=>'Rabu',
 </style><style>.sign .witness-sign{height:105px}.sign .witness-sign .sign-name{top:86px}</style></head><body><div class="bar"><button onclick="window.print()">Cetak / Simpan PDF</button></div><main class="page">
 <div class="center"><h1 class="title">SURAT PERJANJIAN HUTANG PIUTANG</h1><p class="sub">Nomor: <?= $e($nomor) ?></p></div>
 <p>Yang bertanda tangan di bawah ini:</p><div class="party"><strong>PIHAK PERTAMA - PIHAK YANG MEMBERI PINJAMAN</strong><table><tr><td>Nama</td><td>: <?= $e($aturan['nama_pihak_pertama'] ?: ($k['nama']??'')) ?></td></tr><tr><td>NIK</td><td>: <?= $e($aturan['nik_pihak_pertama']??'') ?></td></tr><tr><td>Tempat/Tgl Lahir</td><td>: </td></tr><tr><td>Alamat</td><td>: <?= $e($aturan['alamat_pihak_pertama'] ?? '') ?></td></tr><tr><td>No. HP</td><td>: <?= $e($aturan['telepon_pihak_pertama'] ?? '') ?></td></tr></table></div>
-<div class="party"><strong>PIHAK KEDUA - PIHAK YANG MENERIMA PINJAMAN</strong><table><tr><td>Nama</td><td>: <?= $e($p['nama_lengkap']) ?></td></tr><tr><td>NIK</td><td>: <?= $e($p['ktp']) ?></td></tr><tr><td>Tempat/Tgl Lahir</td><td>: <?= $e($lahir) ?></td></tr><tr><td>Alamat</td><td>: <?= $e($p['alamat']) ?></td></tr><tr><td>No. HP</td><td>: <?= $e($p['telepon']) ?></td></tr></table></div>
+<div class="party"><strong>PIHAK KEDUA - PIHAK YANG MENERIMA PINJAMAN</strong><table><tr><td>Nama</td><td>: <?= $e($p['nama_lengkap']) ?></td></tr><tr><td>Kode</td><td>: <?= $e(!empty($p['memerlukan_jaminan']) ? ($p['kode_anggota_jaminan'] ?: ($p['kode_anggota'] ?? '')) : ($p['kode_anggota'] ?? '')) ?></td></tr><tr><td>NIK</td><td>: <?= $e($p['ktp']) ?></td></tr><tr><td>Tempat/Tgl Lahir</td><td>: <?= $e($lahir) ?></td></tr><tr><td>Alamat</td><td>: <?= $e($p['alamat']) ?></td></tr><tr><td>No. HP</td><td>: <?= $e($p['telepon']) ?></td></tr></table></div>
 <p><?= !empty($p['memerlukan_jaminan']) ? 'Kedua belah pihak sepakat mengadakan perjanjian hutang piutang dengan ketentuan sebagai berikut:' : 'Para pihak dengan ini sepakat mengikatkan diri dalam Perjanjian Hutang Piutang dengan syarat-syarat sebagai berikut:' ?></p>
 <?php if (!empty($p['memerlukan_jaminan'])): ?>
 <div class="article">PASAL 1 - JUMLAH HUTANG</div><div>PIHAK PERTAMA memberikan pinjaman kepada PIHAK KEDUA sebesar <?= $rp($h['pokok']) ?> (<?= $e(terbilangRupiah($h['pokok'])) ?>) yang telah diterima PIHAK KEDUA secara tunai dan penuh 100% tanpa potongan pada saat penandatanganan surat ini.</div>
