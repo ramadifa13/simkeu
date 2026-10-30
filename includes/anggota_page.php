@@ -19,7 +19,10 @@ if (!isAdmin() && !isTeller()) {
 $bolehHapusAnggota = isAdmin();
 
 // Upload melebihi post_max_size membuat $_POST kosong; tampilkan pesan yang jelas
-cekPostMelebihiBatas();
+if (cekPostMelebihiBatas()) {
+    header('Location: anggota.php');
+    exit;
+}
 
 // Kode anggota berikutnya untuk form tambah
 $kode_otomatis = buatKodeAnggota($db);
@@ -28,6 +31,13 @@ $kode_jaminan_otomatis = buatKodeAnggotaJaminan($db);
 // Handle form actions
 if ($_POST) {
     if (isset($_POST['add'])) {
+        try {
+            layananValidasiToken();
+        } catch (Exception $e) {
+            $_SESSION['error'] = $e->getMessage();
+            header('Location: anggota.php');
+            exit;
+        }
         // Kode dibuat server (kiriman form diabaikan agar tidak bisa bentrok/diubah)
         kunciKodeAnggota($db); // dilepas otomatis saat skrip selesai (redirect di akhir proses)
         $kategori_anggota = ($_POST['kategori_anggota'] ?? 'biasa') === 'jaminan' ? 'jaminan' : 'biasa';
@@ -573,6 +583,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down ui-members-modal">
             <div class="modal-content">
                 <form method="POST" enctype="multipart/form-data"><?php echo layananToken(); ?>
+                    <input type="hidden" name="add" value="1">
                     <div class="modal-header">
                         <h5 class="modal-title"><i class="ti ti-user-plus me-2"></i>Tambah Anggota Baru</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
@@ -683,7 +694,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" name="add" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Simpan</button>
+                        <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Simpan</button>
                     </div>
                 </form>
             </div>
