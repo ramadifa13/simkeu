@@ -34,8 +34,9 @@ if (!function_exists('closingBulanValid')) {
     }
 
     /**
-     * Kas aktual bulan ini dari buku kas: pembayaran angsuran/cicilan migrasi,
-     * tanpa pelunasan besar dan tanpa catch-up jumbo (>1jt) yang mencampur data lama.
+     * Kas aktual bulan ini dari buku kas: pembayaran angsuran/cicilan migrasi.
+     * Batch migrasi bisa >1jt (beberapa cicilan digabung) — tetap dihitung,
+     * kecuali pelunasan / denda.
      */
     function closingKasAktualBulan($db, $awal, $akhir) {
         $total = 0.0;
@@ -44,14 +45,16 @@ if (!function_exists('closingBulanValid')) {
                 "SELECT COALESCE(SUM(jumlah),0) FROM kas
                  WHERE jenis = 'masuk'
                    AND DATE(tanggal) BETWEEN ? AND ?
+                   AND jumlah > 0
                    AND (
                         keterangan LIKE 'Pembayaran angsuran%'
                      OR keterangan LIKE 'Pembayaran migrasi%'
                    )
                    AND keterangan NOT LIKE '%PELUNASAN%'
                    AND keterangan NOT LIKE '%-PEL %'
+                   AND keterangan NOT LIKE '%-PEL-%'
                    AND keterangan NOT LIKE '%(denda)%'
-                   AND jumlah <= 1000000"
+                   AND keterangan NOT LIKE '%[DIBATALKAN:%'"
             );
             $q->execute([$awal, $akhir]);
             $total = (float) $q->fetchColumn();
@@ -66,7 +69,7 @@ if (!function_exists('closingBulanValid')) {
                     "SELECT COALESCE(SUM(total_diterima),0) FROM migrasi_pembayaran
                      WHERE tanggal_bayar BETWEEN ? AND ?
                        AND jenis_pembayaran = 'cicilan'
-                       AND total_diterima <= 1000000"
+                       AND total_diterima > 0"
                 );
                 $q->execute([$awal, $akhir]);
                 $total += (float) $q->fetchColumn();
@@ -81,7 +84,7 @@ if (!function_exists('closingBulanValid')) {
                          WHERE dibatalkan_at IS NULL
                            AND DATE(created_at) BETWEEN ? AND ?
                            AND jenis IN ('cicilan','angsuran','bayar')
-                           AND jumlah <= 1000000"
+                           AND jumlah > 0"
                     );
                     $q->execute([$awal, $akhir]);
                     $total += (float) $q->fetchColumn();
