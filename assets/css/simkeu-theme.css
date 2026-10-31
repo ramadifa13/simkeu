@@ -585,6 +585,11 @@ table.dataTable tbody td{
 }
 @media (min-width:1600px){.ui-stat-grid[data-count='6']{grid-template-columns:repeat(6,minmax(0,1fr))}}
 
+/* --- Dashboard growth chart + countup --- */
+.ui-dash-growth{overflow:hidden}
+.ui-dash-growth-chart{min-height:300px;width:100%}
+.js-countup{font-variant-numeric:tabular-nums}
+
 /* --- Dashboard layout padat --- */
 .ui-stat-grid{
   display:grid;

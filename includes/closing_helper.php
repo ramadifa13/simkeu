@@ -24,9 +24,8 @@ if (!function_exists('closingBulanValid')) {
     }
 
     /**
-     * Angsuran masuk closing bulan M hanya jika dibayar di M dan jatuh tempo di M.
-     * Mencegah cicilan lama / catch-up migrasi yang ikut distempel tanggal bayar
-     * mencampur hitungan periode berjalan.
+     * Cicilan masuk closing bulan M bila dibayar di M dan jatuh tempo di M.
+     * Menghindari cicilan lama/catch-up migrasi yang ikut distempel tanggal bayar.
      */
     function closingWhereAngsuranBulan() {
         return "a.status = 'lunas'
@@ -35,36 +34,61 @@ if (!function_exists('closingBulanValid')) {
     }
 
     /**
-     * Total kas aktual bulan ini (migrasi + layanan), tanpa pelunasan besar
-     * yang biasanya settlement historis. Dipakai agar estimasi mendekati buku Excel.
+     * Kas aktual bulan ini dari buku kas: pembayaran angsuran/cicilan migrasi,
+     * tanpa pelunasan besar dan tanpa catch-up jumbo (>1jt) yang mencampur data lama.
      */
     function closingKasAktualBulan($db, $awal, $akhir) {
         $total = 0.0;
         try {
             $q = $db->prepare(
-                "SELECT COALESCE(SUM(total_diterima),0) FROM migrasi_pembayaran
-                 WHERE tanggal_bayar BETWEEN ? AND ?
-                   AND jenis_pembayaran = 'cicilan'"
+                "SELECT COALESCE(SUM(jumlah),0) FROM kas
+                 WHERE jenis = 'masuk'
+                   AND DATE(tanggal) BETWEEN ? AND ?
+                   AND (
+                        keterangan LIKE 'Pembayaran angsuran%'
+                     OR keterangan LIKE 'Pembayaran migrasi%'
+                   )
+                   AND keterangan NOT LIKE '%PELUNASAN%'
+                   AND keterangan NOT LIKE '%-PEL %'
+                   AND keterangan NOT LIKE '%(denda)%'
+                   AND jumlah <= 1000000"
             );
             $q->execute([$awal, $akhir]);
-            $total += (float) $q->fetchColumn();
+            $total = (float) $q->fetchColumn();
         } catch (Exception $e) {
-            // tabel migrasi opsional
+            $total = 0.0;
         }
-        try {
-            $cek = $db->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='layanan_pembayaran'");
-            if ((int) $cek->fetchColumn() > 0) {
+
+        // Fallback bila kas kosong: migrasi_pembayaran cicilan + layanan.
+        if ($total < 0.009) {
+            try {
                 $q = $db->prepare(
-                    "SELECT COALESCE(SUM(jumlah),0) FROM layanan_pembayaran
-                     WHERE dibatalkan_at IS NULL
-                       AND DATE(created_at) BETWEEN ? AND ?
-                       AND jenis IN ('cicilan','angsuran','bayar')"
+                    "SELECT COALESCE(SUM(total_diterima),0) FROM migrasi_pembayaran
+                     WHERE tanggal_bayar BETWEEN ? AND ?
+                       AND jenis_pembayaran = 'cicilan'
+                       AND total_diterima <= 1000000"
                 );
                 $q->execute([$awal, $akhir]);
                 $total += (float) $q->fetchColumn();
+            } catch (Exception $e) {
+                // optional
             }
-        } catch (Exception $e) {
-            // layanan opsional
+            try {
+                $cek = $db->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='layanan_pembayaran'");
+                if ((int) $cek->fetchColumn() > 0) {
+                    $q = $db->prepare(
+                        "SELECT COALESCE(SUM(jumlah),0) FROM layanan_pembayaran
+                         WHERE dibatalkan_at IS NULL
+                           AND DATE(created_at) BETWEEN ? AND ?
+                           AND jenis IN ('cicilan','angsuran','bayar')
+                           AND jumlah <= 1000000"
+                    );
+                    $q->execute([$awal, $akhir]);
+                    $total += (float) $q->fetchColumn();
+                }
+            } catch (Exception $e) {
+                // optional
+            }
         }
         return $total;
     }
@@ -86,7 +110,7 @@ if (!function_exists('closingBulanValid')) {
         foreach ($rows as $r) {
             $jadwal += (float) $r['nominal'];
         }
-        // Utamakan kas aktual (lebih dekat ke Excel); fallback ke jumlah jadwal.
+        // Utamakan kas aktual (sesuai buku/Excel); fallback ke jumlah jadwal.
         $total = $kasAktual > 0.009 ? (float) $kasAktual : $jadwal;
         return ['jumlah' => $jumlah, 'total' => $total, 'jadwal' => $jadwal];
     }

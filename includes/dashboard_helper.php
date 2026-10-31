@@ -65,6 +65,7 @@ if (!function_exists('dashboardLoadStaffDataDefaults')) {
                 'persen' => 0.0,
                 'jumlah_trx' => 0,
             ],
+            'pertumbuhan_series' => [],
         ];
     }
 }
@@ -147,6 +148,52 @@ if (!function_exists('dashboardLoadPertumbuhanLaba')) {
             'persen' => $persen,
             'jumlah_trx' => (int)($row['jumlah_trx'] ?? 0),
         ];
+    }
+}
+
+if (!function_exists('dashboardLoadPertumbuhanLabaSeries')) {
+    /**
+     * Deret bulanan untuk grafik: bunga, total angsuran, dan % laba (6 bulan terakhir).
+     * @return list<array{bulan:string,label:string,bunga:float,angsuran:float,persen:float}>
+     */
+    function dashboardLoadPertumbuhanLabaSeries(PDO $db, int $bulanKeBelakang = 6): array
+    {
+        $out = [];
+        $bulanKeBelakang = max(3, min(12, $bulanKeBelakang));
+        for ($i = $bulanKeBelakang - 1; $i >= 0; $i--) {
+            $bulan = date('Y-m', strtotime("first day of -{$i} month"));
+            $awal = $bulan . '-01';
+            $akhir = date('Y-m-t', strtotime($awal));
+            $terkunci = function_exists('closingBulanTerkunci') && closingBulanTerkunci($db, $bulan);
+            if ($terkunci) {
+                $row = dashboardFetchRow($db, "SELECT
+                        COALESCE(SUM(a.jumlah_angsuran + COALESCE(a.denda,0)),0) AS total_angsuran,
+                        COALESCE(SUM(a.bunga),0) AS total_bunga
+                    FROM closing_angsuran_detail d
+                    JOIN angsuran a ON a.id = d.angsuran_id
+                    JOIN closing_angsuran_bulanan c ON c.id = d.closing_id
+                    WHERE c.bulan = ? AND c.status = 'terkunci'", [$bulan]);
+            } else {
+                $row = dashboardFetchRow($db, "SELECT
+                        COALESCE(SUM(jumlah_angsuran + COALESCE(denda,0)),0) AS total_angsuran,
+                        COALESCE(SUM(bunga),0) AS total_bunga
+                    FROM angsuran
+                    WHERE status = 'lunas'
+                      AND tanggal_bayar BETWEEN ? AND ?
+                      AND tanggal_jatuh_tempo BETWEEN ? AND ?", [$awal, $akhir, $awal, $akhir]);
+            }
+            $angsuran = (float)($row['total_angsuran'] ?? 0);
+            $bunga = (float)($row['total_bunga'] ?? 0);
+            $persen = $angsuran > 0 ? round(($bunga / $angsuran) * 100, 1) : 0.0;
+            $out[] = [
+                'bulan' => $bulan,
+                'label' => dashboardLabelBulan($bulan),
+                'bunga' => $bunga,
+                'angsuran' => $angsuran,
+                'persen' => $persen,
+            ];
+        }
+        return $out;
     }
 }
 
@@ -341,6 +388,9 @@ if (!function_exists('dashboardLoadStaffData')) {
         $pertumbuhanLaba = $isAdmin
             ? dashboardLoadPertumbuhanLaba($db)
             : dashboardLoadStaffDataDefaults($role)['pertumbuhan_laba'];
+        $pertumbuhanSeries = $isAdmin
+            ? dashboardLoadPertumbuhanLabaSeries($db, 6)
+            : [];
 
         return [
             'role' => $role,
@@ -363,6 +413,7 @@ if (!function_exists('dashboardLoadStaffData')) {
             'transaksi_hari_ini' => $transaksiHariIni,
             'setoran_hari_ini' => $setoranHariIni,
             'pertumbuhan_laba' => $pertumbuhanLaba,
+            'pertumbuhan_series' => $pertumbuhanSeries,
         ];
     }
 }

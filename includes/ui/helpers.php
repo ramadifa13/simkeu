@@ -326,8 +326,15 @@ if (!function_exists('ui_stat_grid')) {
             $meta = htmlspecialchars((string)($kpi['meta'] ?? ''), ENT_QUOTES, 'UTF-8');
             $trend = preg_replace('/[^a-z]/', '', strtolower((string)($kpi['trend'] ?? '')));
             $valueRaw = $kpi['value'] ?? '';
+            $countup = $kpi['countup'] ?? null;
+            $countupDecimals = (int)($kpi['countup_decimals'] ?? 0);
+            $countupPrefix = (string)($kpi['countup_prefix'] ?? '');
+            $countupSuffix = (string)($kpi['countup_suffix'] ?? '');
             if (is_int($valueRaw) || is_float($valueRaw)) {
                 $value = htmlspecialchars(number_format((float)$valueRaw, 0, ',', '.'), ENT_QUOTES, 'UTF-8');
+                if ($countup === null) {
+                    $countup = (float)$valueRaw;
+                }
             } else {
                 $value = htmlspecialchars((string)$valueRaw, ENT_QUOTES, 'UTF-8');
             }
@@ -339,7 +346,16 @@ if (!function_exists('ui_stat_grid')) {
             echo '<div class="card-body d-flex justify-content-between align-items-start gap-2">';
             echo '<div class="min-w-0">';
             echo '<p class="mb-0 text-muted small text-uppercase">' . $label . '</p>';
-            echo '<h4 class="mb-0">' . $value;
+            echo '<h4 class="mb-0">';
+            if ($countup !== null && is_numeric($countup)) {
+                echo '<span class="js-countup" data-countup="' . htmlspecialchars((string)$countup, ENT_QUOTES, 'UTF-8') . '"'
+                    . ' data-decimals="' . $countupDecimals . '"'
+                    . ' data-prefix="' . htmlspecialchars($countupPrefix, ENT_QUOTES, 'UTF-8') . '"'
+                    . ' data-suffix="' . htmlspecialchars($countupSuffix, ENT_QUOTES, 'UTF-8') . '">'
+                    . $value . '</span>';
+            } else {
+                echo $value;
+            }
             if ($trend === 'up') {
                 echo ' <span class="ui-stat-trend is-up" aria-hidden="true"><i class="ti ti-arrow-up-right"></i></span>';
             } elseif ($trend === 'down') {

@@ -44,16 +44,19 @@ $labaHint = trim(
 
 $primaryKpis = $isAdmin
     ? [
-        ['label' => 'Anggota', 'value' => number_format((int)$d['stat_anggota']['total']), 'hint' => (int)$d['stat_anggota']['aktif'] . ' aktif', 'icon' => 'ti ti-users', 'tone' => 'primary'],
-        ['label' => 'Simpanan', 'value' => formatRupiah($d['total_simpanan']), 'hint' => 'Saldo real', 'icon' => 'ti ti-pig-money', 'tone' => 'success'],
-        ['label' => 'Setoran hari ini', 'value' => formatRupiah($d['setoran_hari_ini']['total_setoran']), 'hint' => $setoranHariIniHint, 'icon' => 'ti ti-cash-banknote', 'tone' => 'success'],
-        ['label' => 'Pinjaman cair', 'value' => formatRupiah($d['pinjaman_stats']['total_nominal']), 'hint' => (int)$d['pinjaman_stats']['aktif'] . ' aktif', 'icon' => 'ti ti-cash', 'tone' => 'danger'],
-        ['label' => 'Sisa tagihan', 'value' => formatRupiah($d['pinjaman_stats']['total_sisa']), 'hint' => 'Pokok + bunga', 'icon' => 'ti ti-hourglass', 'tone' => 'warning'],
-        ['label' => 'Saldo kas', 'value' => formatRupiah($d['stat_kas']['saldo']), 'hint' => 'Tersedia', 'icon' => 'ti ti-wallet', 'tone' => 'info'],
-        ['label' => 'Waserda', 'value' => formatRupiah($d['waserda_stats']['total_nominal']), 'hint' => (int)$d['waserda_stats']['total_transaksi'] . ' trx', 'icon' => 'ti ti-building-store', 'tone' => 'success'],
+        ['label' => 'Anggota', 'value' => number_format((int)$d['stat_anggota']['total']), 'countup' => (int)$d['stat_anggota']['total'], 'hint' => (int)$d['stat_anggota']['aktif'] . ' aktif', 'icon' => 'ti ti-users', 'tone' => 'primary'],
+        ['label' => 'Simpanan', 'value' => formatRupiah($d['total_simpanan']), 'countup' => (float)$d['total_simpanan'], 'countup_prefix' => 'Rp ', 'hint' => 'Saldo real', 'icon' => 'ti ti-pig-money', 'tone' => 'success'],
+        ['label' => 'Setoran hari ini', 'value' => formatRupiah($d['setoran_hari_ini']['total_setoran']), 'countup' => (float)$d['setoran_hari_ini']['total_setoran'], 'countup_prefix' => 'Rp ', 'hint' => $setoranHariIniHint, 'icon' => 'ti ti-cash-banknote', 'tone' => 'success'],
+        ['label' => 'Pinjaman cair', 'value' => formatRupiah($d['pinjaman_stats']['total_nominal']), 'countup' => (float)$d['pinjaman_stats']['total_nominal'], 'countup_prefix' => 'Rp ', 'hint' => (int)$d['pinjaman_stats']['aktif'] . ' aktif', 'icon' => 'ti ti-cash', 'tone' => 'danger'],
+        ['label' => 'Sisa tagihan', 'value' => formatRupiah($d['pinjaman_stats']['total_sisa']), 'countup' => (float)$d['pinjaman_stats']['total_sisa'], 'countup_prefix' => 'Rp ', 'hint' => 'Pokok + bunga', 'icon' => 'ti ti-hourglass', 'tone' => 'warning'],
+        ['label' => 'Saldo kas', 'value' => formatRupiah($d['stat_kas']['saldo']), 'countup' => (float)$d['stat_kas']['saldo'], 'countup_prefix' => 'Rp ', 'hint' => 'Tersedia', 'icon' => 'ti ti-wallet', 'tone' => 'info'],
+        ['label' => 'Waserda', 'value' => formatRupiah($d['waserda_stats']['total_nominal']), 'countup' => (float)$d['waserda_stats']['total_nominal'], 'countup_prefix' => 'Rp ', 'hint' => (int)$d['waserda_stats']['total_transaksi'] . ' trx', 'icon' => 'ti ti-building-store', 'tone' => 'success'],
         [
             'label' => 'Pertumbuhan laba',
             'value' => $labaPersenTxt,
+            'countup' => $labaPersen,
+            'countup_decimals' => 1,
+            'countup_suffix' => '%',
             'hint' => $labaHint,
             'icon' => $labaPersen > 0 ? 'ti ti-trending-up' : 'ti ti-minus',
             'tone' => $labaPersen > 0 ? 'success' : 'secondary',
@@ -62,10 +65,16 @@ $primaryKpis = $isAdmin
         ],
     ]
     : [
-        ['label' => 'Trx hari ini', 'value' => number_format((int)$d['transaksi_hari_ini']['total_transaksi']), 'hint' => 'Kas input saya', 'icon' => 'ti ti-activity', 'tone' => 'primary'],
-        ['label' => 'Setoran hari ini', 'value' => formatRupiah($d['setoran_hari_ini']['total_setoran']), 'hint' => $setoranHariIniHint, 'icon' => 'ti ti-cash-banknote', 'tone' => 'success'],
-        ['label' => 'Anggota aktif', 'value' => number_format((int)$d['stat_anggota']['aktif']), 'hint' => 'dari ' . number_format((int)$d['stat_anggota']['total']), 'icon' => 'ti ti-users', 'tone' => 'info'],
+        ['label' => 'Trx hari ini', 'value' => number_format((int)$d['transaksi_hari_ini']['total_transaksi']), 'countup' => (int)$d['transaksi_hari_ini']['total_transaksi'], 'hint' => 'Kas input saya', 'icon' => 'ti ti-activity', 'tone' => 'primary'],
+        ['label' => 'Setoran hari ini', 'value' => formatRupiah($d['setoran_hari_ini']['total_setoran']), 'countup' => (float)$d['setoran_hari_ini']['total_setoran'], 'countup_prefix' => 'Rp ', 'hint' => $setoranHariIniHint, 'icon' => 'ti ti-cash-banknote', 'tone' => 'success'],
+        ['label' => 'Anggota aktif', 'value' => number_format((int)$d['stat_anggota']['aktif']), 'countup' => (int)$d['stat_anggota']['aktif'], 'hint' => 'dari ' . number_format((int)$d['stat_anggota']['total']), 'icon' => 'ti ti-users', 'tone' => 'info'],
     ];
+
+$chartSeries = $d['pertumbuhan_series'] ?? [];
+$chartLabels = array_column($chartSeries, 'label');
+$chartBunga = array_map('floatval', array_column($chartSeries, 'bunga'));
+$chartAngsuran = array_map('floatval', array_column($chartSeries, 'angsuran'));
+$chartPersen = array_map('floatval', array_column($chartSeries, 'persen'));
 
 $workQueue = $isAdmin
     ? [
@@ -131,7 +140,7 @@ $quickActions = $isAdmin
                             <div class="min-w-0 flex-fill">
                                 <div class="small text-muted text-truncate"><?php echo htmlspecialchars($item['label']); ?></div>
                             </div>
-                            <div class="fw-semibold"><?php echo number_format((int)$item['value']); ?></div>
+                            <div class="fw-semibold"><span class="js-countup" data-countup="<?php echo (int)$item['value']; ?>"><?php echo number_format((int)$item['value']); ?></span></div>
                         </a>
                     <?php endforeach; ?>
                 </div>
@@ -141,17 +150,35 @@ $quickActions = $isAdmin
             <?php ui_stat_grid($primaryKpis); ?>
 
             <?php if ($isAdmin): ?>
-            <div class="ui-dash-queue" data-count="<?php echo count($workQueue); ?>" aria-label="Antrian kerja">
-                <?php foreach ($workQueue as $item): ?>
-                    <a href="<?php echo htmlspecialchars($item['href']); ?>" class="ui-dash-attention tone-<?php echo htmlspecialchars($item['tone']); ?> text-decoration-none">
-                        <span class="ui-dash-attention-icon"><i class="<?php echo htmlspecialchars($item['icon']); ?>"></i></span>
-                        <div class="min-w-0 flex-fill">
-                            <div class="small text-muted text-truncate"><?php echo htmlspecialchars($item['label']); ?></div>
-                        </div>
-                        <div class="fw-semibold"><?php echo number_format((int)$item['value']); ?></div>
-                    </a>
-                <?php endforeach; ?>
-            </div>
+            <section class="ui-dash-panel mb-3" aria-label="KPI antrian">
+                <div class="ui-dash-sec">
+                    <h3 class="ui-dash-sec-title"><i class="ti ti-activity" aria-hidden="true"></i>KPI antrian</h3>
+                    <span class="ui-dash-sec-note">Prioritas hari ini</span>
+                </div>
+                <div class="ui-dash-queue" data-count="<?php echo count($workQueue); ?>">
+                    <?php foreach ($workQueue as $item): ?>
+                        <a href="<?php echo htmlspecialchars($item['href']); ?>" class="ui-dash-attention tone-<?php echo htmlspecialchars($item['tone']); ?> text-decoration-none">
+                            <span class="ui-dash-attention-icon"><i class="<?php echo htmlspecialchars($item['icon']); ?>"></i></span>
+                            <div class="min-w-0 flex-fill">
+                                <div class="small text-muted text-truncate"><?php echo htmlspecialchars($item['label']); ?></div>
+                            </div>
+                            <div class="fw-semibold"><span class="js-countup" data-countup="<?php echo (int)$item['value']; ?>"><?php echo number_format((int)$item['value']); ?></span></div>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+
+            <?php if ($chartSeries): ?>
+            <section class="card ui-dash-panel ui-dash-growth" aria-label="Grafik pertumbuhan laba">
+                <div class="card-header ui-dash-sec">
+                    <span class="ui-dash-sec-title"><i class="ti ti-chart-bar" aria-hidden="true"></i>Grafik pertumbuhan</span>
+                    <span class="ui-dash-sec-note">Bunga vs angsuran · 6 bulan</span>
+                </div>
+                <div class="card-body">
+                    <div id="dashGrowthChart" class="ui-dash-growth-chart" role="img" aria-label="Grafik pertumbuhan laba bulanan"></div>
+                </div>
+            </section>
+            <?php endif; ?>
             <?php endif; ?>
 
             <section class="ui-dash-panel" aria-label="Aksi cepat">
@@ -342,6 +369,97 @@ $quickActions = $isAdmin
                 </div>
             </div>
             </div>
-<?php include __DIR__ . '/layout/shell_end.php'; ?>
+<?php
+$uiCharts = $isAdmin && !empty($chartSeries);
+include __DIR__ . '/layout/shell_end.php';
+?>
+<script>
+(function () {
+  function formatId(n, decimals) {
+    var fixed = Number(n).toFixed(decimals);
+    var parts = fixed.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return decimals > 0 ? parts.join(',') : parts[0];
+  }
+  function animateCountup(el) {
+    var target = parseFloat(el.getAttribute('data-countup') || '0');
+    if (!isFinite(target)) return;
+    var decimals = parseInt(el.getAttribute('data-decimals') || '0', 10) || 0;
+    var prefix = el.getAttribute('data-prefix') || '';
+    var suffix = el.getAttribute('data-suffix') || '';
+    var start = 0;
+    var duration = 1100;
+    var t0 = null;
+    function frame(ts) {
+      if (t0 === null) t0 = ts;
+      var p = Math.min(1, (ts - t0) / duration);
+      var eased = 1 - Math.pow(1 - p, 3);
+      var val = start + (target - start) * eased;
+      el.textContent = prefix + formatId(val, decimals) + suffix;
+      if (p < 1) requestAnimationFrame(frame);
+      else el.textContent = prefix + formatId(target, decimals) + suffix;
+    }
+    el.textContent = prefix + formatId(0, decimals) + suffix;
+    requestAnimationFrame(frame);
+  }
+  document.querySelectorAll('.js-countup').forEach(animateCountup);
+
+  var chartEl = document.getElementById('dashGrowthChart');
+  if (chartEl && typeof ApexCharts !== 'undefined') {
+    var labels = <?php echo json_encode($chartLabels, JSON_UNESCAPED_UNICODE); ?>;
+    var bunga = <?php echo json_encode($chartBunga); ?>;
+    var angsuran = <?php echo json_encode($chartAngsuran); ?>;
+    var persen = <?php echo json_encode($chartPersen); ?>;
+    var chart = new ApexCharts(chartEl, {
+      chart: { type: 'line', height: 300, toolbar: { show: false }, fontFamily: 'inherit', animations: { enabled: true, speed: 800 } },
+      series: [
+        { name: 'Angsuran', type: 'column', data: angsuran },
+        { name: 'Bunga (laba)', type: 'column', data: bunga },
+        { name: 'Pertumbuhan %', type: 'line', data: persen }
+      ],
+      stroke: { width: [0, 0, 3], curve: 'smooth' },
+      markers: { size: [0, 0, 4], strokeWidth: 0 },
+      plotOptions: { bar: { columnWidth: '48%', borderRadius: 4 } },
+      colors: ['#93c5fd', '#2563eb', '#16a34a'],
+      dataLabels: { enabled: false },
+      xaxis: { categories: labels, labels: { style: { colors: '#64748b' } } },
+      yaxis: [
+        {
+          seriesName: 'Angsuran',
+          title: { text: 'Nominal (Rp)', style: { color: '#64748b' } },
+          labels: {
+            formatter: function (v) {
+              if (v >= 1e6) return (v / 1e6).toFixed(1) + ' jt';
+              if (v >= 1e3) return (v / 1e3).toFixed(0) + ' rb';
+              return String(v);
+            }
+          }
+        },
+        { seriesName: 'Bunga (laba)', show: false },
+        {
+          opposite: true,
+          seriesName: 'Pertumbuhan %',
+          title: { text: 'Pertumbuhan %', style: { color: '#16a34a' } },
+          labels: { formatter: function (v) { return Number(v).toFixed(0) + '%'; } },
+          min: 0,
+          max: Math.max(30, Math.ceil(Math.max.apply(null, persen.concat([0])) / 5) * 5)
+        }
+      ],
+      legend: { position: 'top', horizontalAlign: 'left' },
+      grid: { borderColor: '#e2e8f0', strokeDashArray: 4 },
+      tooltip: {
+        shared: true,
+        y: {
+          formatter: function (val, opts) {
+            if (opts.seriesIndex === 2) return Number(val).toFixed(1) + '%';
+            return 'Rp ' + formatId(val, 0);
+          }
+        }
+      }
+    });
+    chart.render();
+  }
+})();
+</script>
 </body>
 </html>

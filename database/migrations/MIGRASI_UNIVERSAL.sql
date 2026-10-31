@@ -491,6 +491,127 @@ CREATE TABLE IF NOT EXISTS `log_koreksi` (
   CONSTRAINT `fk_log_koreksi_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
+-- Batalkan cicilan salah input (loncat / prematur jauh / kasus Warsingah & Alisa Debi).
+UPDATE layanan_pembayaran lp
+INNER JOIN angsuran a ON a.id = lp.angsuran_id
+LEFT JOIN pinjaman p ON p.id = a.pinjaman_id
+SET lp.dibatalkan_at = COALESCE(lp.dibatalkan_at, NOW())
+WHERE lp.dibatalkan_at IS NULL
+  AND a.status = 'lunas'
+  AND a.cara_bayar = 'cicilan'
+  AND a.tanggal_bayar IS NOT NULL
+  AND a.tanggal_jatuh_tempo IS NOT NULL
+  AND (
+    EXISTS (
+      SELECT 1 FROM angsuran b
+      WHERE b.pinjaman_id = a.pinjaman_id
+        AND b.angsuran_ke < a.angsuran_ke
+        AND b.status <> 'lunas'
+    )
+    OR (
+      a.tanggal_bayar < a.tanggal_jatuh_tempo
+      AND a.tanggal_jatuh_tempo >= CURDATE()
+      AND DATEDIFF(a.tanggal_jatuh_tempo, a.tanggal_bayar) > 7
+    )
+    OR (
+      p.kode_pinjaman IN ('PJN-20261028-0025', 'PJN-20261024-0020')
+      AND a.tanggal_bayar < a.tanggal_jatuh_tempo
+    )
+  );
+
+UPDATE kas k
+INNER JOIN pinjaman p ON k.keterangan LIKE CONCAT('%', p.kode_pinjaman, '%')
+INNER JOIN angsuran a ON a.pinjaman_id = p.id
+  AND k.keterangan LIKE CONCAT('%ke-', a.angsuran_ke, ' -%')
+SET k.jumlah = 0,
+    k.keterangan = CONCAT(COALESCE(k.keterangan, ''), ' [DIBATALKAN: pembayaran prematur]')
+WHERE k.jenis = 'masuk'
+  AND k.jumlah > 0
+  AND k.keterangan LIKE 'Pembayaran angsuran%'
+  AND k.keterangan NOT LIKE '%[DIBATALKAN:%'
+  AND a.status = 'lunas'
+  AND a.cara_bayar = 'cicilan'
+  AND a.tanggal_bayar IS NOT NULL
+  AND a.tanggal_jatuh_tempo IS NOT NULL
+  AND (
+    EXISTS (
+      SELECT 1 FROM angsuran b
+      WHERE b.pinjaman_id = a.pinjaman_id
+        AND b.angsuran_ke < a.angsuran_ke
+        AND b.status <> 'lunas'
+    )
+    OR (
+      a.tanggal_bayar < a.tanggal_jatuh_tempo
+      AND a.tanggal_jatuh_tempo >= CURDATE()
+      AND DATEDIFF(a.tanggal_jatuh_tempo, a.tanggal_bayar) > 7
+    )
+    OR (
+      p.kode_pinjaman IN ('PJN-20261028-0025', 'PJN-20261024-0020')
+      AND a.tanggal_bayar < a.tanggal_jatuh_tempo
+    )
+  );
+
+UPDATE pinjaman p
+INNER JOIN (
+  SELECT a.pinjaman_id, COALESCE(SUM(a.pokok),0) AS pokok_balik
+  FROM angsuran a
+  LEFT JOIN pinjaman px ON px.id = a.pinjaman_id
+  WHERE a.status = 'lunas'
+    AND a.cara_bayar = 'cicilan'
+    AND a.tanggal_bayar IS NOT NULL
+    AND a.tanggal_jatuh_tempo IS NOT NULL
+    AND (
+      EXISTS (
+        SELECT 1 FROM angsuran b
+        WHERE b.pinjaman_id = a.pinjaman_id
+          AND b.angsuran_ke < a.angsuran_ke
+          AND b.status <> 'lunas'
+      )
+      OR (
+        a.tanggal_bayar < a.tanggal_jatuh_tempo
+        AND a.tanggal_jatuh_tempo >= CURDATE()
+        AND DATEDIFF(a.tanggal_jatuh_tempo, a.tanggal_bayar) > 7
+      )
+      OR (
+        px.kode_pinjaman IN ('PJN-20261028-0025', 'PJN-20261024-0020')
+        AND a.tanggal_bayar < a.tanggal_jatuh_tempo
+      )
+    )
+  GROUP BY a.pinjaman_id
+) x ON x.pinjaman_id = p.id
+SET p.sisa_pokok = p.sisa_pokok + x.pokok_balik,
+    p.status = 'aktif',
+    p.tanggal_lunas = NULL;
+
+UPDATE angsuran a
+LEFT JOIN pinjaman p ON p.id = a.pinjaman_id
+SET a.status = IF(a.tanggal_jatuh_tempo < CURDATE(), 'telat', 'belum_bayar'),
+    a.tanggal_bayar = NULL,
+    a.denda = 0,
+    a.keterlambatan_hari = IF(a.tanggal_jatuh_tempo < CURDATE(), DATEDIFF(CURDATE(), a.tanggal_jatuh_tempo), 0),
+    a.cara_bayar = 'cicilan'
+WHERE a.status = 'lunas'
+  AND a.cara_bayar = 'cicilan'
+  AND a.tanggal_bayar IS NOT NULL
+  AND a.tanggal_jatuh_tempo IS NOT NULL
+  AND (
+    EXISTS (
+      SELECT 1 FROM angsuran b
+      WHERE b.pinjaman_id = a.pinjaman_id
+        AND b.angsuran_ke < a.angsuran_ke
+        AND b.status <> 'lunas'
+    )
+    OR (
+      a.tanggal_bayar < a.tanggal_jatuh_tempo
+      AND a.tanggal_jatuh_tempo >= CURDATE()
+      AND DATEDIFF(a.tanggal_jatuh_tempo, a.tanggal_bayar) > 7
+    )
+    OR (
+      p.kode_pinjaman IN ('PJN-20261028-0025', 'PJN-20261024-0020')
+      AND a.tanggal_bayar < a.tanggal_jatuh_tempo
+    )
+  );
+
 SELECT 'Migrasi universal selesai dan aman dijalankan kembali.' AS hasil;
 
 -- Closing angsuran bulanan: pembayaran bulan yang sudah ditutup tidak boleh diubah.
