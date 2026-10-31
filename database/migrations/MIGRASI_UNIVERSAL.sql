@@ -504,9 +504,9 @@ INNER JOIN (
   INNER JOIN pinjaman px ON px.id = a.pinjaman_id
   WHERE a.status = 'lunas'
     AND (
-      (px.kode_pinjaman = 'PJN-20261013-0005' AND a.angsuran_ke IN (5, 6))
-   OR (px.kode_pinjaman = 'PJN-20261013-0004' AND a.angsuran_ke IN (5, 6))
-   OR (px.kode_pinjaman = 'PJN-20261013-0003' AND a.angsuran_ke IN (4, 5, 6))
+      (px.kode_pinjaman = 'PJN-20261013-0005' AND a.angsuran_ke > 4)  -- NOVITASARI Senin → 4
+   OR (px.kode_pinjaman = 'PJN-20261013-0004' AND a.angsuran_ke > 4)  -- Puji Rabu → 4
+   OR (px.kode_pinjaman = 'PJN-20261013-0003' AND a.angsuran_ke > 3)  -- NOVIANI Kamis (sering disebut Novitasari) → 3
    OR (px.kode_pinjaman IN ('PJN-20261028-0025', 'PJN-20261024-0020')
        AND a.tanggal_bayar IS NOT NULL AND a.tanggal_bayar < a.tanggal_jatuh_tempo)
     )
@@ -525,9 +525,9 @@ SET a.status = IF(a.tanggal_jatuh_tempo < CURDATE(), 'telat', 'belum_bayar'),
     a.cara_bayar = 'cicilan'
 WHERE a.status = 'lunas'
   AND (
-    (p.kode_pinjaman = 'PJN-20261013-0005' AND a.angsuran_ke IN (5, 6))
- OR (p.kode_pinjaman = 'PJN-20261013-0004' AND a.angsuran_ke IN (5, 6))
- OR (p.kode_pinjaman = 'PJN-20261013-0003' AND a.angsuran_ke IN (4, 5, 6))
+    (p.kode_pinjaman = 'PJN-20261013-0005' AND a.angsuran_ke > 4)
+ OR (p.kode_pinjaman = 'PJN-20261013-0004' AND a.angsuran_ke > 4)
+ OR (p.kode_pinjaman = 'PJN-20261013-0003' AND a.angsuran_ke > 3)
  OR (p.kode_pinjaman = 'PJN-20261028-0025' AND a.tanggal_bayar IS NOT NULL
      AND a.tanggal_bayar < a.tanggal_jatuh_tempo)
  OR (p.kode_pinjaman = 'PJN-20261024-0020' AND a.tanggal_bayar IS NOT NULL
@@ -540,9 +540,9 @@ INNER JOIN pinjaman p ON p.id = a.pinjaman_id
 SET lp.dibatalkan_at = COALESCE(lp.dibatalkan_at, NOW())
 WHERE lp.dibatalkan_at IS NULL
   AND (
-    (p.kode_pinjaman = 'PJN-20261013-0005' AND a.angsuran_ke IN (5, 6))
- OR (p.kode_pinjaman = 'PJN-20261013-0004' AND a.angsuran_ke IN (5, 6))
- OR (p.kode_pinjaman = 'PJN-20261013-0003' AND a.angsuran_ke IN (4, 5, 6))
+    (p.kode_pinjaman = 'PJN-20261013-0005' AND a.angsuran_ke > 4)
+ OR (p.kode_pinjaman = 'PJN-20261013-0004' AND a.angsuran_ke > 4)
+ OR (p.kode_pinjaman = 'PJN-20261013-0003' AND a.angsuran_ke > 3)
  OR (p.kode_pinjaman IN ('PJN-20261028-0025', 'PJN-20261024-0020')
      AND a.status <> 'lunas')
   );
@@ -619,6 +619,37 @@ WHERE jenis = 'masuk' AND jumlah > 0
 UPDATE kas SET jumlah = 562500
 WHERE jenis = 'masuk' AND jumlah > 0
   AND keterangan LIKE '%BYR-20260915-006%' AND keterangan LIKE '%PJN-20261013-0006%';
+
+-- 3b) Closing Okt: 61 → 60 (SOBIROH ke-7 JT 31 Okt di luar hitungan Excel)
+--     + kas batch Sobiroh disesuaikan agar estimasi = Rp 10.052.000
+UPDATE pinjaman p
+INNER JOIN angsuran a ON a.pinjaman_id = p.id
+SET p.sisa_pokok = p.sisa_pokok + a.pokok,
+    p.status = 'aktif',
+    p.tanggal_lunas = NULL
+WHERE p.kode_pinjaman = 'PJN-20261013-0010'
+  AND a.angsuran_ke = 7
+  AND a.status = 'lunas';
+
+UPDATE angsuran a
+INNER JOIN pinjaman p ON p.id = a.pinjaman_id
+SET a.status = IF(a.tanggal_jatuh_tempo < CURDATE(), 'telat', 'belum_bayar'),
+    a.tanggal_bayar = NULL,
+    a.denda = 0,
+    a.keterlambatan_hari = IF(a.tanggal_jatuh_tempo < CURDATE(), DATEDIFF(CURDATE(), a.tanggal_jatuh_tempo), 0),
+    a.cara_bayar = 'cicilan'
+WHERE p.kode_pinjaman = 'PJN-20261013-0010'
+  AND a.angsuran_ke = 7
+  AND a.status = 'lunas';
+
+UPDATE kas
+SET jumlah = 445000
+WHERE jenis = 'masuk' AND jumlah > 0
+  AND keterangan LIKE '%BYR-20260915-015%' AND keterangan LIKE '%PJN-20261013-0010%';
+
+UPDATE migrasi_pembayaran
+SET total_diterima = 445000
+WHERE source_key = 'BYR-20260915-015' AND total_diterima <> 445000;
 
 -- 4) Warsingah: jadwal dari tgl pengajuan 24 Okt (cicilan 1 = 7 Nov), bukan tgl cair 28 Okt
 UPDATE pengajuan_pinjaman pp
