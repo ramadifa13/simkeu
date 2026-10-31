@@ -65,16 +65,16 @@ if ($current_role === 'teller') {
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="navbar-brand navbar-brand-autodark sk-brand">
-            <a href="dashboard.php" class="d-flex align-items-center gap-2 text-decoration-none">
-                <span class="simkeu-logo">
+            <a href="dashboard.php" class="d-flex align-items-center gap-2 text-decoration-none w-100">
+                <span class="simkeu-logo" aria-hidden="true">
                     <?php if (!empty($logo_path)): ?>
                         <img src="<?= htmlspecialchars($logo_path) ?>" alt="Logo <?= htmlspecialchars($koperasi['nama'] ?? APP_NAME) ?>" onerror="this.style.display='none'; this.parentNode.innerHTML='<i class=\'ti ti-building-bank\'></i>';">
                     <?php else: ?>
                         <i class="ti ti-building-bank"></i>
                     <?php endif; ?>
                 </span>
-                <span class="d-flex flex-column lh-sm text-start">
-                    <span class="sk-brand-name text-truncate"><?= htmlspecialchars($koperasi['nama'] ?? APP_NAME) ?></span>
+                <span class="d-flex flex-column lh-sm text-start flex-fill">
+                    <span class="sk-brand-name"><?= htmlspecialchars($koperasi['nama'] ?? APP_NAME) ?></span>
                     <span class="sk-brand-sub"><?= htmlspecialchars($brandSub) ?></span>
                 </span>
             </a>

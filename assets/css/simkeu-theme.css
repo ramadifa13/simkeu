@@ -14,6 +14,8 @@
     --tblr-font-sans-serif: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
     --tblr-border-radius: .6rem;
     --tblr-border-radius-lg: .85rem;
+    /* Harus di :root agar page-wrapper (saudara sidebar) ikut lebar yang sama */
+    --tblr-navbar-width: 16rem;
     --sk-ink: #1e293b;
     --sk-muted: #64748b;
     --sk-line: #e5e9f2;
@@ -371,12 +373,11 @@ table.dataTable > tbody > tr.child ul.dtr-details { width: 100%; }
 .ui-empty-row { display: none; }
 @media (max-width: 991.98px) { .simkeu-topbar .container-fluid { padding-left: .75rem; padding-right: .75rem; } }
 
-/* --- Sidebar v2 --- */
-.simkeu-sidebar{--tblr-navbar-width:15.5rem}
-.simkeu-sidebar .sk-brand{padding:1rem .75rem;margin:0;min-width:0;width:100%;justify-content:flex-start}
-.simkeu-sidebar .sk-brand a{min-width:0;max-width:100%}
-.sk-brand-name{font-size:1rem;font-weight:700;line-height:1.2;color:#fff;max-width:9.5rem}
-.sk-brand-sub{font-size:.72rem;letter-spacing:.04em;color:#c7d2fe;font-weight:500}
+/* --- Sidebar brand & nav --- */
+.simkeu-sidebar .sk-brand{padding:1rem .85rem;margin:0;width:100%;justify-content:flex-start}
+.simkeu-sidebar .sk-brand a{width:100%;max-width:100%;gap:.65rem}
+.sk-brand-name{font-size:.95rem;font-weight:700;line-height:1.25;color:#fff}
+.sk-brand-sub{font-size:.7rem;letter-spacing:.04em;color:#c7d2fe;font-weight:500}
 .sk-brand-badge{font-size:.68rem;margin-top:.15rem}
 .simkeu-sidebar .navbar-nav{padding-bottom:1rem}
 .simkeu-sidebar .nav-link{font-size:.9rem;font-weight:500;color:#e0e7ff}
@@ -485,49 +486,46 @@ table.dataTable tbody td{
 
 [data-notif-pinjaman].badge{background:#b45309!important;color:#fff!important}[data-notif-pinjaman=total].badge{background:#c62828!important}
 
-/* --- Sidebar v3: fixed di tablet+, menu nempel atas (tanpa gap aneh) --- */
-.simkeu-sidebar{box-shadow:4px 0 24px rgba(15,23,42,.18)}
+/*
+ * Shell sidebar — sama untuk admin / teller / anggota (.page.simkeu-shell).
+ * Fixed full-height + page-wrapper digeser agar konten tidak ketutup.
+ */
+.simkeu-shell{--tblr-navbar-width:16rem}
+.simkeu-shell .simkeu-sidebar{box-shadow:4px 0 24px rgba(15,23,42,.18)}
 @media (min-width:768px){
-  .simkeu-sidebar.navbar-vertical{
+  .simkeu-shell .simkeu-sidebar.navbar-vertical{
     position:fixed!important;
+    inset:0 auto 0 0;
     top:0;left:0;bottom:0;
-    z-index:1030;
-    width:var(--tblr-navbar-width,15.5rem);
-    height:100vh;height:100dvh;
-    align-items:stretch!important; /* override Tabler flex-start yang bikin layout “melayang” */
+    z-index:1040;
+    width:var(--tblr-navbar-width)!important;
+    max-width:var(--tblr-navbar-width)!important;
+    height:100vh!important;height:100dvh!important;
+    align-items:stretch!important;
     overflow:hidden!important;
     overscroll-behavior:none;
-    padding:0;
+    padding:0!important;
+    margin:0!important;
   }
-  .simkeu-sidebar > .container-fluid{
-    display:flex;
-    flex-direction:column;
-    align-items:stretch;
-    justify-content:flex-start;
-    width:100%;
-    height:100%;
-    max-height:100%;
-    min-height:0;
-    margin:0;
-    padding:0;
-    overflow:hidden;
-  }
-  .simkeu-sidebar .navbar-toggler{display:none!important}
-  .simkeu-sidebar .sk-brand{
-    flex:0 0 auto;
-    width:100%;
-    max-width:100%;
-  }
-  .simkeu-sidebar .navbar-collapse{
+  .simkeu-shell .simkeu-sidebar > .container-fluid{
     display:flex!important;
     flex-direction:column;
     align-items:stretch;
-    justify-content:flex-start;
-    flex:1 1 auto;
+    width:100%;
+    height:100%;
     min-height:0;
+    margin:0;
+    padding:0;
+  }
+  .simkeu-shell .simkeu-sidebar .navbar-toggler{display:none!important}
+  .simkeu-shell .simkeu-sidebar .sk-brand{flex:0 0 auto;width:100%}
+  .simkeu-shell .simkeu-sidebar .navbar-collapse{
+    display:flex!important;
+    flex-direction:column;
+    flex:1 1 auto;
+    min-height:0!important;
     width:100%;
     height:auto!important;
-    max-height:none;
     overflow-x:hidden;
     overflow-y:auto;
     overscroll-behavior:contain;
@@ -535,21 +533,29 @@ table.dataTable tbody td{
     scrollbar-width:thin;
     scrollbar-color:rgba(255,255,255,.25) transparent;
   }
-  /* Jangan flex-grow nav list — itu yang bikin jarak kosong besar di atas/tengah */
-  .simkeu-sidebar .navbar-nav{
+  .simkeu-shell .simkeu-sidebar .navbar-nav{
     flex:0 0 auto!important;
     width:100%;
     margin:0;
     padding-top:.35rem!important;
     padding-bottom:.5rem;
   }
-  .simkeu-sidebar .sk-side-user{
+  .simkeu-shell .simkeu-sidebar .sk-side-user{
     flex:0 0 auto;
-    width:auto;
     margin:.5rem .75rem .75rem!important;
-    margin-top:auto!important; /* dorong kartu user ke bawah, menu tetap di atas */
+    margin-top:auto!important;
   }
-  .page-wrapper{margin-left:var(--tblr-navbar-width,15.5rem)}
+  .simkeu-shell > .page-wrapper,
+  .simkeu-shell .simkeu-sidebar ~ .page-wrapper{
+    margin-left:var(--tblr-navbar-width)!important;
+  }
+  .simkeu-shell .simkeu-topbar{z-index:1020}
+}
+@media (max-width:767.98px){
+  .simkeu-shell > .page-wrapper,
+  .simkeu-shell .simkeu-sidebar ~ .page-wrapper{
+    margin-left:0!important;
+  }
 }
 .simkeu-sidebar .sk-brand{border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:.35rem}
 .simkeu-sidebar .nav-link{margin:.15rem .75rem;padding:.6rem .8rem!important;border-radius:.7rem;gap:.15rem}
@@ -696,15 +702,17 @@ table.dataTable tbody td{
   flex-basis:calc((100% - 1.4rem) / 3);
   min-width:calc((100% - 1.4rem) / 3 - .01px);
 }
-/* 7 KPI: selalu ~4 kolom (4+3 merata), jangan 7-sebaris agar nominal Rp tidak kepotong */
-.ui-dash-page .ui-stat-grid[data-count="7"] > .stat-card{
+/* 7–8 KPI: ~4 kolom agar nominal Rp / % tidak kepotong */
+.ui-dash-page .ui-stat-grid[data-count="7"] > .stat-card,
+.ui-dash-page .ui-stat-grid[data-count="8"] > .stat-card{
   flex-basis:calc((100% - 2.1rem) / 4);
   min-width:min(100%,calc((100% - 2.1rem) / 4 - .01px));
 }
 @media (max-width:991.98px){
   .ui-dash-page .ui-stat-grid[data-count="5"] > .stat-card,
   .ui-dash-page .ui-stat-grid[data-count="6"] > .stat-card,
-  .ui-dash-page .ui-stat-grid[data-count="7"] > .stat-card{
+  .ui-dash-page .ui-stat-grid[data-count="7"] > .stat-card,
+  .ui-dash-page .ui-stat-grid[data-count="8"] > .stat-card{
     flex-basis:calc((100% - .7rem) / 2);
     min-width:calc((100% - .7rem) / 2 - .01px);
   }
@@ -714,11 +722,24 @@ table.dataTable tbody td{
   .ui-dash-page .ui-stat-grid[data-count="4"] > .stat-card,
   .ui-dash-page .ui-stat-grid[data-count="5"] > .stat-card,
   .ui-dash-page .ui-stat-grid[data-count="6"] > .stat-card,
-  .ui-dash-page .ui-stat-grid[data-count="7"] > .stat-card{
+  .ui-dash-page .ui-stat-grid[data-count="7"] > .stat-card,
+  .ui-dash-page .ui-stat-grid[data-count="8"] > .stat-card{
     flex-basis:calc((100% - .7rem) / 2);
     min-width:calc((100% - .7rem) / 2 - .01px);
   }
 }
+.ui-stat-trend{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:1.15rem;height:1.15rem;border-radius:.4rem;
+  font-size:.75rem;vertical-align:middle;margin-left:.15rem;
+}
+.ui-stat-trend.is-up{background:#dcfce7;color:#15803d}
+.ui-stat-trend.is-down{background:#fee2e2;color:#b91c1c}
+.ui-stat-meta{
+  display:block;font-size:.68rem;font-weight:650;color:#64748b;
+  margin:.1rem 0 .15rem;letter-spacing:.02em;
+}
+.stat-card.has-trend.trend-up{--tone:#16a34a}
 .ui-dash-page .stat-card .card-body{
   display:block!important;
   padding:.85rem 2.75rem .85rem .9rem;
@@ -3209,7 +3230,7 @@ button.ui-dash-btn-add:hover{
   .ui-jsim-field-grid{grid-template-columns:1fr}
 }
 
-/* Jenis Simpanan � form modal */
+/* Jenis Simpanan � form modal */
 .ui-jsim-modal-eyebrow{
   font-size:.68rem;font-weight:750;letter-spacing:.06em;text-transform:uppercase;
   opacity:.85;margin-bottom:.15rem!important;
@@ -4600,7 +4621,7 @@ button.ui-dash-btn-add:hover{
   .ui-agt-modal-kpis{grid-template-columns:1fr}
 }
 
-/* Waserda anggota � kartu mobile + modal nota */
+/* Waserda anggota � kartu mobile + modal nota */
 .ui-agt-was-list{display:grid;gap:.75rem}
 .ui-agt-was-card{
   border:1px solid #e2e8f0;border-radius:.9rem;background:#fff;
@@ -4643,7 +4664,6 @@ button.ui-dash-btn-add:hover{
 /* Global role navigation and responsive workspaces */
 :root, [data-bs-theme="light"] { --sk-surface:#fff; --sk-sidebar:#111827; --sk-sidebar-muted:#9ca3af; --sk-accent:#818cf8; }
 .simkeu-sidebar { background:var(--sk-sidebar) !important; border:0 !important; }
-.simkeu-sidebar .navbar-collapse { min-height:calc(100vh - 5rem); }
 .simkeu-nav-section { padding:1.15rem 1rem .38rem; color:var(--sk-sidebar-muted); font-size:.64rem; font-weight:700; letter-spacing:.11em; text-transform:uppercase; }
 .simkeu-sidebar .nav-link { min-height:2.65rem; }
 .simkeu-sidebar .nav-item.active > .nav-link { box-shadow:inset 3px 0 0 var(--sk-accent); }
@@ -4659,4 +4679,17 @@ button.ui-dash-btn-add:hover{
   .simkeu-nav-section { padding-top:.9rem; }
   .simkeu-topbar { min-height:3.25rem; }
   .card { border-radius:.75rem; }
+}
+
+/* Brand sidebar (semua role) */
+.simkeu-shell .simkeu-sidebar .sk-brand > a{
+  display:flex!important;
+  align-items:center;
+  gap:.65rem;
+  width:100%;
+}
+.simkeu-shell .simkeu-sidebar .sk-brand-name,
+.simkeu-shell .simkeu-sidebar .sk-brand-sub{
+  display:block;
+  line-height:1.25;
 }

@@ -218,6 +218,14 @@ function migrasiImportFinal(PDO $db,$path,$userId=null){
                 }
                 $params[]=$loan;
                 $q->execute($params);
+                // Cicilan tersisa yang ikut dilunasi: pakai tanggal jatuh tempo agar closing
+                // tidak mencampur tenor lain ke bulan tanggal bayar pelunasan.
+                $db->prepare(
+                    "UPDATE angsuran SET tanggal_bayar = tanggal_jatuh_tempo
+                     WHERE pinjaman_id = ? AND status = 'lunas' AND cara_bayar = 'pelunasan'
+                       AND angsuran_ke <> ? AND tanggal_bayar = ? AND tanggal_jatuh_tempo IS NOT NULL
+                       AND tanggal_jatuh_tempo <> ?"
+                )->execute([$loan, $ke, $date, $date]);
             } else {
                 $q=$db->prepare(
                     "UPDATE angsuran SET status='lunas',tanggal_bayar=?,"
@@ -233,6 +241,14 @@ function migrasiImportFinal(PDO $db,$path,$userId=null){
                 $params[]=$loan;
                 $params[]=$ke;
                 $q->execute($params);
+                // Catch-up cicilan (ke < target): kembalikan tanggal_bayar ke jatuh tempo
+                // supaya periode closing tidak menggelembung oleh data lama.
+                $db->prepare(
+                    "UPDATE angsuran SET tanggal_bayar = tanggal_jatuh_tempo
+                     WHERE pinjaman_id = ? AND status = 'lunas' AND angsuran_ke < ?
+                       AND tanggal_bayar = ? AND tanggal_jatuh_tempo IS NOT NULL
+                       AND tanggal_jatuh_tempo < ?"
+                )->execute([$loan, $ke, $date, $date]);
             }
             // Laporan Denda / sisa denda membaca layanan_bayar_denda — isi saat historis punya Denda.
             if ($denda > 0.005) {

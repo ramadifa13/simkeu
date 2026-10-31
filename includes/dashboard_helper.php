@@ -55,6 +55,97 @@ if (!function_exists('dashboardLoadStaffDataDefaults')) {
             'angsuran_terbaru' => [],
             'transaksi_hari_ini' => ['total_transaksi' => 0],
             'setoran_hari_ini' => ['total_transaksi' => 0, 'total_setoran' => 0, 'total_nasabah' => 0],
+            'pertumbuhan_laba' => [
+                'bulan' => date('Y-m'),
+                'bulan_label' => date('Y-m'),
+                'terkunci' => false,
+                'total_angsuran' => 0.0,
+                'total_bunga' => 0.0,
+                'total_pokok' => 0.0,
+                'persen' => 0.0,
+                'jumlah_trx' => 0,
+            ],
+        ];
+    }
+}
+
+if (!function_exists('dashboardLabelBulan')) {
+    function dashboardLabelBulan(string $ym): string
+    {
+        static $nama = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+        ];
+        if (!preg_match('/^(\d{4})-(\d{2})$/', $ym, $m)) {
+            return $ym;
+        }
+        $n = (int)$m[2];
+        return ($nama[$n] ?? $m[2]) . ' ' . $m[1];
+    }
+}
+
+if (!function_exists('dashboardLoadPertumbuhanLaba')) {
+    /**
+     * Persentase pertumbuhan laba = bunga / total angsuran periode.
+     * Prioritas: closing terkunci terakhir; jika belum ada → bulan berjalan (preview).
+     *
+     * @return array{bulan:string,bulan_label:string,terkunci:bool,total_angsuran:float,total_bunga:float,total_pokok:float,persen:float,jumlah_trx:int}
+     */
+    function dashboardLoadPertumbuhanLaba(PDO $db): array
+    {
+        $bulan = date('Y-m');
+        $terkunci = false;
+        if (function_exists('closingTabelAda') && closingTabelAda($db)) {
+            $locked = dashboardFetchScalar(
+                $db,
+                "SELECT bulan FROM closing_angsuran_bulanan WHERE status='terkunci' ORDER BY bulan DESC LIMIT 1"
+            );
+            if (is_string($locked) && preg_match('/^\d{4}-\d{2}$/', $locked)) {
+                $bulan = $locked;
+                $terkunci = true;
+            }
+        }
+
+        $awal = $bulan . '-01';
+        $akhir = date('Y-m-t', strtotime($awal));
+
+        if ($terkunci) {
+            $row = dashboardFetchRow($db, "SELECT
+                    COUNT(*) AS jumlah_trx,
+                    COALESCE(SUM(a.jumlah_angsuran + COALESCE(a.denda,0)),0) AS total_angsuran,
+                    COALESCE(SUM(a.bunga),0) AS total_bunga,
+                    COALESCE(SUM(a.pokok),0) AS total_pokok
+                FROM closing_angsuran_detail d
+                JOIN angsuran a ON a.id = d.angsuran_id
+                JOIN closing_angsuran_bulanan c ON c.id = d.closing_id
+                WHERE c.bulan = ? AND c.status = 'terkunci'", [$bulan]);
+        } else {
+            $row = dashboardFetchRow($db, "SELECT
+                    COUNT(*) AS jumlah_trx,
+                    COALESCE(SUM(jumlah_angsuran + COALESCE(denda,0)),0) AS total_angsuran,
+                    COALESCE(SUM(bunga),0) AS total_bunga,
+                    COALESCE(SUM(pokok),0) AS total_pokok
+                FROM angsuran
+                WHERE status = 'lunas'
+                  AND tanggal_bayar BETWEEN ? AND ?
+                  AND tanggal_jatuh_tempo BETWEEN ? AND ?", [$awal, $akhir, $awal, $akhir]);
+        }
+
+        $totalAngsuran = (float)($row['total_angsuran'] ?? 0);
+        $totalBunga = (float)($row['total_bunga'] ?? 0);
+        $totalPokok = (float)($row['total_pokok'] ?? 0);
+        $persen = $totalAngsuran > 0 ? round(($totalBunga / $totalAngsuran) * 100, 1) : 0.0;
+
+        return [
+            'bulan' => $bulan,
+            'bulan_label' => dashboardLabelBulan($bulan),
+            'terkunci' => $terkunci,
+            'total_angsuran' => $totalAngsuran,
+            'total_bunga' => $totalBunga,
+            'total_pokok' => $totalPokok,
+            'persen' => $persen,
+            'jumlah_trx' => (int)($row['jumlah_trx'] ?? 0),
         ];
     }
 }
@@ -247,6 +338,10 @@ if (!function_exists('dashboardLoadStaffData')) {
         $setoranHariIni = dashboardFetchRow($db, $setoranSql, $setoranParams)
             ?: ['total_transaksi' => 0, 'total_setoran' => 0, 'total_nasabah' => 0];
 
+        $pertumbuhanLaba = $isAdmin
+            ? dashboardLoadPertumbuhanLaba($db)
+            : dashboardLoadStaffDataDefaults($role)['pertumbuhan_laba'];
+
         return [
             'role' => $role,
             'tanggal' => formatTanggalUi($today),
@@ -267,6 +362,7 @@ if (!function_exists('dashboardLoadStaffData')) {
             'angsuran_terbaru' => $angsuranTerbaru,
             'transaksi_hari_ini' => $transaksiHariIni,
             'setoran_hari_ini' => $setoranHariIni,
+            'pertumbuhan_laba' => $pertumbuhanLaba,
         ];
     }
 }

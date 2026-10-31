@@ -16,6 +16,14 @@ if (!isAdmin() && !isTeller()) {
     exit('Akses ditolak.');
 }
 
+if (function_exists('pulihkanGraceNonaktifTerbaru') && empty($_SESSION['_grace_shu_pulih'])) {
+    pulihkanGraceNonaktifTerbaru($db);
+    $_SESSION['_grace_shu_pulih'] = 1;
+}
+if (function_exists('prosesJadwalNonaktifAnggota')) {
+    prosesJadwalNonaktifAnggota($db);
+}
+
 $bolehHapusAnggota = isAdmin();
 
 // Upload melebihi post_max_size membuat $_POST kosong; tampilkan pesan yang jelas

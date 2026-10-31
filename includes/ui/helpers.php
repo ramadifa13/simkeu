@@ -308,7 +308,7 @@ if (!function_exists('ui_pagination')) {
 if (!function_exists('ui_stat_grid')) {
     /**
      * Dense KPI cards (SSOT with dashboard).
-     * @param array<int,array{label:string,value:string|int|float,hint?:string,tone?:string,icon?:string}> $items
+     * @param array<int,array{label:string,value:string|int|float,hint?:string,tone?:string,icon?:string,trend?:string,meta?:string}> $items
      */
     function ui_stat_grid(array $items): void
     {
@@ -323,17 +323,32 @@ if (!function_exists('ui_stat_grid')) {
             $icon = (string)($kpi['icon'] ?? 'ti ti-chart-bar');
             $label = htmlspecialchars((string)($kpi['label'] ?? ''), ENT_QUOTES, 'UTF-8');
             $hint = htmlspecialchars((string)($kpi['hint'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $meta = htmlspecialchars((string)($kpi['meta'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $trend = preg_replace('/[^a-z]/', '', strtolower((string)($kpi['trend'] ?? '')));
             $valueRaw = $kpi['value'] ?? '';
             if (is_int($valueRaw) || is_float($valueRaw)) {
                 $value = htmlspecialchars(number_format((float)$valueRaw, 0, ',', '.'), ENT_QUOTES, 'UTF-8');
             } else {
                 $value = htmlspecialchars((string)$valueRaw, ENT_QUOTES, 'UTF-8');
             }
-            echo '<div class="stat-card tone-' . htmlspecialchars($tone, ENT_QUOTES, 'UTF-8') . '">';
+            $cardClass = 'stat-card tone-' . htmlspecialchars($tone, ENT_QUOTES, 'UTF-8');
+            if ($trend !== '') {
+                $cardClass .= ' has-trend trend-' . htmlspecialchars($trend, ENT_QUOTES, 'UTF-8');
+            }
+            echo '<div class="' . $cardClass . '">';
             echo '<div class="card-body d-flex justify-content-between align-items-start gap-2">';
             echo '<div class="min-w-0">';
             echo '<p class="mb-0 text-muted small text-uppercase">' . $label . '</p>';
-            echo '<h4 class="mb-0">' . $value . '</h4>';
+            echo '<h4 class="mb-0">' . $value;
+            if ($trend === 'up') {
+                echo ' <span class="ui-stat-trend is-up" aria-hidden="true"><i class="ti ti-arrow-up-right"></i></span>';
+            } elseif ($trend === 'down') {
+                echo ' <span class="ui-stat-trend is-down" aria-hidden="true"><i class="ti ti-arrow-down-right"></i></span>';
+            }
+            echo '</h4>';
+            if ($meta !== '') {
+                echo '<span class="ui-stat-meta">' . $meta . '</span>';
+            }
             if ($hint !== '') {
                 echo '<small class="text-muted">' . $hint . '</small>';
             }

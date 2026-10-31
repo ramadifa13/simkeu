@@ -51,22 +51,7 @@ $closing = closingTabelAda($db)
     ? $db->query("SELECT c.*, u.nama_lengkap FROM closing_angsuran_bulanan c LEFT JOIN users u ON u.id = c.ditutup_oleh ORDER BY c.bulan DESC")->fetchAll(PDO::FETCH_ASSOC)
     : [];
 
-$previewRows = $db->query(
-    "SELECT DATE_FORMAT(tanggal_bayar,'%Y-%m') bulan,
-            COUNT(*) jumlah,
-            COALESCE(SUM(jumlah_angsuran + COALESCE(denda,0)),0) total
-     FROM angsuran
-     WHERE status='lunas' AND tanggal_bayar IS NOT NULL
-     GROUP BY DATE_FORMAT(tanggal_bayar,'%Y-%m')
-     ORDER BY bulan DESC"
-)->fetchAll(PDO::FETCH_ASSOC);
-$previewMap = [];
-foreach ($previewRows as $pr) {
-    $previewMap[$pr['bulan']] = [
-        'jumlah' => (int)$pr['jumlah'],
-        'total' => (float)$pr['total'],
-    ];
-}
+$previewMap = closingPreviewMap($db);
 $lockedSet = [];
 foreach ($closing as $row) {
     if (($row['status'] ?? '') === 'terkunci') {

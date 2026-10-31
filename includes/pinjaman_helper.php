@@ -437,34 +437,130 @@ if (!function_exists('tandaiLunasBilaSelesai')) {
     }
 }
 
-if (!function_exists('nonaktifkanAnggotaBilaSemuaPinjamanLunas')) {
-    /**
-     * Nonaktifkan anggota dan akun loginnya hanya bila tidak ada pinjaman aktif
-     * maupun pengajuan baru yang masih berjalan. Nasabah dengan dua pinjaman tidak
-     * dinonaktifkan ketika baru salah satunya yang lunas.
-     */
-    function nonaktifkanAnggotaBilaSemuaPinjamanLunas($db, $anggota_id) {
+if (!defined('ANGGOTA_GRACE_NONAKTIF_HARI')) {
+    /** Masa aktif setelah semua pinjaman lunas — nasabah masih bisa cek SHU. */
+    define('ANGGOTA_GRACE_NONAKTIF_HARI', 7);
+}
+
+if (!function_exists('pastikanKolomNonaktifJadwal')) {
+    function pastikanKolomNonaktifJadwal($db) {
+        if (!kolomAda($db, 'anggota', 'nonaktif_jadwal')) {
+            $db->exec("ALTER TABLE `anggota` ADD COLUMN `nonaktif_jadwal` DATE NULL DEFAULT NULL AFTER `status`");
+        }
+    }
+}
+
+if (!function_exists('anggotaMasihPunyaPinjamanAtauPengajuan')) {
+    function anggotaMasihPunyaPinjamanAtauPengajuan($db, $anggota_id) {
         $stmt = $db->prepare("SELECT
             (SELECT COUNT(*) FROM pinjaman WHERE anggota_id = ? AND status <> 'lunas') +
             (SELECT COUNT(*) FROM pengajuan_pinjaman WHERE anggota_id = ? AND status IN ('menunggu','disetujui'))");
         $stmt->execute([$anggota_id, $anggota_id]);
-        if ((int) $stmt->fetchColumn() > 0) {
+        return (int) $stmt->fetchColumn() > 0;
+    }
+}
+
+if (!function_exists('nonaktifkanAnggotaBilaSemuaPinjamanLunas')) {
+    /**
+     * Setelah semua pinjaman lunas: jangan langsung nonaktif.
+     * Jadwalkan nonaktif +7 hari agar nasabah masih bisa login dan cek SHU.
+     * Jika dalam masa tenggang ada pengajuan ulang, jadwal dibatalkan.
+     */
+    function nonaktifkanAnggotaBilaSemuaPinjamanLunas($db, $anggota_id) {
+        if (anggotaMasihPunyaPinjamanAtauPengajuan($db, $anggota_id)) {
             return false;
         }
-        $db->prepare("UPDATE anggota SET status = 'nonaktif' WHERE id = ?")->execute([$anggota_id]);
+        pastikanKolomNonaktifJadwal($db);
+        $jadwal = date('Y-m-d', strtotime('+' . ANGGOTA_GRACE_NONAKTIF_HARI . ' days'));
+        $db->prepare("UPDATE anggota SET status = 'aktif', nonaktif_jadwal = ? WHERE id = ?")
+           ->execute([$jadwal, $anggota_id]);
         $db->prepare("UPDATE users u JOIN anggota a ON a.user_id = u.id
-                      SET u.status = 'nonaktif' WHERE a.id = ? AND u.role = 'anggota'")
+                      SET u.status = 'aktif' WHERE a.id = ? AND u.role = 'anggota'")
            ->execute([$anggota_id]);
         return true;
     }
 }
 
 if (!function_exists('aktifkanKembaliAnggota')) {
-    /** Aktifkan akun lama saat pengajuan baru berhasil dibuat. */
+    /** Aktifkan akun lama saat pengajuan baru berhasil dibuat; batalkan jadwal nonaktif. */
     function aktifkanKembaliAnggota($db, $anggota_id) {
-        $db->prepare("UPDATE anggota SET status = 'aktif' WHERE id = ?")->execute([$anggota_id]);
+        pastikanKolomNonaktifJadwal($db);
+        $db->prepare("UPDATE anggota SET status = 'aktif', nonaktif_jadwal = NULL WHERE id = ?")
+           ->execute([$anggota_id]);
         $db->prepare("UPDATE users u JOIN anggota a ON a.user_id = u.id
                       SET u.status = 'aktif' WHERE a.id = ? AND u.role = 'anggota'")
            ->execute([$anggota_id]);
+    }
+}
+
+if (!function_exists('prosesJadwalNonaktifAnggota')) {
+    /**
+     * Nonaktifkan anggota yang masa tenggangnya habis dan tidak ada pengajuan ulang.
+     * Dipanggil lazy saat anggota login / halaman anggota dibuka.
+     */
+    function prosesJadwalNonaktifAnggota($db, $anggota_id = null) {
+        pastikanKolomNonaktifJadwal($db);
+        if ($anggota_id !== null) {
+            $stmt = $db->prepare("SELECT id FROM anggota
+                WHERE id = ? AND nonaktif_jadwal IS NOT NULL AND nonaktif_jadwal <= CURDATE()");
+            $stmt->execute([(int) $anggota_id]);
+        } else {
+            $stmt = $db->query("SELECT id FROM anggota
+                WHERE nonaktif_jadwal IS NOT NULL AND nonaktif_jadwal <= CURDATE()");
+        }
+        $ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($ids as $id) {
+            $id = (int) $id;
+            if (anggotaMasihPunyaPinjamanAtauPengajuan($db, $id)) {
+                $db->prepare("UPDATE anggota SET nonaktif_jadwal = NULL, status = 'aktif' WHERE id = ?")
+                   ->execute([$id]);
+                $db->prepare("UPDATE users u JOIN anggota a ON a.user_id = u.id
+                              SET u.status = 'aktif' WHERE a.id = ? AND u.role = 'anggota'")
+                   ->execute([$id]);
+                continue;
+            }
+            $db->prepare("UPDATE anggota SET status = 'nonaktif', nonaktif_jadwal = NULL WHERE id = ?")
+               ->execute([$id]);
+            $db->prepare("UPDATE users u JOIN anggota a ON a.user_id = u.id
+                          SET u.status = 'nonaktif' WHERE a.id = ? AND u.role = 'anggota'")
+               ->execute([$id]);
+        }
+        return count($ids);
+    }
+}
+
+if (!function_exists('pulihkanGraceNonaktifTerbaru')) {
+    /**
+     * Pulihkan anggota yang baru saja dinonaktifkan karena lunas (masih dalam jendela grace)
+     * supaya bisa cek SHU — dijalankan sekali saat skema nonaktif_jadwal tersedia.
+     */
+    function pulihkanGraceNonaktifTerbaru($db) {
+        pastikanKolomNonaktifJadwal($db);
+        if (!kolomAda($db, 'pinjaman', 'tanggal_lunas')) {
+            return 0;
+        }
+        $hari = (int) ANGGOTA_GRACE_NONAKTIF_HARI;
+        // Transisi: anggota yang sudah nonaktif karena lunas dapat 1x masa tenggang
+        // dari hari ini agar masih sempat cek SHU setelah fitur ini aktif.
+        $sql = "UPDATE anggota a
+                SET a.status = 'aktif',
+                    a.nonaktif_jadwal = DATE_ADD(CURDATE(), INTERVAL {$hari} DAY)
+                WHERE a.status = 'nonaktif'
+                  AND a.nonaktif_jadwal IS NULL
+                  AND EXISTS (SELECT 1 FROM pinjaman p WHERE p.anggota_id = a.id)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM pinjaman px
+                      WHERE px.anggota_id = a.id AND px.status <> 'lunas'
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM pengajuan_pinjaman pp
+                      WHERE pp.anggota_id = a.id AND pp.status IN ('menunggu','disetujui')
+                  )";
+        $db->exec($sql);
+        $db->exec("UPDATE users u
+                   JOIN anggota a ON a.user_id = u.id
+                   SET u.status = 'aktif'
+                   WHERE u.role = 'anggota' AND a.status = 'aktif' AND a.nonaktif_jadwal IS NOT NULL");
+        return 1;
     }
 }

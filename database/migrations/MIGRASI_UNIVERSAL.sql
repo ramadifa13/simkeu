@@ -53,7 +53,33 @@ CREATE TABLE IF NOT EXISTS `jenis_pinjaman_tarif` (
 ALTER TABLE `anggota`
   ADD COLUMN IF NOT EXISTS `kode_anggota_jaminan` VARCHAR(20) DEFAULT NULL AFTER `kode_anggota`,
   ADD COLUMN IF NOT EXISTS `foto_kk` VARCHAR(255) DEFAULT NULL AFTER `foto_ktp`,
-  ADD COLUMN IF NOT EXISTS `foto_ktp_pasangan` VARCHAR(255) DEFAULT NULL AFTER `foto_kk`;
+  ADD COLUMN IF NOT EXISTS `foto_ktp_pasangan` VARCHAR(255) DEFAULT NULL AFTER `foto_kk`,
+  ADD COLUMN IF NOT EXISTS `nonaktif_jadwal` DATE NULL DEFAULT NULL AFTER `status`;
+
+-- Perbaiki tanggal_bayar hasil migrasi catch-up: cicilan lama tidak ikut menyatu
+-- ke bulan pembayaran terakhir (menggelembungkan closing).
+UPDATE angsuran a
+JOIN migrasi_pembayaran mp
+  ON mp.pinjaman_id = a.pinjaman_id
+ AND mp.tanggal_bayar = a.tanggal_bayar
+ AND mp.jenis_pembayaran = 'cicilan'
+SET a.tanggal_bayar = a.tanggal_jatuh_tempo
+WHERE a.status = 'lunas'
+  AND a.angsuran_ke < mp.angsuran_ke
+  AND a.tanggal_jatuh_tempo IS NOT NULL
+  AND a.tanggal_jatuh_tempo < a.tanggal_bayar;
+
+UPDATE angsuran a
+JOIN migrasi_pembayaran mp
+  ON mp.pinjaman_id = a.pinjaman_id
+ AND mp.tanggal_bayar = a.tanggal_bayar
+ AND mp.jenis_pembayaran = 'pelunasan'
+SET a.tanggal_bayar = a.tanggal_jatuh_tempo
+WHERE a.status = 'lunas'
+  AND a.cara_bayar = 'pelunasan'
+  AND a.angsuran_ke <> mp.angsuran_ke
+  AND a.tanggal_jatuh_tempo IS NOT NULL
+  AND a.tanggal_jatuh_tempo <> a.tanggal_bayar;
 SET @idx_agtj=(SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='anggota' AND index_name='uniq_kode_anggota_jaminan');
 SET @sql_agtj=IF(@idx_agtj=0,'ALTER TABLE `anggota` ADD UNIQUE KEY `uniq_kode_anggota_jaminan` (`kode_anggota_jaminan`)','SELECT 1');
 PREPARE stmt_agtj FROM @sql_agtj; EXECUTE stmt_agtj; DEALLOCATE PREPARE stmt_agtj;

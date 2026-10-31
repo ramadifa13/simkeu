@@ -33,6 +33,15 @@ $setoranScopeHint = $isAdmin ? 'semua teller' : 'input saya';
 $setoranHariIniHint = ((int)($d['setoran_hari_ini']['total_nasabah'] ?? 0)) . ' nasabah · '
     . ((int)$d['setoran_hari_ini']['total_transaksi']) . ' trx (' . $setoranScopeHint . ')';
 
+$laba = $d['pertumbuhan_laba'] ?? [];
+$labaPersen = (float)($laba['persen'] ?? 0);
+$labaPersenTxt = number_format($labaPersen, 1, ',', '.') . '%';
+$labaHint = trim(
+    (string)($laba['bulan_label'] ?? '')
+    . (!empty($laba['terkunci']) ? ' · terkunci' : ' · belum dikunci')
+    . ' · Laba ' . formatRupiah((float)($laba['total_bunga'] ?? 0))
+);
+
 $primaryKpis = $isAdmin
     ? [
         ['label' => 'Anggota', 'value' => number_format((int)$d['stat_anggota']['total']), 'hint' => (int)$d['stat_anggota']['aktif'] . ' aktif', 'icon' => 'ti ti-users', 'tone' => 'primary'],
@@ -42,6 +51,15 @@ $primaryKpis = $isAdmin
         ['label' => 'Sisa tagihan', 'value' => formatRupiah($d['pinjaman_stats']['total_sisa']), 'hint' => 'Pokok + bunga', 'icon' => 'ti ti-hourglass', 'tone' => 'warning'],
         ['label' => 'Saldo kas', 'value' => formatRupiah($d['stat_kas']['saldo']), 'hint' => 'Tersedia', 'icon' => 'ti ti-wallet', 'tone' => 'info'],
         ['label' => 'Waserda', 'value' => formatRupiah($d['waserda_stats']['total_nominal']), 'hint' => (int)$d['waserda_stats']['total_transaksi'] . ' trx', 'icon' => 'ti ti-building-store', 'tone' => 'success'],
+        [
+            'label' => 'Pertumbuhan laba',
+            'value' => $labaPersenTxt,
+            'hint' => $labaHint,
+            'icon' => $labaPersen > 0 ? 'ti ti-trending-up' : 'ti ti-minus',
+            'tone' => $labaPersen > 0 ? 'success' : 'secondary',
+            'trend' => $labaPersen > 0 ? 'up' : 'flat',
+            'meta' => 'Bunga / angsuran',
+        ],
     ]
     : [
         ['label' => 'Trx hari ini', 'value' => number_format((int)$d['transaksi_hari_ini']['total_transaksi']), 'hint' => 'Kas input saya', 'icon' => 'ti ti-activity', 'tone' => 'primary'],
