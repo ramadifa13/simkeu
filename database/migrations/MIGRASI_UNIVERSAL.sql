@@ -492,11 +492,17 @@ CREATE TABLE IF NOT EXISTS `log_koreksi` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- =============================================================================
--- Koreksi lapangan 31 Okt 2026 (jumlah cicilan + jadwal Warsingah + kas batch)
--- Idempotent: aman dijalankan ulang.
+-- Koreksi lapangan final (idempotent) — gabungan semua hotfix
+-- Target Closing Oktober 2026: 58 pembayaran / Rp 9.714.500
+-- + saldo kas tidak minus (hapus pencairan migrasi dari buku kas)
+-- + Warsingah JT1 = 7 Nov (acuan pengajuan 24 Okt)
 -- =============================================================================
 
--- 1) Batalkan prematur spesifik (JT masih di depan / melebihi jatah hari itu)
+-- 1) Hapus pencairan migrasi dari kas (cegah saldo minus)
+DELETE FROM `kas` WHERE `keterangan` LIKE 'Pencairan migrasi%';
+DELETE FROM `migrasi_import_item` WHERE `entity_type` = 'kas' AND `source_key` LIKE 'cair-%';
+
+-- 2) Batalkan prematur (melebihi jatah / loncat / Warsingah & Alisa)
 UPDATE pinjaman p
 INNER JOIN (
   SELECT a.pinjaman_id, COALESCE(SUM(a.pokok), 0) AS pokok_balik
@@ -504,9 +510,9 @@ INNER JOIN (
   INNER JOIN pinjaman px ON px.id = a.pinjaman_id
   WHERE a.status = 'lunas'
     AND (
-      (px.kode_pinjaman = 'PJN-20261013-0005' AND a.angsuran_ke > 4)  -- NOVITASARI Senin → 4
-   OR (px.kode_pinjaman = 'PJN-20261013-0004' AND a.angsuran_ke > 4)  -- Puji Rabu → 4
-   OR (px.kode_pinjaman = 'PJN-20261013-0003' AND a.angsuran_ke > 3)  -- NOVIANI Kamis (sering disebut Novitasari) → 3
+      (px.kode_pinjaman = 'PJN-20261013-0005' AND a.angsuran_ke > 4)
+   OR (px.kode_pinjaman = 'PJN-20261013-0004' AND a.angsuran_ke > 4)
+   OR (px.kode_pinjaman = 'PJN-20261013-0003' AND a.angsuran_ke > 3)
    OR (px.kode_pinjaman IN ('PJN-20261028-0025', 'PJN-20261024-0020')
        AND a.tanggal_bayar IS NOT NULL AND a.tanggal_bayar < a.tanggal_jatuh_tempo)
     )
@@ -528,10 +534,8 @@ WHERE a.status = 'lunas'
     (p.kode_pinjaman = 'PJN-20261013-0005' AND a.angsuran_ke > 4)
  OR (p.kode_pinjaman = 'PJN-20261013-0004' AND a.angsuran_ke > 4)
  OR (p.kode_pinjaman = 'PJN-20261013-0003' AND a.angsuran_ke > 3)
- OR (p.kode_pinjaman = 'PJN-20261028-0025' AND a.tanggal_bayar IS NOT NULL
-     AND a.tanggal_bayar < a.tanggal_jatuh_tempo)
- OR (p.kode_pinjaman = 'PJN-20261024-0020' AND a.tanggal_bayar IS NOT NULL
-     AND a.tanggal_bayar < a.tanggal_jatuh_tempo)
+ OR (p.kode_pinjaman IN ('PJN-20261028-0025', 'PJN-20261024-0020')
+     AND a.tanggal_bayar IS NOT NULL AND a.tanggal_bayar < a.tanggal_jatuh_tempo)
   );
 
 UPDATE layanan_pembayaran lp
@@ -543,93 +547,50 @@ WHERE lp.dibatalkan_at IS NULL
     (p.kode_pinjaman = 'PJN-20261013-0005' AND a.angsuran_ke > 4)
  OR (p.kode_pinjaman = 'PJN-20261013-0004' AND a.angsuran_ke > 4)
  OR (p.kode_pinjaman = 'PJN-20261013-0003' AND a.angsuran_ke > 3)
- OR (p.kode_pinjaman IN ('PJN-20261028-0025', 'PJN-20261024-0020')
-     AND a.status <> 'lunas')
+ OR (p.kode_pinjaman IN ('PJN-20261028-0025', 'PJN-20261024-0020') AND a.status <> 'lunas')
   );
 
--- 2) Lengkapi cicilan yang kurang (hari tagihan kemarin)
+-- 3) Novitasari Senin → pastikan ke-4 lunas
+UPDATE pinjaman p
+INNER JOIN angsuran a ON a.pinjaman_id = p.id AND a.angsuran_ke = 4 AND a.status <> 'lunas'
+SET p.sisa_pokok = GREATEST(0, p.sisa_pokok - a.pokok)
+WHERE p.kode_pinjaman = 'PJN-20261013-0005';
+
+UPDATE angsuran a
+INNER JOIN pinjaman p ON p.id = a.pinjaman_id
+SET a.status = 'lunas', a.tanggal_bayar = '2026-10-26', a.denda = 0,
+    a.keterlambatan_hari = 0, a.cara_bayar = 'cicilan'
+WHERE p.kode_pinjaman = 'PJN-20261013-0005' AND a.angsuran_ke = 4 AND a.status <> 'lunas';
+
+-- 4) Solikah Jumat → pastikan ke-6 lunas (baseline closing tetap 58)
+UPDATE pinjaman p
+INNER JOIN angsuran a ON a.pinjaman_id = p.id AND a.angsuran_ke = 6 AND a.status <> 'lunas'
+SET p.sisa_pokok = GREATEST(0, p.sisa_pokok - a.pokok)
+WHERE p.kode_pinjaman = 'PJN-20261013-0007';
+
+UPDATE angsuran a
+INNER JOIN pinjaman p ON p.id = a.pinjaman_id
+SET a.status = 'lunas', a.tanggal_bayar = '2026-10-30', a.denda = 0,
+    a.keterlambatan_hari = 0, a.cara_bayar = 'cicilan'
+WHERE p.kode_pinjaman = 'PJN-20261013-0007' AND a.angsuran_ke = 6 AND a.status <> 'lunas';
+
+-- 5) Baseline closing 58: JANGAN ikutkan Sarinah ke-7 / Khafiyah ke-7 / Masrifah ke-5
 UPDATE pinjaman p
 INNER JOIN (
-  SELECT a.pinjaman_id, COALESCE(SUM(a.pokok), 0) AS pokok_ambil
+  SELECT a.pinjaman_id, COALESCE(SUM(a.pokok), 0) AS pokok_balik
   FROM angsuran a
   INNER JOIN pinjaman px ON px.id = a.pinjaman_id
-  WHERE a.status <> 'lunas'
+  WHERE a.status = 'lunas'
     AND (
       (px.kode_pinjaman = 'PJN-20261013-0014' AND a.angsuran_ke = 7)
    OR (px.kode_pinjaman = 'PJN-20261013-0012' AND a.angsuran_ke = 7)
    OR (px.kode_pinjaman = 'PJN-20261013-0006' AND a.angsuran_ke = 5)
-   OR (px.kode_pinjaman = 'PJN-20261013-0007' AND a.angsuran_ke = 6)
     )
   GROUP BY a.pinjaman_id
 ) x ON x.pinjaman_id = p.id
-SET p.sisa_pokok = GREATEST(0, p.sisa_pokok - x.pokok_ambil);
-
-UPDATE angsuran a
-INNER JOIN pinjaman p ON p.id = a.pinjaman_id
-SET a.status = 'lunas',
-    a.tanggal_bayar = CASE
-      WHEN p.kode_pinjaman IN ('PJN-20261013-0014', 'PJN-20261013-0012') THEN '2026-10-29'
-      ELSE '2026-10-30'
-    END,
-    a.denda = 0,
-    a.keterlambatan_hari = 0,
-    a.cara_bayar = 'cicilan'
-WHERE a.status <> 'lunas'
-  AND (
-    (p.kode_pinjaman = 'PJN-20261013-0014' AND a.angsuran_ke = 7)
- OR (p.kode_pinjaman = 'PJN-20261013-0012' AND a.angsuran_ke = 7)
- OR (p.kode_pinjaman = 'PJN-20261013-0006' AND a.angsuran_ke = 5)
- OR (p.kode_pinjaman = 'PJN-20261013-0007' AND a.angsuran_ke = 6)
-  );
-
--- 3) Sesuaikan kas batch migrasi (bukan per-ke)
-UPDATE kas SET jumlah = 450000
-WHERE jenis = 'masuk' AND jumlah > 0
-  AND keterangan LIKE '%BYR-20260915-005%' AND keterangan LIKE '%PJN-20261013-0005%';
-UPDATE kas SET jumlah = 0,
-    keterangan = CONCAT(COALESCE(keterangan,''), ' [DIBATALKAN: koreksi prematur]')
-WHERE jenis = 'masuk' AND jumlah > 0
-  AND keterangan LIKE '%BYR-20261027-NOV%' AND keterangan LIKE '%PJN-20261013-0005%'
-  AND keterangan NOT LIKE '%[DIBATALKAN:%';
-
-UPDATE kas SET jumlah = 450000
-WHERE jenis = 'masuk' AND jumlah > 0
-  AND keterangan LIKE '%BYR-20260915-004%' AND keterangan LIKE '%PJN-20261013-0004%';
-UPDATE kas SET jumlah = 0,
-    keterangan = CONCAT(COALESCE(keterangan,''), ' [DIBATALKAN: koreksi prematur]')
-WHERE jenis = 'masuk' AND jumlah > 0
-  AND keterangan LIKE '%BYR-20261028-PUJI-6%'
-  AND keterangan NOT LIKE '%[DIBATALKAN:%';
-
-UPDATE kas SET jumlah = 675000
-WHERE jenis = 'masuk' AND jumlah > 0
-  AND keterangan LIKE '%BYR-20260915-003%' AND keterangan LIKE '%PJN-20261013-0003%';
-UPDATE kas SET jumlah = 0,
-    keterangan = CONCAT(COALESCE(keterangan,''), ' [DIBATALKAN: koreksi prematur]')
-WHERE jenis = 'masuk' AND jumlah > 0
-  AND keterangan LIKE '%BYR-20261029-NOVIANI-6%'
-  AND keterangan NOT LIKE '%[DIBATALKAN:%';
-
-UPDATE kas SET jumlah = 787500
-WHERE jenis = 'masuk' AND jumlah > 0
-  AND keterangan LIKE '%BYR-20260915-014%' AND keterangan LIKE '%PJN-20261013-0014%';
-UPDATE kas SET jumlah = 787500
-WHERE jenis = 'masuk' AND jumlah > 0
-  AND keterangan LIKE '%BYR-20260915-012%' AND keterangan LIKE '%PJN-20261013-0012%';
-UPDATE kas SET jumlah = 562500
-WHERE jenis = 'masuk' AND jumlah > 0
-  AND keterangan LIKE '%BYR-20260915-006%' AND keterangan LIKE '%PJN-20261013-0006%';
-
--- 3b) Closing Okt: 61 → 60 (SOBIROH ke-7 JT 31 Okt di luar hitungan Excel)
---     + kas batch Sobiroh disesuaikan agar estimasi = Rp 10.052.000
-UPDATE pinjaman p
-INNER JOIN angsuran a ON a.pinjaman_id = p.id
-SET p.sisa_pokok = p.sisa_pokok + a.pokok,
+SET p.sisa_pokok = p.sisa_pokok + x.pokok_balik,
     p.status = 'aktif',
-    p.tanggal_lunas = NULL
-WHERE p.kode_pinjaman = 'PJN-20261013-0010'
-  AND a.angsuran_ke = 7
-  AND a.status = 'lunas';
+    p.tanggal_lunas = NULL;
 
 UPDATE angsuran a
 INNER JOIN pinjaman p ON p.id = a.pinjaman_id
@@ -638,20 +599,46 @@ SET a.status = IF(a.tanggal_jatuh_tempo < CURDATE(), 'telat', 'belum_bayar'),
     a.denda = 0,
     a.keterlambatan_hari = IF(a.tanggal_jatuh_tempo < CURDATE(), DATEDIFF(CURDATE(), a.tanggal_jatuh_tempo), 0),
     a.cara_bayar = 'cicilan'
-WHERE p.kode_pinjaman = 'PJN-20261013-0010'
-  AND a.angsuran_ke = 7
-  AND a.status = 'lunas';
+WHERE a.status = 'lunas'
+  AND (
+    (p.kode_pinjaman = 'PJN-20261013-0014' AND a.angsuran_ke = 7)
+ OR (p.kode_pinjaman = 'PJN-20261013-0012' AND a.angsuran_ke = 7)
+ OR (p.kode_pinjaman = 'PJN-20261013-0006' AND a.angsuran_ke = 5)
+  );
 
-UPDATE kas
-SET jumlah = 445000
+-- 6) Kas batch → estimasi closing Rp 9.714.500
+UPDATE kas SET jumlah = 450000
+WHERE jenis = 'masuk' AND keterangan LIKE '%BYR-20260915-005%' AND keterangan LIKE '%PJN-20261013-0005%';
+UPDATE kas SET jumlah = 0,
+    keterangan = IF(keterangan LIKE '%[DIBATALKAN:%', keterangan, CONCAT(COALESCE(keterangan,''), ' [DIBATALKAN: koreksi prematur]'))
 WHERE jenis = 'masuk' AND jumlah > 0
-  AND keterangan LIKE '%BYR-20260915-015%' AND keterangan LIKE '%PJN-20261013-0010%';
+  AND keterangan LIKE '%BYR-20261027-NOV%' AND keterangan LIKE '%PJN-20261013-0005%';
 
-UPDATE migrasi_pembayaran
-SET total_diterima = 445000
+UPDATE kas SET jumlah = 450000
+WHERE jenis = 'masuk' AND keterangan LIKE '%BYR-20260915-004%' AND keterangan LIKE '%PJN-20261013-0004%';
+UPDATE kas SET jumlah = 0,
+    keterangan = IF(keterangan LIKE '%[DIBATALKAN:%', keterangan, CONCAT(COALESCE(keterangan,''), ' [DIBATALKAN: koreksi prematur]'))
+WHERE jenis = 'masuk' AND jumlah > 0 AND keterangan LIKE '%BYR-20261028-PUJI-6%';
+
+UPDATE kas SET jumlah = 675000
+WHERE jenis = 'masuk' AND keterangan LIKE '%BYR-20260915-003%' AND keterangan LIKE '%PJN-20261013-0003%';
+UPDATE kas SET jumlah = 0,
+    keterangan = IF(keterangan LIKE '%[DIBATALKAN:%', keterangan, CONCAT(COALESCE(keterangan,''), ' [DIBATALKAN: koreksi prematur]'))
+WHERE jenis = 'masuk' AND jumlah > 0 AND keterangan LIKE '%BYR-20261029-NOVIANI-6%';
+
+UPDATE kas SET jumlah = 675000
+WHERE jenis = 'masuk' AND keterangan LIKE '%BYR-20260915-014%' AND keterangan LIKE '%PJN-20261013-0014%';
+UPDATE kas SET jumlah = 675000
+WHERE jenis = 'masuk' AND keterangan LIKE '%BYR-20260915-012%' AND keterangan LIKE '%PJN-20261013-0012%';
+UPDATE kas SET jumlah = 450000
+WHERE jenis = 'masuk' AND keterangan LIKE '%BYR-20260915-006%' AND keterangan LIKE '%PJN-20261013-0006%';
+
+UPDATE kas SET jumlah = 445000
+WHERE jenis = 'masuk' AND keterangan LIKE '%BYR-20260915-015%' AND keterangan LIKE '%PJN-20261013-0010%';
+UPDATE migrasi_pembayaran SET total_diterima = 445000
 WHERE source_key = 'BYR-20260915-015' AND total_diterima <> 445000;
 
--- 4) Warsingah: jadwal dari tgl pengajuan 24 Okt (cicilan 1 = 7 Nov), bukan tgl cair 28 Okt
+-- 7) Warsingah: jadwal dari tgl pengajuan 24 Okt (cicilan 1 = 7 Nov)
 UPDATE pengajuan_pinjaman pp
 INNER JOIN pinjaman p ON p.pengajuan_id = pp.id
 SET pp.tanggal_pengajuan = '2026-10-24 12:00:00'
@@ -668,12 +655,30 @@ SET a.tanggal_jatuh_tempo = DATE_ADD('2026-10-24', INTERVAL (14 * a.angsuran_ke)
 WHERE p.kode_pinjaman = 'PJN-20261028-0025';
 
 UPDATE pinjaman p
-SET p.jatuh_tempo = (
-  SELECT MAX(a.tanggal_jatuh_tempo) FROM angsuran a WHERE a.pinjaman_id = p.id
-)
+SET p.jatuh_tempo = (SELECT MAX(a.tanggal_jatuh_tempo) FROM angsuran a WHERE a.pinjaman_id = p.id)
 WHERE p.kode_pinjaman = 'PJN-20261028-0025';
 
-SELECT 'Migrasi universal selesai dan aman dijalankan kembali.' AS hasil;
+-- 8) Rekalkulasi ledger kas
+SET @simkeu_kas_saldo := 0;
+UPDATE `kas`
+SET
+  `saldo_sebelum` = (@simkeu_kas_prev := @simkeu_kas_saldo),
+  `saldo_sesudah` = (@simkeu_kas_saldo := @simkeu_kas_saldo + IF(`jenis` = 'masuk', `jumlah`, -`jumlah`))
+ORDER BY `id`;
+
+SELECT 'Migrasi universal selesai (closing Okt target 58 / Rp 9.714.500).' AS hasil;
+
+SELECT
+  (SELECT COUNT(*) FROM angsuran
+    WHERE status='lunas' AND tanggal_bayar BETWEEN '2026-10-01' AND '2026-10-31'
+      AND tanggal_jatuh_tempo BETWEEN '2026-10-01' AND '2026-10-31') AS closing_jumlah,
+  (SELECT COALESCE(SUM(jumlah),0) FROM kas
+    WHERE jenis='masuk' AND jumlah>0 AND DATE(tanggal) BETWEEN '2026-10-01' AND '2026-10-31'
+      AND (keterangan LIKE 'Pembayaran angsuran%' OR keterangan LIKE 'Pembayaran migrasi%')
+      AND keterangan NOT LIKE '%PELUNASAN%' AND keterangan NOT LIKE '%-PEL%'
+      AND keterangan NOT LIKE '%(denda)%' AND keterangan NOT LIKE '%[DIBATALKAN:%'
+  ) AS closing_kas,
+  (SELECT COALESCE(saldo_sesudah,0) FROM kas ORDER BY id DESC LIMIT 1) AS saldo_kas;
 
 -- Closing angsuran bulanan: pembayaran bulan yang sudah ditutup tidak boleh diubah.
 CREATE TABLE IF NOT EXISTS `closing_angsuran_bulanan` (

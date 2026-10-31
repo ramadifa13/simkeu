@@ -237,20 +237,25 @@ if (!function_exists('dashboardLoadStaffData')) {
             JOIN jenis_simpanan j ON t.jenis_simpanan_id = j.id
             WHERE j.kode_jenis NOT IN ('ANG','BONUS','SHU')");
 
-        // Kas: saldo = masuk (setoran+angsuran+waserda) - keluar (sudah termasuk pencairan bila tercatat di kas)
+        // Kas: pecahan masuk untuk kartu; saldo pakai ledger terakhir (saldo_sesudah)
+        // agar selaras setelah migrasiRekalkulasiKas / koreksi jumlah baris kas.
         $totalSetoran = (float)dashboardFetchScalar($db, "SELECT COALESCE(SUM(jumlah),0) FROM kas
-            WHERE jenis = 'masuk' AND (keterangan = '' OR (keterangan NOT LIKE '%angsuran%' AND keterangan NOT LIKE '%Waserda%'))");
+            WHERE jenis = 'masuk' AND jumlah > 0
+              AND (keterangan = '' OR (keterangan NOT LIKE '%angsuran%' AND keterangan NOT LIKE '%migrasi%' AND keterangan NOT LIKE '%Waserda%'))");
         $totalAngsuranKas = (float)dashboardFetchScalar($db, "SELECT COALESCE(SUM(jumlah),0) FROM kas
-            WHERE jenis = 'masuk' AND keterangan LIKE '%angsuran%'");
+            WHERE jenis = 'masuk' AND jumlah > 0
+              AND (keterangan LIKE '%angsuran%' OR keterangan LIKE 'Pembayaran migrasi%')");
         $totalWaserdaKas = (float)dashboardFetchScalar($db, "SELECT COALESCE(SUM(jumlah),0) FROM kas
-            WHERE jenis = 'masuk' AND keterangan LIKE '%Waserda%'");
-        $totalKeluar = (float)dashboardFetchScalar($db, "SELECT COALESCE(SUM(jumlah),0) FROM kas WHERE jenis = 'keluar'");
+            WHERE jenis = 'masuk' AND jumlah > 0 AND keterangan LIKE '%Waserda%'");
+        $totalKeluar = (float)dashboardFetchScalar($db, "SELECT COALESCE(SUM(jumlah),0) FROM kas
+            WHERE jenis = 'keluar' AND jumlah > 0 AND keterangan NOT LIKE 'Pencairan migrasi%'");
         $totalPencairan = (float)dashboardFetchScalar($db, 'SELECT COALESCE(SUM(jumlah_pinjaman),0) FROM pinjaman');
         $totalMasuk = $totalSetoran + $totalAngsuranKas + $totalWaserdaKas;
+        $saldoLedger = (float)dashboardFetchScalar($db, 'SELECT COALESCE(saldo_sesudah,0) FROM kas ORDER BY id DESC LIMIT 1');
         $statKas = [
             'total_masuk' => $totalMasuk,
             'total_keluar' => $totalKeluar,
-            'saldo' => $totalMasuk - $totalKeluar,
+            'saldo' => $saldoLedger,
             'total_setoran' => $totalSetoran,
             'total_angsuran' => $totalAngsuranKas,
             'total_waserda' => $totalWaserdaKas,

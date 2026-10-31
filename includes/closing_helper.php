@@ -24,8 +24,17 @@ if (!function_exists('closingBulanValid')) {
     }
 
     /**
-     * Cicilan masuk closing bulan M bila dibayar di M dan jatuh tempo di M.
-     * Menghindari cicilan lama/catch-up migrasi yang ikut distempel tanggal bayar.
+     * Alur closing angsuran bulanan
+     * --------------------------------
+     * 1) jumlah = COUNT angsuran lunas dengan tanggal_bayar DAN tanggal_jatuh_tempo
+     *    sama-sama di bulan M (hindari catch-up migrasi yang JT-nya bulan lain).
+     * 2) total  = SUM kas masuk "Pembayaran angsuran/migrasi" di bulan M
+     *    (batch Excel digabung; pelunasan & denda dikecualikan).
+     *    Bila kas kosong → fallback migrasi_pembayaran / layanan.
+     * 3) Preview di closing_angsuran.php membaca closingHitungBulan().
+     * 4) Kunci periode menulis header + detail (nominal dialokasi proporsional ke kas).
+     *
+     * Oktober 2026 (Excel koperasi): target 58 pembayaran / Rp 9.714.500.
      */
     function closingWhereAngsuranBulan() {
         return "a.status = 'lunas'
