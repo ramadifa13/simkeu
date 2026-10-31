@@ -573,7 +573,10 @@ table.dataTable tbody td{
 .stat-card small,.stat-card .text-muted{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 .ui-dash-attention{white-space:nowrap}
 .ui-dash-attention>*{min-width:0}
-@media (min-width:768px) and (max-width:1599.98px){.ui-stat-grid[data-count='6']{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:768px) and (max-width:1599.98px){
+  .ui-stat-grid[data-count='6']{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ui-stat-grid[data-count='7']{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
 @media (min-width:1600px){.ui-stat-grid[data-count='6']{grid-template-columns:repeat(6,minmax(0,1fr))}}
 
 /* --- Dashboard layout padat --- */
@@ -587,17 +590,20 @@ table.dataTable tbody td{
 .ui-stat-grid[data-count="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}
 .ui-stat-grid[data-count="5"],
 .ui-stat-grid[data-count="6"]{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ui-stat-grid[data-count="7"]{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:575.98px){
   .ui-stat-grid,
   .ui-stat-grid[data-count="3"],
   .ui-stat-grid[data-count="4"],
   .ui-stat-grid[data-count="5"],
-  .ui-stat-grid[data-count="6"]{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ui-stat-grid[data-count="6"],
+  .ui-stat-grid[data-count="7"]{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (min-width:1400px){
   .ui-stat-grid[data-count="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}
   .ui-stat-grid[data-count="6"]{grid-template-columns:repeat(6,minmax(0,1fr))}
   .ui-stat-grid[data-count="5"]{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .ui-stat-grid[data-count="7"]{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
 .ui-dash-attention{
   display:flex;align-items:center;justify-content:space-between;gap:.75rem;
@@ -656,20 +662,123 @@ table.dataTable tbody td{
 .ui-dash-actions{display:grid!important;flex-wrap:unset!important}
 .simkeu-topbar .badge.bg-red.badge-notification,.simkeu-topbar [data-notif-pinjaman=total]{color:#fff!important;background-color:#dc2626!important}
 
-/* Dashboard grid — override final */
-.ui-stat-grid[data-count="3"]{grid-template-columns:repeat(3,minmax(0,1fr))!important}
-.ui-stat-grid[data-count="4"]{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-.ui-stat-grid[data-count="5"],
-.ui-stat-grid[data-count="6"]{grid-template-columns:repeat(3,minmax(0,1fr))!important}
-@media (max-width:575.98px){
-  .ui-stat-grid[data-count="3"],
-  .ui-stat-grid[data-count="4"],
-  .ui-stat-grid[data-count="5"],
-  .ui-stat-grid[data-count="6"]{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+/*
+ * Dashboard KPI: flex fill agar baris terakhir merata (tanpa celah kosong),
+ * dipakai admin (7), teller (3), anggota (3), dan halaman lain di .ui-dash-page.
+ */
+.ui-dash-page .ui-stat-grid{
+  display:flex!important;
+  flex-wrap:wrap;
+  align-items:stretch;
+  gap:.7rem!important;
+  margin-bottom:.75rem!important;
+  grid-template-columns:none!important;
 }
-@media (min-width:1400px){
-  .ui-stat-grid[data-count="6"]{grid-template-columns:repeat(6,minmax(0,1fr))!important}
-  .ui-stat-grid[data-count="5"]{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+.ui-dash-page .ui-stat-grid > .stat-card{
+  flex:1 1 12rem;
+  min-width:min(100%,12rem);
+  max-width:100%;
+}
+.ui-dash-page .ui-stat-grid[data-count="3"] > .stat-card{
+  flex-basis:calc((100% - 1.4rem) / 3);
+  min-width:calc((100% - 1.4rem) / 3 - .01px);
+}
+.ui-dash-page .ui-stat-grid[data-count="4"] > .stat-card{
+  flex-basis:calc((100% - 2.1rem) / 4);
+  min-width:calc((100% - 2.1rem) / 4 - .01px);
+}
+.ui-dash-page .ui-stat-grid[data-count="5"] > .stat-card,
+.ui-dash-page .ui-stat-grid[data-count="6"] > .stat-card{
+  flex-basis:calc((100% - 2.1rem) / 4);
+  min-width:calc((100% - 2.1rem) / 4 - .01px);
+}
+.ui-dash-page .ui-stat-grid[data-count="6"] > .stat-card{
+  flex-basis:calc((100% - 1.4rem) / 3);
+  min-width:calc((100% - 1.4rem) / 3 - .01px);
+}
+/* 7 KPI: selalu ~4 kolom (4+3 merata), jangan 7-sebaris agar nominal Rp tidak kepotong */
+.ui-dash-page .ui-stat-grid[data-count="7"] > .stat-card{
+  flex-basis:calc((100% - 2.1rem) / 4);
+  min-width:min(100%,calc((100% - 2.1rem) / 4 - .01px));
+}
+@media (max-width:991.98px){
+  .ui-dash-page .ui-stat-grid[data-count="5"] > .stat-card,
+  .ui-dash-page .ui-stat-grid[data-count="6"] > .stat-card,
+  .ui-dash-page .ui-stat-grid[data-count="7"] > .stat-card{
+    flex-basis:calc((100% - .7rem) / 2);
+    min-width:calc((100% - .7rem) / 2 - .01px);
+  }
+}
+@media (max-width:575.98px){
+  .ui-dash-page .ui-stat-grid[data-count="3"] > .stat-card,
+  .ui-dash-page .ui-stat-grid[data-count="4"] > .stat-card,
+  .ui-dash-page .ui-stat-grid[data-count="5"] > .stat-card,
+  .ui-dash-page .ui-stat-grid[data-count="6"] > .stat-card,
+  .ui-dash-page .ui-stat-grid[data-count="7"] > .stat-card{
+    flex-basis:calc((100% - .7rem) / 2);
+    min-width:calc((100% - .7rem) / 2 - .01px);
+  }
+}
+.ui-dash-page .stat-card .card-body{
+  display:block!important;
+  padding:.85rem 2.75rem .85rem .9rem;
+  position:relative;
+}
+/* Ikon pojok: tidak merebut lebar nominal */
+.ui-dash-page .stat-card .stat-icon{
+  position:absolute;top:.75rem;right:.7rem;
+  width:2rem;height:2rem;font-size:1.05rem;border-radius:.65rem;
+  margin:0;
+}
+.ui-dash-page .stat-card .card-body > .min-w-0{
+  min-width:0;max-width:100%;width:100%;
+}
+.ui-dash-page .stat-card .text-uppercase{font-size:.68rem;letter-spacing:.04em}
+.ui-dash-page .stat-card small{
+  font-size:.72rem;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+/* Saldo penuh: tanpa ellipsis; ukuran ikut lebar kartu (cqw) */
+.ui-dash-page .stat-card h4,
+.ui-dash-page .stat-card .h4,
+.ui-dash-page .stat-card .stat-value{
+  white-space:nowrap!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  font-size:clamp(.84rem,8.6cqw,1.28rem)!important;
+  line-height:1.25;
+  margin:.12rem 0;
+  max-width:100%;
+}
+.ui-stat-grid > .stat-card:nth-child(7){animation-delay:.3s}
+
+/* Antrian kerja + status hero: isi merata tanpa slot kosong */
+.ui-dash-page .ui-dash-queue{
+  display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.85rem;
+}
+.ui-dash-page .ui-dash-queue > *{
+  flex:1 1 0;
+  min-width:min(100%,12rem);
+  max-width:100%;
+}
+.ui-dash-page .ui-dash-queue[data-count="3"] > *{
+  flex-basis:calc((100% - 1rem) / 3);
+  min-width:calc((100% - 1rem) / 3 - .01px);
+}
+.ui-dash-page .ui-status-hero{
+  display:flex!important;flex-wrap:wrap;gap:.65rem;margin-bottom:.85rem;
+  grid-template-columns:none!important;
+}
+.ui-dash-page .ui-status-hero > .ui-status-hero-card{
+  flex:1 1 0;
+  min-width:calc((100% - 1.3rem) / 3 - .01px);
+}
+@media (max-width:575.98px){
+  .ui-dash-page .ui-dash-queue[data-count="3"] > *,
+  .ui-dash-page .ui-status-hero > .ui-status-hero-card{
+    flex-basis:100%;
+    min-width:100%;
+  }
 }
 .ui-dash-actions[data-count="6"]{grid-template-columns:repeat(3,minmax(0,1fr))!important}
 @media (min-width:768px){
@@ -4530,4 +4639,24 @@ button.ui-dash-btn-add:hover{
 @media (max-width:575.98px){
   .ui-agt-was-modal-meta{grid-template-columns:1fr}
   .ui-agt-simpanan-grid{grid-template-columns:1fr}
+}
+/* Global role navigation and responsive workspaces */
+:root, [data-bs-theme="light"] { --sk-surface:#fff; --sk-sidebar:#111827; --sk-sidebar-muted:#9ca3af; --sk-accent:#818cf8; }
+.simkeu-sidebar { background:var(--sk-sidebar) !important; border:0 !important; }
+.simkeu-sidebar .navbar-collapse { min-height:calc(100vh - 5rem); }
+.simkeu-nav-section { padding:1.15rem 1rem .38rem; color:var(--sk-sidebar-muted); font-size:.64rem; font-weight:700; letter-spacing:.11em; text-transform:uppercase; }
+.simkeu-sidebar .nav-link { min-height:2.65rem; }
+.simkeu-sidebar .nav-item.active > .nav-link { box-shadow:inset 3px 0 0 var(--sk-accent); }
+.simkeu-sidebar .dropdown-menu { padding-left:.45rem; }
+.simkeu-sidebar .dropdown-item { min-height:2.35rem; }
+.simkeu-container > :first-child { margin-top:0; }
+@media (max-width:767.98px) {
+  body { font-size:.875rem; }
+  .simkeu-page { padding-top:.75rem; }
+  .simkeu-container { padding-left:.85rem; padding-right:.85rem; }
+  .simkeu-sidebar .navbar-collapse { min-height:0; max-height:calc(100dvh - 4.5rem); overflow-y:auto; }
+  .simkeu-sidebar .navbar-nav { padding-bottom:1rem; }
+  .simkeu-nav-section { padding-top:.9rem; }
+  .simkeu-topbar { min-height:3.25rem; }
+  .card { border-radius:.75rem; }
 }

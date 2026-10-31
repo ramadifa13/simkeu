@@ -79,7 +79,6 @@ $quickActions = $isAdmin
         ['href' => 'anggota.php', 'label' => 'Anggota', 'icon' => 'ti ti-users', 'class' => 'btn-outline-secondary'],
     ];
 
-$kpiCount = count($primaryKpis);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -107,41 +106,8 @@ $kpiCount = count($primaryKpis);
                     <h3 class="ui-dash-sec-title"><i class="ti ti-list-check" aria-hidden="true"></i>Antrian kerja hari ini</h3>
                     <span class="ui-dash-sec-note">Tindak lanjut prioritas</span>
                 </div>
-                <div class="row g-2">
+                <div class="ui-dash-queue" data-count="<?php echo count($workQueue); ?>">
                     <?php foreach ($workQueue as $item): ?>
-                        <div class="col-sm-4">
-                            <a href="<?php echo htmlspecialchars($item['href']); ?>" class="ui-dash-attention tone-<?php echo htmlspecialchars($item['tone']); ?> text-decoration-none">
-                                <span class="ui-dash-attention-icon"><i class="<?php echo htmlspecialchars($item['icon']); ?>"></i></span>
-                                <div class="min-w-0 flex-fill">
-                                    <div class="small text-muted text-truncate"><?php echo htmlspecialchars($item['label']); ?></div>
-                                </div>
-                                <div class="fw-semibold"><?php echo number_format((int)$item['value']); ?></div>
-                            </a>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </section>
-            <?php endif; ?>
-
-            <div class="ui-stat-grid" data-count="<?php echo (int)$kpiCount; ?>">
-                <?php foreach ($primaryKpis as $kpi): ?>
-                    <div class="stat-card tone-<?php echo htmlspecialchars($kpi['tone']); ?>">
-                        <div class="card-body d-flex justify-content-between align-items-start gap-2">
-                            <div class="min-w-0">
-                                <p class="mb-0 text-muted small text-uppercase"><?php echo htmlspecialchars($kpi['label']); ?></p>
-                                <h4 class="mb-0"><?php echo $kpi['value']; ?></h4>
-                                <small class="text-muted"><?php echo htmlspecialchars($kpi['hint']); ?></small>
-                            </div>
-                            <span class="stat-icon"><i class="<?php echo htmlspecialchars($kpi['icon']); ?>"></i></span>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-
-            <?php if ($isAdmin): ?>
-            <div class="row g-2 mb-3">
-                <?php foreach ($workQueue as $item): ?>
-                    <div class="col-sm-4">
                         <a href="<?php echo htmlspecialchars($item['href']); ?>" class="ui-dash-attention tone-<?php echo htmlspecialchars($item['tone']); ?> text-decoration-none">
                             <span class="ui-dash-attention-icon"><i class="<?php echo htmlspecialchars($item['icon']); ?>"></i></span>
                             <div class="min-w-0 flex-fill">
@@ -149,7 +115,23 @@ $kpiCount = count($primaryKpis);
                             </div>
                             <div class="fw-semibold"><?php echo number_format((int)$item['value']); ?></div>
                         </a>
-                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+            <?php endif; ?>
+
+            <?php ui_stat_grid($primaryKpis); ?>
+
+            <?php if ($isAdmin): ?>
+            <div class="ui-dash-queue" data-count="<?php echo count($workQueue); ?>" aria-label="Antrian kerja">
+                <?php foreach ($workQueue as $item): ?>
+                    <a href="<?php echo htmlspecialchars($item['href']); ?>" class="ui-dash-attention tone-<?php echo htmlspecialchars($item['tone']); ?> text-decoration-none">
+                        <span class="ui-dash-attention-icon"><i class="<?php echo htmlspecialchars($item['icon']); ?>"></i></span>
+                        <div class="min-w-0 flex-fill">
+                            <div class="small text-muted text-truncate"><?php echo htmlspecialchars($item['label']); ?></div>
+                        </div>
+                        <div class="fw-semibold"><?php echo number_format((int)$item['value']); ?></div>
+                    </a>
                 <?php endforeach; ?>
             </div>
             <?php endif; ?>

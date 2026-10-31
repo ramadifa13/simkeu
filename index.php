@@ -12,10 +12,65 @@ $simpanan = $db->query(
      WHERE status='aktif' AND kode_jenis NOT IN ('ANG','BONUS','SHU')
      ORDER BY id LIMIT 4"
 )->fetchAll(PDO::FETCH_ASSOC);
-$pinjaman = $db->query(
-    "SELECT nama_jenis, deskripsi, memerlukan_jaminan FROM jenis_pinjaman
-     WHERE status='aktif' ORDER BY id LIMIT 4"
+$pinjamanRows = $db->query(
+    "SELECT nama_jenis, deskripsi, memerlukan_jaminan, frekuensi_diizinkan, tenor_max
+     FROM jenis_pinjaman
+     WHERE status='aktif'
+     ORDER BY memerlukan_jaminan ASC,
+              FIELD(SUBSTRING_INDEX(frekuensi_diizinkan, ',', 1), 'mingguan', 'dua_mingguan', 'bulanan'),
+              tenor_max, id"
 )->fetchAll(PDO::FETCH_ASSOC);
+
+/** Ringkas produk pinjaman per kategori publik (mingguan / 2 minggu / gadai). */
+$pinjaman = [];
+foreach ($pinjamanRows as $row) {
+    $isGadai = !empty($row['memerlukan_jaminan']);
+    $freqParts = array_values(array_filter(array_map('trim', explode(',', (string) ($row['frekuensi_diizinkan'] ?? 'bulanan')))));
+    $freq = $freqParts[0] ?? 'bulanan';
+    if ($isGadai) {
+        $key = 'gadai';
+        $title = 'Jaminan / Gadai';
+        $meta = 'Dengan jaminan · Tenor bulanan';
+        $deskripsi = 'Pinjaman dengan jaminan/gadai. Cicilan tenor bulanan sesuai ketentuan koperasi.';
+    } elseif (in_array('dua_mingguan', $freqParts, true) || $freq === 'dua_mingguan') {
+        $key = 'dua_mingguan';
+        $title = '2 Minggu Sekali';
+        $meta = 'Tanpa jaminan';
+        $deskripsi = 'Pinjaman khusus tanpa jaminan dengan cicilan setiap 2 minggu sekali.';
+    } else {
+        $key = 'mingguan';
+        $title = 'Mingguan';
+        $meta = 'Tanpa jaminan';
+        $deskripsi = 'Pinjaman tanpa jaminan dengan cicilan mingguan untuk tenor singkat.';
+    }
+    if (!isset($pinjaman[$key])) {
+        $pinjaman[$key] = [
+            'title' => $title,
+            'meta' => $meta,
+            'deskripsi' => $deskripsi,
+            'tenors' => [],
+        ];
+    }
+    $tenor = (int) ($row['tenor_max'] ?? 0);
+    if ($tenor > 0) {
+        $pinjaman[$key]['tenors'][$tenor] = true;
+    }
+}
+$pinjaman = array_values($pinjaman);
+foreach ($pinjaman as &$pItem) {
+    $tenors = array_keys($pItem['tenors']);
+    sort($tenors, SORT_NUMERIC);
+    if ($tenors) {
+        $pItem['tenor_label'] = count($tenors) === 1
+            ? 'Tenor hingga ' . $tenors[0] . ' bulan'
+            : 'Tenor ' . $tenors[0] . '–' . end($tenors) . ' bulan';
+    } else {
+        $pItem['tenor_label'] = '';
+    }
+    unset($pItem['tenors']);
+}
+unset($pItem);
+
 function homeEscape($v)
 {
     return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
@@ -136,12 +191,16 @@ $jsV = @filemtime(__DIR__ . '/assets/js/public-home.js') ?: time();
             </div>
 
             <h3 class="lp-subhead lp-reveal">Pinjaman</h3>
-            <div class="lp-product-grid">
+            <p class="lp-product-lead lp-reveal">Tersedia pinjaman mingguan dan 2 minggu sekali khusus tanpa jaminan, serta pinjaman dengan jaminan/gadai ber-tenor bulanan.</p>
+            <div class="lp-product-grid lp-product-grid-pinjaman">
                 <?php if ($pinjaman): foreach ($pinjaman as $p): ?>
                 <article class="lp-product lp-reveal">
-                    <strong><?= homeEscape($p['nama_jenis']) ?></strong>
+                    <strong><?= homeEscape($p['title']) ?></strong>
                     <p><?= homeEscape($p['deskripsi'] ?: 'Ajukan pembiayaan melalui Teller koperasi.') ?></p>
-                    <span class="lp-product-meta"><?= !empty($p['memerlukan_jaminan']) ? 'Dengan jaminan' : 'Tanpa jaminan' ?></span>
+                    <?php if ($p['tenor_label'] !== ''): ?>
+                    <span class="lp-product-tenor"><?= homeEscape($p['tenor_label']) ?></span>
+                    <?php endif; ?>
+                    <span class="lp-product-meta"><?= homeEscape($p['meta']) ?></span>
                 </article>
                 <?php endforeach; else: ?>
                 <p class="lp-empty lp-reveal">Informasi produk pinjaman tersedia melalui Teller.</p>
