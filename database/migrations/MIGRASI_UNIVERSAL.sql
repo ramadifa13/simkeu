@@ -500,7 +500,7 @@ CREATE TABLE IF NOT EXISTS `log_koreksi` (
 
 -- 1) Hapus pencairan migrasi dari kas (cegah saldo minus)
 DELETE FROM `kas` WHERE `keterangan` LIKE 'Pencairan migrasi%';
-DELETE FROM `migrasi_import_item` WHERE `entity_type` = 'kas' AND `source_key` LIKE 'cair-%';
+DELETE FROM `migrasi_import_item` WHERE `jenis` = 'kas' AND `source_key` LIKE 'cair-%';
 
 -- 2) Batalkan prematur (melebihi jatah / loncat / Warsingah & Alisa)
 UPDATE pinjaman p
@@ -562,7 +562,7 @@ SET a.status = 'lunas', a.tanggal_bayar = '2026-10-26', a.denda = 0,
     a.keterlambatan_hari = 0, a.cara_bayar = 'cicilan'
 WHERE p.kode_pinjaman = 'PJN-20261013-0005' AND a.angsuran_ke = 4 AND a.status <> 'lunas';
 
--- 4) Solikah Jumat → pastikan ke-6 lunas (baseline closing tetap 58)
+-- 4) Solikah Jumat → pastikan ke-6 lunas + kas 112.500 (baseline closing 58 / 9.714.500)
 UPDATE pinjaman p
 INNER JOIN angsuran a ON a.pinjaman_id = p.id AND a.angsuran_ke = 6 AND a.status <> 'lunas'
 SET p.sisa_pokok = GREATEST(0, p.sisa_pokok - a.pokok)
@@ -573,6 +573,34 @@ INNER JOIN pinjaman p ON p.id = a.pinjaman_id
 SET a.status = 'lunas', a.tanggal_bayar = '2026-10-30', a.denda = 0,
     a.keterlambatan_hari = 0, a.cara_bayar = 'cicilan'
 WHERE p.kode_pinjaman = 'PJN-20261013-0007' AND a.angsuran_ke = 6 AND a.status <> 'lunas';
+
+INSERT INTO `transaksi` (
+  `kode_transaksi`, `anggota_id`, `jenis_simpanan_id`, `jenis_transaksi`,
+  `jumlah`, `saldo_sebelum`, `saldo_sesudah`, `keterangan`, `user_id`, `tanggal_transaksi`
+)
+SELECT
+  'BYR-SOLIKAH-6-OKT30', p.anggota_id, (SELECT MIN(id) FROM jenis_simpanan), 'setoran',
+  112500, 0, 112500,
+  'Pembayaran migrasi BYR-20261030-SOLIKAH-6 - PJN-20261013-0007',
+  (SELECT MIN(id) FROM users), '2026-10-30 12:00:00'
+FROM pinjaman p
+WHERE p.kode_pinjaman = 'PJN-20261013-0007'
+  AND NOT EXISTS (
+    SELECT 1 FROM kas WHERE keterangan LIKE '%BYR-20261030-SOLIKAH-6%'
+  );
+
+INSERT INTO `kas` (
+  `transaksi_id`, `jenis`, `jumlah`, `saldo_sebelum`, `saldo_sesudah`, `keterangan`, `tanggal`
+)
+SELECT
+  t.id, 'masuk', 112500, 0, 0,
+  'Pembayaran migrasi BYR-20261030-SOLIKAH-6 - PJN-20261013-0007',
+  '2026-10-30 12:00:00'
+FROM transaksi t
+WHERE t.kode_transaksi = 'BYR-SOLIKAH-6-OKT30'
+  AND NOT EXISTS (
+    SELECT 1 FROM kas WHERE keterangan LIKE '%BYR-20261030-SOLIKAH-6%'
+  );
 
 -- 5) Baseline closing 58: JANGAN ikutkan Sarinah ke-7 / Khafiyah ke-7 / Masrifah ke-5
 UPDATE pinjaman p
