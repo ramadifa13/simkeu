@@ -168,9 +168,30 @@ if (!function_exists('closingBulanValid')) {
 
         $db->beginTransaction();
         try {
-            $q = $db->prepare("INSERT INTO closing_angsuran_bulanan(bulan,status,ditutup_at,ditutup_oleh,catatan,total_pembayaran,jumlah_pembayaran) VALUES(?,?,?,?,?,0,0)");
-            $q->execute([$bulan, 'terkunci', date('Y-m-d H:i:s'), $userId, $catatan !== '' ? $catatan : null]);
-            $closingId = (int) $db->lastInsertId();
+            $cek = $db->prepare("SELECT id, status FROM closing_angsuran_bulanan WHERE bulan=? FOR UPDATE");
+            $cek->execute([$bulan]);
+            $existing = $cek->fetch(PDO::FETCH_ASSOC);
+            if ($existing && ($existing['status'] ?? '') === 'terkunci') {
+                throw new Exception('Periode tersebut sudah terkunci.');
+            }
+
+            $now = date('Y-m-d H:i:s');
+            $catatanVal = $catatan !== '' ? $catatan : null;
+            if ($existing) {
+                // Periode pernah dibuka — kunci ulang pada baris yang sama.
+                $closingId = (int) $existing['id'];
+                $db->prepare("DELETE FROM closing_angsuran_detail WHERE closing_id=?")->execute([$closingId]);
+                $db->prepare("UPDATE closing_angsuran_bulanan
+                              SET status='terkunci', ditutup_at=?, ditutup_oleh=?, dibuka_at=NULL, dibuka_oleh=NULL,
+                                  catatan=?, total_pembayaran=0, jumlah_pembayaran=0
+                              WHERE id=?")
+                   ->execute([$now, $userId, $catatanVal, $closingId]);
+            } else {
+                $q = $db->prepare("INSERT INTO closing_angsuran_bulanan(bulan,status,ditutup_at,ditutup_oleh,catatan,total_pembayaran,jumlah_pembayaran) VALUES(?,?,?,?,?,0,0)");
+                $q->execute([$bulan, 'terkunci', $now, $userId, $catatanVal]);
+                $closingId = (int) $db->lastInsertId();
+            }
+
             $ins = $db->prepare(
                 "INSERT INTO closing_angsuran_detail(closing_id,angsuran_id,nominal,tanggal_bayar) VALUES (?,?,?,?)"
             );
@@ -190,5 +211,42 @@ if (!function_exists('closingBulanValid')) {
             $db->commit();
             return ['id'=>$closingId, 'jumlah_pembayaran'=>$hit['jumlah'], 'total_pembayaran'=>$sumNominal];
         } catch (Exception $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }
+    }
+
+    /**
+     * Buka kunci periode closing (Admin). Setelah dibuka, backdate/koreksi di bulan itu diizinkan lagi.
+     * Snapshot detail dihapus; kunci ulang akan menghitung ulang dari data terkini.
+     */
+    function bukaClosingAngsuran($db, $bulan, $userId, $catatan = '') {
+        if (!closingBulanValid($bulan)) throw new Exception('Bulan closing tidak valid.');
+        if (!closingTabelAda($db)) throw new Exception('Tabel closing belum tersedia.');
+
+        $db->beginTransaction();
+        try {
+            $q = $db->prepare("SELECT id, catatan FROM closing_angsuran_bulanan WHERE bulan=? AND status='terkunci' FOR UPDATE");
+            $q->execute([$bulan]);
+            $row = $q->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                throw new Exception('Periode tersebut tidak terkunci atau tidak ditemukan.');
+            }
+
+            $catatanBaru = trim((string) $catatan);
+            $catatanGabung = (string) ($row['catatan'] ?? '');
+            if ($catatanBaru !== '') {
+                $catatanGabung = ($catatanGabung !== '' ? $catatanGabung . "\n" : '')
+                    . '[Dibuka ' . date('d/m/Y H:i') . '] ' . $catatanBaru;
+            }
+
+            $db->prepare("UPDATE closing_angsuran_bulanan
+                          SET status='dibuka', dibuka_at=?, dibuka_oleh=?, catatan=?
+                          WHERE id=?")
+               ->execute([date('Y-m-d H:i:s'), $userId, $catatanGabung !== '' ? $catatanGabung : null, (int) $row['id']]);
+            $db->prepare("DELETE FROM closing_angsuran_detail WHERE closing_id=?")->execute([(int) $row['id']]);
+            $db->commit();
+            return ['id' => (int) $row['id'], 'bulan' => $bulan];
+        } catch (Exception $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            throw $e;
+        }
     }
 }

@@ -77,6 +77,7 @@ if (!function_exists('simkeu_permissions')) {
             ],
             'actions' => [
                 'closing.lock' => $admin,
+                'closing.unlock' => $admin,
                 'angsuran.bayar' => $staff,
                 'angsuran.batal_langsung' => $admin,
                 'angsuran.ajukan_batal' => $staff,

@@ -1,7 +1,7 @@
 <?php
 /**
  * Single implementation — Closing Angsuran Bulanan (Admin & Teller).
- * Kunci periode: Admin saja (can('closing.lock')).
+ * Kunci/buka periode: Admin saja (can('closing.lock') / can('closing.unlock')).
  */
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/auth.php';
@@ -26,6 +26,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tutup_closing'])) {
             $_SESSION['success'] = 'Periode ' . $b . ' berhasil dikunci ('
                 . $h['jumlah_pembayaran'] . ' pembayaran, '
                 . formatRupiah((float)$h['total_pembayaran']) . ').';
+        } catch (Exception $e) {
+            $_SESSION['error'] = $e->getMessage();
+        }
+    }
+    header('Location: closing_angsuran.php');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['buka_closing'])) {
+    if (!can('closing.unlock')) {
+        $_SESSION['error'] = 'Hanya Admin yang dapat membuka kunci periode angsuran.';
+    } else {
+        try {
+            layananValidasiToken();
+            $b = trim($_POST['bulan'] ?? '');
+            bukaClosingAngsuran($db, $b, $_SESSION['user_id'], trim($_POST['catatan'] ?? ''));
+            $_SESSION['success'] = 'Kunci periode ' . $b . ' berhasil dibuka. Backdate dan koreksi di bulan tersebut diizinkan lagi.';
         } catch (Exception $e) {
             $_SESSION['error'] = $e->getMessage();
         }
@@ -114,6 +131,7 @@ $page_title = 'Closing Angsuran';
                 <div class="alert alert-info ui-cl-info" role="status" data-ui-toast-skip>
                     <i class="ti ti-info-circle me-1" aria-hidden="true"></i>
                     Setelah periode dikunci, pembayaran dan pembatalan untuk tanggal dalam bulan tersebut tidak dapat diubah.
+                    Admin dapat membuka kunci bila perlu koreksi atau backdate.
                     <?php if ($bulanBerjalanTerkunci): ?>
                     <strong class="ms-1">Bulan berjalan sudah terkunci.</strong>
                     <?php endif; ?>
@@ -195,6 +213,7 @@ $page_title = 'Closing Angsuran';
                                         <th>Ditutup oleh</th>
                                         <th>Waktu</th>
                                         <th>Catatan</th>
+                                        <?php if (can('closing.unlock')): ?><th class="text-end">Aksi</th><?php endif; ?>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -207,6 +226,11 @@ $page_title = 'Closing Angsuran';
                                         <td>
                                             <?php if ($row['status'] === 'terkunci'): ?>
                                             <span class="badge bg-success"><i class="ti ti-lock me-1" aria-hidden="true"></i>Terkunci</span>
+                                            <?php elseif ($row['status'] === 'dibuka'): ?>
+                                            <span class="badge bg-warning text-dark"><i class="ti ti-lock-open me-1" aria-hidden="true"></i>Dibuka</span>
+                                            <?php if (!empty($row['dibuka_at'])): ?>
+                                            <br><small class="text-muted"><?php echo formatTanggalUi($row['dibuka_at'], true); ?></small>
+                                            <?php endif; ?>
                                             <?php else: ?>
                                             <span class="badge bg-secondary"><?php echo htmlspecialchars(ucfirst((string)$row['status'])); ?></span>
                                             <?php endif; ?>
@@ -215,7 +239,21 @@ $page_title = 'Closing Angsuran';
                                         <td class="text-end fw-semibold ui-cl-money"><?php echo formatRupiah((float)$row['total_pembayaran']); ?></td>
                                         <td><?php echo htmlspecialchars($row['nama_lengkap'] ?: '—'); ?></td>
                                         <td data-order="<?php echo htmlspecialchars((string)$row['ditutup_at']); ?>"><?php echo formatTanggalUi($row['ditutup_at'], true); ?></td>
-                                        <td class="text-muted"><?php echo htmlspecialchars($row['catatan'] ?: '—'); ?></td>
+                                        <td class="text-muted"><?php echo nl2br(htmlspecialchars($row['catatan'] ?: '—')); ?></td>
+                                        <?php if (can('closing.unlock')): ?>
+                                        <td class="text-end">
+                                            <?php if ($row['status'] === 'terkunci'): ?>
+                                            <button type="button" class="btn btn-sm btn-outline-warning"
+                                                    data-bs-toggle="modal" data-bs-target="#bukaClosingModal"
+                                                    data-bulan="<?php echo htmlspecialchars($row['bulan'], ENT_QUOTES, 'UTF-8'); ?>"
+                                                    data-bulan-label="<?php echo htmlspecialchars($fmtBulan($row['bulan']), ENT_QUOTES, 'UTF-8'); ?>">
+                                                <i class="ti ti-lock-open me-1" aria-hidden="true"></i>Buka kunci
+                                            </button>
+                                            <?php else: ?>
+                                            <span class="text-muted">—</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <?php endif; ?>
                                     </tr>
                                 <?php endforeach; ?>
                                 </tbody>
@@ -223,38 +261,91 @@ $page_title = 'Closing Angsuran';
                         </div>
                     </div>
                 </div>
+
+                <?php if (can('closing.unlock')): ?>
+                <div class="modal fade ui-tx-modal" id="bukaClosingModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <form method="post">
+                                <?php echo layananToken(); ?>
+                                <input type="hidden" name="buka_closing" value="1">
+                                <input type="hidden" name="bulan" id="buka_closing_bulan" value="">
+                                <div class="modal-header">
+                                    <h5 class="modal-title"><i class="ti ti-lock-open me-1" aria-hidden="true"></i>Buka kunci periode</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="mb-2">Buka kunci periode <strong id="buka_closing_label">—</strong>?</p>
+                                    <div class="alert alert-warning mb-3" role="status">
+                                        <small><i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>
+                                        Setelah dibuka, angsuran dengan tanggal di bulan tersebut bisa diproses ulang / dikoreksi. Kunci lagi setelah selesai.</small>
+                                    </div>
+                                    <div class="mb-0">
+                                        <label for="buka_closing_catatan" class="form-label">Alasan membuka kunci</label>
+                                        <textarea name="catatan" id="buka_closing_catatan" class="form-control" rows="2" maxlength="500"
+                                                  placeholder="Contoh: koreksi angsuran kelewat / backdate laporan" required></textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                                    <button type="submit" class="btn btn-warning">
+                                        <i class="ti ti-lock-open me-1" aria-hidden="true"></i>Ya, buka kunci
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
         <?php include __DIR__ . '/layout/shell_end.php'; ?>
 <script>
 (function () {
   var bulanEl = document.getElementById('closing_bulan');
   var box = document.getElementById('closingPreview');
-  if (!bulanEl || !box) return;
-  var map = {};
-  var locked = {};
-  try { map = JSON.parse(box.getAttribute('data-map') || '{}') || {}; } catch (e) { map = {}; }
-  try {
-    (JSON.parse(box.getAttribute('data-locked') || '[]') || []).forEach(function (b) { locked[b] = true; });
-  } catch (e) { locked = {}; }
-  function rp(n) {
-    n = Math.round(Number(n) || 0);
-    return 'Rp ' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  }
-  function sync() {
-    var b = bulanEl.value;
-    var row = map[b] || { jumlah: 0, total: 0 };
-    var j = box.querySelector('[data-preview="jumlah"]');
-    var t = box.querySelector('[data-preview="total"]');
-    var s = box.querySelector('[data-preview="status"]');
-    if (j) j.textContent = Number(row.jumlah || 0).toLocaleString('id-ID');
-    if (t) t.textContent = rp(row.total || 0);
-    if (s) {
-      s.textContent = locked[b] ? 'Sudah terkunci' : 'Siap dikunci';
-      s.classList.toggle('is-locked', !!locked[b]);
+  if (bulanEl && box) {
+    var map = {};
+    var locked = {};
+    try { map = JSON.parse(box.getAttribute('data-map') || '{}') || {}; } catch (e) { map = {}; }
+    try {
+      (JSON.parse(box.getAttribute('data-locked') || '[]') || []).forEach(function (b) { locked[b] = true; });
+    } catch (e) { locked = {}; }
+    function rp(n) {
+      n = Math.round(Number(n) || 0);
+      return 'Rp ' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     }
+    function sync() {
+      var b = bulanEl.value;
+      var row = map[b] || { jumlah: 0, total: 0 };
+      var j = box.querySelector('[data-preview="jumlah"]');
+      var t = box.querySelector('[data-preview="total"]');
+      var s = box.querySelector('[data-preview="status"]');
+      if (j) j.textContent = Number(row.jumlah || 0).toLocaleString('id-ID');
+      if (t) t.textContent = rp(row.total || 0);
+      if (s) {
+        s.textContent = locked[b] ? 'Sudah terkunci' : 'Siap dikunci';
+        s.classList.toggle('is-locked', !!locked[b]);
+      }
+    }
+    bulanEl.addEventListener('change', sync);
+    sync();
   }
-  bulanEl.addEventListener('change', sync);
-  sync();
+
+  var bukaModal = document.getElementById('bukaClosingModal');
+  if (bukaModal) {
+    bukaModal.addEventListener('show.bs.modal', function (event) {
+      var btn = event.relatedTarget;
+      if (!btn) return;
+      var bulan = btn.getAttribute('data-bulan') || '';
+      var label = btn.getAttribute('data-bulan-label') || bulan;
+      var input = document.getElementById('buka_closing_bulan');
+      var labelEl = document.getElementById('buka_closing_label');
+      var catatan = document.getElementById('buka_closing_catatan');
+      if (input) input.value = bulan;
+      if (labelEl) labelEl.textContent = label;
+      if (catatan) catatan.value = '';
+    });
+  }
 })();
 </script>
 </body>
