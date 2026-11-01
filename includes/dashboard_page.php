@@ -76,6 +76,33 @@ $chartBunga = array_map('floatval', array_column($chartSeries, 'bunga'));
 $chartAngsuran = array_map('floatval', array_column($chartSeries, 'angsuran'));
 $chartPersen = array_map('floatval', array_column($chartSeries, 'persen'));
 
+$tren = $d['tren'] ?? ['noa' => [], 'telat' => [], 'denda' => [], 'macet' => []];
+
+$dashDeltaBadge = static function (?float $delta, bool $naikBaik = true): string {
+    if ($delta === null) {
+        return '<span class="ui-tren-delta is-flat">bulan pertama</span>';
+    }
+    $naik = $delta > 0;
+    $datar = abs($delta) < 0.05;
+    if ($datar) {
+        return '<span class="ui-tren-delta is-flat"><i class="ti ti-minus" aria-hidden="true"></i>0%</span>';
+    }
+    $baik = $naikBaik ? $naik : !$naik;
+    $cls = $baik ? 'is-up' : 'is-down';
+    $icon = $naik ? 'ti-trending-up' : 'ti-trending-down';
+    $txt = ($naik ? '+' : '') . number_format($delta, 1, ',', '.') . '%';
+    return '<span class="ui-tren-delta ' . $cls . '"><i class="ti ' . $icon . '" aria-hidden="true"></i>' . htmlspecialchars($txt) . ' <small>vs bln lalu</small></span>';
+};
+
+$trenLast = static function (array $series): array {
+    return $series ? $series[count($series) - 1] : [];
+};
+
+$noaLast = $trenLast($tren['noa'] ?? []);
+$telatLast = $trenLast($tren['telat'] ?? []);
+$dendaLast = $trenLast($tren['denda'] ?? []);
+$macetLast = $trenLast($tren['macet'] ?? []);
+
 $workQueue = $isAdmin
     ? [
         ['label' => 'Pengajuan menunggu', 'value' => (int)$d['pengajuan_stats']['menunggu'], 'href' => 'persetujuan.php', 'tone' => 'warning', 'icon' => 'ti ti-file-check'],
@@ -168,10 +195,102 @@ $quickActions = $isAdmin
                 </div>
             </section>
 
+            <section class="ui-tren-section mb-3" aria-label="Tren operasional 6 bulan">
+                <div class="ui-dash-sec">
+                    <h3 class="ui-dash-sec-title"><i class="ti ti-chart-area-line" aria-hidden="true"></i>Tren operasional</h3>
+                    <span class="ui-dash-sec-note">Pantau naik/turun · 6 bulan</span>
+                </div>
+                <div class="ui-tren-grid">
+                    <article class="card ui-tren-card" data-tren="noa">
+                        <div class="ui-tren-head">
+                            <div>
+                                <p class="ui-tren-eyebrow mb-0">Pertumbuhan NOA</p>
+                                <h4 class="ui-tren-title">Anggota / nasabah</h4>
+                            </div>
+                            <?php echo $dashDeltaBadge(isset($noaLast['delta']) ? (float)$noaLast['delta'] : null, true); ?>
+                        </div>
+                        <div class="ui-tren-kpi">
+                            <div>
+                                <span class="ui-tren-kpi-val js-countup" data-countup="<?php echo (int)($noaLast['baru'] ?? 0); ?>"><?php echo number_format((int)($noaLast['baru'] ?? 0)); ?></span>
+                                <span class="ui-tren-kpi-lbl">baru bulan ini</span>
+                            </div>
+                            <div class="ui-tren-kpi-side">
+                                <span class="ui-tren-kpi-val is-muted js-countup" data-countup="<?php echo (int)($noaLast['kumulatif'] ?? 0); ?>"><?php echo number_format((int)($noaLast['kumulatif'] ?? 0)); ?></span>
+                                <span class="ui-tren-kpi-lbl">kumulatif</span>
+                            </div>
+                        </div>
+                        <div id="dashTrenNoa" class="ui-tren-chart" role="img" aria-label="Grafik pertumbuhan anggota"></div>
+                    </article>
+
+                    <article class="card ui-tren-card" data-tren="telat">
+                        <div class="ui-tren-head">
+                            <div>
+                                <p class="ui-tren-eyebrow mb-0">Kolektibilitas</p>
+                                <h4 class="ui-tren-title">Telat angsuran</h4>
+                            </div>
+                            <?php echo $dashDeltaBadge(isset($telatLast['delta']) ? (float)$telatLast['delta'] : null, false); ?>
+                        </div>
+                        <div class="ui-tren-kpi">
+                            <div>
+                                <span class="ui-tren-kpi-val js-countup" data-countup="<?php echo (int)($telatLast['jumlah'] ?? 0); ?>"><?php echo number_format((int)($telatLast['jumlah'] ?? 0)); ?></span>
+                                <span class="ui-tren-kpi-lbl">cicilan telat</span>
+                            </div>
+                            <div class="ui-tren-kpi-side">
+                                <span class="ui-tren-kpi-val is-muted"><?php echo formatRupiah((float)($telatLast['nominal'] ?? 0)); ?></span>
+                                <span class="ui-tren-kpi-lbl">nominal</span>
+                            </div>
+                        </div>
+                        <div id="dashTrenTelat" class="ui-tren-chart" role="img" aria-label="Grafik telat angsuran"></div>
+                    </article>
+
+                    <article class="card ui-tren-card" data-tren="denda">
+                        <div class="ui-tren-head">
+                            <div>
+                                <p class="ui-tren-eyebrow mb-0">Pendapatan denda</p>
+                                <h4 class="ui-tren-title">Denda</h4>
+                            </div>
+                            <?php echo $dashDeltaBadge(isset($dendaLast['delta']) ? (float)$dendaLast['delta'] : null, true); ?>
+                        </div>
+                        <div class="ui-tren-kpi">
+                            <div>
+                                <span class="ui-tren-kpi-val"><?php echo formatRupiah((float)($dendaLast['terbentuk'] ?? 0)); ?></span>
+                                <span class="ui-tren-kpi-lbl">terbentuk</span>
+                            </div>
+                            <div class="ui-tren-kpi-side">
+                                <span class="ui-tren-kpi-val is-muted"><?php echo formatRupiah((float)($dendaLast['tertagih'] ?? 0)); ?></span>
+                                <span class="ui-tren-kpi-lbl">tertagih</span>
+                            </div>
+                        </div>
+                        <div id="dashTrenDenda" class="ui-tren-chart" role="img" aria-label="Grafik denda"></div>
+                    </article>
+
+                    <article class="card ui-tren-card" data-tren="macet">
+                        <div class="ui-tren-head">
+                            <div>
+                                <p class="ui-tren-eyebrow mb-0">Risiko kredit</p>
+                                <h4 class="ui-tren-title">Macet (≥7 hari)</h4>
+                            </div>
+                            <?php echo $dashDeltaBadge(isset($macetLast['delta']) ? (float)$macetLast['delta'] : null, false); ?>
+                        </div>
+                        <div class="ui-tren-kpi">
+                            <div>
+                                <span class="ui-tren-kpi-val js-countup" data-countup="<?php echo (int)($macetLast['jumlah'] ?? 0); ?>"><?php echo number_format((int)($macetLast['jumlah'] ?? 0)); ?></span>
+                                <span class="ui-tren-kpi-lbl">pinjaman</span>
+                            </div>
+                            <div class="ui-tren-kpi-side">
+                                <span class="ui-tren-kpi-val is-muted"><?php echo formatRupiah((float)($macetLast['nominal'] ?? 0)); ?></span>
+                                <span class="ui-tren-kpi-lbl">tagihan macet</span>
+                            </div>
+                        </div>
+                        <div id="dashTrenMacet" class="ui-tren-chart" role="img" aria-label="Grafik pinjaman macet"></div>
+                    </article>
+                </div>
+            </section>
+
             <?php if ($chartSeries): ?>
             <section class="card ui-dash-panel ui-dash-growth" aria-label="Grafik pertumbuhan laba">
                 <div class="card-header ui-dash-sec">
-                    <span class="ui-dash-sec-title"><i class="ti ti-chart-bar" aria-hidden="true"></i>Grafik pertumbuhan</span>
+                    <span class="ui-dash-sec-title"><i class="ti ti-chart-bar" aria-hidden="true"></i>Grafik pertumbuhan laba</span>
                     <span class="ui-dash-sec-note">Bunga vs angsuran · 6 bulan</span>
                 </div>
                 <div class="card-body">
@@ -370,7 +489,7 @@ $quickActions = $isAdmin
             </div>
             </div>
 <?php
-$uiCharts = $isAdmin && !empty($chartSeries);
+$uiCharts = $isAdmin;
 include __DIR__ . '/layout/shell_end.php';
 ?>
 <script>
@@ -380,6 +499,17 @@ include __DIR__ . '/layout/shell_end.php';
     var parts = fixed.split('.');
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     return decimals > 0 ? parts.join(',') : parts[0];
+  }
+  function formatShortRp(v) {
+    if (v >= 1e9) return (v / 1e9).toFixed(1) + ' M';
+    if (v >= 1e6) return (v / 1e6).toFixed(1) + ' jt';
+    if (v >= 1e3) return (v / 1e3).toFixed(0) + ' rb';
+    return String(Math.round(v));
+  }
+  function shortMonth(label) {
+    if (!label) return '';
+    var p = String(label).split(' ');
+    return p[0] ? p[0].slice(0, 3) : label;
   }
   function animateCountup(el) {
     var target = parseFloat(el.getAttribute('data-countup') || '0');
@@ -404,60 +534,185 @@ include __DIR__ . '/layout/shell_end.php';
   }
   document.querySelectorAll('.js-countup').forEach(animateCountup);
 
+  if (typeof ApexCharts === 'undefined') return;
+
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var isNarrow = window.matchMedia && window.matchMedia('(max-width: 575.98px)').matches;
+  var chartH = isNarrow ? 200 : 230;
+
+  function baseChart(opts) {
+    return Object.assign({
+      chart: {
+        height: chartH,
+        toolbar: { show: false },
+        fontFamily: 'inherit',
+        animations: { enabled: !reduceMotion, speed: 700 },
+        sparkline: { enabled: false },
+        parentHeightOffset: 0
+      },
+      dataLabels: { enabled: false },
+      grid: { borderColor: '#e2e8f0', strokeDashArray: 4, padding: { left: 8, right: 8, top: 0, bottom: 0 } },
+      legend: { show: true, position: 'top', horizontalAlign: 'left', fontSize: '11px', markers: { width: 8, height: 8, radius: 2 }, itemMargin: { horizontal: 8 } },
+      tooltip: { shared: true, intersect: false },
+      xaxis: {
+        labels: {
+          style: { colors: '#94a3b8', fontSize: '11px' },
+          formatter: shortMonth,
+          rotate: isNarrow ? -45 : 0,
+          hideOverlappingLabels: true
+        },
+        axisBorder: { show: false },
+        axisTicks: { show: false }
+      }
+    }, opts);
+  }
+
+  var tren = <?php echo json_encode([
+      'noa' => $tren['noa'] ?? [],
+      'telat' => $tren['telat'] ?? [],
+      'denda' => $tren['denda'] ?? [],
+      'macet' => $tren['macet'] ?? [],
+  ], JSON_UNESCAPED_UNICODE); ?>;
+
+  function labelsOf(rows) {
+    return (rows || []).map(function (r) { return r.label; });
+  }
+
+  var noaEl = document.getElementById('dashTrenNoa');
+  if (noaEl && tren.noa && tren.noa.length) {
+    new ApexCharts(noaEl, baseChart({
+      chart: { type: 'area', height: chartH, toolbar: { show: false }, fontFamily: 'inherit', animations: { enabled: !reduceMotion, speed: 700 } },
+      series: [
+        { name: 'Anggota baru', type: 'column', data: tren.noa.map(function (r) { return r.baru; }) },
+        { name: 'Kumulatif', type: 'area', data: tren.noa.map(function (r) { return r.kumulatif; }) }
+      ],
+      stroke: { width: [0, 3], curve: 'smooth' },
+      fill: { type: ['solid', 'gradient'], gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 90, 100] } },
+      colors: ['#6366f1', '#0ea5e9'],
+      plotOptions: { bar: { columnWidth: '42%', borderRadius: 4 } },
+      xaxis: { categories: labelsOf(tren.noa), labels: { style: { colors: '#94a3b8', fontSize: '11px' }, formatter: shortMonth } },
+      yaxis: [
+        { seriesName: 'Anggota baru', labels: { style: { colors: '#94a3b8', fontSize: '11px' }, formatter: function (v) { return Math.round(v); } } },
+        { opposite: true, seriesName: 'Kumulatif', labels: { style: { colors: '#94a3b8', fontSize: '11px' }, formatter: function (v) { return Math.round(v); } } }
+      ],
+      tooltip: { y: { formatter: function (v) { return formatId(v, 0) + ' orang'; } } }
+    })).render();
+  }
+
+  var telatEl = document.getElementById('dashTrenTelat');
+  if (telatEl && tren.telat && tren.telat.length) {
+    new ApexCharts(telatEl, baseChart({
+      chart: { type: 'bar', height: chartH, toolbar: { show: false }, fontFamily: 'inherit', animations: { enabled: !reduceMotion, speed: 700 } },
+      series: [{ name: 'Cicilan telat', data: tren.telat.map(function (r) { return r.jumlah; }) }],
+      colors: ['#f59e0b'],
+      plotOptions: { bar: { borderRadius: 5, columnWidth: '48%', distributed: false } },
+      legend: { show: false },
+      xaxis: { categories: labelsOf(tren.telat), labels: { style: { colors: '#94a3b8', fontSize: '11px' }, formatter: shortMonth } },
+      yaxis: { labels: { style: { colors: '#94a3b8', fontSize: '11px' }, formatter: function (v) { return Math.round(v); } }, forceNiceScale: true, min: 0 },
+      tooltip: {
+        y: {
+          formatter: function (v, opts) {
+            var row = tren.telat[opts.dataPointIndex] || {};
+            return formatId(v, 0) + ' cicilan · Rp ' + formatId(row.nominal || 0, 0);
+          }
+        }
+      }
+    })).render();
+  }
+
+  var dendaEl = document.getElementById('dashTrenDenda');
+  if (dendaEl && tren.denda && tren.denda.length) {
+    new ApexCharts(dendaEl, baseChart({
+      chart: { type: 'bar', height: chartH, toolbar: { show: false }, fontFamily: 'inherit', animations: { enabled: !reduceMotion, speed: 700 }, stacked: false },
+      series: [
+        { name: 'Terbentuk', data: tren.denda.map(function (r) { return r.terbentuk; }) },
+        { name: 'Tertagih', data: tren.denda.map(function (r) { return r.tertagih; }) }
+      ],
+      colors: ['#ef4444', '#16a34a'],
+      plotOptions: { bar: { borderRadius: 4, columnWidth: '55%' } },
+      xaxis: { categories: labelsOf(tren.denda), labels: { style: { colors: '#94a3b8', fontSize: '11px' }, formatter: shortMonth } },
+      yaxis: { labels: { style: { colors: '#94a3b8', fontSize: '11px' }, formatter: formatShortRp }, forceNiceScale: true, min: 0 },
+      tooltip: { y: { formatter: function (v) { return 'Rp ' + formatId(v, 0); } } }
+    })).render();
+  }
+
+  var macetEl = document.getElementById('dashTrenMacet');
+  if (macetEl && tren.macet && tren.macet.length) {
+    new ApexCharts(macetEl, baseChart({
+      chart: { type: 'area', height: chartH, toolbar: { show: false }, fontFamily: 'inherit', animations: { enabled: !reduceMotion, speed: 700 } },
+      series: [
+        { name: 'Pinjaman macet', type: 'line', data: tren.macet.map(function (r) { return r.jumlah; }) },
+        { name: 'Tagihan macet', type: 'area', data: tren.macet.map(function (r) { return r.nominal; }) }
+      ],
+      stroke: { width: [3, 0], curve: 'smooth' },
+      fill: { type: ['solid', 'gradient'], gradient: { shadeIntensity: 1, opacityFrom: 0.28, opacityTo: 0.04, stops: [0, 90, 100] } },
+      colors: ['#dc2626', '#fecaca'],
+      markers: { size: [4, 0], strokeWidth: 0 },
+      xaxis: { categories: labelsOf(tren.macet), labels: { style: { colors: '#94a3b8', fontSize: '11px' }, formatter: shortMonth } },
+      yaxis: [
+        { seriesName: 'Pinjaman macet', labels: { style: { colors: '#94a3b8', fontSize: '11px' }, formatter: function (v) { return Math.round(v); } }, min: 0, forceNiceScale: true },
+        { opposite: true, seriesName: 'Tagihan macet', labels: { style: { colors: '#94a3b8', fontSize: '11px' }, formatter: formatShortRp }, min: 0 }
+      ],
+      tooltip: {
+        y: {
+          formatter: function (v, opts) {
+            if (opts.seriesIndex === 0) return formatId(v, 0) + ' pinjaman';
+            return 'Rp ' + formatId(v, 0);
+          }
+        }
+      }
+    })).render();
+  }
+
   var chartEl = document.getElementById('dashGrowthChart');
-  if (chartEl && typeof ApexCharts !== 'undefined') {
+  if (chartEl) {
     var labels = <?php echo json_encode($chartLabels, JSON_UNESCAPED_UNICODE); ?>;
     var bunga = <?php echo json_encode($chartBunga); ?>;
     var angsuran = <?php echo json_encode($chartAngsuran); ?>;
     var persen = <?php echo json_encode($chartPersen); ?>;
-    var chart = new ApexCharts(chartEl, {
-      chart: { type: 'line', height: 300, toolbar: { show: false }, fontFamily: 'inherit', animations: { enabled: true, speed: 800 } },
-      series: [
-        { name: 'Angsuran', type: 'column', data: angsuran },
-        { name: 'Bunga (laba)', type: 'column', data: bunga },
-        { name: 'Pertumbuhan %', type: 'line', data: persen }
-      ],
-      stroke: { width: [0, 0, 3], curve: 'smooth' },
-      markers: { size: [0, 0, 4], strokeWidth: 0 },
-      plotOptions: { bar: { columnWidth: '48%', borderRadius: 4 } },
-      colors: ['#93c5fd', '#2563eb', '#16a34a'],
-      dataLabels: { enabled: false },
-      xaxis: { categories: labels, labels: { style: { colors: '#64748b' } } },
-      yaxis: [
-        {
-          seriesName: 'Angsuran',
-          title: { text: 'Nominal (Rp)', style: { color: '#64748b' } },
-          labels: {
-            formatter: function (v) {
-              if (v >= 1e6) return (v / 1e6).toFixed(1) + ' jt';
-              if (v >= 1e3) return (v / 1e3).toFixed(0) + ' rb';
-              return String(v);
+    if (labels && labels.length) {
+      new ApexCharts(chartEl, {
+        chart: { type: 'line', height: isNarrow ? 260 : 300, toolbar: { show: false }, fontFamily: 'inherit', animations: { enabled: !reduceMotion, speed: 800 } },
+        series: [
+          { name: 'Angsuran', type: 'column', data: angsuran },
+          { name: 'Bunga (laba)', type: 'column', data: bunga },
+          { name: 'Pertumbuhan %', type: 'line', data: persen }
+        ],
+        stroke: { width: [0, 0, 3], curve: 'smooth' },
+        markers: { size: [0, 0, 4], strokeWidth: 0 },
+        plotOptions: { bar: { columnWidth: '48%', borderRadius: 4 } },
+        colors: ['#93c5fd', '#2563eb', '#16a34a'],
+        dataLabels: { enabled: false },
+        xaxis: { categories: labels, labels: { style: { colors: '#64748b' }, formatter: shortMonth } },
+        yaxis: [
+          {
+            seriesName: 'Angsuran',
+            title: { text: 'Nominal (Rp)', style: { color: '#64748b' } },
+            labels: { formatter: formatShortRp }
+          },
+          { seriesName: 'Bunga (laba)', show: false },
+          {
+            opposite: true,
+            seriesName: 'Pertumbuhan %',
+            title: { text: 'Pertumbuhan %', style: { color: '#16a34a' } },
+            labels: { formatter: function (v) { return Number(v).toFixed(0) + '%'; } },
+            min: 0,
+            max: Math.max(30, Math.ceil(Math.max.apply(null, persen.concat([0])) / 5) * 5)
+          }
+        ],
+        legend: { position: 'top', horizontalAlign: 'left' },
+        grid: { borderColor: '#e2e8f0', strokeDashArray: 4 },
+        tooltip: {
+          shared: true,
+          y: {
+            formatter: function (val, opts) {
+              if (opts.seriesIndex === 2) return Number(val).toFixed(1) + '%';
+              return 'Rp ' + formatId(val, 0);
             }
           }
-        },
-        { seriesName: 'Bunga (laba)', show: false },
-        {
-          opposite: true,
-          seriesName: 'Pertumbuhan %',
-          title: { text: 'Pertumbuhan %', style: { color: '#16a34a' } },
-          labels: { formatter: function (v) { return Number(v).toFixed(0) + '%'; } },
-          min: 0,
-          max: Math.max(30, Math.ceil(Math.max.apply(null, persen.concat([0])) / 5) * 5)
         }
-      ],
-      legend: { position: 'top', horizontalAlign: 'left' },
-      grid: { borderColor: '#e2e8f0', strokeDashArray: 4 },
-      tooltip: {
-        shared: true,
-        y: {
-          formatter: function (val, opts) {
-            if (opts.seriesIndex === 2) return Number(val).toFixed(1) + '%';
-            return 'Rp ' + formatId(val, 0);
-          }
-        }
-      }
-    });
-    chart.render();
+      }).render();
+    }
   }
 })();
 </script>

@@ -590,6 +590,113 @@ table.dataTable tbody td{
 .ui-dash-growth-chart{min-height:300px;width:100%}
 .js-countup{font-variant-numeric:tabular-nums}
 
+/* --- Tren operasional (NOA / telat / denda / macet) --- */
+.ui-tren-section{margin-bottom:.85rem}
+.ui-tren-grid{
+  display:grid;
+  gap:.85rem;
+  grid-template-columns:1fr;
+}
+@media (min-width:768px){
+  .ui-tren-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+.ui-tren-card{
+  margin-bottom:0!important;
+  overflow:hidden;
+  border:1px solid var(--sk-line);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--tren-accent, #6366f1) 6%, #fff) 0%, #fff 42%);
+  transition:transform .2s ease, box-shadow .2s ease;
+}
+.ui-tren-card:hover{transform:translateY(-2px);box-shadow:var(--sk-shadow-hover)}
+.ui-tren-card[data-tren="noa"]{--tren-accent:#6366f1}
+.ui-tren-card[data-tren="telat"]{--tren-accent:#f59e0b}
+.ui-tren-card[data-tren="denda"]{--tren-accent:#ef4444}
+.ui-tren-card[data-tren="macet"]{--tren-accent:#dc2626}
+.ui-tren-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:.75rem;
+  padding:1rem 1rem .35rem;
+}
+.ui-tren-eyebrow{
+  font-size:.72rem;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  color:var(--sk-muted);
+  font-weight:600;
+}
+.ui-tren-title{
+  margin:0;
+  font-size:1.05rem;
+  font-weight:700;
+  color:var(--sk-ink);
+  line-height:1.25;
+}
+.ui-tren-delta{
+  display:inline-flex;
+  align-items:center;
+  gap:.25rem;
+  flex:0 0 auto;
+  padding:.28rem .55rem;
+  border-radius:999px;
+  font-size:.72rem;
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+  background:#f1f5f9;
+  color:#64748b;
+}
+.ui-tren-delta small{font-weight:500;opacity:.85}
+.ui-tren-delta.is-up{background:#dcfce7;color:#15803d}
+.ui-tren-delta.is-down{background:#fee2e2;color:#b91c1c}
+.ui-tren-delta.is-flat{background:#f1f5f9;color:#64748b}
+.ui-tren-kpi{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:1rem;
+  padding:.25rem 1rem .55rem;
+}
+.ui-tren-kpi-val{
+  display:block;
+  font-size:1.45rem;
+  font-weight:700;
+  line-height:1.1;
+  color:var(--sk-ink);
+  font-variant-numeric:tabular-nums;
+}
+.ui-tren-kpi-val.is-muted{
+  font-size:1.05rem;
+  font-weight:600;
+  color:var(--sk-muted);
+  text-align:right;
+}
+.ui-tren-kpi-side{text-align:right}
+.ui-tren-kpi-lbl{
+  display:block;
+  margin-top:.15rem;
+  font-size:.72rem;
+  color:var(--sk-muted);
+}
+.ui-tren-chart{
+  width:100%;
+  min-height:200px;
+  padding:0 .35rem .55rem;
+}
+@media (max-width:575.98px){
+  .ui-tren-head{padding:.9rem .9rem .25rem;flex-wrap:wrap}
+  .ui-tren-kpi{padding:.15rem .9rem .45rem}
+  .ui-tren-kpi-val{font-size:1.25rem}
+  .ui-tren-chart{min-height:190px}
+  .ui-dash-growth-chart{min-height:250px}
+}
+@media (prefers-reduced-motion:reduce){
+  .ui-tren-card{transition:none}
+  .ui-tren-card:hover{transform:none}
+}
+
 /* --- Dashboard layout padat --- */
 .ui-stat-grid{
   display:grid;

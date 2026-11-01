@@ -66,6 +66,12 @@ if (!function_exists('dashboardLoadStaffDataDefaults')) {
                 'jumlah_trx' => 0,
             ],
             'pertumbuhan_series' => [],
+            'tren' => [
+                'noa' => [],
+                'telat' => [],
+                'denda' => [],
+                'macet' => [],
+            ],
         ];
     }
 }
@@ -147,6 +153,285 @@ if (!function_exists('dashboardLoadPertumbuhanLaba')) {
             'total_pokok' => $totalPokok,
             'persen' => $persen,
             'jumlah_trx' => (int)($row['jumlah_trx'] ?? 0),
+        ];
+    }
+}
+
+if (!function_exists('dashboardBulanKeys')) {
+    /**
+     * @return list<string> YYYY-MM tertua → terbaru
+     */
+    function dashboardBulanKeys(int $bulanKeBelakang = 6): array
+    {
+        $bulanKeBelakang = max(3, min(12, $bulanKeBelakang));
+        $out = [];
+        for ($i = $bulanKeBelakang - 1; $i >= 0; $i--) {
+            $out[] = date('Y-m', strtotime("first day of -{$i} month"));
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('dashboardDeltaPersen')) {
+    function dashboardDeltaPersen(float $sekarang, float $sebelum): ?float
+    {
+        if ($sebelum == 0.0) {
+            return $sekarang > 0 ? 100.0 : ($sekarang < 0 ? -100.0 : null);
+        }
+        return round((($sekarang - $sebelum) / abs($sebelum)) * 100, 1);
+    }
+}
+
+if (!function_exists('dashboardMapByBulan')) {
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return array<string,array<string,mixed>>
+     */
+    function dashboardMapByBulan(array $rows, string $key = 'bulan'): array
+    {
+        $map = [];
+        foreach ($rows as $row) {
+            $b = (string)($row[$key] ?? '');
+            if ($b !== '') {
+                $map[$b] = $row;
+            }
+        }
+        return $map;
+    }
+}
+
+if (!function_exists('dashboardLoadNoaSeries')) {
+    /**
+     * Pertumbuhan anggota/NOA: anggota baru per bulan + kumulatif.
+     * @return list<array{bulan:string,label:string,baru:int,kumulatif:int,delta:float|null}>
+     */
+    function dashboardLoadNoaSeries(PDO $db, int $bulanKeBelakang = 6): array
+    {
+        $keys = dashboardBulanKeys($bulanKeBelakang);
+        $awal = $keys[0] . '-01';
+        $rows = dashboardFetchAll($db, "SELECT DATE_FORMAT(tanggal_daftar, '%Y-%m') AS bulan, COUNT(*) AS baru
+            FROM anggota
+            WHERE tanggal_daftar IS NOT NULL AND tanggal_daftar >= ?
+            GROUP BY DATE_FORMAT(tanggal_daftar, '%Y-%m')", [$awal]);
+        $map = dashboardMapByBulan($rows);
+        $sebelumAwal = (int)dashboardFetchScalar(
+            $db,
+            'SELECT COUNT(*) FROM anggota WHERE tanggal_daftar IS NOT NULL AND tanggal_daftar < ?',
+            [$awal]
+        );
+        $kumulatif = $sebelumAwal;
+        $out = [];
+        $prevBaru = null;
+        foreach ($keys as $bulan) {
+            $baru = (int)($map[$bulan]['baru'] ?? 0);
+            $kumulatif += $baru;
+            $out[] = [
+                'bulan' => $bulan,
+                'label' => dashboardLabelBulan($bulan),
+                'baru' => $baru,
+                'kumulatif' => $kumulatif,
+                'delta' => $prevBaru === null ? null : dashboardDeltaPersen((float)$baru, (float)$prevBaru),
+            ];
+            $prevBaru = $baru;
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('dashboardLoadTelatSeries')) {
+    /**
+     * Telat angsuran per bulan jatuh tempo (masih telat / pernah bayar terlambat).
+     * @return list<array{bulan:string,label:string,jumlah:int,nominal:float,delta:float|null}>
+     */
+    function dashboardLoadTelatSeries(PDO $db, int $bulanKeBelakang = 6): array
+    {
+        $keys = dashboardBulanKeys($bulanKeBelakang);
+        $awal = $keys[0] . '-01';
+        $rows = dashboardFetchAll($db, "SELECT DATE_FORMAT(tanggal_jatuh_tempo, '%Y-%m') AS bulan,
+                COUNT(*) AS jumlah,
+                COALESCE(SUM(jumlah_angsuran + COALESCE(denda,0)),0) AS nominal
+            FROM angsuran
+            WHERE tanggal_jatuh_tempo >= ?
+              AND (
+                    status = 'telat'
+                 OR COALESCE(keterlambatan_hari,0) > 0
+                 OR (status = 'lunas' AND tanggal_bayar IS NOT NULL AND tanggal_bayar > tanggal_jatuh_tempo)
+              )
+            GROUP BY DATE_FORMAT(tanggal_jatuh_tempo, '%Y-%m')", [$awal]);
+        $map = dashboardMapByBulan($rows);
+        $out = [];
+        $prev = null;
+        foreach ($keys as $bulan) {
+            $jumlah = (int)($map[$bulan]['jumlah'] ?? 0);
+            $nominal = (float)($map[$bulan]['nominal'] ?? 0);
+            $out[] = [
+                'bulan' => $bulan,
+                'label' => dashboardLabelBulan($bulan),
+                'jumlah' => $jumlah,
+                'nominal' => $nominal,
+                'delta' => $prev === null ? null : dashboardDeltaPersen((float)$jumlah, (float)$prev),
+            ];
+            $prev = $jumlah;
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('dashboardLoadDendaSeries')) {
+    /**
+     * Denda per bulan: terbentuk (pada cicilan telat) vs tertagih.
+     * @return list<array{bulan:string,label:string,terbentuk:float,tertagih:float,delta:float|null}>
+     */
+    function dashboardLoadDendaSeries(PDO $db, int $bulanKeBelakang = 6): array
+    {
+        $keys = dashboardBulanKeys($bulanKeBelakang);
+        $awal = $keys[0] . '-01';
+
+        $terbentukRows = dashboardFetchAll($db, "SELECT DATE_FORMAT(tanggal_jatuh_tempo, '%Y-%m') AS bulan,
+                COALESCE(SUM(COALESCE(denda,0)),0) AS terbentuk
+            FROM angsuran
+            WHERE tanggal_jatuh_tempo >= ?
+              AND COALESCE(denda,0) > 0
+            GROUP BY DATE_FORMAT(tanggal_jatuh_tempo, '%Y-%m')", [$awal]);
+        $terbentukMap = dashboardMapByBulan($terbentukRows);
+
+        $tertagihMap = [];
+        $punyaLedgerDenda = false;
+        try {
+            $bayarRows = dashboardFetchAll($db, "SELECT DATE_FORMAT(created_at, '%Y-%m') AS bulan,
+                    COALESCE(SUM(jumlah),0) AS tertagih
+                FROM layanan_bayar_denda
+                WHERE created_at >= ?
+                GROUP BY DATE_FORMAT(created_at, '%Y-%m')", [$awal . ' 00:00:00']);
+            $tertagihMap = dashboardMapByBulan($bayarRows);
+            $punyaLedgerDenda = true;
+        } catch (Throwable $e) {
+            // tabel layanan belum ada di sebagian DB lama
+        }
+
+        // Legacy: denda ikut lunas di angsuran tanpa ledger layanan_bayar_denda
+        if ($punyaLedgerDenda) {
+            $lunasRows = dashboardFetchAll($db, "SELECT DATE_FORMAT(a.tanggal_bayar, '%Y-%m') AS bulan,
+                    COALESCE(SUM(COALESCE(a.denda,0)),0) AS tertagih
+                FROM angsuran a
+                WHERE a.status = 'lunas'
+                  AND a.tanggal_bayar IS NOT NULL
+                  AND a.tanggal_bayar >= ?
+                  AND COALESCE(a.denda,0) > 0
+                  AND NOT EXISTS (SELECT 1 FROM layanan_bayar_denda b WHERE b.angsuran_id = a.id)
+                GROUP BY DATE_FORMAT(a.tanggal_bayar, '%Y-%m')", [$awal]);
+        } else {
+            $lunasRows = dashboardFetchAll($db, "SELECT DATE_FORMAT(tanggal_bayar, '%Y-%m') AS bulan,
+                    COALESCE(SUM(COALESCE(denda,0)),0) AS tertagih
+                FROM angsuran
+                WHERE status = 'lunas'
+                  AND tanggal_bayar IS NOT NULL
+                  AND tanggal_bayar >= ?
+                  AND COALESCE(denda,0) > 0
+                GROUP BY DATE_FORMAT(tanggal_bayar, '%Y-%m')", [$awal]);
+        }
+        foreach ($lunasRows as $row) {
+            $b = (string)$row['bulan'];
+            $tertagihMap[$b]['tertagih'] = (float)($tertagihMap[$b]['tertagih'] ?? 0) + (float)$row['tertagih'];
+        }
+
+        $out = [];
+        $prev = null;
+        foreach ($keys as $bulan) {
+            $terbentuk = (float)($terbentukMap[$bulan]['terbentuk'] ?? 0);
+            $tertagih = (float)($tertagihMap[$bulan]['tertagih'] ?? 0);
+            $out[] = [
+                'bulan' => $bulan,
+                'label' => dashboardLabelBulan($bulan),
+                'terbentuk' => $terbentuk,
+                'tertagih' => $tertagih,
+                'delta' => $prev === null ? null : dashboardDeltaPersen($terbentuk, (float)$prev),
+            ];
+            $prev = $terbentuk;
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('dashboardLoadMacetSeries')) {
+    /**
+     * Macet (≥7 hari) diakhir bulan: jumlah pinjaman + nominal sisa pokok.
+     * Rekonstruksi point-in-time dari jadwal angsuran (tanpa snapshot historis).
+     * @return list<array{bulan:string,label:string,jumlah:int,nominal:float,delta:float|null}>
+     */
+    function dashboardLoadMacetSeries(PDO $db, int $bulanKeBelakang = 6): array
+    {
+        $keys = dashboardBulanKeys($bulanKeBelakang);
+        $punyaTanggalLunas = function_exists('kolomAda') && kolomAda($db, 'pinjaman', 'tanggal_lunas');
+        $aktifSql = $punyaTanggalLunas
+            ? "(p.status IN ('aktif','macet') OR (p.status = 'lunas' AND (p.tanggal_lunas IS NULL OR p.tanggal_lunas > ?)))"
+            : "(p.status IN ('aktif','macet') OR p.status = 'lunas')";
+        $out = [];
+        $prev = null;
+        $hariIni = date('Y-m-d');
+        foreach ($keys as $bulan) {
+            $akhirBulan = date('Y-m-t', strtotime($bulan . '-01'));
+            $acuan = $akhirBulan > $hariIni ? $hariIni : $akhirBulan;
+            $paramsAktif = $punyaTanggalLunas ? [$acuan, $acuan] : [$acuan];
+            $jumlah = (int)dashboardFetchScalar($db, "SELECT COUNT(*)
+                FROM pinjaman p
+                WHERE p.tanggal_pencairan <= ?
+                  AND {$aktifSql}
+                  AND EXISTS (
+                    SELECT 1 FROM angsuran a
+                    WHERE a.pinjaman_id = p.id
+                      AND a.tanggal_jatuh_tempo <= ?
+                      AND DATEDIFF(?, a.tanggal_jatuh_tempo) >= 7
+                      AND (
+                            a.status IN ('belum_bayar','telat')
+                         OR (a.status = 'lunas' AND a.tanggal_bayar IS NOT NULL AND a.tanggal_bayar > ?)
+                      )
+                  )", array_merge($paramsAktif, [$acuan, $acuan, $acuan]));
+            $nominal = (float)dashboardFetchScalar($db, "SELECT COALESCE(SUM(a.jumlah_angsuran + COALESCE(a.denda,0)),0)
+                FROM angsuran a
+                JOIN pinjaman p ON p.id = a.pinjaman_id
+                WHERE p.tanggal_pencairan <= ?
+                  AND {$aktifSql}
+                  AND EXISTS (
+                    SELECT 1 FROM angsuran x
+                    WHERE x.pinjaman_id = p.id
+                      AND x.tanggal_jatuh_tempo <= ?
+                      AND DATEDIFF(?, x.tanggal_jatuh_tempo) >= 7
+                      AND (
+                            x.status IN ('belum_bayar','telat')
+                         OR (x.status = 'lunas' AND x.tanggal_bayar IS NOT NULL AND x.tanggal_bayar > ?)
+                      )
+                  )
+                  AND a.tanggal_jatuh_tempo <= ?
+                  AND (
+                        a.status IN ('belum_bayar','telat')
+                     OR (a.status = 'lunas' AND a.tanggal_bayar IS NOT NULL AND a.tanggal_bayar > ?)
+                  )", array_merge($paramsAktif, [$acuan, $acuan, $acuan, $acuan, $acuan]));
+
+            $out[] = [
+                'bulan' => $bulan,
+                'label' => dashboardLabelBulan($bulan),
+                'jumlah' => $jumlah,
+                'nominal' => $nominal,
+                'delta' => $prev === null ? null : dashboardDeltaPersen((float)$jumlah, (float)$prev),
+            ];
+            $prev = $jumlah;
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('dashboardLoadTrenOperasional')) {
+    /**
+     * @return array{noa:list,telat:list,denda:list,macet:list}
+     */
+    function dashboardLoadTrenOperasional(PDO $db, int $bulanKeBelakang = 6): array
+    {
+        return [
+            'noa' => dashboardLoadNoaSeries($db, $bulanKeBelakang),
+            'telat' => dashboardLoadTelatSeries($db, $bulanKeBelakang),
+            'denda' => dashboardLoadDendaSeries($db, $bulanKeBelakang),
+            'macet' => dashboardLoadMacetSeries($db, $bulanKeBelakang),
         ];
     }
 }
@@ -396,6 +681,9 @@ if (!function_exists('dashboardLoadStaffData')) {
         $pertumbuhanSeries = $isAdmin
             ? dashboardLoadPertumbuhanLabaSeries($db, 6)
             : [];
+        $tren = $isAdmin
+            ? dashboardLoadTrenOperasional($db, 6)
+            : dashboardLoadStaffDataDefaults($role)['tren'];
 
         return [
             'role' => $role,
@@ -419,6 +707,7 @@ if (!function_exists('dashboardLoadStaffData')) {
             'setoran_hari_ini' => $setoranHariIni,
             'pertumbuhan_laba' => $pertumbuhanLaba,
             'pertumbuhan_series' => $pertumbuhanSeries,
+            'tren' => $tren,
         ];
     }
 }
