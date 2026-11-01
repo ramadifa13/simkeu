@@ -26,18 +26,22 @@ if (!function_exists('closingBulanValid')) {
     /**
      * Alur closing angsuran bulanan
      * --------------------------------
-     * 1) jumlah = COUNT angsuran lunas dengan tanggal_bayar DAN tanggal_jatuh_tempo
+     * 1) jumlah = COUNT angsuran lunas cicilan dengan tanggal_bayar DAN tanggal_jatuh_tempo
      *    sama-sama di bulan M (hindari catch-up migrasi yang JT-nya bulan lain).
+     *    cara_bayar='pelunasan' dikecualikan: sisa tenor pelunasan sering punya
+     *    tanggal_bayar = JT di bulan depan (bukan setoran cicilan real di bulan itu).
      * 2) total  = SUM kas masuk "Pembayaran angsuran/migrasi" di bulan M
      *    (batch Excel digabung; pelunasan & denda dikecualikan).
-     *    Bila kas kosong → fallback migrasi_pembayaran / layanan.
+     *    Bila kas kosong → fallback migrasi_pembayaran / layanan; bila tetap kosong
+     *    → jumlah jadwal cicilan (bukan estimasi tenor belum dibayar).
      * 3) Preview di closing_angsuran.php membaca closingHitungBulan().
      * 4) Kunci periode menulis header + detail (nominal dialokasi proporsional ke kas).
      *
-     * Oktober 2026 (Excel koperasi): target 58 pembayaran / Rp 9.714.500.
+     * Oktober 2026 (Excel koperasi): target kas Rp 9.714.500 (pelunasan tidak ikut).
      */
     function closingWhereAngsuranBulan() {
         return "a.status = 'lunas'
+            AND COALESCE(a.cara_bayar, 'cicilan') = 'cicilan'
             AND a.tanggal_bayar BETWEEN ? AND ?
             AND a.tanggal_jatuh_tempo BETWEEN ? AND ?";
     }
@@ -127,12 +131,14 @@ if (!function_exists('closingBulanValid')) {
         return ['jumlah' => $jumlah, 'total' => $total, 'jadwal' => $jadwal];
     }
 
-    /** Ringkasan preview per bulan (belum dikunci). */
+    /** Ringkasan preview per bulan (belum dikunci). Hanya cicilan real, bukan sisa pelunasan. */
     function closingPreviewMap($db) {
         $bulanRows = $db->query(
             "SELECT DISTINCT DATE_FORMAT(tanggal_bayar,'%Y-%m') bulan
              FROM angsuran
-             WHERE status = 'lunas' AND tanggal_bayar IS NOT NULL
+             WHERE status = 'lunas'
+               AND tanggal_bayar IS NOT NULL
+               AND COALESCE(cara_bayar, 'cicilan') = 'cicilan'
              ORDER BY bulan DESC"
         )->fetchAll(PDO::FETCH_COLUMN);
         $map = [];
@@ -140,7 +146,12 @@ if (!function_exists('closingBulanValid')) {
             if (!closingBulanValid($bulan)) {
                 continue;
             }
-            $map[$bulan] = closingHitungBulan($db, $bulan);
+            $hit = closingHitungBulan($db, $bulan);
+            // Lewati bulan yang hanya punya artefak (0 cicilan & 0 kas).
+            if ((int) $hit['jumlah'] === 0 && (float) $hit['total'] < 0.009) {
+                continue;
+            }
+            $map[$bulan] = $hit;
         }
         return $map;
     }

@@ -179,7 +179,7 @@ $page_title = 'Closing Angsuran';
                                 <strong data-preview="jumlah"><?php echo number_format((int)$previewDefault['jumlah'], 0, ',', '.'); ?></strong>
                             </div>
                             <div class="ui-cl-preview-item">
-                                <span>Estimasi total</span>
+                                <span>Total pembayaran</span>
                                 <strong data-preview="total"><?php echo formatRupiah((float)$previewDefault['total']); ?></strong>
                             </div>
                             <div class="ui-cl-preview-item is-status">
