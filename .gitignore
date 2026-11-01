@@ -24,4 +24,5 @@ Thumbs.db
 # Dependency lokal bila dibuat kemudian
 /vendor/
 /node_modules/
+/laravel/
 .repo-inspect
