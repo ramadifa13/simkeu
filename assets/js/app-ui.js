@@ -661,6 +661,26 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     function constrainModalToViewport(dialog) {
         if (!dialog || dialog.classList.contains('modal-fullscreen')) return;
+        // Modal konfirmasi pendek: jangan paksa tinggi penuh (header/body bisa terdorong keluar viewport).
+        if (dialog.closest('.ui-modal-compact')) {
+            dialog.classList.remove('modal-dialog-scrollable');
+            const content = dialog.querySelector(':scope > .modal-content');
+            const form = content && content.querySelector(':scope > form');
+            const body = (form || content) && (form || content).querySelector(':scope > .modal-body');
+            if (content) {
+                content.style.height = '';
+                content.style.maxHeight = '';
+            }
+            if (form) {
+                form.style.height = '';
+                form.style.maxHeight = '';
+            }
+            if (body) {
+                body.style.minHeight = '';
+                body.style.overflowY = '';
+            }
+            return;
+        }
         dialog.classList.add('modal-dialog-scrollable');
         const content = dialog.querySelector(':scope > .modal-content');
         if (!content) return;

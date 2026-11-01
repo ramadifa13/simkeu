@@ -263,7 +263,7 @@ $page_title = 'Closing Angsuran';
                 </div>
 
                 <?php if (can('closing.unlock')): ?>
-                <div class="modal fade ui-tx-modal" id="bukaClosingModal" tabindex="-1" aria-hidden="true">
+                <div class="modal fade ui-tx-modal ui-modal-compact" id="bukaClosingModal" tabindex="-1" aria-labelledby="bukaClosingModalLabel" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content">
                             <form method="post">
@@ -271,7 +271,7 @@ $page_title = 'Closing Angsuran';
                                 <input type="hidden" name="buka_closing" value="1">
                                 <input type="hidden" name="bulan" id="buka_closing_bulan" value="">
                                 <div class="modal-header">
-                                    <h5 class="modal-title"><i class="ti ti-lock-open me-1" aria-hidden="true"></i>Buka kunci periode</h5>
+                                    <h5 class="modal-title" id="bukaClosingModalLabel"><i class="ti ti-lock-open me-1" aria-hidden="true"></i>Buka kunci periode</h5>
                                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
                                 </div>
                                 <div class="modal-body">
@@ -333,6 +333,10 @@ $page_title = 'Closing Angsuran';
 
   var bukaModal = document.getElementById('bukaClosingModal');
   if (bukaModal) {
+    // Lepas dari page-wrapper (overflow/clip) agar modal fixed ke viewport, bukan ikut scroll konten.
+    if (bukaModal.parentElement !== document.body) {
+      document.body.appendChild(bukaModal);
+    }
     bukaModal.addEventListener('show.bs.modal', function (event) {
       var btn = event.relatedTarget;
       if (!btn) return;

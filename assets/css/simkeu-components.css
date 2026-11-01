@@ -576,6 +576,36 @@ body>.ui-combobox-list { max-height:min(220px,40vh) }
 .ui-modal-short .modal-dialog-scrollable .modal-body{
   overflow-y:auto!important;flex:1 1 auto;min-height:0!important;touch-action:pan-y;
 }
+/* Konfirmasi pendek: ukuran mengikuti isi, tidak dipaksa penuh layar */
+.ui-modal-compact .modal-dialog,
+.modal.ui-modal-compact .modal-dialog{
+  height:auto!important;
+  max-height:min(var(--ui-modal-max-h, 90dvh), 36rem)!important;
+}
+.ui-modal-compact .modal-dialog.modal-dialog-scrollable,
+.modal.ui-modal-compact .modal-dialog.modal-dialog-scrollable{
+  height:auto!important;
+  max-height:min(var(--ui-modal-max-h, 90dvh), 36rem)!important;
+}
+.ui-modal-compact .modal-content,
+.ui-modal-compact .modal-content > form,
+.ui-modal-short .ui-modal-compact .modal-dialog-scrollable .modal-content,
+.ui-modal-short .ui-modal-compact .modal-dialog-scrollable .modal-content > form,
+.ui-modal-short .modal.ui-modal-compact .modal-dialog-scrollable .modal-content,
+.ui-modal-short .modal.ui-modal-compact .modal-dialog-scrollable .modal-content > form{
+  height:auto!important;
+  max-height:none!important;
+  overflow:visible!important;
+}
+.ui-modal-compact .modal-body,
+.ui-modal-short .ui-modal-compact .modal-body,
+.ui-modal-short .modal.ui-modal-compact .modal-body,
+.ui-modal-short .ui-modal-compact .modal-dialog-scrollable .modal-body{
+  flex:0 1 auto!important;
+  min-height:auto!important;
+  overflow:visible!important;
+  color:#0f172a;
+}
 .ui-notification-list a[data-notif-key="pelunasan_dini"] .ui-notification-icon,
 .ui-notification-list a[data-notif-key="pelunasan_disetujui"] .ui-notification-icon { background:#e9f7ed;color:#24804a }
 @keyframes ui-bell-ring {0%,100%{transform:rotate(0)}20%{transform:rotate(13deg)}40%{transform:rotate(-11deg)}60%{transform:rotate(8deg)}80%{transform:rotate(-5deg)}}
