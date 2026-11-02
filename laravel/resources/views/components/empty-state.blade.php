@@ -1,4 +1,4 @@
-@props(['title' => 'Belum ada data', 'description' => null, 'icon' => 'folder-off'])
+@props(['title' => 'Belum ada data', 'description' => null, 'icon' => 'folder-open'])
 
 <div {{ $attributes->merge(['class' => 'ui-empty-state']) }}>
     <span class="ui-empty-icon"><flux:icon :name="$icon" class="size-6" /></span>

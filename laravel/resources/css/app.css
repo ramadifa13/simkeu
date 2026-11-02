@@ -150,6 +150,16 @@
     .ui-table-shell thead th { padding: 0.625rem 1rem !important; font-size: 0.6875rem; letter-spacing: 0.045em; }
     .ui-table-shell tbody td { overflow: hidden; padding: 0.6875rem 1rem !important; font-size: 0.8125rem; line-height: 1.25rem; }
 
+    @media (min-width: 1024px) {
+        .ui-table-shell table { width: 100%; table-layout: fixed; }
+        .ui-table-shell col:nth-child(1) { width: 11%; }
+        .ui-table-shell col:nth-child(2) { width: 30%; }
+        .ui-table-shell col:nth-child(3) { width: 18%; }
+        .ui-table-shell col:nth-child(4) { width: 13%; }
+        .ui-table-shell col:nth-child(5) { width: 16%; }
+        .ui-table-shell col:nth-child(6) { width: 12%; }
+    }
+
     .ui-table-shell tbody tr { transition: background-color 160ms ease; }
     .ui-table-shell tbody tr:hover { background: rgb(240 253 250 / 0.62); }
 
