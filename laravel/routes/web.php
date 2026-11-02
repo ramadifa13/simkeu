@@ -20,6 +20,11 @@ Route::middleware('auth')->group(function (): void {
 });
 
 Route::middleware(['auth', 'role'])->prefix('portal')->name('portal.')->group(function (): void {
+    // Halaman internal sementara untuk menyetujui fondasi UI sebelum dipakai modul bisnis.
+    Route::view('/{role}/ui-preview', 'portal.ui-preview')
+        ->whereIn('role', ['admin'])
+        ->name('ui-preview');
+
     Route::get('/{role}/dashboard', DashboardController::class)
         ->whereIn('role', ['admin', 'teller', 'anggota'])
         ->name('dashboard');
