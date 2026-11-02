@@ -1,0 +1,7 @@
+<x-layouts.public title="Masuk — SIMKEU">
+    <main class="grid min-h-screen place-items-center px-6 py-12"><section class="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-teal-950/20 backdrop-blur sm:p-10">
+        <a href="{{ route('landing') }}" class="flex items-center gap-3 font-semibold text-white"><span class="grid size-10 place-items-center rounded-xl bg-teal-300 text-lg font-black text-slate-950">S</span>SIMKEU</a>
+        <h1 class="mt-10 text-2xl font-semibold text-white">Selamat datang kembali</h1><p class="mt-2 text-sm leading-6 text-slate-300">Autentikasi akan terhubung ke akun legacy secara aman pada workstream database berikutnya.</p>
+        <form method="POST" action="{{ route('login.store') }}" class="mt-8 space-y-5" aria-label="Form masuk">@csrf<flux:field><flux:label class="text-slate-200">Username</flux:label><flux:input type="text" name="username" value="{{ old('username') }}" autocomplete="username" placeholder="Masukkan username" required autofocus /><flux:error name="username" /></flux:field><flux:field><flux:label class="text-slate-200">Password</flux:label><flux:input type="password" name="password" autocomplete="current-password" placeholder="Masukkan password" required /><flux:error name="password" /></flux:field><flux:button type="submit" variant="primary" class="w-full">Masuk</flux:button></form>
+    </section></main>
+</x-layouts.public>
