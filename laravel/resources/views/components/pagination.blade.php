@@ -12,11 +12,13 @@
                 </label>
             @endif
             <div class="ui-pagination-controls">
+                <button type="button" class="ui-pagination-button" wire:click="gotoPage(1)" @disabled($paginator->onFirstPage()) aria-label="Halaman pertama">«</button>
                 <button type="button" class="ui-pagination-button" wire:click="previousPage" @disabled($paginator->onFirstPage()) aria-label="Halaman sebelumnya">‹</button>
                 @foreach ($paginator->getUrlRange(max(1, $paginator->currentPage() - 1), min($paginator->lastPage(), $paginator->currentPage() + 1)) as $page => $url)
                     <button type="button" class="ui-pagination-button" wire:click="gotoPage({{ $page }})" @if($page === $paginator->currentPage()) aria-current="page" @endif aria-label="Halaman {{ $page }}">{{ $page }}</button>
                 @endforeach
                 <button type="button" class="ui-pagination-button" wire:click="nextPage" @disabled(!$paginator->hasMorePages()) aria-label="Halaman berikutnya">›</button>
+                <button type="button" class="ui-pagination-button" wire:click="gotoPage({{ $paginator->lastPage() }})" @disabled(!$paginator->hasMorePages()) aria-label="Halaman terakhir">»</button>
             </div>
         </div>
     </nav>

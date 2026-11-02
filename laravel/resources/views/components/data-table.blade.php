@@ -7,6 +7,9 @@
             @if (isset($tableActions))<div>{{ $tableActions }}</div>@endif
         </div>
     @endif
+    @if (isset($filters))
+        <div class="ui-table-filters-slot">{{ $filters }}</div>
+    @endif
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
             <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
