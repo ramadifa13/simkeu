@@ -1,6 +1,12 @@
-@props(['columns' => [], 'sortable' => true, 'mobileHidden' => []])
+@props(['columns' => [], 'sortable' => true, 'mobileHidden' => [], 'title' => null, 'count' => null])
 
 <div {{ $attributes->merge(['class' => 'ui-table-shell']) }}>
+    @if ($title)
+        <div class="ui-table-heading">
+            <div class="ui-table-title"><span class="ui-table-title-mark"><flux:icon name="users" class="size-4" /></span>{{ $title }} @if (!is_null($count))<span class="ui-table-count">{{ $count }} data</span>@endif</div>
+            @if (isset($tableActions))<div>{{ $tableActions }}</div>@endif
+        </div>
+    @endif
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
             <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">

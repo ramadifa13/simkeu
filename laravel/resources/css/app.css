@@ -67,7 +67,8 @@
 @layer components {
     .ui-app-shell {
         background:
-            radial-gradient(circle at 100% 0%, rgb(204 251 241 / 0.42), transparent 28rem),
+            radial-gradient(circle at 94% 4%, rgb(153 246 228 / 0.42), transparent 26rem),
+            radial-gradient(circle at -4% 100%, rgb(94 234 212 / 0.2), transparent 24rem),
             var(--simkeu-canvas);
     }
 
@@ -79,6 +80,7 @@
         background: linear-gradient(135deg, rgb(255 255 255 / 0.96), rgb(240 253 250 / 0.84));
         padding: clamp(0.875rem, 1.5vw, 1.2rem);
         box-shadow: 0 8px 24px rgb(15 23 42 / 0.05);
+        isolation: isolate;
     }
 
     .ui-page-header::after {
@@ -92,6 +94,11 @@
         content: '';
         pointer-events: none;
     }
+
+    .ui-page-header-art { position: absolute; right: clamp(7.5rem, 20vw, 19rem); top: 50%; z-index: -1; width: 10rem; height: 5.5rem; transform: translateY(-50%); opacity: 0.9; }
+    .ui-page-header-art::before, .ui-page-header-art::after { position: absolute; border-radius: 9999px; content: ''; }
+    .ui-page-header-art::before { width: 7.5rem; height: 7.5rem; right: 0.8rem; top: -1rem; background: radial-gradient(circle at 36% 35%, #5eead4 0 0.4rem, transparent 0.45rem), radial-gradient(circle at 68% 45%, #0f766e 0 1.25rem, #14b8a6 1.3rem 2.1rem, transparent 2.15rem), radial-gradient(circle at 20% 77%, #2563eb 0 1.2rem, transparent 1.25rem); box-shadow: 0 12px 25px rgb(20 184 166 / 0.22); }
+    .ui-page-header-art::after { width: 4.5rem; height: 5.2rem; right: -2.7rem; top: 0.1rem; border: 1px solid rgb(255 255 255 / 0.8); background: linear-gradient(145deg, rgb(255 255 255 / 0.82), rgb(240 253 250 / 0.65)); box-shadow: 0 10px 20px rgb(15 23 42 / 0.08); }
 
     .ui-panel {
         border: 1px solid var(--simkeu-border);
@@ -131,6 +138,11 @@
         background: var(--simkeu-surface);
         box-shadow: 0 8px 24px rgb(15 23 42 / 0.045);
     }
+
+    .ui-table-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; border-bottom: 1px solid rgb(226 232 240 / 0.9); padding: 0.875rem 1rem; background: linear-gradient(100deg, rgb(255 255 255), rgb(240 253 250 / 0.54)); }
+    .ui-table-title { display: flex; align-items: center; gap: 0.625rem; color: #0f172a; font-size: 0.9375rem; font-weight: 750; }
+    .ui-table-title-mark { display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: 0.75rem; background: #ccfbf1; color: #0f766e; }
+    .ui-table-count { border: 1px solid #99f6e4; border-radius: 9999px; background: #f0fdfa; padding: 0.25rem 0.625rem; color: #0f766e; font-size: 0.75rem; font-weight: 700; }
 
     [data-portal-shell] { font-size: 0.875rem; }
     .ui-app-shell header > div:first-child > .min-w-0 > p { display: none; }
@@ -201,6 +213,7 @@
     .ui-action-menu > summary:hover, .ui-action-menu[open] > summary { border-color: #5eead4; background: #f0fdfa; color: #0f766e; }
     .ui-action-menu > div { border: 1px solid #dbe3ef; border-radius: 0.875rem; background: #fff; padding: 0.375rem; box-shadow: 0 16px 32px rgb(15 23 42 / 0.14); }
     .ui-document-preview { border: 1px solid var(--simkeu-border); border-radius: 1rem; background: #fff; box-shadow: 0 6px 18px rgb(15 23 42 / 0.04); }
+    .ui-member-avatar { display: grid; width: 2.25rem; height: 2.25rem; place-items: center; border: 1px solid #99f6e4; border-radius: 9999px; background: linear-gradient(145deg, #ecfdf5, #ccfbf1); color: #0f766e; font-size: 0.75rem; font-weight: 800; }
 
     [data-portal-shell] {
         --sidebar-width: 18rem;
@@ -248,6 +261,7 @@
     .ui-pagination-per-page { flex: 1; justify-content: flex-end; }
     .ui-stat-card { padding: 1rem; }
     [data-flux-modal-content] { border-radius: 1rem; }
+    .ui-page-header-art { right: 0.5rem; opacity: 0.28; transform: translateY(-50%) scale(0.7); transform-origin: right center; }
 }
 
 @media (min-width: 641px) and (max-width: 1023px) {
@@ -255,6 +269,7 @@
     .ui-filter-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(11rem, 0.65fr) auto; align-items: end; }
     .ui-filter-field { min-width: 0; }
     .ui-table-shell thead th, .ui-table-shell tbody td { padding-inline: 0.875rem !important; }
+    .ui-page-header-art { right: 11rem; opacity: 0.55; transform: translateY(-50%) scale(0.82); }
 }
 
 @media (prefers-reduced-motion: reduce) {
