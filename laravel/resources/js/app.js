@@ -27,6 +27,22 @@ if (localStorage.getItem('simkeu-sidebar-collapsed') === 'true') {
     });
 }
 
+document.querySelector('[data-sidebar]')?.addEventListener('click', (event) => {
+    if (!shell?.classList.contains('sidebar-collapsed')) {
+        return;
+    }
+
+    if (!event.target.closest('a, summary')) {
+        return;
+    }
+
+    shell.classList.remove('sidebar-collapsed');
+    localStorage.setItem('simkeu-sidebar-collapsed', 'false');
+    document.querySelectorAll('[data-sidebar-toggle]').forEach((toggle) => {
+        toggle.setAttribute('aria-expanded', 'true');
+    });
+});
+
 const toggleMobileNavigation = () => {
     const isOpen = mobileNavigation?.classList.toggle('translate-x-0');
     mobileNavigation?.classList.toggle('-translate-x-full', !isOpen);
