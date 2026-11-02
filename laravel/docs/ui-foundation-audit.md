@@ -12,6 +12,7 @@
 | Aksi | primer, sekunder, ghost, bahaya; tiga titik hanya pada baris tabel | tombol dan action menu |
 | Form | teks, email, sandi, telepon, angka/mata uang, tanggal/waktu, textarea, select, radio, checkbox, autocomplete, upload, label, bantuan, error, disabled | katalog input lengkap, form pendek, dan form panjang |
 | Data | heading tabel, toolbar filter, search, sort, date range, chip filter, badge, menu baris, selection/bulk action, pagination, kolom prioritas mobile | tabel contoh, skeleton, kosong |
+| List angsuran | filter status pembatalan dan hari minggu ini, pencarian, kartu pinjaman nasabah, plafon/sisa pokok/jadwal/progress, detail jadwal, aksi baris, keranjang pembayaran | pola list angsuran statis dari native; logika finansial tetap Fase 7 |
 | Detail | kartu ringkasan, tab, timeline audit, dokumen privat | ringkasan/detail contoh |
 | Feedback | toast sukses/peringatan/gagal/info, callout, validasi, loading/retry, empty, offline | notifikasi interaktif dan state |
 | Aksesibilitas | fokus terlihat, label, keyboard, target nyaman, kontras, reduced motion | checklist dan kontrol fokus |
