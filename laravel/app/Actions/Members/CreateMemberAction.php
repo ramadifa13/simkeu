@@ -4,6 +4,7 @@ namespace App\Actions\Members;
 
 use App\Models\Anggota;
 use App\Models\User;
+use App\Support\ImageStorage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +41,7 @@ class CreateMemberAction
             foreach (['foto_ktp', 'foto_kk', 'foto_ktp_pasangan'] as $documentField) {
                 /** @var UploadedFile $document */
                 $document = $attributes[$documentField];
-                $member->{$documentField} = $document->store("anggota/{$member->id}", 'local');
+                $member->{$documentField} = app(ImageStorage::class)->store($document, "anggota/{$member->id}");
             }
 
             $member->save();

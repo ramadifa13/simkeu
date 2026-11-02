@@ -34,9 +34,9 @@ class UpdateMemberRequest extends FormRequest
             'ktp' => ['nullable', 'string', 'max:20'],
             'rekening_bank' => ['nullable', 'string', 'max:100'],
             'kategori_shu' => ['required', Rule::in(['anggota', 'ketua_kelompok'])],
-            'foto_ktp' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_kk' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_ktp_pasangan' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'foto_ktp' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp'],
+            'foto_kk' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp'],
+            'foto_ktp_pasangan' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp'],
         ];
     }
 

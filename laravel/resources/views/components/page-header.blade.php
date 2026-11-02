@@ -1,7 +1,10 @@
-@props(['eyebrow' => null, 'title', 'description' => null, 'icon' => null])
+@props(['eyebrow' => null, 'title', 'description' => null, 'icon' => null, 'backHref' => null, 'backLabel' => 'Kembali'])
 
 <div {{ $attributes->merge(['class' => 'ui-page-header flex flex-col justify-between gap-4 sm:flex-row sm:items-end']) }}>
     <div class="ui-page-header-main">
+        @if ($backHref)
+            <flux:button :href="$backHref" variant="outline" icon="arrow-left" class="ui-page-header-back">{{ $backLabel }}</flux:button>
+        @endif
         @if ($icon)<span class="ui-page-header-icon"><flux:icon :name="$icon" class="size-7" /></span>@endif
         <div>
             @if ($eyebrow)

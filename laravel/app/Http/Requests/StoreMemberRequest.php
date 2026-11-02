@@ -33,9 +33,9 @@ class StoreMemberRequest extends FormRequest
             'ktp' => ['nullable', 'string', 'max:20'],
             'rekening_bank' => ['nullable', 'string', 'max:100'],
             'kategori_shu' => ['required', Rule::in(['anggota', 'ketua_kelompok'])],
-            'foto_ktp' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_kk' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_ktp_pasangan' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'foto_ktp' => ['required', 'file', 'mimes:jpg,jpeg,png,webp'],
+            'foto_kk' => ['required', 'file', 'mimes:jpg,jpeg,png,webp'],
+            'foto_ktp_pasangan' => ['required', 'file', 'mimes:jpg,jpeg,png,webp'],
         ];
     }
 }
