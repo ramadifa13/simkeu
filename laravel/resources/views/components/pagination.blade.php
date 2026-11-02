@@ -2,7 +2,7 @@
 
 @if ($paginator->hasPages())
     <nav {{ $attributes->merge(['class' => 'ui-pagination']) }} aria-label="Navigasi halaman">
-        <p class="ui-pagination-meta">Menampilkan {{ $paginator->firstItem() }}â€“{{ $paginator->lastItem() }} dari {{ $paginator->total() }} data</p>
+        <p class="ui-pagination-meta">Menampilkan {{ $paginator->firstItem() }}-{{ $paginator->lastItem() }} dari {{ $paginator->total() }} data</p>
         <div class="flex flex-wrap items-center gap-3">
             @if ($perPageModel)
                 <label class="ui-pagination-per-page">Baris

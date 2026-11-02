@@ -74,7 +74,7 @@
         border: 1px solid rgb(219 227 239 / 0.9);
         border-radius: 1.25rem;
         background: linear-gradient(135deg, rgb(255 255 255 / 0.96), rgb(240 253 250 / 0.84));
-        padding: clamp(1rem, 1.8vw, 1.4rem);
+        padding: clamp(0.875rem, 1.5vw, 1.2rem);
         box-shadow: 0 8px 24px rgb(15 23 42 / 0.05);
     }
 
@@ -82,8 +82,8 @@
         position: absolute;
         right: -3rem;
         top: -4rem;
-        width: 9rem;
-        height: 9rem;
+        width: 8rem;
+        height: 8rem;
         border-radius: 9999px;
         background: rgb(45 212 191 / 0.12);
         content: '';
@@ -126,6 +126,11 @@
         background: var(--simkeu-surface);
         box-shadow: 0 8px 24px rgb(15 23 42 / 0.045);
     }
+
+    [data-portal-shell] { font-size: 0.875rem; }
+    .ui-app-shell header > div:first-child > .min-w-0 > p { display: none; }
+    .ui-table-shell thead th { padding: 0.625rem 1rem !important; font-size: 0.6875rem; letter-spacing: 0.045em; }
+    .ui-table-shell tbody td { padding: 0.6875rem 1rem !important; font-size: 0.8125rem; line-height: 1.25rem; }
 
     .ui-table-shell tbody tr { transition: background-color 160ms ease; }
     .ui-table-shell tbody tr:hover { background: rgb(240 253 250 / 0.62); }
@@ -225,7 +230,7 @@
 
 @media (max-width: 640px) {
     .ui-panel-header { padding: 1rem 1.125rem; }
-    .ui-table-shell table { font-size: 0.8125rem; }
+    .ui-table-shell table { font-size: 0.75rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
