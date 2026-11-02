@@ -126,7 +126,7 @@ Setiap fase yang membuat atau mengubah modul wajib mengecek seluruh butir yang r
 - [x] Terapkan halaman login modern, responsif, dan aksesibel dengan feedback validasi/loading yang jelas.
 - [x] Buat profil, ubah kata sandi, reset kata sandi, logout, dan area notifikasi.
 - [x] Terapkan aturan tombol utama dan action menu tabel secara konsisten.
-- [x] Sempurnakan fondasi visual reusable: token warna berkontras, surface/panel, page header, stat card, tabel, form section, dan state kosong/memuat dengan responsif serta reduced-motion.
+- [x] Sempurnakan fondasi visual reusable: token warna berkontras, surface/panel, page header, stat card, tabel, form section, semua kontrol Flux (input/select/textarea/upload/tombol), menu aksi, modal, dan state kosong/memuat dengan responsif serta reduced-motion.
 
 **Bukti kelulusan:** terpenuhi untuk fondasi Fase 3 pada 2026-11-02. Navigasi per peran dan placeholder dikendalikan oleh `config/navigation.php`; UI publik/akun menggunakan Blade, Flux, token Tailwind, dan aksesibilitas dasar. Penyempurnaan fondasi visual terbaru menyatukan token kontras dan primitive reusable untuk surface/panel, header halaman, statistik, tabel, form, serta empty/loading state. Migrations reset kata sandi telah dijalankan, cache Blade berhasil, Vite build berhasil, dan 14 feature test lulus. Data profil koperasi spesifik (alamat, jam, kontak resmi, legal/privacy final) akan dibaca dari master pengaturan pada Fase 5; landing saat ini menampilkan fallback aman tanpa mengarang data.
 

@@ -7,7 +7,7 @@
 ])
 
 <flux:modal name="{{ $name }}" class="max-w-lg">
-    <div class="space-y-5">
+    <div class="space-y-4">
         <div>
             <flux:heading size="lg">{{ $title }}</flux:heading>
             <flux:subheading>{{ $description }}</flux:subheading>

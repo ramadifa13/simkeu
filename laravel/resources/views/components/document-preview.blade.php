@@ -1,6 +1,6 @@
 @props(['url' => null, 'label' => 'Dokumen', 'mime' => null])
 
-<div {{ $attributes->merge(['class' => 'overflow-hidden rounded-2xl border border-slate-200 bg-white']) }}>
+<div {{ $attributes->merge(['class' => 'ui-document-preview overflow-hidden']) }}>
     @if ($url && str_starts_with((string) $mime, 'image/'))
         <img src="{{ $url }}" alt="Pratinjau {{ $label }}" class="aspect-video w-full object-cover">
     @else
