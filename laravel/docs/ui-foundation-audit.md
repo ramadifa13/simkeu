@@ -7,15 +7,16 @@
 | Kelompok | Fondasi yang harus sama di semua modul | Validasi di preview |
 | --- | --- | --- |
 | Arah visual | canvas slate, surface putih, aksen teal, teks navy/slate berkontras, radius, shadow, wave header | token, hero, status semantik |
-| Shell | sidebar sticky/collapsible, header akun/notifikasi, mobile drawer, skip link | layout portal responsif |
+| Shell | sidebar sticky/collapsible, header akun/notifikasi, avatar fallback, tooltip ikon, mobile drawer/bottom sheet, skip link | layout portal responsif |
 | Hierarki halaman | eyebrow, judul, deskripsi, aksi utama | header wave dan tombol primer |
 | Aksi | primer, sekunder, ghost, bahaya; tiga titik hanya pada baris tabel | tombol dan action menu |
 | Form | teks, email, sandi, telepon, angka/mata uang, tanggal/waktu, textarea, select, radio, checkbox, autocomplete, upload, label, bantuan, error, disabled | katalog input lengkap, form pendek, dan form panjang |
-| Data | heading tabel, toolbar filter, search, sort, badge, menu baris, pagination, kolom prioritas mobile | tabel contoh, skeleton, kosong |
+| Data | heading tabel, toolbar filter, search, sort, date range, chip filter, badge, menu baris, selection/bulk action, pagination, kolom prioritas mobile | tabel contoh, skeleton, kosong |
 | Detail | kartu ringkasan, tab, timeline audit, dokumen privat | ringkasan/detail contoh |
-| Feedback | toast sukses/peringatan/gagal/info, callout, validasi, loading/retry, empty | notifikasi interaktif dan state |
+| Feedback | toast sukses/peringatan/gagal/info, callout, validasi, loading/retry, empty, offline | notifikasi interaktif dan state |
 | Aksesibilitas | fokus terlihat, label, keyboard, target nyaman, kontras, reduced motion | checklist dan kontrol fokus |
 | Responsif | mobile-first, tablet grid, desktop density, tabel horizontal yang terkendali | panduan breakpoint |
+| Kegagalan sistem | 403, 404, 419, 500, koneksi terputus, perubahan belum tersimpan | kartu state dan modal konfirmasi |
 
 ## Keputusan yang tidak boleh berubah per modul
 
