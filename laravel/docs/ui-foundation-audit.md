@@ -29,6 +29,15 @@
 6. Animasi hanya micro-interaction singkat dan wajib mematuhi `prefers-reduced-motion`.
 7. Semua jenis kontrol yang tersedia di UI Preview harus memakai primitive ini; jangan membuat input, modal, toast, atau status baru per modul tanpa terlebih dahulu menambahkannya ke fondasi.
 
+## Peta komponen reusable
+
+- **Data:** `data-table`, `table-filters`, `filter-chips`, `bulk-action-bar`, `pagination`, `action-menu`, `empty-state`, `loading-state`.
+- **Form dan feedback:** `form-section`, `form-actions`, `autocomplete`, `file-upload`, `upload-progress`, `short-form-modal`, `confirm-action-modal`, `bottom-sheet`, `side-drawer`, `unsaved-changes-modal`, serta toast/callout Flux.
+- **Ringkasan dan sistem:** `page-header`, `stat-card`, `status-badge`, `system-state-card`, `audit-timeline`, `document-preview`.
+- **Angsuran:** `installments/filter-chips`, `installments/loan-card`, dan `installments/payment-cart`.
+
+Halaman preview hanya menyusun komponen-komponen ini. Ia tidak menyimpan salinan markup fondasi. Karena itu pembaruan pada satu komponen otomatis berlaku di preview dan modul yang memakainya.
+
 ## Yang perlu disetujui melalui preview
 
 - Kepadatan teks, padding baris tabel, ukuran kontrol, dan bentuk tombol.
