@@ -165,10 +165,9 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
             throw new Exception("Angsuran 2 minggu sekali tanpa jaminan hanya tersedia untuk tenor 6 bulan");
         }
         if (empty($jenis_info['memerlukan_jaminan']) && $frekuensi === 'dua_mingguan') {
-            if (!in_array((int) $jumlah_pinjaman, [2000000, 3000000], true)) {
-                throw new Exception("Tenor 6 bulan / 2 minggu sekali saat ini hanya tersedia untuk pinjaman Rp 2 juta atau Rp 3 juta");
-            }
-            // Sesuai tabel resmi: total kembali 145% dari pokok.
+            // Plafon mengikuti maksimal_pinjaman pada jenis pinjaman yang dipilih.
+            // Jangan membatasi nominal ke angka tetap karena produk Admin dapat
+            // menyediakan plafon di atas Rp3 juta.
             $bunga = 45;
         }
 
@@ -1206,10 +1205,6 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
             const gadai = selectedOption && selectedOption.getAttribute('data-jaminan') === '1';
             if (!gadai && getFrekuensiTerpilih() === 'dua_mingguan' && tenor !== 6) {
                 window.uiToast && uiToast('warning', 'Angsuran 2 minggu sekali tanpa jaminan hanya untuk tenor 6 bulan');
-                return false;
-            }
-            if (!gadai && getFrekuensiTerpilih() === 'dua_mingguan' && [2000000, 3000000].indexOf(jumlah) === -1) {
-                window.uiToast && uiToast('warning', 'Tenor 6 bulan / 2 minggu sekali hanya untuk Rp 2 juta atau Rp 3 juta');
                 return false;
             }
             if (gadai && typeof biayaMingguanGadai === 'function' && biayaMingguanGadai(jumlah) === null) {
