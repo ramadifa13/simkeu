@@ -136,8 +136,10 @@
     .ui-table-title-mark { display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: 0.75rem; background: #ccfbf1; color: #0f766e; }
     .ui-table-count { border: 1px solid #99f6e4; border-radius: 9999px; background: #f0fdfa; padding: 0.25rem 0.625rem; color: #0f766e; font-size: 0.75rem; font-weight: 700; }
     .ui-table-filters-slot { border-bottom: 1px solid rgb(226 232 240 / 0.9); background: rgb(248 250 252 / 0.62); }
-    .ui-table-skeleton { height: 0.875rem; border-radius: 9999px; background: linear-gradient(90deg, #e2e8f0 20%, #f8fafc 50%, #e2e8f0 80%); background-size: 200% 100%; animation: table-skeleton-shimmer 1.4s ease-in-out infinite; }
-    .ui-table-skeleton-row td { height: 3.9rem; }
+    .ui-table-skeleton { height: 0.75rem; border-radius: 9999px; background: linear-gradient(90deg, #e2e8f0 20%, #f8fafc 50%, #dbeafe 80%); background-size: 200% 100%; animation: table-skeleton-shimmer 1.2s ease-in-out infinite; }
+    .ui-table-skeleton-row { background: rgb(255 255 255 / 0.86); }
+    .ui-table-skeleton-row td { height: 3.65rem; }
+    .ui-table-skeleton-row:nth-child(2n) .ui-table-skeleton { animation-delay: 120ms; }
     .ui-empty-icon { display: grid; width: 3.5rem; height: 3.5rem; place-items: center; margin-inline: auto; border: 1px solid #a7f3d0; border-radius: 1.125rem; background: linear-gradient(145deg, #ecfdf5, #d1fae5); color: #047857; }
     .ui-table-shell thead > tr:first-child th { border-bottom: 0; background: #f8fafc; color: #475569; }
     .ui-table-reset { min-height: 2.125rem !important; border: 1px solid #cbd5e1 !important; background: #fff !important; color: #475569 !important; font-size: 0.75rem !important; font-weight: 700 !important; }
@@ -146,7 +148,7 @@
     [data-portal-shell] { font-size: 0.875rem; }
     .ui-app-shell header > div:first-child > .min-w-0 > p { display: none; }
     .ui-table-shell thead th { padding: 0.625rem 1rem !important; font-size: 0.6875rem; letter-spacing: 0.045em; }
-    .ui-table-shell tbody td { padding: 0.6875rem 1rem !important; font-size: 0.8125rem; line-height: 1.25rem; }
+    .ui-table-shell tbody td { overflow: hidden; padding: 0.6875rem 1rem !important; font-size: 0.8125rem; line-height: 1.25rem; }
 
     .ui-table-shell tbody tr { transition: background-color 160ms ease; }
     .ui-table-shell tbody tr:hover { background: rgb(240 253 250 / 0.62); }
@@ -182,6 +184,8 @@
         transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
     }
     input[data-flux-control], select[data-flux-control] { min-height: 2.5rem !important; padding-block: 0.5rem !important; }
+    select[data-flux-control] { border-radius: 0.875rem !important; background-color: #fff !important; background-position: right 0.65rem center !important; transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease !important; }
+    select[data-flux-control]:focus { background-color: #faffff !important; }
     textarea[data-flux-control] { min-height: 5.5rem !important; padding: 0.625rem 0.75rem !important; }
     input[data-flux-control]::placeholder, textarea[data-flux-control]::placeholder { color: #94a3b8 !important; opacity: 1; }
     input[data-flux-control]:hover:not(:disabled), select[data-flux-control]:hover:not(:disabled), textarea[data-flux-control]:hover:not(:disabled) { border-color: #94a3b8 !important; }

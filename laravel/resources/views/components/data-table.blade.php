@@ -14,7 +14,12 @@
         <div class="ui-table-loading-layer" wire:loading @if ($loadingTarget) wire:target="{{ $loadingTarget }}" @endif>{{ $loading }}</div>
     @endif
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+        <table class="w-full min-w-[46rem] divide-y divide-slate-200 text-left text-sm lg:min-w-full lg:table-fixed">
+            <colgroup>
+                @foreach ($columns as $key => $label)
+                    <col class="{{ match ($key) { 'kode_anggota' => 'w-[11%]', 'nama_lengkap' => 'w-[30%]', 'telepon' => 'w-[18%]', 'status' => 'w-[13%]', 'tanggal_daftar' => 'w-[16%]', 'actions' => 'w-[8%]', default => '' } }}">
+                @endforeach
+            </colgroup>
             <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                     @foreach ($columns as $key => $label)

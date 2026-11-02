@@ -2,7 +2,7 @@
     <x-data-table title="Daftar anggota" :count="$this->members->total()" :columns="['kode_anggota' => 'Kode', 'nama_lengkap' => 'Nama anggota', 'telepon' => 'Telepon', 'status' => 'Status', 'tanggal_daftar' => 'Terdaftar', 'actions' => 'Aksi']" :mobile-hidden="['telepon', 'tanggal_daftar']">
         <x-slot:filters>
             <x-table-filters class="ui-table-filter-bar">
-                <div class="ui-filter-field"><p class="ui-filter-label">Pencarian</p><flux:input wire:model.live.debounce.300ms="search" type="search" placeholder="Cari nama, kode, atau telepon" aria-label="Cari anggota" /></div>
+                <div class="ui-filter-field"><p class="ui-filter-label">Pencarian</p><flux:input :loading="false" wire:model.live.debounce.300ms="search" type="search" placeholder="Cari nama, kode, atau telepon" aria-label="Cari anggota" /></div>
                 <div class="ui-filter-field"><p class="ui-filter-label">Status anggota</p><flux:select wire:model.live="status" aria-label="Filter status anggota"><option value="">Semua status</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></flux:select></div>
                 @if ($search !== '' || $status !== '')<flux:button type="button" variant="ghost" wire:click="resetFilters" class="ui-table-reset">Reset filter</flux:button>@endif
             </x-table-filters>
