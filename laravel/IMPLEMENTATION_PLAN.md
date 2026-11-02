@@ -82,11 +82,11 @@ Setiap fase yang membuat atau mengubah modul wajib mengecek seluruh butir yang r
 
 ## Fase 2 — Katalog legacy dan peta kesetaraan
 
-**Status: AKTIF — dimulai setelah Fase 1 selesai pada 2026-11-02.**
+**Status: SELESAI — 2026-11-02.**
 
 **Tujuan:** setiap data/rule native sudah diketahui sebelum membangun fitur baru.
 
-**Progres terdokumentasi (2026-11-02):** baseline skema telah dikelompokkan, halaman per peran telah diberi fase tujuan, dan kontrak awal untuk unggahan, kode anggota, pembatalan angsuran, closing, denda, serta impor sudah dicatat di `docs/legacy-module-inventory.md` dan `docs/migration-contracts.md`. Fase ini belum selesai: rincian tiap helper, field, form, keluaran, dan test native masih harus ditutup satu per satu.
+**Progres terdokumentasi (2026-11-02):** baseline skema, halaman/form/helper, field dan klasifikasinya, relasi, kontrak finansial, keluaran, automasi, serta baseline rekonsiliasi telah diaudit. Bukti lengkap berada pada `docs/phase-2-completion-audit.md`.
 
 - [x] Catat sumber matriks peran/aksi native dan keputusan struktur informasi awal.
 - [x] Buat inventaris halaman native per peran dan fase target awal.
@@ -102,14 +102,14 @@ Setiap fase yang membuat atau mengubah modul wajib mengecek seluruh butir yang r
 
 - [x] Inventaris 54 tabel legacy: kolom, indeks, enum/status, dan relasi implisit (clone juga memiliki ekstensi legacy `user_permissions`; 55 tabel telah disnapshot).
 - [x] Inventaris seluruh halaman/helper/form native per Admin, Teller, Anggota, cron, dan shared.
-- [ ] Lengkapi docs/field-rule-catalogue.md untuk setiap field/rule.
-- [ ] Buat matriks page-to-route, page-to-policy, page-to-table, page-to-export/PDF, dan page-to-test untuk seluruh native scope.
-- [ ] Tandai setiap field sebagai dipertahankan, dipindah, historis baca-saja, digabung, atau dihentikan beserta alasannya.
-- [ ] Petakan seluruh upload, lokasi file, PDF, Excel, import/export, dan aturan akses dokumen.
-- [ ] Petakan seluruh efek finansial, transaksi DB, lock, reversal, otorisasi, dan audit log.
-- [ ] Rekonsiliasi jumlah data awal untuk users, anggota, simpanan, transaksi, kas, pinjaman, angsuran, denda, SHU, dan file.
+- [x] Lengkapi docs/field-rule-catalogue.md untuk setiap field/rule.
+- [x] Buat matriks page-to-route, page-to-policy, page-to-table, page-to-export/PDF, dan page-to-test untuk seluruh native scope.
+- [x] Tandai setiap field sebagai dipertahankan, dipindah, historis baca-saja, digabung, atau dihentikan beserta alasannya.
+- [x] Petakan seluruh upload, lokasi file, PDF, Excel, import/export, dan aturan akses dokumen.
+- [x] Petakan seluruh efek finansial, transaksi DB, lock, reversal, otorisasi, dan audit log.
+- [x] Rekonsiliasi jumlah data awal untuk users, anggota, simpanan, transaksi, kas, pinjaman, angsuran, denda, SHU, dan file.
 
-**Bukti kelulusan:** tidak ada tabel, field, status, halaman, atau rule native yang belum diklasifikasikan.
+**Bukti kelulusan:** terpenuhi pada 2026-11-02; lihat `docs/phase-2-completion-audit.md`.
 
 ## Fase 3 — Arsitektur informasi, landing, dan akun
 
