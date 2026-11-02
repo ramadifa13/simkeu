@@ -1,6 +1,6 @@
 @props(['eyebrow' => null, 'title', 'description' => null])
 
-<div {{ $attributes->merge(['class' => 'flex flex-col justify-between gap-5 sm:flex-row sm:items-end']) }}>
+<div {{ $attributes->merge(['class' => 'ui-page-header flex flex-col justify-between gap-5 sm:flex-row sm:items-end']) }}>
     <div>
         @if ($eyebrow)
             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-teal-700">{{ $eyebrow }}</p>

@@ -1,6 +1,6 @@
 @props(['columns' => [], 'sortable' => true, 'mobileHidden' => []])
 
-<div {{ $attributes->merge(['class' => 'overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm']) }}>
+<div {{ $attributes->merge(['class' => 'ui-table-shell']) }}>
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
             <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
