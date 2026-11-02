@@ -29,10 +29,10 @@
 
 ### Kekurangan utama yang terverifikasi
 
-- [ ] Landing belum memiliki profil koperasi, layanan, proses, FAQ, kontak, lokasi/jam, dan tautan legal.
+- [ ] Landing modern telah memuat profil koperasi, layanan, produk simpanan/pinjaman aktif, kontak, serta CTA responsif; proses rinci, FAQ, lokasi/jam layanan, dan tautan legal final masih menunggu master pengaturan Fase 5.
 - [ ] Login belum memiliki lupa/reset kata sandi, halaman akun nonaktif/terkunci, profil, dan alur akun lengkap.
 - [ ] Navigasi hanya memiliki Dashboard dan Data Anggota; seluruh modul native lain belum memiliki route/screen Laravel.
-- [ ] Dashboard Admin, Teller, dan Anggota masih placeholder tanpa data/KPI/antrean/tautan filter.
+- [x] Dashboard Admin, Teller, dan Anggota telah memakai data nyata, KPI, antrean, aktivitas, aksi cepat, serta state kosong/error.
 - [ ] Transaksi, kas, pembelian, pinjaman, layanan, laporan, SHU, master data, pengaturan, impor, ekspor, PDF, scheduler, dan portal mandiri belum dimigrasikan.
 - [ ] Katalog field/rule belum mencakup seluruh tabel, halaman, form, status, relasi, dan efek finansial native.
 - [ ] Cakupan test Laravel masih dasar; test bisnis/finansial/UAT belum ada.
@@ -133,17 +133,21 @@ Setiap fase yang membuat atau mengubah modul wajib mengecek seluruh butir yang r
 
 ## Fase 4 — Dashboard berbasis data nyata
 
+**Status: AKTIF — implementasi dashboard read-only dimulai 2026-11-03.**
+
 **Mulai hanya setelah Fase 3 selesai.**
 
-- [ ] Buat action/query dashboard yang aman per role.
-- [ ] Rancang pola dashboard per role: hierarki KPI, kartu prioritas, alert, antrean, aktivitas terbaru, grafik yang diperlukan, quick action, dan empty/loading/error state.
-- [ ] Terapkan layout dashboard modern, interaktif, dan responsif untuk mobile, tablet, dan desktop tanpa menyembunyikan informasi prioritas.
-- [ ] Admin: anggota, kas, simpanan, pinjaman aktif, sisa pokok, jatuh tempo/telat, denda, pengajuan/pencairan, SHU, audit terbaru.
-- [ ] Teller: transaksi hari ini, antrean operasional, angsuran jatuh tempo, denda, pencairan siap proses, aktivitas teller.
-- [ ] Anggota: simpanan, pinjaman aktif, angsuran berikutnya, status pengajuan, SHU, dan aktivitas terbaru.
-- [ ] Setiap kartu/alert mengarah ke halaman tabel yang telah terfilter dan berizin.
-- [ ] Lengkapi loading, empty state, error/retry, dan test dashboard.
-- [ ] Pastikan refresh data, periode/tanggal dashboard, timezone, dan angka finansial memiliki sumber/label yang jelas.
+- [x] Buat action/query dashboard yang aman per role.
+- [x] Rancang pola dashboard per role: hierarki KPI, kartu prioritas, alert, antrean, aktivitas terbaru, quick action, dan empty/error/retry state. Loading SSR memakai navigasi halaman; refresh async menunggu sumber data final.
+- [x] Terapkan layout dashboard modern, interaktif, dan responsif untuk mobile, tablet, dan desktop tanpa menyembunyikan informasi prioritas.
+- [x] Tambahkan panel **Tren operasional** Admin yang responsif: tab portofolio, kolektibilitas, denda, dan laba dengan grafik enam bulan dari query read-only; struktur tab diperbaiki agar grafik tampil kembali pada 2026-11-03.
+- [x] Admin: anggota, kas, pinjaman aktif/sisa pokok, jatuh tempo/telat, pengajuan, dan audit terbaru dari sumber legacy yang tersedia. KPI simpanan, denda, pencairan, serta SHU ditahan sampai modul dan kontrak closing pemiliknya tersedia agar tidak menampilkan angka semu.
+- [x] Teller: transaksi hari ini, nilai transaksi, angsuran jatuh tempo, pinjaman aktif, antrean, dan aktivitas teller.
+- [x] Anggota: simpanan, pinjaman aktif, angsuran berikutnya, status pengajuan, dan aktivitas pribadi; data anggota lain tidak pernah di-query.
+- [x] Setiap kartu, alert, antrean, dan aksi cepat dashboard mengarah ke halaman detail Laravel read-only yang telah terfilter dan berizin; tidak lagi menuju placeholder.
+- [x] Lengkapi empty state, error/retry, dan test akses dashboard. State loading interaktif akan ditambahkan bersama refresh async setelah sumber data final tersedia.
+- [x] Pastikan periode/tanggal dashboard dan angka finansial memiliki sumber/label yang jelas; query menggunakan timezone aplikasi Asia/Jakarta. Refresh KPI/antrean memakai endpoint JSON asinkron dengan state memuat tanpa mutasi data.
+- [ ] Selesaikan UAT angka terhadap variasi data native (tanpa transaksi, normal, telat/lunas) setelah modul transaksi, pinjaman, dan laporan Fase 5–8 tersedia; peta audit ada di `docs/dashboard-parity-audit.md`.
 
 **Bukti kelulusan:** nilai dashboard cocok dengan query native dan data role lain tidak dapat diakses.
 

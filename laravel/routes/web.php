@@ -3,6 +3,7 @@
 use App\Http\Controllers\Account\ProfileController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Portal\DashboardController;
+use App\Http\Controllers\Portal\DashboardReportController;
 use App\Http\Controllers\Portal\MemberController;
 use App\Http\Controllers\Portal\ModulePlaceholderController;
 use App\Http\Controllers\Public\LandingController;
@@ -23,6 +24,10 @@ Route::middleware(['auth', 'role'])->prefix('portal')->name('portal.')->group(fu
     Route::get('/{role}/dashboard', DashboardController::class)
         ->whereIn('role', ['admin', 'teller', 'anggota'])
         ->name('dashboard');
+
+    Route::get('/{role}/dashboard/detail/{report}', DashboardReportController::class)
+        ->whereIn('role', ['admin', 'teller', 'anggota'])
+        ->name('dashboard.drilldown');
 
     Route::view('/{role}/anggota', 'portal.members.index')
         ->whereIn('role', ['admin', 'teller'])
