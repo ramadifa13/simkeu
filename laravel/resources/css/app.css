@@ -57,6 +57,12 @@
     [data-portal-shell].sidebar-collapsed [data-sidebar] { padding-inline: 0.75rem; }
     [data-portal-shell].sidebar-collapsed [data-sidebar] a,
     [data-portal-shell].sidebar-collapsed [data-sidebar] summary { justify-content: center; }
+
+    .sidebar-scroll { scrollbar-color: rgb(71 85 105 / 0.85) transparent; scrollbar-width: thin; }
+    .sidebar-scroll::-webkit-scrollbar { width: 0.45rem; }
+    .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-scroll::-webkit-scrollbar-thumb { border: 2px solid #020617; border-radius: 999px; background: rgb(100 116 139 / 0.85); }
+    .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgb(45 212 191 / 0.9); }
 }
 
 @media (prefers-reduced-motion: reduce) {
