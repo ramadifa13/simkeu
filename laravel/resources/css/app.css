@@ -84,28 +84,12 @@
         color: #0f172a;
     }
 
-    .ui-page-header::after {
-        position: absolute;
-        right: -3rem;
-        top: -4rem;
-        width: 8rem;
-        height: 8rem;
-        border-radius: 9999px;
-        background: rgb(45 212 191 / 0.12);
-        content: '';
-        pointer-events: none;
-    }
-
-    .ui-page-header-art { position: absolute; right: clamp(7.5rem, 20vw, 19rem); top: 50%; z-index: 0; width: 10rem; height: 5.5rem; transform: translateY(-50%); opacity: 0.9; pointer-events: none; }
-    .ui-page-header-art::before, .ui-page-header-art::after { position: absolute; border-radius: 9999px; content: ''; }
-    .ui-page-header-art::before { width: 7.5rem; height: 7.5rem; right: 0.8rem; top: -1rem; background: radial-gradient(circle at 36% 35%, #5eead4 0 0.4rem, transparent 0.45rem), radial-gradient(circle at 68% 45%, #0f766e 0 1.25rem, #14b8a6 1.3rem 2.1rem, transparent 2.15rem), radial-gradient(circle at 20% 77%, #2563eb 0 1.2rem, transparent 1.25rem); box-shadow: 0 12px 25px rgb(20 184 166 / 0.22); }
-    .ui-page-header-art::after { width: 4.5rem; height: 5.2rem; right: -2.7rem; top: 0.1rem; border: 1px solid rgb(255 255 255 / 0.8); background: linear-gradient(145deg, rgb(255 255 255 / 0.82), rgb(240 253 250 / 0.65)); box-shadow: 0 10px 20px rgb(15 23 42 / 0.08); }
-    .ui-page-header > :not(.ui-page-header-art) { position: relative; z-index: 1; }
+    .ui-page-header::after { position: absolute; right: -5%; bottom: -2.6rem; width: 62%; height: 5.5rem; border-radius: 56% 44% 0 0 / 80% 60% 0 0; background: linear-gradient(100deg, rgb(45 212 191 / 0.12), rgb(20 184 166 / 0.3)); content: ''; pointer-events: none; transform: rotate(-3deg); }
+    .ui-page-header > * { position: relative; z-index: 1; }
     .ui-page-header-main { display: flex; align-items: flex-start; gap: 1rem; }
     .ui-page-header-icon { display: grid; width: 3.75rem; height: 3.75rem; flex: 0 0 auto; place-items: center; border: 1px solid rgb(153 246 228 / 0.9); border-radius: 1.25rem; background: linear-gradient(145deg, #ecfdf5, #ccfbf1); color: #047857; box-shadow: 0 12px 24px rgb(13 148 136 / 0.16); }
     .ui-page-header-rich { min-height: 10.5rem; padding: clamp(1.25rem, 2.2vw, 2rem); background: linear-gradient(110deg, rgb(255 255 255 / 0.98) 0%, rgb(248 250 252 / 0.9) 46%, rgb(236 253 245 / 0.86) 100%); }
     .ui-page-header-rich::before { position: absolute; inset: auto auto 0 -2rem; width: 16rem; height: 3.5rem; border-radius: 50% 50% 0 0; background: linear-gradient(90deg, rgb(20 184 166 / 0.55), rgb(94 234 212 / 0.1)); content: ''; pointer-events: none; }
-    .ui-page-header-rich .ui-page-header-art { right: clamp(12rem, 24vw, 24rem); width: 13rem; transform: translateY(-50%) scale(1.2); }
 
     .ui-panel {
         border: 1px solid var(--simkeu-border);
@@ -139,6 +123,7 @@
     }
 
     .ui-table-shell {
+        position: relative;
         overflow: hidden;
         border: 1px solid var(--simkeu-border);
         border-radius: 1.25rem;
@@ -151,6 +136,8 @@
     .ui-table-title-mark { display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: 0.75rem; background: #ccfbf1; color: #0f766e; }
     .ui-table-count { border: 1px solid #99f6e4; border-radius: 9999px; background: #f0fdfa; padding: 0.25rem 0.625rem; color: #0f766e; font-size: 0.75rem; font-weight: 700; }
     .ui-table-filters-slot { border-bottom: 1px solid rgb(226 232 240 / 0.9); background: rgb(248 250 252 / 0.62); }
+    .ui-table-loading-layer { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1.25rem; background: rgb(255 255 255 / 0.76); backdrop-filter: blur(2px); }
+    .ui-table-loading-layer > * { min-width: min(100%, 18rem); box-shadow: 0 16px 32px rgb(15 23 42 / 0.1); }
     .ui-table-shell thead > tr:first-child th { border-bottom: 0; background: #f8fafc; color: #475569; }
     .ui-table-reset { min-height: 2.125rem !important; border: 1px solid #cbd5e1 !important; background: #fff !important; color: #475569 !important; font-size: 0.75rem !important; font-weight: 700 !important; }
     .ui-table-reset:hover { border-color: #5eead4 !important; background: #f0fdfa !important; color: #0f766e !important; }

@@ -1,4 +1,4 @@
-@props(['columns' => [], 'sortable' => true, 'mobileHidden' => [], 'title' => null, 'count' => null])
+@props(['columns' => [], 'sortable' => true, 'mobileHidden' => [], 'title' => null, 'count' => null, 'loadingTarget' => null])
 
 <div {{ $attributes->merge(['class' => 'ui-table-shell']) }}>
     @if ($title)
@@ -10,12 +10,15 @@
     @if (isset($filters))
         <div class="ui-table-filters-slot">{{ $filters }}</div>
     @endif
+    @if (isset($loading))
+        <div class="ui-table-loading-layer" wire:loading @if ($loadingTarget) wire:target="{{ $loadingTarget }}" @endif>{{ $loading }}</div>
+    @endif
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
             <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                     @foreach ($columns as $key => $label)
-                        <th scope="col" class="whitespace-nowrap px-5 py-3 {{ in_array($key, $mobileHidden, true) ? 'hidden md:table-cell' : '' }}">
+                        <th scope="col" class="whitespace-nowrap px-5 py-3 {{ $key === 'actions' ? 'text-right' : '' }} {{ in_array($key, $mobileHidden, true) ? 'hidden md:table-cell' : '' }}">
                             @if ($sortable && $key !== 'actions')
                                 <button type="button" wire:click="sort('{{ $key }}')" class="inline-flex items-center gap-1 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600">{{ $label }} <span aria-hidden="true">↕</span></button>
                             @else

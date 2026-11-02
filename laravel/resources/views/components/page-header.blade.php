@@ -1,7 +1,6 @@
 @props(['eyebrow' => null, 'title', 'description' => null, 'icon' => null])
 
 <div {{ $attributes->merge(['class' => 'ui-page-header flex flex-col justify-between gap-4 sm:flex-row sm:items-end']) }}>
-    <div class="ui-page-header-art" aria-hidden="true"></div>
     <div class="ui-page-header-main">
         @if ($icon)<span class="ui-page-header-icon"><flux:icon :name="$icon" class="size-7" /></span>@endif
         <div>
