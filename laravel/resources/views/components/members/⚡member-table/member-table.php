@@ -20,6 +20,8 @@ new class extends Component
 
     public string $sortDirection = 'asc';
 
+    public int $perPage = 10;
+
     public function mount(string $role): void
     {
         $this->role = $role;
@@ -39,7 +41,7 @@ new class extends Component
             })
             ->when($this->status !== '', fn ($query) => $query->where('status', $this->status))
             ->orderBy($this->sortBy, $this->sortDirection)
-            ->paginate(10);
+            ->paginate($this->perPage);
     }
 
     public function sort(string $column): void
@@ -62,6 +64,12 @@ new class extends Component
 
     public function updatedStatus(): void
     {
+        $this->resetPage();
+    }
+
+    public function updatedPerPage(mixed $value): void
+    {
+        $this->perPage = in_array((int) $value, [5, 10, 25, 50], true) ? (int) $value : 10;
         $this->resetPage();
     }
 

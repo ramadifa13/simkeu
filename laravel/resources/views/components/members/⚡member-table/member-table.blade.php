@@ -1,8 +1,8 @@
 <div class="space-y-5">
     <x-table-filters>
-        <flux:input wire:model.live.debounce.300ms="search" type="search" placeholder="Cari nama, kode anggota, atau telepon" aria-label="Cari anggota" />
-        <flux:select wire:model.live="status" aria-label="Filter status anggota"><option value="">Semua status</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></flux:select>
-        <flux:button type="button" variant="ghost" wire:click="resetFilters">Reset filter</flux:button>
+        <div class="ui-filter-field"><p class="ui-filter-label">Pencarian</p><flux:input wire:model.live.debounce.300ms="search" type="search" placeholder="Nama, kode, atau telepon" aria-label="Cari anggota" /></div>
+        <div class="ui-filter-field"><p class="ui-filter-label">Status anggota</p><flux:select wire:model.live="status" aria-label="Filter status anggota"><option value="">Semua status</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></flux:select></div>
+        <flux:button type="button" variant="ghost" wire:click="resetFilters" class="shrink-0">Reset</flux:button>
     </x-table-filters>
 
     <x-loading-state wire:loading wire:target="search,status,sort,resetFilters" />
@@ -21,5 +21,5 @@
         @endforelse
     </x-data-table>
 
-    <div class="flex items-center justify-between gap-4 text-sm text-slate-500"><p>{{ $this->members->total() }} anggota ditemukan</p>{{ $this->members->links() }}</div>
+    <x-pagination :paginator="$this->members" per-page-model="perPage" />
 </div>

@@ -3,11 +3,11 @@
 <div {{ $attributes->merge(['class' => 'ui-page-header flex flex-col justify-between gap-5 sm:flex-row sm:items-end']) }}>
     <div>
         @if ($eyebrow)
-            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-teal-700">{{ $eyebrow }}</p>
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">{{ $eyebrow }}</p>
         @endif
-        <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ $title }}</h1>
+        <h1 class="mt-1.5 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">{{ $title }}</h1>
         @if ($description)
-            <p class="mt-3 max-w-2xl text-slate-600">{{ $description }}</p>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">{{ $description }}</p>
         @endif
     </div>
     @if (isset($actions))
