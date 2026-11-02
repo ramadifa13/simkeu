@@ -81,6 +81,7 @@
         padding: clamp(0.875rem, 1.5vw, 1.2rem);
         box-shadow: 0 8px 24px rgb(15 23 42 / 0.05);
         isolation: isolate;
+        color: #0f172a;
     }
 
     .ui-page-header::after {
@@ -150,6 +151,9 @@
     .ui-table-title-mark { display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: 0.75rem; background: #ccfbf1; color: #0f766e; }
     .ui-table-count { border: 1px solid #99f6e4; border-radius: 9999px; background: #f0fdfa; padding: 0.25rem 0.625rem; color: #0f766e; font-size: 0.75rem; font-weight: 700; }
     .ui-table-filters-slot { border-bottom: 1px solid rgb(226 232 240 / 0.9); background: rgb(248 250 252 / 0.62); }
+    .ui-table-column-filters th { padding-top: 0.5rem !important; padding-bottom: 0.625rem !important; background: rgb(248 250 252 / 0.78); }
+    .ui-table-filter-cell [data-flux-control] { min-height: 2.125rem !important; background: #fff !important; color: #334155 !important; font-size: 0.75rem !important; font-weight: 500 !important; letter-spacing: normal !important; text-transform: none !important; }
+    .ui-table-reset { min-height: 2.125rem !important; font-size: 0.75rem !important; }
 
     [data-portal-shell] { font-size: 0.875rem; }
     .ui-app-shell header > div:first-child > .min-w-0 > p { display: none; }
@@ -275,6 +279,10 @@
     .ui-page-header-rich { min-height: auto; padding: 1rem; }
     .ui-page-header-rich .ui-page-header-art { right: 0.5rem; opacity: 0.24; transform: translateY(-50%) scale(0.62); }
     .ui-page-header-icon { width: 3rem; height: 3rem; border-radius: 1rem; }
+    .ui-page-header-rich .ui-page-header-main { max-width: 100%; }
+    .ui-table-column-filters th:nth-child(1), .ui-table-column-filters th:nth-child(3), .ui-table-column-filters th:nth-child(5) { display: none; }
+    .ui-table-column-filters th:nth-child(2), .ui-table-column-filters th:nth-child(4) { display: table-cell; }
+    .ui-table-column-filters th:last-child { display: table-cell; }
 }
 
 @media (min-width: 641px) and (max-width: 1023px) {
@@ -284,6 +292,7 @@
     .ui-table-shell thead th, .ui-table-shell tbody td { padding-inline: 0.875rem !important; }
     .ui-page-header-art { right: 11rem; opacity: 0.55; transform: translateY(-50%) scale(0.82); }
     .ui-page-header-rich .ui-page-header-art { right: 12rem; transform: translateY(-50%) scale(0.85); }
+    .ui-page-header-rich .ui-page-header-main { max-width: 62%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

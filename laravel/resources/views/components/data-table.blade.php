@@ -24,6 +24,9 @@
                         </th>
                     @endforeach
                 </tr>
+                @if (isset($columnFilters))
+                    <tr class="ui-table-column-filters">{{ $columnFilters }}</tr>
+                @endif
             </thead>
             <tbody class="divide-y divide-slate-100">{{ $slot }}</tbody>
         </table>
