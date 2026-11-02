@@ -745,6 +745,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 }
                 ?>
 
+                <?php if (($angsuranMode ?? 'list') === 'detail'): ?>
                 <div class="card ui-ag-cart mb-3<?php echo $keranjang ? ' has-items' : ''; ?>" id="keranjangAngsuran">
                     <div class="card-header ui-dash-sec">
                         <span class="ui-dash-sec-title"><i class="ti ti-basket" aria-hidden="true"></i>Keranjang pembayaran</span>
@@ -803,6 +804,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         <?php endif; ?>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <?php if ($jumlah_menunggu > 0): ?>
                 <div class="alert alert-warning ui-ag-info py-2" role="status">
@@ -868,6 +870,8 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                 </div>
                             </div>
                         </div>
+
+                        <?php include __DIR__ . '/ui/keranjang_angsuran.php'; ?>
 
                         <?php if (empty($pinjaman_list)): ?>
                         <div class="ui-ag-empty">
