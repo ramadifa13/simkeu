@@ -95,10 +95,16 @@
         pointer-events: none;
     }
 
-    .ui-page-header-art { position: absolute; right: clamp(7.5rem, 20vw, 19rem); top: 50%; z-index: -1; width: 10rem; height: 5.5rem; transform: translateY(-50%); opacity: 0.9; }
+    .ui-page-header-art { position: absolute; right: clamp(7.5rem, 20vw, 19rem); top: 50%; z-index: 0; width: 10rem; height: 5.5rem; transform: translateY(-50%); opacity: 0.9; pointer-events: none; }
     .ui-page-header-art::before, .ui-page-header-art::after { position: absolute; border-radius: 9999px; content: ''; }
     .ui-page-header-art::before { width: 7.5rem; height: 7.5rem; right: 0.8rem; top: -1rem; background: radial-gradient(circle at 36% 35%, #5eead4 0 0.4rem, transparent 0.45rem), radial-gradient(circle at 68% 45%, #0f766e 0 1.25rem, #14b8a6 1.3rem 2.1rem, transparent 2.15rem), radial-gradient(circle at 20% 77%, #2563eb 0 1.2rem, transparent 1.25rem); box-shadow: 0 12px 25px rgb(20 184 166 / 0.22); }
     .ui-page-header-art::after { width: 4.5rem; height: 5.2rem; right: -2.7rem; top: 0.1rem; border: 1px solid rgb(255 255 255 / 0.8); background: linear-gradient(145deg, rgb(255 255 255 / 0.82), rgb(240 253 250 / 0.65)); box-shadow: 0 10px 20px rgb(15 23 42 / 0.08); }
+    .ui-page-header > :not(.ui-page-header-art) { position: relative; z-index: 1; }
+    .ui-page-header-main { display: flex; align-items: flex-start; gap: 1rem; }
+    .ui-page-header-icon { display: grid; width: 3.75rem; height: 3.75rem; flex: 0 0 auto; place-items: center; border: 1px solid rgb(153 246 228 / 0.9); border-radius: 1.25rem; background: linear-gradient(145deg, #ecfdf5, #ccfbf1); color: #047857; box-shadow: 0 12px 24px rgb(13 148 136 / 0.16); }
+    .ui-page-header-rich { min-height: 10.5rem; padding: clamp(1.25rem, 2.2vw, 2rem); background: linear-gradient(110deg, rgb(255 255 255 / 0.98) 0%, rgb(248 250 252 / 0.9) 46%, rgb(236 253 245 / 0.86) 100%); }
+    .ui-page-header-rich::before { position: absolute; inset: auto auto 0 -2rem; width: 16rem; height: 3.5rem; border-radius: 50% 50% 0 0; background: linear-gradient(90deg, rgb(20 184 166 / 0.55), rgb(94 234 212 / 0.1)); content: ''; pointer-events: none; }
+    .ui-page-header-rich .ui-page-header-art { right: clamp(12rem, 24vw, 24rem); width: 13rem; transform: translateY(-50%) scale(1.2); }
 
     .ui-panel {
         border: 1px solid var(--simkeu-border);
@@ -197,9 +203,9 @@
     [data-flux-input-file]::file-selector-button { margin-right: 0.75rem; border: 0; border-radius: 0.5rem; background: #f0fdfa; color: #0f766e; font-weight: 650; }
     [data-flux-modal-content] { border: 1px solid #dbe3ef; border-radius: 1.25rem; box-shadow: 0 24px 64px rgb(15 23 42 / 0.2); }
 
-    .ui-filter-bar { border: 1px solid var(--simkeu-border); border-radius: 1rem; background: rgb(255 255 255 / 0.92); padding: 0.875rem; box-shadow: 0 6px 18px rgb(15 23 42 / 0.04); }
+    .ui-filter-bar { border: 1px solid rgb(203 213 225 / 0.9); border-radius: 1.25rem; background: rgb(255 255 255 / 0.94); padding: 1rem; box-shadow: 0 12px 28px rgb(15 23 42 / 0.07); }
     .ui-filter-field { min-width: min(100%, 15rem); flex: 1 1 15rem; }
-    .ui-filter-label { display: flex; align-items: center; gap: 0.375rem; margin: 0 0 0.35rem; color: #64748b; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    .ui-filter-label { display: flex; align-items: center; gap: 0.375rem; margin: 0 0 0.35rem; color: #475569; font-size: 0.75rem; font-weight: 750; letter-spacing: 0.02em; }
     .ui-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; border-top: 1px solid #e2e8f0; padding-top: 0.875rem; }
     .ui-pagination-meta { color: #64748b; font-size: 0.8125rem; }
     .ui-pagination-controls { display: flex; align-items: center; gap: 0.25rem; }
@@ -262,6 +268,9 @@
     .ui-stat-card { padding: 1rem; }
     [data-flux-modal-content] { border-radius: 1rem; }
     .ui-page-header-art { right: 0.5rem; opacity: 0.28; transform: translateY(-50%) scale(0.7); transform-origin: right center; }
+    .ui-page-header-rich { min-height: auto; padding: 1rem; }
+    .ui-page-header-rich .ui-page-header-art { right: 0.5rem; opacity: 0.24; transform: translateY(-50%) scale(0.62); }
+    .ui-page-header-icon { width: 3rem; height: 3rem; border-radius: 1rem; }
 }
 
 @media (min-width: 641px) and (max-width: 1023px) {
@@ -270,6 +279,7 @@
     .ui-filter-field { min-width: 0; }
     .ui-table-shell thead th, .ui-table-shell tbody td { padding-inline: 0.875rem !important; }
     .ui-page-header-art { right: 11rem; opacity: 0.55; transform: translateY(-50%) scale(0.82); }
+    .ui-page-header-rich .ui-page-header-art { right: 12rem; transform: translateY(-50%) scale(0.85); }
 }
 
 @media (prefers-reduced-motion: reduce) {
