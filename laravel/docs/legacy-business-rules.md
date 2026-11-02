@@ -5,6 +5,7 @@ Semua nilai uang memakai decimal/Rupiah; mutasi finansial harus berada dalam tra
 ## Perhitungan pinjaman dan jadwal
 
 - Frekuensi `bulanan`, `mingguan`, `dua_mingguan` menghasilkan jumlah cicilan: tenor bulan × 1, × 4, atau × 2.
+- Nilai maksimal pengajuan selalu mengikuti `jenis_pinjaman.maksimal_pinjaman` pada produk aktif. Tidak boleh ada batas nominal hard-coded berdasarkan frekuensi: produk mingguan atau `dua_mingguan` tetap dapat mengajukan di atas Rp3.000.000 bila plafond produk mengizinkannya. Ketentuan khusus tenor dan bunga produk tetap diterapkan terpisah.
 - Skema `flat`: total bunga = pembulatan `pokok × bunga%`; total = pokok + bunga. Cicilan dan pokok dibulatkan per Rupiah; sisa pembulatan selalu dialokasikan ke cicilan terakhir agar total pokok dan total tagihan tepat.
 - Skema `tahunan` adalah rumus historis: bunga = pokok × bunga% × tenor/12. Nilai historis tidak boleh dihitung ulang dengan skema baru.
 - Gadai hanya untuk kelipatan Rp1.000.000; biaya mingguan = Rp5.000 + (jumlah juta × Rp5.000), dikalikan tenor×4 dan ditambahkan pada bunga dasar sebelum jadwal dihitung.

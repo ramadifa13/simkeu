@@ -86,7 +86,7 @@ Setiap fase yang membuat atau mengubah modul wajib mengecek seluruh butir yang r
 
 **Tujuan:** setiap data/rule native sudah diketahui sebelum membangun fitur baru.
 
-**Progres terdokumentasi (2026-11-02):** baseline skema, halaman/form/helper, field dan klasifikasinya, relasi, kontrak finansial, keluaran, automasi, serta baseline rekonsiliasi telah diaudit. Bukti lengkap berada pada `docs/phase-2-completion-audit.md`.
+**Progres terdokumentasi (2026-11-02):** baseline skema, halaman/form/helper, field dan klasifikasinya, relasi, kontrak finansial, keluaran, automasi, serta baseline rekonsiliasi telah diaudit. Sinkronisasi dari `main` juga menegaskan bahwa plafond pengajuan harus mengikuti produk aktif, bukan nominal hard-coded per frekuensi. Bukti lengkap berada pada `docs/phase-2-completion-audit.md`.
 
 - [x] Catat sumber matriks peran/aksi native dan keputusan struktur informasi awal.
 - [x] Buat inventaris halaman native per peran dan fase target awal.

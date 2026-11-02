@@ -77,7 +77,7 @@ This catalogue is the traceability record for the native-to-Laravel migration. A
 
 | Source fields / tables | Laravel destination | Rule | Status |
 | --- | --- | --- | --- |
-| `jenis_pinjaman` dan `jenis_pinjaman_tarif` | Master produk pinjaman | Kode unik; maksimum, tenor, bunga, frekuensi (`bulanan`, `mingguan`, `dua_mingguan`), jaminan, dan status harus terjaga. Tarif tenor mengesampingkan/menentukan bunga menurut helper native saat diverifikasi di Fase 7. | Documented |
+| `jenis_pinjaman` dan `jenis_pinjaman_tarif` | Master produk pinjaman | Kode unik; `maksimal_pinjaman` produk aktif adalah satu-satunya batas nominal pengajuan untuk semua frekuensi (`bulanan`, `mingguan`, `dua_mingguan`), tanpa batas hard-coded per frekuensi. Tenor, bunga, jaminan, dan status harus terjaga. Tarif tenor mengesampingkan/menentukan bunga menurut helper native saat diverifikasi di Fase 7. | Documented |
 | `pengajuan_pinjaman` | Workflow pengajuan | Status: `menunggu`, `disetujui`, `ditolak`, `dicairkan`, `batal_cair`; simpan nilai pinjaman, tenor, bunga/skema, frekuensi, tujuan, jadwal, fasilitas prioritas, kategori/ketua kelompok, serta pelaku dan waktu keputusan. | Documented |
 | `pinjaman` | Kontrak pinjaman aktif | Kode unik; simpan pokok, sisa pokok, total, cicilan, tanggal cair/jatuh tempo/lunas, frekuensi, foto cair, status `aktif`/`lunas`/`macet`, input mundur dan cicilan di muka. | Documented |
 | `angsuran` | Jadwal dan pembayaran angsuran | Nomor cicilan unik per pinjaman secara bisnis; simpan pokok, bunga, denda, jatuh tempo/bayar, status `belum_bayar`/`lunas`/`telat`, cara bayar, hari terlambat, dan flag denda manual. | Documented |
