@@ -10,10 +10,10 @@
 | Shell | sidebar sticky/collapsible, header akun/notifikasi, mobile drawer, skip link | layout portal responsif |
 | Hierarki halaman | eyebrow, judul, deskripsi, aksi utama | header wave dan tombol primer |
 | Aksi | primer, sekunder, ghost, bahaya; tiga titik hanya pada baris tabel | tombol dan action menu |
-| Form | label, bantuan, error, disabled, select pendek, autocomplete panjang, textarea, upload | form pendek dan form panjang |
+| Form | teks, email, sandi, telepon, angka/mata uang, tanggal/waktu, textarea, select, radio, checkbox, autocomplete, upload, label, bantuan, error, disabled | katalog input lengkap, form pendek, dan form panjang |
 | Data | heading tabel, toolbar filter, search, sort, badge, menu baris, pagination, kolom prioritas mobile | tabel contoh, skeleton, kosong |
 | Detail | kartu ringkasan, tab, timeline audit, dokumen privat | ringkasan/detail contoh |
-| Feedback | sukses, peringatan, error, loading/retry, empty | notifikasi dan state |
+| Feedback | toast sukses/peringatan/gagal/info, callout, validasi, loading/retry, empty | notifikasi interaktif dan state |
 | Aksesibilitas | fokus terlihat, label, keyboard, target nyaman, kontras, reduced motion | checklist dan kontrol fokus |
 | Responsif | mobile-first, tablet grid, desktop density, tabel horizontal yang terkendali | panduan breakpoint |
 
@@ -25,6 +25,7 @@
 4. Tabel selalu menyediakan state memuat, kosong, gagal/retry, search/filter/sort, pagination, serta kolom prioritas di mobile.
 5. Warna tidak membawa makna sendiri tanpa teks; status memakai label dan kontras minimum yang terbaca.
 6. Animasi hanya micro-interaction singkat dan wajib mematuhi `prefers-reduced-motion`.
+7. Semua jenis kontrol yang tersedia di UI Preview harus memakai primitive ini; jangan membuat input, modal, toast, atau status baru per modul tanpa terlebih dahulu menambahkannya ke fondasi.
 
 ## Yang perlu disetujui melalui preview
 
