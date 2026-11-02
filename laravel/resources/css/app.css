@@ -13,10 +13,40 @@
 }
 
 @layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+
     :focus-visible {
         outline: 2px solid var(--color-teal-400);
         outline-offset: 3px;
     }
+}
+
+@keyframes rise-in {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float-gentle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+@utility animate-rise-in {
+    animation: rise-in 700ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+@utility animate-float-gentle {
+    animation: float-gentle 5s ease-in-out infinite;
+}
+
+@utility animation-delay-150 {
+    animation-delay: 150ms;
+}
+
+@utility animation-delay-300 {
+    animation-delay: 300ms;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -15,17 +15,17 @@
     </head>
     <body class="min-h-screen bg-slate-50 font-sans text-slate-900 antialiased">
         <a href="#content" class="sr-only fixed left-4 top-4 z-50 rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white focus:not-sr-only">Lewati ke konten utama</a>
-        <div class="min-h-screen lg:grid lg:grid-cols-[17rem_1fr]">
-            <aside class="hidden border-r border-slate-200 bg-slate-950 px-5 py-6 text-slate-100 lg:block">
-                <a href="{{ route('portal.dashboard', ['role' => $role]) }}" class="flex items-center gap-3 font-semibold tracking-tight">
-                    <span class="grid size-10 place-items-center rounded-xl bg-teal-300 text-lg font-black text-slate-950">S</span>
-                    <span>SIMKEU <small class="block text-xs font-medium text-slate-400">Portal {{ ucfirst($role) }}</small></span>
+        <div class="min-h-screen bg-slate-100 lg:grid lg:grid-cols-[18rem_1fr]">
+            <aside class="hidden border-r border-white/10 bg-slate-950 px-4 py-5 text-slate-100 lg:block">
+                <a href="{{ route('portal.dashboard', ['role' => $role]) }}" class="flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-white/8">
+                    <span class="grid size-11 place-items-center rounded-2xl bg-teal-300 text-lg font-black text-slate-950 shadow-lg shadow-teal-400/20">S</span>
+                    <span class="font-semibold tracking-tight">SIMKEU <small class="mt-0.5 block text-xs font-medium text-slate-400">Portal {{ ucfirst($role) }}</small></span>
                 </a>
                 <x-portal-navigation :role="$role" class="mt-4" />
             </aside>
 
             <div class="min-w-0">
-                <header class="flex min-h-18 items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-10">
+                <header class="sticky top-0 z-20 flex min-h-18 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-10">
                     <div class="flex min-w-0 items-center gap-3">
                         <details class="relative lg:hidden">
                             <summary class="grid size-10 cursor-pointer place-items-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50" aria-label="Buka menu navigasi">☰</summary>
@@ -43,7 +43,7 @@
                         <form method="POST" action="{{ route('logout') }}">@csrf<flux:button type="submit" variant="ghost">Keluar</flux:button></form>
                     </div>
                 </header>
-                <main id="content" class="px-4 py-6 sm:px-6 lg:px-10 lg:py-8">{{ $slot }}</main>
+                <main id="content" class="animate-rise-in px-4 py-6 sm:px-6 lg:px-10 lg:py-8">{{ $slot }}</main>
             </div>
         </div>
         <div class="sr-only" aria-live="polite" aria-atomic="true"></div>

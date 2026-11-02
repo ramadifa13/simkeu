@@ -2,8 +2,6 @@
 
 use App\Http\Controllers\Account\ProfileController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
-use App\Http\Controllers\Auth\NewPasswordController;
-use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Portal\DashboardController;
 use App\Http\Controllers\Portal\MemberController;
 use App\Http\Controllers\Portal\ModulePlaceholderController;
@@ -13,10 +11,6 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', LandingController::class)->name('landing');
 Route::view('/login', 'auth.login')->name('login');
 Route::post('/login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:login')->name('login.store');
-Route::get('/lupa-kata-sandi', [PasswordResetLinkController::class, 'create'])->middleware('guest')->name('password.request');
-Route::post('/lupa-kata-sandi', [PasswordResetLinkController::class, 'store'])->middleware(['guest', 'throttle:password-reset'])->name('password.email');
-Route::get('/atur-ulang-kata-sandi/{token}', [NewPasswordController::class, 'create'])->middleware('guest')->name('password.reset');
-Route::post('/atur-ulang-kata-sandi', [NewPasswordController::class, 'store'])->middleware('guest')->name('password.store');
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->middleware('auth')->name('logout');
 
 Route::middleware('auth')->group(function (): void {

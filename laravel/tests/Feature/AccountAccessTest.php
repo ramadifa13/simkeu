@@ -6,12 +6,11 @@ use Tests\TestCase;
 
 class AccountAccessTest extends TestCase
 {
-    public function test_password_reset_request_page_is_available_to_guests(): void
+    public function test_public_password_reset_page_is_not_available(): void
     {
-        $response = $this->get(route('password.request'));
+        $response = $this->get('/lupa-kata-sandi');
 
-        $response->assertOk();
-        $response->assertSee('Atur ulang kata sandi');
+        $response->assertNotFound();
     }
 
     public function test_profile_requires_authentication(): void
