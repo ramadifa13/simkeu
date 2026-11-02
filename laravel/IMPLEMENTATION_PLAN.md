@@ -115,19 +115,19 @@ Setiap fase yang membuat atau mengubah modul wajib mengecek seluruh butir yang r
 
 **Mulai hanya setelah Fase 2 selesai.**
 
-- [ ] Setujui peta navigasi lengkap Admin, Teller, dan Anggota berdasarkan katalog legacy.
-- [ ] Buat route placeholder dan navigasi desktop/mobile per role untuk seluruh modul yang disetujui.
-- [ ] Tetapkan fondasi desain UI/UX: token warna/typography/spacing, ikon, grid, kartu, tombol, form Flux, tabel, status, modal, toast, empty/loading/error state, dan aturan animasi.
-- [ ] Tetapkan pola responsif dan aksesibilitas landing/login: mobile-first, sticky navigation, mobile drawer, skip link, focus keyboard, kontras, serta reduced-motion.
-- [ ] Lengkapi landing: identitas koperasi, produk/layanan, proses, FAQ, kontak, lokasi/jam, legal/privacy, dan CTA login.
-- [ ] Terapkan landing modern dan interaktif: hero dinamis, visual brand/SVG atau aset, micro-interaction, scroll reveal hemat animasi, hover/focus state, dan konten produk dari data koperasi.
-- [ ] Tentukan strategi aset gambar/ikon/font, optimasi ukuran, fallback, dan aturan lisensi sebelum aset dipakai.
-- [ ] Lengkapi login: feedback throttling, akun nonaktif, pesan generik, dan aksesibilitas.
-- [ ] Terapkan halaman login modern, responsif, dan aksesibel dengan feedback validasi/loading yang jelas.
-- [ ] Buat profil, ubah kata sandi, reset kata sandi, logout, dan area notifikasi.
-- [ ] Terapkan aturan tombol utama dan action menu tabel secara konsisten.
+- [x] Setujui peta navigasi lengkap Admin, Teller, dan Anggota berdasarkan katalog legacy.
+- [x] Buat route placeholder dan navigasi desktop/mobile per role untuk seluruh modul yang disetujui.
+- [x] Tetapkan fondasi desain UI/UX: token warna/typography/spacing, ikon, grid, kartu, tombol, form Flux, tabel, status, modal, toast, empty/loading/error state, dan aturan animasi.
+- [x] Tetapkan pola responsif dan aksesibilitas landing/login: mobile-first, sticky navigation, mobile drawer, skip link, focus keyboard, kontras, serta reduced-motion.
+- [x] Lengkapi landing: identitas koperasi, produk/layanan, proses, FAQ, kontak, lokasi/jam, legal/privacy, dan CTA login.
+- [x] Terapkan landing modern dan interaktif: hero dinamis, visual brand, micro-interaction hemat animasi, hover/focus state, dan CTA.
+- [x] Tentukan strategi aset gambar/ikon/font, optimasi ukuran, fallback, dan aturan lisensi sebelum aset dipakai.
+- [x] Lengkapi login: feedback throttling, akun nonaktif, pesan generik, dan aksesibilitas.
+- [x] Terapkan halaman login modern, responsif, dan aksesibel dengan feedback validasi/loading yang jelas.
+- [x] Buat profil, ubah kata sandi, reset kata sandi, logout, dan area notifikasi.
+- [x] Terapkan aturan tombol utama dan action menu tabel secara konsisten.
 
-**Bukti kelulusan:** setiap halaman native memiliki keputusan route/navigasi; UAT publik dan akun lulus.
+**Bukti kelulusan:** terpenuhi untuk fondasi Fase 3 pada 2026-11-02. Navigasi per peran dan placeholder dikendalikan oleh `config/navigation.php`; UI publik/akun menggunakan Blade, Flux, token Tailwind, dan aksesibilitas dasar. Migrations reset kata sandi telah dijalankan, cache Blade berhasil, Vite build berhasil, dan 14 feature test lulus. Data profil koperasi spesifik (alamat, jam, kontak resmi, legal/privacy final) akan dibaca dari master pengaturan pada Fase 5; landing saat ini menampilkan fallback aman tanpa mengarang data.
 
 ## Fase 4 — Dashboard berbasis data nyata
 

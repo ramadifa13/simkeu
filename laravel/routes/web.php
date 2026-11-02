@@ -1,15 +1,29 @@
 <?php
 
+use App\Http\Controllers\Account\ProfileController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\NewPasswordController;
+use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Portal\DashboardController;
 use App\Http\Controllers\Portal\MemberController;
+use App\Http\Controllers\Portal\ModulePlaceholderController;
 use App\Http\Controllers\Public\LandingController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', LandingController::class)->name('landing');
 Route::view('/login', 'auth.login')->name('login');
 Route::post('/login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:login')->name('login.store');
+Route::get('/lupa-kata-sandi', [PasswordResetLinkController::class, 'create'])->middleware('guest')->name('password.request');
+Route::post('/lupa-kata-sandi', [PasswordResetLinkController::class, 'store'])->middleware(['guest', 'throttle:password-reset'])->name('password.email');
+Route::get('/atur-ulang-kata-sandi/{token}', [NewPasswordController::class, 'create'])->middleware('guest')->name('password.reset');
+Route::post('/atur-ulang-kata-sandi', [NewPasswordController::class, 'store'])->middleware('guest')->name('password.store');
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->middleware('auth')->name('logout');
+
+Route::middleware('auth')->group(function (): void {
+    Route::get('/akun', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/akun', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/akun/kata-sandi', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
+});
 
 Route::middleware(['auth', 'role'])->prefix('portal')->name('portal.')->group(function (): void {
     Route::get('/{role}/dashboard', DashboardController::class)
@@ -40,4 +54,8 @@ Route::middleware(['auth', 'role'])->prefix('portal')->name('portal.')->group(fu
     Route::get('/{role}/anggota/{member}', [MemberController::class, 'show'])
         ->whereIn('role', ['admin', 'teller'])
         ->name('members.show');
+
+    Route::get('/{role}/modul/{module}', ModulePlaceholderController::class)
+        ->whereIn('role', ['admin', 'teller', 'anggota'])
+        ->name('modules.placeholder');
 });
