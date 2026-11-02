@@ -6,6 +6,12 @@ document.querySelectorAll('[data-sidebar-toggle]').forEach((button) => {
     button.addEventListener('click', () => {
         const isCollapsed = shell?.classList.toggle('sidebar-collapsed');
 
+        if (isCollapsed) {
+            document.querySelectorAll('[data-sidebar] details').forEach((group) => {
+                group.open = false;
+            });
+        }
+
         document.querySelectorAll('[data-sidebar-toggle]').forEach((toggle) => {
             toggle.setAttribute('aria-expanded', String(!isCollapsed));
         });
@@ -16,6 +22,9 @@ document.querySelectorAll('[data-sidebar-toggle]').forEach((button) => {
 
 if (localStorage.getItem('simkeu-sidebar-collapsed') === 'true') {
     shell?.classList.add('sidebar-collapsed');
+    document.querySelectorAll('[data-sidebar] details').forEach((group) => {
+        group.open = false;
+    });
 }
 
 const toggleMobileNavigation = () => {
