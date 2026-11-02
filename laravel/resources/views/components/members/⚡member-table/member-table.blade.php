@@ -1,12 +1,12 @@
 <div class="space-y-5">
     <x-loading-state wire:loading wire:target="search,status,sort,resetFilters" />
-    <x-data-table title="Daftar anggota" :count="$this->members->total()" :columns="['kode_anggota' => 'Kode', 'nama_lengkap' => 'Nama anggota', 'telepon' => 'Telepon', 'status' => 'Status', 'tanggal_daftar' => 'Terdaftar', 'actions' => '']" :mobile-hidden="['telepon', 'tanggal_daftar']">
+    <x-data-table title="Daftar anggota" :count="$this->members->total()" :columns="['kode_anggota' => 'Kode', 'nama_lengkap' => 'Nama anggota', 'telepon' => 'Telepon', 'status' => 'Status', 'tanggal_daftar' => 'Terdaftar', 'actions' => 'Aksi']" :mobile-hidden="['telepon', 'tanggal_daftar']">
         <x-slot:columnFilters>
-            <th class="ui-table-filter-cell"><span class="sr-only">Filter kode</span></th>
+            <th class="ui-table-filter-cell ui-table-filter-muted"><span aria-hidden="true">&mdash;</span><span class="sr-only">Tidak ada filter kode</span></th>
             <th class="ui-table-filter-cell"><flux:input wire:model.live.debounce.300ms="search" type="search" placeholder="Cari nama, kode, telepon" aria-label="Cari anggota" /></th>
-            <th class="ui-table-filter-cell"><span class="sr-only">Filter telepon</span></th>
+            <th class="ui-table-filter-cell ui-table-filter-muted"><span aria-hidden="true">&mdash;</span><span class="sr-only">Tidak ada filter telepon</span></th>
             <th class="ui-table-filter-cell"><flux:select wire:model.live="status" aria-label="Filter status anggota"><option value="">Semua</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></flux:select></th>
-            <th class="ui-table-filter-cell"><span class="sr-only">Filter tanggal</span></th>
+            <th class="ui-table-filter-cell ui-table-filter-muted"><span aria-hidden="true">&mdash;</span><span class="sr-only">Tidak ada filter tanggal</span></th>
             <th class="ui-table-filter-cell text-right"><flux:button type="button" variant="ghost" wire:click="resetFilters" class="ui-table-reset">Reset</flux:button></th>
         </x-slot:columnFilters>
         @forelse ($this->members as $member)
