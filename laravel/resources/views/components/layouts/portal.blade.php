@@ -1,54 +1,9 @@
 @props(['role', 'title' => 'SIMKEU', 'breadcrumbs' => []])
-
 @php($user = auth()->user())
-
 <!DOCTYPE html>
-<html lang="id" class="bg-slate-50">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
-        <title>{{ $title }}</title>
-        @fluxAppearance
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-        @livewireStyles
-    </head>
-    <body class="min-h-screen bg-slate-50 font-sans text-slate-900 antialiased">
-        <a href="#content" class="sr-only fixed left-4 top-4 z-50 rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white focus:not-sr-only">Lewati ke konten utama</a>
-        <div class="min-h-screen bg-slate-100 lg:grid lg:grid-cols-[18rem_1fr]">
-            <aside class="hidden border-r border-white/10 bg-slate-950 px-4 py-5 text-slate-100 lg:block">
-                <a href="{{ route('portal.dashboard', ['role' => $role]) }}" class="flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-white/8">
-                    <span class="grid size-11 place-items-center rounded-2xl bg-teal-300 text-lg font-black text-slate-950 shadow-lg shadow-teal-400/20">S</span>
-                    <span class="font-semibold tracking-tight">SIMKEU <small class="mt-0.5 block text-xs font-medium text-slate-400">Portal {{ ucfirst($role) }}</small></span>
-                </a>
-                <x-portal-navigation :role="$role" class="mt-4" />
-            </aside>
-
-            <div class="min-w-0">
-                <header class="sticky top-0 z-20 flex min-h-18 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-10">
-                    <div class="flex min-w-0 items-center gap-3">
-                        <details class="relative lg:hidden">
-                            <summary class="grid size-10 cursor-pointer place-items-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50" aria-label="Buka menu navigasi">☰</summary>
-                            <div class="absolute left-0 z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl"><x-portal-navigation :role="$role" :mobile="true" /></div>
-                        </details>
-                        <div class="min-w-0"><p class="truncate text-sm font-medium text-slate-500">{{ $title }}</p>@if ($breadcrumbs)<x-breadcrumbs :items="$breadcrumbs" class="mt-1" />@endif</div>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <details class="relative">
-                            <summary class="grid size-10 cursor-pointer place-items-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50" aria-label="Buka notifikasi">🔔</summary>
-                            <div class="absolute right-0 z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl"><p class="font-semibold text-slate-900">Notifikasi</p><p class="mt-2 text-sm leading-6 text-slate-500">Belum ada notifikasi baru. Notifikasi operasional akan dihubungkan saat modul terkait tersedia.</p></div>
-                        </details>
-                        <div class="hidden text-right sm:block"><p class="text-sm font-semibold text-slate-900">{{ $user?->nama_lengkap }}</p><p class="text-xs text-slate-500">{{ ucfirst($role) }}</p></div>
-                        <a href="{{ route('profile.edit') }}" class="hidden text-sm font-semibold text-teal-700 hover:text-teal-800 sm:block">Akun</a>
-                        <form method="POST" action="{{ route('logout') }}">@csrf<flux:button type="submit" variant="ghost">Keluar</flux:button></form>
-                    </div>
-                </header>
-                <main id="content" class="animate-rise-in px-4 py-6 sm:px-6 lg:px-10 lg:py-8">{{ $slot }}</main>
-            </div>
-        </div>
-        <div class="sr-only" aria-live="polite" aria-atomic="true"></div>
-        <flux:toast position="bottom end" />
-        @livewireScripts
-        @fluxScripts
-    </body>
-</html>
+<html lang="id" class="bg-slate-100"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>{{ $title }}</title>@fluxAppearance @vite(['resources/css/app.css', 'resources/js/app.js']) @livewireStyles</head>
+<body class="min-h-screen bg-slate-100 font-sans text-slate-900 antialiased"><a href="#content" class="sr-only fixed left-4 top-4 z-50 rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white focus:not-sr-only">Lewati ke konten utama</a>
+<div class="min-h-screen lg:grid lg:grid-cols-[var(--sidebar-width)_minmax(0,1fr)]" data-portal-shell>
+<aside class="fixed inset-y-0 left-0 z-40 hidden w-[var(--sidebar-width)] flex-col border-r border-white/10 bg-slate-950 px-4 py-5 text-slate-100 transition-[width] duration-300 lg:flex" data-sidebar><div class="flex items-center justify-between gap-2"><a href="{{ route('portal.dashboard', ['role' => $role]) }}" class="flex min-w-0 items-center gap-3 rounded-2xl p-2 transition hover:bg-white/8"><span class="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-300 text-lg font-black text-slate-950 shadow-lg shadow-teal-400/20">S</span><span class="sidebar-label min-w-0 font-semibold tracking-tight">SIMKEU <small class="mt-0.5 block text-xs font-medium text-slate-400">Portal {{ ucfirst($role) }}</small></span></a><button type="button" class="sidebar-label grid size-9 place-items-center rounded-xl text-slate-400 transition hover:bg-white/10 hover:text-white" data-sidebar-toggle aria-label="Ciutkan sidebar" aria-expanded="true">&laquo;</button></div><x-portal-navigation :role="$role" class="mt-5 flex-1" /><a href="{{ route('profile.edit') }}" class="sidebar-label mt-4 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-slate-300 transition hover:border-teal-300/40 hover:bg-white/10"><span class="block font-semibold text-white">{{ $user?->nama_lengkap }}</span><span class="mt-0.5 block text-xs">Kelola akun</span></a></aside>
+<div class="min-w-0 lg:col-start-2"><header class="sticky top-0 z-30 flex min-h-18 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8"><div class="flex min-w-0 items-center gap-3"><button type="button" class="grid size-10 place-items-center rounded-xl border border-slate-200 bg-white text-lg text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-300 hover:text-teal-700 lg:hidden" data-mobile-nav-toggle aria-label="Buka menu navigasi" aria-expanded="false">&#9776;</button><button type="button" class="hidden size-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-300 hover:text-teal-700 lg:grid" data-sidebar-toggle aria-label="Tampilkan atau ciutkan sidebar">&#9776;</button><div class="min-w-0"><p class="truncate text-sm font-semibold text-slate-700">{{ $title }}</p>@if ($breadcrumbs)<x-breadcrumbs :items="$breadcrumbs" class="mt-1" />@endif</div></div><div class="flex items-center gap-2 sm:gap-3"><details class="relative"><summary class="grid size-10 cursor-pointer place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-300 hover:text-teal-700" aria-label="Buka notifikasi">&#128276;</summary><div class="absolute right-0 z-30 mt-3 w-72 rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-900/15"><p class="font-semibold text-slate-900">Notifikasi</p><p class="mt-2 text-sm leading-6 text-slate-500">Belum ada notifikasi baru.</p></div></details><a href="{{ route('profile.edit') }}" class="hidden items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-slate-100 sm:flex"><span class="grid size-8 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{{ mb_substr($user?->nama_lengkap ?? 'U', 0, 1) }}</span><span class="max-w-32 truncate text-left text-sm"><span class="block font-semibold text-slate-900">{{ $user?->nama_lengkap }}</span><span class="block text-xs text-slate-500">{{ ucfirst($role) }}</span></span></a><form method="POST" action="{{ route('logout') }}">@csrf<flux:button type="submit" variant="ghost" class="hidden sm:inline-flex">Keluar</flux:button></form></div></header><main id="content" class="animate-rise-in px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{{ $slot }}</main></div></div>
+<div class="fixed inset-0 z-40 hidden bg-slate-950/45 backdrop-blur-sm lg:hidden" data-mobile-nav-backdrop></div><aside class="fixed inset-y-0 left-0 z-50 flex w-80 max-w-[86vw] -translate-x-full flex-col bg-slate-950 p-4 text-slate-100 shadow-2xl transition-transform duration-300 lg:hidden" data-mobile-nav aria-label="Navigasi portal mobile"><div class="flex items-center justify-between"><span class="font-semibold">Menu SIMKEU</span><button type="button" class="grid size-10 place-items-center rounded-xl hover:bg-white/10" data-mobile-nav-toggle aria-label="Tutup menu">&times;</button></div><x-portal-navigation :role="$role" :mobile="true" class="mt-5" /></aside><div class="sr-only" aria-live="polite" aria-atomic="true"></div><flux:toast position="bottom end" /> @livewireScripts @fluxScripts</body></html>

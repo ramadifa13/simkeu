@@ -49,6 +49,16 @@
     animation-delay: 300ms;
 }
 
+@layer components {
+    [data-portal-shell] { --sidebar-width: 18rem; }
+    [data-portal-shell].sidebar-collapsed { --sidebar-width: 5.5rem; }
+    [data-portal-shell].sidebar-collapsed .sidebar-label,
+    [data-portal-shell].sidebar-collapsed .sidebar-submenu { display: none; }
+    [data-portal-shell].sidebar-collapsed [data-sidebar] { padding-inline: 0.75rem; }
+    [data-portal-shell].sidebar-collapsed [data-sidebar] a,
+    [data-portal-shell].sidebar-collapsed [data-sidebar] summary { justify-content: center; }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     ::before,
