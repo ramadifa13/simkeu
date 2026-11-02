@@ -21,7 +21,7 @@
 
 1. Semua input memakai Flux UI; pilihan sedikit memakai select dan pilihan panjang memakai autocomplete.
 2. Form singkat ada di modal; form panjang, unggahan, dan transaksi finansial memakai halaman tersendiri.
-3. Tombol aksi utama selalu terlihat. Menu tiga titik hanya untuk aksi kontekstual baris tabel.
+3. Tombol aksi utama selalu memakai `variant="primary"` dengan aksen teal dan teks putih; tombol sekunder memakai `outline` dengan teks slate. Menu tiga titik hanya untuk aksi kontekstual baris tabel.
 4. Tabel selalu menyediakan state memuat, kosong, gagal/retry, search/filter/sort, pagination, serta kolom prioritas di mobile.
 5. Warna tidak membawa makna sendiri tanpa teks; status memakai label dan kontras minimum yang terbaca.
 6. Animasi hanya micro-interaction singkat dan wajib mematuhi `prefers-reduced-motion`.

@@ -9,7 +9,8 @@
         'Segoe UI Symbol', 'Noto Color Emoji';
     --color-brand-50: oklch(0.97 0.03 181);
     --color-brand-300: oklch(0.84 0.12 181);
-    --color-brand-700: oklch(0.43 0.1 181);
+    /* #0f766e + white gives a readable primary action contrast. */
+    --color-brand-700: #0f766e;
     --color-accent: var(--color-brand-700);
     --color-accent-content: var(--color-brand-700);
     --color-accent-foreground: #ffffff;
@@ -203,7 +204,7 @@
     input[data-flux-control]:disabled, select[data-flux-control]:disabled, textarea[data-flux-control]:disabled { border-color: #e2e8f0 !important; background-color: #f8fafc !important; color: #64748b !important; }
     [data-flux-error] { color: #be123c !important; font-size: 0.75rem; }
     [data-flux-description] { color: #64748b !important; font-size: 0.75rem; }
-    [data-flux-button] { min-height: 2.5rem; border-radius: 0.75rem; font-size: 0.875rem; line-height: 1.25rem; transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease; }
+    [data-flux-button] { min-height: 2.5rem; border-radius: 0.75rem; font-size: 0.875rem; font-weight: 650; line-height: 1.25rem; transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease; }
     [data-flux-button]:hover:not(:disabled) { transform: translateY(-1px); }
     [data-flux-button]:focus-visible { outline: 3px solid rgb(45 212 191 / 0.3); outline-offset: 2px; }
     [data-flux-input-file] { border-color: #cbd5e1 !important; border-radius: 0.75rem !important; background: #fff !important; color: #334155 !important; font-size: 0.8125rem !important; }
