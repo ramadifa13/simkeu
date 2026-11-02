@@ -50,13 +50,31 @@
 }
 
 @layer components {
-    [data-portal-shell] { --sidebar-width: 18rem; }
+    [data-portal-shell] {
+        --sidebar-width: 18rem;
+        transition: grid-template-columns 320ms cubic-bezier(.16, 1, .3, 1);
+    }
     [data-portal-shell].sidebar-collapsed { --sidebar-width: 5.5rem; }
-    [data-portal-shell].sidebar-collapsed .sidebar-label,
+    [data-sidebar] .sidebar-label {
+        max-width: 13rem;
+        overflow: hidden;
+        opacity: 1;
+        transform: translateX(0);
+        transition: max-width 240ms cubic-bezier(.16, 1, .3, 1), opacity 160ms ease, transform 240ms cubic-bezier(.16, 1, .3, 1);
+        white-space: nowrap;
+    }
+    [data-sidebar] .sidebar-icon { transition: transform 240ms cubic-bezier(.16, 1, .3, 1), color 160ms ease; }
+    [data-portal-shell].sidebar-collapsed .sidebar-label {
+        max-width: 0;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-0.5rem);
+    }
     [data-portal-shell].sidebar-collapsed .sidebar-submenu { display: none; }
     [data-portal-shell].sidebar-collapsed [data-sidebar] { padding-inline: 0.75rem; }
     [data-portal-shell].sidebar-collapsed [data-sidebar] a,
     [data-portal-shell].sidebar-collapsed [data-sidebar] summary { justify-content: center; }
+    [data-portal-shell].sidebar-collapsed [data-sidebar] .sidebar-icon { transform: scale(1.08); }
 
     .sidebar-scroll { scrollbar-color: rgb(71 85 105 / 0.85) transparent; scrollbar-width: thin; }
     .sidebar-scroll::-webkit-scrollbar { width: 0.45rem; }
