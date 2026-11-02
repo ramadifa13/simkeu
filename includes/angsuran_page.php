@@ -124,11 +124,21 @@ if ($_POST) {
     try { layananValidasiToken(); } catch (Exception $e) { $_SESSION['error']=$e->getMessage();header('Location: angsuran.php');exit; }
     $cartKey = 'keranjang_angsuran_' . (int)$_SESSION['user_id'];
     if (!isset($_SESSION[$cartKey]) || !is_array($_SESSION[$cartKey])) $_SESSION[$cartKey] = [];
-    $redirectAngsuran = isset($_GET['pinjaman_id'])
-        ? ('detail_angsuran.php?pinjaman_id=' . (int)$_GET['pinjaman_id'])
-        : (isset($_POST['pinjaman_id']) && (int)$_POST['pinjaman_id'] > 0
-            ? ('detail_angsuran.php?pinjaman_id=' . (int)$_POST['pinjaman_id'])
-            : 'angsuran.php');
+    $returnFilters = [];
+    $hariKembali = isset($_GET['hari']) ? (int) $_GET['hari'] : 0;
+    if ($hariKembali >= 1 && $hariKembali <= 7) {
+        $returnFilters['hari'] = $hariKembali;
+    }
+    $filterKembali = (string) ($_GET['filter'] ?? '');
+    if (in_array($filterKembali, ['menunggu', 'disetujui', 'ditolak'], true)) {
+        $returnFilters['filter'] = $filterKembali;
+    }
+    $pinjamanRedirectId = isset($_GET['pinjaman_id'])
+        ? (int) $_GET['pinjaman_id']
+        : (int) ($_POST['pinjaman_id'] ?? 0);
+    $redirectAngsuran = $pinjamanRedirectId > 0
+        ? ('detail_angsuran.php?' . http_build_query(['pinjaman_id' => $pinjamanRedirectId] + $returnFilters))
+        : ('angsuran.php' . ($returnFilters ? '?' . http_build_query($returnFilters) : ''));
     // Kembali ke jadwal/tabel agar sort DataTables (stateSave) tetap terlihat setelah reload.
     $redirectAngsuranJadwal = $redirectAngsuran . '#tabelJadwalAngsuran';
     $redirectAngsuranKeranjang = $redirectAngsuran . '#keranjangAngsuran';
@@ -1433,5 +1443,30 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
     }
 })();
 </script>
+<?php if (($angsuranMode ?? 'list') === 'detail'): ?>
+<script>
+(function () {
+    var kembaliKeDaftar = <?php echo json_encode(
+        'angsuran.php' . ($qs_filter ? '?' . ltrim($qs_filter, '&') : ''),
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+    ); ?>;
+
+    document.addEventListener('submit', function (event) {
+        var form = event.target;
+        if (!(form instanceof HTMLFormElement) || event.defaultPrevented) {
+            return;
+        }
+
+        // Form tanpa action harus tetap POST ke detail yang sedang dibuka.
+        // History halaman ini diganti menjadi daftar dengan filter yang sama,
+        // sehingga Back setelah pembayaran tidak membuka form lama kembali.
+        if (!form.hasAttribute('action')) {
+            form.setAttribute('action', window.location.href);
+        }
+        window.history.replaceState(null, document.title, kembaliKeDaftar);
+    }, true);
+})();
+</script>
+<?php endif; ?>
 </body>
 </html>
