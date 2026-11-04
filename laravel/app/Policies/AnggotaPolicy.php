@@ -31,4 +31,19 @@ class AnggotaPolicy
     {
         return $this->view($user, $member);
     }
+
+    public function export(User $user): bool
+    {
+        return $this->viewAny($user);
+    }
+
+    public function resetPassword(User $user, Anggota $member): bool
+    {
+        return in_array($user->role, ['admin', 'teller'], true);
+    }
+
+    public function delete(User $user, Anggota $member): bool
+    {
+        return $user->role === 'admin';
+    }
 }

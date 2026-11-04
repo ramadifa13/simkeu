@@ -44,11 +44,12 @@ class DashboardRoleAccessTest extends TestCase
         $response->assertForbidden();
     }
 
-    public function test_module_placeholder_accepts_structured_breadcrumbs(): void
+    public function test_migrated_module_placeholder_is_no_longer_in_role_nav(): void
     {
+        // Modul sudah punya route nyata; placeholder /modul/{module} hanya untuk entry nav bertipe module.
         $response = $this->actingAs($this->user('admin'))->get('/portal/admin/modul/simpanan-kas');
 
-        $response->assertStatus(503)->assertSee('Simpanan & kas');
+        $response->assertForbidden();
     }
 
     public function test_dashboard_drilldown_is_a_real_authorized_data_page(): void

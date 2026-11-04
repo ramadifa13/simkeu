@@ -12,6 +12,6 @@ class LandingPageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('SIMKEU');
-        $response->assertSee('Masuk ke portal');
+        $response->assertSee('Masuk ke akun');
     }
 }

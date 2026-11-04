@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'whatsapp' => [
+        'phone_number_id' => env('WA_PHONE_NUMBER_ID'),
+        'access_token' => env('WA_ACCESS_TOKEN'),
+        'graph_version' => env('WA_GRAPH_VERSION', 'v20.0'),
+        'template_name' => env('WA_TEMPLATE_NAME', 'pengingat_angsuran_h1'),
+        'template_lang' => env('WA_TEMPLATE_LANG', 'id'),
+    ],
+
 ];

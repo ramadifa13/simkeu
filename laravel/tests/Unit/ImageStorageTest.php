@@ -29,4 +29,32 @@ class ImageStorageTest extends TestCase
             unlink($sourcePath);
         }
     }
+
+    public function test_cooperative_logo_keeps_original_transparent_png(): void
+    {
+        Storage::fake('local');
+        $image = imagecreatetruecolor(240, 240);
+        imagealphablending($image, false);
+        imagesavealpha($image, true);
+        $transparent = imagecolorallocatealpha($image, 0, 0, 0, 127);
+        imagefilledrectangle($image, 0, 0, 239, 239, $transparent);
+        imagealphablending($image, true);
+        imagefilledellipse($image, 120, 120, 120, 120, imagecolorallocatealpha($image, 13, 148, 136, 0));
+        $sourcePath = tempnam(sys_get_temp_dir(), 'simkeu-logo-');
+        imagepng($image, $sourcePath);
+        imagedestroy($image);
+
+        try {
+            $upload = new UploadedFile($sourcePath, 'logo.png', 'image/png', null, true);
+            $path = app(ImageStorage::class)->store($upload, 'koperasi');
+            $stored = imagecreatefromstring(Storage::disk('local')->get($path));
+
+            $this->assertStringEndsWith('.png', $path);
+            $this->assertSame('image/png', getimagesizefromstring(Storage::disk('local')->get($path))['mime']);
+            $this->assertSame(127, imagecolorsforindex($stored, imagecolorat($stored, 8, 8))['alpha']);
+            imagedestroy($stored);
+        } finally {
+            unlink($sourcePath);
+        }
+    }
 }

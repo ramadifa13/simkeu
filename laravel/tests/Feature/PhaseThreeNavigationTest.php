@@ -11,7 +11,7 @@ class PhaseThreeNavigationTest extends TestCase
         $response = $this->get('/');
 
         $response->assertOk();
-        $response->assertSee('Masuk ke portal');
+        $response->assertSee('Masuk ke akun');
         $response->assertSee('Pertanyaan umum');
         $response->assertSee('Lewati ke konten utama');
     }

@@ -23,8 +23,8 @@
             <section aria-label="Ringkasan utama" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 @foreach ($dashboard['cards'] as $card)
                     @php($href = $card['route'] === 'portal.dashboard.drilldown' ? route($card['route'], ['role' => $role, 'report' => $card['module']]) : route($card['route'], ['role' => $role]))
-                    <a href="{{ $href }}" data-dashboard-card class="ui-stat-card group block transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-lg hover:shadow-teal-950/5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-600">
-                        <div class="flex items-start justify-between gap-3"><p class="text-sm font-medium text-slate-600">{{ $card['label'] }}</p><span class="grid size-8 place-items-center rounded-lg bg-teal-50 text-teal-700"><flux:icon :name="$card['icon']" class="size-4" /></span></div>
+                    <a href="{{ $href }}" data-dashboard-card class="ui-stat-card is-{{ ['teal', 'amber', 'sky', 'cyan', 'rose', 'emerald'][$loop->index % 6] }} group block focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-500">
+                        <div class="flex items-start justify-between gap-3"><p class="text-sm font-medium text-slate-600">{{ $card['label'] }}</p><span class="ui-stat-icon"><flux:icon :name="$card['icon']" class="size-4" /></span></div>
                         <p data-dashboard-value class="mt-3 text-xl font-semibold tracking-tight text-slate-950">{{ $card['value'] }}</p>
                         <p data-dashboard-hint class="mt-1.5 text-xs leading-5 text-slate-500">{{ $card['hint'] }}</p>
                     </a>
@@ -34,14 +34,14 @@
             @if (filled($dashboard['queue'] ?? []))
                 <section class="ui-panel p-4 sm:p-5" aria-labelledby="dashboard-queue-title">
                     <div class="mb-3 flex items-center justify-between gap-3"><h2 id="dashboard-queue-title" class="text-sm font-semibold text-slate-900">{{ $role === 'admin' ? 'KPI antrean' : 'Antrean kerja hari ini' }}</h2><span class="text-xs text-slate-500">Tindak lanjut prioritas</span></div>
-                    <div class="grid gap-3 sm:grid-cols-3">@foreach ($dashboard['queue'] as $item)<a href="{{ route('portal.dashboard.drilldown', ['role' => $role, 'report' => $item['module']]) }}" class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm transition hover:border-teal-200 hover:bg-teal-50"><span class="text-slate-700">{{ $item['label'] }}</span><strong data-dashboard-queue @class(['text-rose-700' => $item['tone'] === 'danger', 'text-amber-700' => $item['tone'] === 'warning', 'text-emerald-700' => $item['tone'] === 'success'])>{{ $item['value'] }}</strong></a>@endforeach</div>
+                    <div class="grid gap-3 sm:grid-cols-3">@foreach ($dashboard['queue'] as $item)<a href="{{ route('portal.dashboard.drilldown', ['role' => $role, 'report' => $item['module']]) }}" class="ui-queue-item is-{{ $item['tone'] }} flex items-center justify-between px-3.5 py-3 text-sm"><span class="text-slate-700">{{ $item['label'] }}</span><strong data-dashboard-queue @class(['text-rose-700' => $item['tone'] === 'danger', 'text-amber-700' => $item['tone'] === 'warning', 'text-emerald-700' => $item['tone'] === 'success'])>{{ $item['value'] }}</strong></a>@endforeach</div>
                 </section>
             @endif
 
             @if (filled($dashboard['quickActions'] ?? []))
                 <section class="ui-panel p-4 sm:p-5" aria-labelledby="dashboard-quick-title">
                     <div class="mb-3 flex items-center justify-between gap-3"><h2 id="dashboard-quick-title" class="text-sm font-semibold text-slate-900">Aksi cepat</h2><span class="text-xs text-slate-500">Pintasan {{ $role === 'anggota' ? 'akun' : 'transaksi' }}</span></div>
-                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">@foreach ($dashboard['quickActions'] as $item)@php($href = isset($item['route']) ? route($item['route'], $item['route'] === 'portal.members.index' ? ['role' => $role] : []) : route('portal.dashboard.drilldown', ['role' => $role, 'report' => $item['module']]))<a href="{{ $href }}" class="flex min-h-20 flex-col justify-between rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-800"><flux:icon :name="$item['icon']" class="size-5 text-teal-700" /><span>{{ $item['label'] }}</span></a>@endforeach</div>
+                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">@foreach ($dashboard['quickActions'] as $item)@php($href = isset($item['route']) ? route($item['route'], $item['route'] === 'portal.members.index' ? ['role' => $role] : []) : route('portal.dashboard.drilldown', ['role' => $role, 'report' => $item['module']]))<a href="{{ $href }}" class="ui-quick-tile is-{{ $loop->index % 6 }} flex min-h-20 flex-col justify-between p-3 text-sm font-semibold"><flux:icon :name="$item['icon']" class="size-5" /><span>{{ $item['label'] }}</span></a>@endforeach</div>
                 </section>
             @endif
 

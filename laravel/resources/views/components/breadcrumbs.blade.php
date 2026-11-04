@@ -1,6 +1,6 @@
 @props(['items' => []])
 
-<nav {{ $attributes->merge(['class' => 'flex items-center gap-2 overflow-x-auto text-sm text-slate-500']) }} aria-label="Breadcrumb">
+<nav {{ $attributes->merge(['class' => 'ui-breadcrumbs flex items-center gap-2 overflow-x-auto text-sm text-slate-500']) }} aria-label="Breadcrumb">
     @foreach ($items as $label => $item)
         @php
             $url = is_array($item) ? ($item['href'] ?? null) : $item;

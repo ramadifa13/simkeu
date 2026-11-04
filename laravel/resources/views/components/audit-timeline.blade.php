@@ -1,9 +1,9 @@
 @props(['events' => []])
 
-<ol {{ $attributes->merge(['class' => 'space-y-0']) }}>
+<ol {{ $attributes->merge(['class' => 'ui-audit-timeline space-y-0']) }}>
     @forelse ($events as $event)
-        <li class="relative border-l border-slate-200 pb-6 pl-6 last:border-l-0 last:pb-0">
-            <span class="absolute -left-1.5 top-1 size-3 rounded-full bg-teal-600 ring-4 ring-teal-50"></span>
+        <li class="relative border-l pb-6 pl-6 last:border-l-0 last:pb-0">
+            <span class="absolute -left-1.5 top-1 size-3 rounded-full"></span>
             <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <p class="font-semibold text-slate-900">{{ data_get($event, 'action', data_get($event, 'aksi', 'Aktivitas')) }}</p>

@@ -24,6 +24,7 @@ new class extends Component
 
     public function mount(string $role): void
     {
+        abort_unless(in_array(auth()->user()?->role, ['admin', 'teller'], true), 403);
         $this->role = $role;
     }
 
@@ -31,7 +32,7 @@ new class extends Component
     public function members(): LengthAwarePaginator
     {
         return Anggota::query()
-            ->select(['id', 'kode_anggota', 'nama_lengkap', 'telepon', 'status', 'tanggal_daftar'])
+            ->select(['id', 'kode_anggota', 'kode_anggota_jaminan', 'nama_lengkap', 'telepon', 'kategori_shu', 'status', 'tanggal_daftar'])
             ->when($this->search !== '', function ($query): void {
                 $query->where(function ($query): void {
                     $query->where('nama_lengkap', 'like', "%{$this->search}%")

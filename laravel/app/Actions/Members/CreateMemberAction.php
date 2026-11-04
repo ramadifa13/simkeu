@@ -5,6 +5,7 @@ namespace App\Actions\Members;
 use App\Models\Anggota;
 use App\Models\User;
 use App\Support\ImageStorage;
+use App\Support\TemporaryPassword;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -14,31 +15,42 @@ class CreateMemberAction
 {
     /**
      * @param  array<string, mixed>  $attributes
+     * @return array{member: Anggota, password: string}
      */
-    public function handle(array $attributes): Anggota
+    public function handle(array $attributes, ?GenerateMemberCodes $codes = null): array
     {
-        return DB::transaction(function () use ($attributes): Anggota {
-            $username = (string) $attributes['kode_anggota'];
+        $codes ??= app(GenerateMemberCodes::class);
+
+        return DB::transaction(function () use ($attributes, $codes): array {
+            $generatedCodes = $codes->handle($attributes['kategori_anggota'] ?? 'biasa');
+            $attributes = [...$attributes, ...$generatedCodes];
+            $username = $generatedCodes['kode_anggota'];
+            $plainPassword = TemporaryPassword::generate();
 
             $user = User::query()->create([
                 'username' => $username,
-                'password' => Hash::make('123456'),
                 'nama_lengkap' => $attributes['nama_lengkap'],
                 'email' => $attributes['email'] ?? null,
                 'telepon' => $attributes['telepon'] ?? null,
-                'role' => 'anggota',
                 'status' => 'aktif',
             ]);
+            $user->forceFill([
+                'password' => Hash::make($plainPassword),
+                'role' => 'anggota',
+            ])->save();
 
             $member = Anggota::query()->create([
-                ...Arr::except($attributes, ['foto_ktp', 'foto_kk', 'foto_ktp_pasangan', 'kode_anggota_jaminan']),
-                'kode_anggota_jaminan' => $attributes['kode_anggota_jaminan'] ?? null,
+                ...Arr::except($attributes, ['foto_ktp', 'foto_kk', 'foto_ktp_pasangan', 'kategori_anggota']),
                 'user_id' => $user->id,
                 'status' => 'aktif',
                 'tanggal_daftar' => now()->toDateString(),
             ]);
 
             foreach (['foto_ktp', 'foto_kk', 'foto_ktp_pasangan'] as $documentField) {
+                if (! isset($attributes[$documentField])) {
+                    continue;
+                }
+
                 /** @var UploadedFile $document */
                 $document = $attributes[$documentField];
                 $member->{$documentField} = app(ImageStorage::class)->store($document, "anggota/{$member->id}");
@@ -46,7 +58,7 @@ class CreateMemberAction
 
             $member->save();
 
-            return $member;
+            return ['member' => $member->fresh(['user']), 'password' => $plainPassword];
         });
     }
 }

@@ -1,14 +1,17 @@
 @props(['eyebrow' => null, 'title', 'description' => null, 'icon' => null, 'backHref' => null, 'backLabel' => 'Kembali'])
 
-<div {{ $attributes->merge(['class' => 'ui-page-header flex flex-col justify-between gap-4 sm:flex-row sm:items-end']) }}>
+<section {{ $attributes->merge(['class' => 'ui-page-header flex flex-col justify-between gap-4 sm:flex-row sm:items-center']) }}>
     <div class="ui-page-header-main">
         @if ($backHref)
-            <flux:button :href="$backHref" variant="outline" icon="arrow-left" class="ui-page-header-back">{{ $backLabel }}</flux:button>
+            <a href="{{ $backHref }}" class="ui-page-header-back" data-safe-back aria-label="{{ $backLabel }}" title="{{ $backLabel }}">
+                <flux:icon name="arrow-left" class="size-4" />
+                <span class="sr-only">{{ $backLabel }}</span>
+            </a>
         @endif
         @if ($icon)<span class="ui-page-header-icon"><flux:icon :name="$icon" class="size-7" /></span>@endif
-        <div>
+        <div class="ui-page-header-copy">
             @if ($eyebrow)
-                <p class="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">{{ $eyebrow }}</p>
+                <p class="ui-kicker text-xs font-bold uppercase tracking-[0.18em]">{{ $eyebrow }}</p>
             @endif
             <h1 class="mt-1.5 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">{{ $title }}</h1>
             @if ($description)
@@ -17,6 +20,6 @@
         </div>
     </div>
     @if (isset($actions))
-        <div class="shrink-0">{{ $actions }}</div>
+        <div class="ui-page-header-actions shrink-0">{{ $actions }}</div>
     @endif
-</div>
+</section>

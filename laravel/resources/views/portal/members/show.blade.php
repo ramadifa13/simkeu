@@ -1,6 +1,9 @@
 <x-layouts.portal :role="$role" title="Detail Anggota — {{ $member->nama_lengkap }}">
-    <div class="mx-auto max-w-7xl">
-        <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+    <div class="mx-auto max-w-7xl pb-10">
+        <x-page-header icon="users" eyebrow="{{ $member->kode_anggota }} · {{ ucfirst($member->status) }}" :title="$member->nama_lengkap" description="Profil anggota, dokumen privat, dan riwayat operasional." :back-href="route('portal.members.index', ['role' => $role])" back-label="Daftar anggota">
+            <x-slot:actions><div class="ui-member-hero-actions flex flex-wrap gap-2"><flux:button :href="route('portal.members.edit', ['role' => $role, 'member' => $member])" variant="primary">Edit</flux:button><flux:modal.trigger name="reset-member-detail"><flux:button type="button" variant="outline">Reset password</flux:button></flux:modal.trigger>@if(auth()->user()?->role === 'admin')<flux:modal.trigger name="delete-member-detail"><flux:button type="button" variant="outline" class="border-rose-200! bg-rose-50! text-rose-700! hover:bg-rose-100!">Hapus</flux:button></flux:modal.trigger>@endif</div></x-slot:actions>
+        </x-page-header>
+        <div class="hidden">
             <div>
                 <a href="{{ route('portal.members.index', ['role' => $role]) }}" class="text-sm font-semibold text-teal-700">← Kembali ke daftar anggota</a>
                 <p class="mt-6 text-sm font-semibold uppercase tracking-[0.2em] text-teal-700">{{ $member->kode_anggota }}</p>
@@ -10,21 +13,24 @@
             <flux:button :href="route('portal.members.edit', ['role' => $role, 'member' => $member])" variant="primary">Ubah anggota</flux:button>
         </div>
 
-        <nav class="mt-8 flex gap-2 overflow-x-auto border-b border-slate-200" aria-label="Tab detail anggota">
+        <nav class="ui-member-detail-tabs mt-6 flex gap-2 overflow-x-auto border-b border-slate-200" aria-label="Tab detail anggota">
             @foreach ($tabs as $tab)
                 <a href="{{ route('portal.members.show', ['role' => $role, 'member' => $member, 'tab' => $tab]) }}" class="whitespace-nowrap border-b-2 px-3 py-3 text-sm font-semibold {{ $activeTab === $tab ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-900' }}">{{ $tab === 'shu' ? 'SHU' : ucfirst($tab) }}</a>
             @endforeach
         </nav>
 
-        <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section class="ui-member-detail-content mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mt-6 sm:p-6">
             @if ($activeTab === 'profil')
+                <x-members.profile-details :member="$member" />
+                @if (false)
                 <dl class="grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
-                    @foreach (['Kode anggota' => $member->kode_anggota, 'Nama lengkap' => $member->nama_lengkap, 'Telepon' => $member->telepon, 'Email' => $member->email, 'Alamat' => $member->alamat, 'Tempat, tanggal lahir' => trim(($member->tempat_lahir ? $member->tempat_lahir.', ' : '').($member->tanggal_lahir?->translatedFormat('d F Y') ?? '')), 'Jenis kelamin' => $member->jenis_kelamin === 'L' ? 'Laki-laki' : ($member->jenis_kelamin === 'P' ? 'Perempuan' : null), 'Pekerjaan' => $member->pekerjaan, 'Rekening bank' => $member->rekening_bank, 'Kategori SHU' => $member->kategori_shu, 'Tanggal daftar' => $member->tanggal_daftar?->translatedFormat('d F Y')] as $label => $value)
+                    @foreach (['Kode anggota' => $member->kode_anggota, 'Kode anggota jaminan' => $member->kode_anggota_jaminan, 'Nama lengkap' => $member->nama_lengkap, 'Status' => ucfirst($member->status), 'Telepon' => $member->telepon, 'Email' => $member->email, 'Alamat' => $member->alamat, 'Tempat, tanggal lahir' => trim(($member->tempat_lahir ? $member->tempat_lahir.', ' : '').($member->tanggal_lahir?->translatedFormat('d F Y') ?? '')), 'Jenis kelamin' => $member->jenis_kelamin === 'L' ? 'Laki-laki' : ($member->jenis_kelamin === 'P' ? 'Perempuan' : null), 'Pekerjaan' => $member->pekerjaan, 'NIK / KTP' => $member->ktp, 'Rekening bank' => $member->rekening_bank, 'Kategori SHU' => $member->kategori_shu === 'ketua_kelompok' ? 'Ketua kelompok' : 'Anggota', 'Ketua kelompok' => $member->ketuaKelompok?->nama_lengkap, 'Nonaktif terjadwal' => $member->nonaktif_jadwal?->translatedFormat('d F Y'), 'Tanggal daftar' => $member->tanggal_daftar?->translatedFormat('d F Y'), 'ID anggota' => $member->id, 'ID akun' => $member->user_id, 'Dibuat pada' => $member->created_at?->translatedFormat('d F Y H:i')] as $label => $value)
                         <div><dt class="text-sm font-medium text-slate-500">{{ $label }}</dt><dd class="mt-1 whitespace-pre-line text-sm font-semibold text-slate-900">{{ $value ?: '—' }}</dd></div>
                     @endforeach
                 </dl>
+                @endif
             @elseif ($activeTab === 'dokumen')
-                <div class="grid gap-4 sm:grid-cols-3">@foreach (['foto_ktp' => 'KTP', 'foto_kk' => 'Kartu Keluarga', 'foto_ktp_pasangan' => 'KTP Pasangan'] as $field => $label)<div class="rounded-xl border border-slate-200 p-4"><p class="font-semibold">{{ $label }}</p><p class="mt-2 text-sm {{ $member->{$field} ? 'text-emerald-700' : 'text-slate-500' }}">{{ $member->{$field} ? 'Dokumen tersedia' : 'Belum tersedia' }}</p>@if ($member->{$field})<a href="{{ route('portal.members.documents.show', ['role' => $role, 'member' => $member, 'document' => $field]) }}" target="_blank" rel="noopener" class="mt-4 inline-flex text-sm font-semibold text-teal-700 hover:text-teal-800">Buka dokumen</a>@endif</div>@endforeach</div>
+                <x-members.document-cards :member="$member" :role="$role" />
             @elseif ($activeTab === 'simpanan')
                 <x-data-table :columns="['jenis' => 'Jenis simpanan', 'saldo' => 'Saldo', 'actions' => '']" :sortable="false">@forelse ($tabData['savings'] as $saving)<tr><td class="px-5 py-4 font-semibold text-slate-900">{{ $saving->nama_jenis }} <span class="ml-1 font-mono text-xs text-slate-500">{{ $saving->kode_jenis }}</span></td><td class="px-5 py-4 font-semibold text-slate-900"><x-money :amount="$saving->saldo" /></td><td></td></tr>@empty<tr><td colspan="3" class="px-5 py-10 text-center text-sm text-slate-500">Belum ada rekening simpanan.</td></tr>@endforelse</x-data-table>
             @elseif ($activeTab === 'transaksi')
@@ -37,5 +43,26 @@
                 <div class="space-y-6"><div><h2 class="text-base font-semibold text-slate-900">Koreksi transaksi</h2><div class="mt-3"><x-data-table :columns="['waktu' => 'Waktu', 'perubahan' => 'Perubahan', 'keterangan' => 'Keterangan', 'oleh' => 'Oleh']" :sortable="false">@forelse ($tabData['corrections'] as $correction)<tr><td class="whitespace-nowrap px-5 py-4">{{ \Illuminate\Support\Carbon::parse($correction->created_at)->translatedFormat('d M Y H:i') }}</td><td class="px-5 py-4"><x-money :amount="$correction->jumlah_lama" /> → <x-money :amount="$correction->jumlah_baru" /></td><td class="px-5 py-4 text-sm text-slate-600">{{ $correction->keterangan ?: '—' }}</td><td class="px-5 py-4">{{ $correction->actor ?: 'Sistem' }}</td></tr>@empty<tr><td colspan="4" class="px-5 py-8 text-center text-sm text-slate-500">Tidak ada koreksi transaksi.</td></tr>@endforelse</x-data-table></div></div><div><h2 class="text-base font-semibold text-slate-900">Aktivitas layanan pinjaman</h2><div class="mt-3"><x-data-table :columns="['waktu' => 'Waktu', 'pinjaman' => 'Pinjaman', 'aksi' => 'Aksi', 'detail' => 'Detail', 'oleh' => 'Oleh']" :sortable="false">@forelse ($tabData['loanActivities'] as $activity)<tr><td class="whitespace-nowrap px-5 py-4">{{ \Illuminate\Support\Carbon::parse($activity->created_at)->translatedFormat('d M Y H:i') }}</td><td class="px-5 py-4 font-mono text-xs">{{ $activity->kode_pinjaman }}</td><td class="px-5 py-4 font-semibold">{{ ucfirst(str_replace('_', ' ', $activity->aksi)) }}</td><td class="px-5 py-4 text-sm text-slate-600">{{ $activity->detail }}</td><td class="px-5 py-4">{{ $activity->actor ?: 'Sistem' }}</td></tr>@empty<tr><td colspan="5" class="px-5 py-8 text-center text-sm text-slate-500">Tidak ada aktivitas layanan pinjaman.</td></tr>@endforelse</x-data-table></div></div></div>
             @endif
         </section>
+        <x-confirm-action-modal name="reset-member-detail" :action="route('portal.members.password.reset', ['role' => $role, 'member' => $member])" title="Reset password anggota" :description="'Password login '.$member->kode_anggota.' akan diganti sandi acak sekali tampil.'" confirm-label="Ya, reset password"><p class="text-sm text-slate-600">Salin sandi baru dari pesan sukses dan sampaikan hanya kepada anggota yang bersangkutan.</p></x-confirm-action-modal>
+        @if(auth()->user()?->role === 'admin')
+            <x-confirm-action-modal
+                name="delete-member-detail"
+                :action="route('portal.members.destroy', ['role' => $role, 'member' => $member])"
+                method="DELETE"
+                title="Hapus anggota"
+                :description="'Anda akan menghapus '.$member->nama_lengkap.' ('.$member->kode_anggota.').'"
+                confirm-label="Hapus anggota"
+                variant="danger"
+            >
+                <div class="space-y-2 rounded-xl border border-rose-100 bg-rose-50 px-3 py-3 text-sm text-rose-800">
+                    <p class="font-semibold">Syarat penghapusan</p>
+                    <ul class="list-disc space-y-1 pl-5">
+                        <li>Status harus <strong>Nonaktif</strong>@if($member->status === 'aktif') <span class="font-normal">(saat ini masih Aktif)</span>@endif</li>
+                        <li>Tidak punya rekening simpanan, transaksi, pinjaman, pengajuan, atau hak SHU</li>
+                    </ul>
+                    <p class="text-xs leading-5 text-rose-700">Jika gagal, toast akan menjelaskan penyebabnya. Data keuangan tidak dihapus demi audit.</p>
+                </div>
+            </x-confirm-action-modal>
+        @endif
     </div>
 </x-layouts.portal>

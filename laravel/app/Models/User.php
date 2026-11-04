@@ -16,6 +16,7 @@ class User extends Authenticatable
 
     public $timestamps = false;
 
+    /** Password never mass-assigned — use forceFill() in trusted actions only. */
     protected $fillable = [
         'username',
         'nama_lengkap',

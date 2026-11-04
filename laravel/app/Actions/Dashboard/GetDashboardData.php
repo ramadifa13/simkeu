@@ -6,6 +6,7 @@ use App\Models\Anggota;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -43,7 +44,7 @@ class GetDashboardData
             'queue' => $this->staffQueue($staff),
             'quickActions' => [['label' => 'Pengajuan', 'icon' => 'document-plus', 'module' => 'applications'], ['label' => 'Persetujuan', 'icon' => 'clipboard-document-check', 'module' => 'approvals'], ['label' => 'Angsuran', 'icon' => 'calendar-days', 'module' => 'installments'], ['label' => 'Anggota', 'icon' => 'users', 'route' => 'portal.members.index'], ['label' => 'Waserda', 'icon' => 'shopping-bag', 'module' => 'waserda'], ['label' => 'Laporan kas', 'icon' => 'chart-bar', 'module' => 'cash']],
             'staff' => $staff,
-            'trends' => $this->trendSeries($today),
+            'trends' => Cache::remember('dashboard:admin:trends:'.substr($today, 0, 7), 600, fn () => $this->trendSeries($today)),
             'alerts' => $this->loanAlerts($today),
             'activity' => $staff['transactions'],
             'periodLabel' => 'Data operasional per '.Carbon::parse($today)->translatedFormat('d M Y'),

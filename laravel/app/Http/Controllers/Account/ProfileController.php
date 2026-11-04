@@ -13,7 +13,9 @@ class ProfileController extends Controller
 {
     public function edit(): View
     {
-        return view('account.profile');
+        return view('account.profile', [
+            'role' => auth()->user()->role,
+        ]);
     }
 
     public function update(UpdateProfileRequest $request): RedirectResponse

@@ -12,6 +12,10 @@
     <body class="min-h-screen bg-slate-950 font-sans text-slate-100 antialiased">
         <a href="#content" class="sr-only fixed left-4 top-4 z-50 rounded-lg bg-white px-4 py-2 font-semibold text-slate-950 focus:not-sr-only">Lewati ke konten utama</a>
         {{ $slot }}
+        <x-flash-status />
+        @persist('toast')
+            <flux:toast position="bottom end" />
+        @endpersist
         @livewireScripts
         @fluxScripts
     </body>

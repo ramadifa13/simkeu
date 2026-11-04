@@ -21,7 +21,6 @@ class UpdateMemberAction
             $oldDocuments = [];
 
             $member->fill(Arr::except($attributes, $documents));
-            $member->kode_anggota_jaminan = $attributes['kode_anggota_jaminan'] ?? null;
 
             foreach ($documents as $documentField) {
                 if (! isset($attributes[$documentField])) {
@@ -40,6 +39,7 @@ class UpdateMemberAction
                 'nama_lengkap' => $member->nama_lengkap,
                 'email' => $member->email,
                 'telepon' => $member->telepon,
+                'status' => $member->status,
             ]);
 
             DB::afterCommit(function () use ($oldDocuments): void {

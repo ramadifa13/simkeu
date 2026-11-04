@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Anggota;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -21,8 +20,6 @@ class UpdateMemberRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'kode_anggota' => ['required', 'string', 'max:20', 'alpha_dash', Rule::unique('anggota', 'kode_anggota')->ignore($this->memberModel()), Rule::unique('users', 'username')->ignore($this->memberModel()->user_id)],
-            'kode_anggota_jaminan' => ['nullable', 'string', 'max:20', 'alpha_dash', Rule::unique('anggota', 'kode_anggota_jaminan')->ignore($this->memberModel())],
             'nama_lengkap' => ['required', 'string', 'max:100'],
             'alamat' => ['nullable', 'string'],
             'telepon' => ['nullable', 'string', 'max:20'],
@@ -31,17 +28,15 @@ class UpdateMemberRequest extends FormRequest
             'tanggal_lahir' => ['nullable', 'date', 'before_or_equal:today'],
             'jenis_kelamin' => ['nullable', Rule::in(['L', 'P'])],
             'pekerjaan' => ['nullable', 'string', 'max:50'],
-            'ktp' => ['nullable', 'string', 'max:20'],
+            'ktp' => ['required', 'string', 'max:20'],
             'rekening_bank' => ['nullable', 'string', 'max:100'],
             'kategori_shu' => ['required', Rule::in(['anggota', 'ketua_kelompok'])],
-            'foto_ktp' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp'],
-            'foto_kk' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp'],
-            'foto_ktp_pasangan' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp'],
+            'ketua_kelompok_id' => ['nullable', 'integer', Rule::exists('anggota', 'id')->where('kategori_shu', 'ketua_kelompok')->where('status', 'aktif')],
+            'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
+            'nonaktif_jadwal' => ['nullable', 'date', 'after_or_equal:today'],
+            'foto_ktp' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'foto_kk' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'foto_ktp_pasangan' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
-    }
-
-    private function memberModel(): Anggota
-    {
-        return $this->route('member');
     }
 }

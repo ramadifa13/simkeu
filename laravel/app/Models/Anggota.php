@@ -30,6 +30,9 @@ class Anggota extends Model
         'status',
         'nonaktif_jadwal',
         'tanggal_daftar',
+        'foto_ktp',
+        'foto_kk',
+        'foto_ktp_pasangan',
     ];
 
     protected function casts(): array
@@ -38,11 +41,17 @@ class Anggota extends Model
             'tanggal_lahir' => 'date',
             'tanggal_daftar' => 'date',
             'nonaktif_jadwal' => 'date',
+            'created_at' => 'datetime',
         ];
     }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function ketuaKelompok(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'ketua_kelompok_id');
     }
 }
