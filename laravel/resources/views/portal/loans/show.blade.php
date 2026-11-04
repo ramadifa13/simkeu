@@ -19,15 +19,15 @@
                     <flux:button :href="route('portal.loans.agreement', ['role' => $role, 'loan' => $loan->id])" variant="outline" icon="document-text">
                         Perjanjian
                     </flux:button>
-                    <flux:button :href="route('portal.documents.agreement', ['role' => $role, 'loan' => $loan->id])" variant="outline" icon="document-arrow-down">
-                        PDF perjanjian
+                    <flux:button :href="route('portal.documents.agreement', ['role' => $role, 'loan' => $loan->id])" target="_blank" variant="outline" icon="printer">
+                        Cetak perjanjian
                     </flux:button>
                 @endif
-                <flux:button :href="route('portal.documents.disbursement', ['role' => $role, 'loan' => $loan->id])" variant="outline" icon="banknotes">
-                    Slip PDF
+                <flux:button :href="route('portal.documents.disbursement', ['role' => $role, 'loan' => $loan->id])" target="_blank" variant="outline" icon="banknotes">
+                    Cetak slip
                 </flux:button>
-                <flux:button :href="route('portal.documents.installment-book', ['role' => $role, 'loan' => $loan->id])" variant="outline" icon="book-open">
-                    Buku PDF
+                <flux:button :href="route('portal.documents.installment-book', ['role' => $role, 'loan' => $loan->id])" target="_blank" variant="outline" icon="book-open">
+                    Cetak buku
                 </flux:button>
                 @if ($role !== 'anggota' && ($cartCount ?? 0) > 0)
                     <flux:button :href="route('portal.loans.cart', ['role' => $role, 'from' => $loan->id])" variant="primary" icon="shopping-cart">
@@ -73,7 +73,7 @@
             <x-stat-card label="Jatuh tempo akhir" :value="\Carbon\Carbon::parse($loan->jatuh_tempo)->translatedFormat('d M Y')" icon="calendar-days" />
         </div>
 
-        @if ($loan->status === 'aktif' && $role !== 'anggota' && $nextUnpaid && $focus !== 'pelunasan')
+        @if (\App\Support\LoanLifecycle::isCollectible($loan->status) && $role !== 'anggota' && $nextUnpaid && $focus !== 'pelunasan')
             <x-loans.next-step
                 :title="'Bayar angsuran ke-'.$nextUnpaid->angsuran_ke"
                 :description="'Jatuh tempo '.$nextUnpaidDue.($nextUnpaid->denda > $nextUnpaid->denda_dibayar ? ' · ada sisa denda yang harus dilunasi lebih dulu.' : '.')"
@@ -88,7 +88,7 @@
             </x-loans.next-step>
         @endif
 
-        @if ($loan->status === 'aktif' && $role !== 'anggota')
+        @if (\App\Support\LoanLifecycle::isCollectible($loan->status) && $role !== 'anggota')
             <x-loans.next-step
                 eyebrow="Pelunasan"
                 :title="'Total pelunasan saat ini: Rp '.number_format($settlement['total'], 0, ',', '.')"
@@ -225,7 +225,7 @@
                     description="Unduh kwitansi BAST PDF untuk arsip serah terima jaminan."
                 >
                     <x-slot:actions>
-                        <flux:button :href="route('portal.documents.bast', ['role' => $role, 'loan' => $loan->id])" variant="outline" icon="document-arrow-down">BAST PDF</flux:button>
+                        <flux:button :href="route('portal.documents.bast', ['role' => $role, 'loan' => $loan->id])" target="_blank" variant="outline" icon="printer">Cetak BAST</flux:button>
                     </x-slot:actions>
                 </x-loans.next-step>
             @endif

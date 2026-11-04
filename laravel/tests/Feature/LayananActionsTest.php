@@ -178,6 +178,7 @@ class LayananActionsTest extends TestCase
         ], $admin);
 
         $this->assertDatabaseHas('layanan_laporan_macet', ['id' => $laporanId, 'status' => 'ditindaklanjuti']);
+        $this->assertDatabaseHas('pinjaman', ['id' => 1, 'status' => 'macet']);
     }
 
     public function test_write_off_and_priority_require_admin_for_decision(): void

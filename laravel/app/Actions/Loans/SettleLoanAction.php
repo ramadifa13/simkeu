@@ -29,7 +29,7 @@ class SettleLoanAction
             }
 
             $loan = DB::table('pinjaman')->where('id', $loanId)->lockForUpdate()->first();
-            if (! $loan || $loan->status !== 'aktif') {
+            if (! $loan || ! \App\Support\LoanLifecycle::isCollectible($loan->status)) {
                 throw new DomainException('Pinjaman tidak aktif atau sudah lunas.');
             }
             $loan->memerlukan_jaminan = Schema::hasTable('jenis_pinjaman')

@@ -78,7 +78,7 @@ class LoanController extends Controller
     {
         $this->authorize('view-loans');
         $detail = $this->loanForRole($request, $role, $loan);
-        if ($detail->status === 'aktif') {
+        if (\App\Support\LoanLifecycle::isCollectible($detail->status)) {
             $refresh->handle($loan, today()->toDateString());
             $detail = $this->loanForRole($request, $role, $loan);
         }
@@ -203,7 +203,7 @@ class LoanController extends Controller
         $penalties = DB::table('angsuran as i')
             ->join('pinjaman as p', 'p.id', '=', 'i.pinjaman_id')->join('anggota as a', 'a.id', '=', 'p.anggota_id')
             ->leftJoin('layanan_bayar_denda as d', 'd.angsuran_id', '=', 'i.id')
-            ->where('p.status', 'aktif')->where('i.status', '<>', 'lunas')
+            ->whereIn('p.status', \App\Support\LoanLifecycle::collectibleStatuses())->where('i.status', '<>', 'lunas')
             ->when(filled($filters['q'] ?? null), function ($query) use ($filters): void {
                 $term = '%'.$filters['q'].'%';
                 $query->where(fn ($search) => $search->where('a.nama_lengkap', 'like', $term)->orWhere('a.kode_anggota', 'like', $term)->orWhere('p.kode_pinjaman', 'like', $term));
@@ -224,7 +224,7 @@ class LoanController extends Controller
         $loans = DB::table('pinjaman as p')->join('anggota as a', 'a.id', '=', 'p.anggota_id')
             ->leftJoin('angsuran as i', fn ($join) => $join->on('i.pinjaman_id', '=', 'p.id')->where('i.status', '<>', 'lunas'))
             ->leftJoin('layanan_bayar_denda as d', 'd.angsuran_id', '=', 'i.id')
-            ->where('p.status', 'aktif')
+            ->whereIn('p.status', \App\Support\LoanLifecycle::collectibleStatuses())
             ->when(filled($filters['q'] ?? null), function ($query) use ($filters): void {
                 $term = '%'.$filters['q'].'%';
                 $query->where(fn ($search) => $search->where('a.nama_lengkap', 'like', $term)->orWhere('a.kode_anggota', 'like', $term)->orWhere('p.kode_pinjaman', 'like', $term));

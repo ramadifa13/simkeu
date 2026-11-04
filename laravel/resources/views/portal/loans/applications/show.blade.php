@@ -12,7 +12,7 @@
             <x-slot:actions>
                 <div class="flex flex-wrap gap-2">
                     @if (in_array($application->status, ['disetujui', 'dicairkan'], true))
-                        <flux:button :href="route('portal.documents.draft-agreement', ['role' => $role, 'application' => $application->id])" variant="outline" icon="document-arrow-down">Draft PDF</flux:button>
+                        <flux:button :href="route('portal.documents.draft-agreement', ['role' => $role, 'application' => $application->id])" target="_blank" variant="outline" icon="printer">Cetak draft</flux:button>
                     @endif
                     @if ($application->status === 'disetujui' && ! $loan && in_array($role, ['admin', 'teller'], true))
                         <flux:button :href="route('portal.loans.applications.disburse.form', ['role' => $role, 'application' => $application->id])" variant="primary" icon="banknotes">Proses pencairan</flux:button>

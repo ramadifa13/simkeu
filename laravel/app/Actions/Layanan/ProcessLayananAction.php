@@ -91,6 +91,11 @@ class ProcessLayananAction
             throw new DomainException('Laporan tidak ditemukan atau sudah diputuskan.');
         }
 
+        // Align pinjaman.status with collection follow-up so filters/dashboard stay consistent.
+        if (in_array($decision, ['ditindaklanjuti', 'selesai'], true) && $loan->status === 'aktif') {
+            DB::table('pinjaman')->where('id', $loan->id)->where('status', 'aktif')->update(['status' => 'macet']);
+        }
+
         return $note;
     }
 

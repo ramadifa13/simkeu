@@ -28,8 +28,8 @@ class PayInstallmentAction
                 throw new DomainException('Angsuran sudah dibayar atau tidak ditemukan.');
             }
             $loan = DB::table('pinjaman')->where('id', $installment->pinjaman_id)->lockForUpdate()->first();
-            if (! $loan || $loan->status !== 'aktif') {
-                throw new DomainException('Pinjaman tidak aktif.');
+            if (! $loan || ! \App\Support\LoanLifecycle::isCollectible($loan->status)) {
+                throw new DomainException('Pinjaman tidak aktif atau sudah lunas.');
             }
             DB::table('kas')->orderByDesc('id')->limit(1)->lockForUpdate()->get();
             $daysLate = max(0, (int) floor((strtotime($paymentDate) - strtotime($installment->tanggal_jatuh_tempo)) / 86400));

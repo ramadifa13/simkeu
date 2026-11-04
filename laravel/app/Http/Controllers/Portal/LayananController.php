@@ -44,9 +44,32 @@ class LayananController extends Controller
             });
         }
         if (($filters['status'] ?? '') === 'macet') {
-            $query->where('p.status', 'aktif')->whereExists(fn ($q) => $q->selectRaw('1')->from('angsuran as i')->whereColumn('i.pinjaman_id', 'p.id')->where('i.status', '<>', 'lunas')->whereDate('i.tanggal_jatuh_tempo', '<', today()->toDateString()));
+            $threshold = today()->subDays(\App\Support\LoanLifecycle::overdueDaysForMacet())->toDateString();
+            $query->where(function ($builder) use ($threshold): void {
+                $builder->where('p.status', 'macet')
+                    ->orWhere(function ($overdue) use ($threshold): void {
+                        $overdue->whereIn('p.status', \App\Support\LoanLifecycle::collectibleStatuses())
+                            ->whereExists(fn ($q) => $q->selectRaw('1')->from('angsuran as i')
+                                ->whereColumn('i.pinjaman_id', 'p.id')
+                                ->where('i.status', '<>', 'lunas')
+                                ->whereDate('i.tanggal_jatuh_tempo', '<=', $threshold));
+                    });
+            });
         } elseif (filled($filters['status'] ?? null)) {
             $query->where('p.status', $filters['status']);
+        }
+
+        if (($filters['focus'] ?? '') === 'macet') {
+            $query->whereExists(fn ($q) => $q->selectRaw('1')->from('layanan_laporan_macet as lm')
+                ->whereColumn('lm.pinjaman_id', 'p.id')->where('lm.status', 'menunggu'));
+        } elseif (($filters['focus'] ?? '') === 'hapus_denda') {
+            $query->whereExists(fn ($q) => $q->selectRaw('1')->from('layanan_pengajuan_hapus_denda as hd')
+                ->whereColumn('hd.pinjaman_id', 'p.id')->where('hd.status', 'menunggu'));
+        } elseif (($filters['focus'] ?? '') === 'prioritas') {
+            $query->whereExists(fn ($q) => $q->selectRaw('1')->from('layanan_prioritas as lp')
+                ->whereColumn('lp.pinjaman_id', 'p.id')->whereIn('lp.status', ['menunggu', 'pengecekan']));
+        } elseif (($filters['focus'] ?? '') === 'lelang') {
+            $query->whereExists(fn ($q) => $q->selectRaw('1')->from('layanan_lelang as ll')->whereColumn('ll.pinjaman_id', 'p.id'));
         }
 
         $loans = $query->orderByDesc('p.id')->paginate((int) ($filters['per_page'] ?? 10))->withQueryString();
@@ -154,6 +177,14 @@ class LayananController extends Controller
         }
 
         $audit->handle($request->user(), 'layanan.'.$data['aksi'], 'pinjaman', $loan, ['detail' => $detail], $request);
+
+        if ($data['aksi'] === 'repeat_order') {
+            $anggotaId = (int) DB::table('pinjaman')->where('id', $loan)->value('anggota_id');
+
+            return redirect()
+                ->route('portal.loans.applications.create', ['role' => $role, 'anggota_id' => $anggotaId])
+                ->with('status', 'Repeat order dicatat. Lanjutkan buat pengajuan pinjaman baru untuk anggota ini.');
+        }
 
         return redirect()->route('portal.layanan.show', ['role' => $role, 'loan' => $loan])
             ->with('status', 'Tindakan layanan berhasil: '.$data['aksi'].'.');

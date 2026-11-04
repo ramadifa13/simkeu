@@ -39,6 +39,7 @@
                                 <flux:modal.trigger name="aksi-bonus"><flux:button size="sm" variant="primary">Bayar bonus</flux:button></flux:modal.trigger>
                             @endif
                             <flux:modal.trigger name="aksi-repeat"><flux:button size="sm" variant="filled">Repeat order</flux:button></flux:modal.trigger>
+                            <flux:button size="sm" variant="primary" :href="route('portal.loans.applications.create', ['role' => $role, 'anggota_id' => $loan->anggota_id])">Buat pengajuan ulang</flux:button>
                         @endif
                         @if($auction && (float) $auction->kelebihan > (float) $auction->dikembalikan)
                             <flux:modal.trigger name="aksi-kembali-lebih"><flux:button size="sm">Kembalikan lebih</flux:button></flux:modal.trigger>
@@ -46,6 +47,12 @@
                     @endcan
                 </div>
 
+                @if($repeat)
+                    <div class="rounded-xl border border-teal-100 bg-teal-50/70 p-3 text-sm text-teal-900">
+                        Repeat order sudah dicatat.
+                        <a class="font-semibold underline" href="{{ route('portal.loans.applications.create', ['role' => $role, 'anggota_id' => $loan->anggota_id]) }}">Lanjut ke pengajuan baru</a>
+                    </div>
+                @endif
                 @if($macet->where('status', 'menunggu')->isNotEmpty())
                     <div class="rounded-xl border border-amber-100 bg-amber-50/60 p-3 text-sm text-amber-900">Ada laporan macet menunggu keputusan Admin.</div>
                 @endif
@@ -169,7 +176,7 @@
             <x-image-upload name="bukti" label="Bukti" required />
         </x-confirm-action-modal>
 
-        <x-confirm-action-modal name="aksi-repeat" title="Catat repeat order?" description="Tindak lanjut nasabah lunas." confirm-label="Simpan" :action="$process">
+        <x-confirm-action-modal name="aksi-repeat" title="Catat repeat order?" description="Catatan penawaran pinjaman ulang. Setelah disimpan Anda akan diarahkan ke form pengajuan baru." confirm-label="Simpan & buat pengajuan" :action="$process">
             <input type="hidden" name="aksi" value="repeat_order" />
             <flux:field><flux:label>Catatan</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
         </x-confirm-action-modal>

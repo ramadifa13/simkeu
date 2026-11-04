@@ -1,3 +1,7 @@
+import { animateCounters, animateCharts, animateValue, bootDashboardMotion, revealDashboard } from './dashboard-motion';
+
+window.SimkeuDashboard = { animateCounters, animateCharts, animateValue, bootDashboardMotion, revealDashboard };
+
 const shell = document.querySelector('[data-portal-shell]');
 const mobileNavigation = document.querySelector('[data-mobile-nav]');
 const mobileBackdrop = document.querySelector('[data-mobile-nav-backdrop]');
@@ -515,3 +519,5 @@ const dateObserver = new MutationObserver((mutations) => {
 if (document.body) {
     dateObserver.observe(document.body, { childList: true, subtree: true });
 }
+
+document.querySelectorAll('[data-dashboard-root]').forEach((root) => bootDashboardMotion(root));

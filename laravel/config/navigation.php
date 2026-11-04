@@ -30,6 +30,7 @@ return [
             ['label' => 'Pengaturan koperasi', 'route' => 'portal.settings.cooperative.edit'],
             ['label' => 'Perjanjian & layanan', 'route' => 'portal.settings.agreement.edit'],
             ['label' => 'Audit aktivitas', 'route' => 'portal.audit.index'],
+            ['label' => 'Pengingat WhatsApp', 'route' => 'portal.whatsapp.index', 'active_when' => ['portal.whatsapp']],
             ['label' => 'Migrasi data', 'route' => 'portal.migration.index', 'active_when' => ['portal.migration']],
             ['label' => 'Backup data', 'route' => 'portal.backup.index', 'active_when' => ['portal.backup']],
         ]],

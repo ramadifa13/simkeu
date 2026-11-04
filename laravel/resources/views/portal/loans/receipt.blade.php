@@ -3,7 +3,7 @@
         <x-page-header icon="document-check" eyebrow="Pembayaran berhasil" title="Bukti angsuran" description="Simpan atau cetak bukti pembayaran ini." :back-href="route('portal.loans.show', ['role' => $role, 'loan' => $loan->id])">
             <x-slot:actions>
                 <flux:button onclick="window.print()" icon="printer">Cetak</flux:button>
-                <flux:button :href="route('portal.documents.payment-receipt', ['role' => $role, 'loan' => $loan->id, 'installment' => $payment->id])" variant="outline" icon="document-arrow-down">PDF</flux:button>
+                <flux:button :href="route('portal.documents.payment-receipt', ['role' => $role, 'loan' => $loan->id, 'installment' => $payment->id])" target="_blank" variant="outline" icon="printer">Cetak template</flux:button>
             </x-slot:actions>
         </x-page-header>
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm print:shadow-none">

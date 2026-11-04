@@ -52,7 +52,7 @@
             <x-slot:filters>
                 <form method="GET" class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
                     <flux:field class="lg:col-span-2"><flux:label>Pencarian</flux:label><flux:input type="search" name="q" :value="$filters['q'] ?? ''" placeholder="Kode pinjaman atau anggota" /></flux:field>
-                    <flux:field><flux:label>Status</flux:label><flux:select name="status"><option value="">Semua</option><option value="aktif" @selected(($filters['status'] ?? '') === 'aktif')>Aktif</option><option value="lunas" @selected(($filters['status'] ?? '') === 'lunas')>Lunas</option><option value="macet" @selected(($filters['status'] ?? '') === 'macet')>Terlambat</option></flux:select></flux:field>
+                    <flux:field><flux:label>Status</flux:label><flux:select name="status"><option value="">Semua</option><option value="aktif" @selected(($filters['status'] ?? '') === 'aktif')>Aktif</option><option value="lunas" @selected(($filters['status'] ?? '') === 'lunas')>Lunas</option><option value="macet" @selected(($filters['status'] ?? '') === 'macet')>Macet (≥7 hari / status)</option></flux:select></flux:field>
                     <div class="flex gap-2"><flux:button type="submit" variant="primary" class="flex-1">Terapkan</flux:button>@if($activeFilter)<flux:button :href="route('portal.layanan.index', ['role' => $role])" variant="ghost">Reset</flux:button>@endif</div>
                 </form>
             </x-slot:filters>

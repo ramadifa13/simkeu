@@ -12,7 +12,7 @@ class RequestEarlySettlementAction
     {
         DB::transaction(function () use ($loanId, $actor, $note): void {
             $loan = DB::table('pinjaman')->where('id', $loanId)->lockForUpdate()->first();
-            if (! $loan || $loan->status !== 'aktif') {
+            if (! $loan || ! \App\Support\LoanLifecycle::isCollectible($loan->status)) {
                 throw new DomainException('Hanya pinjaman aktif yang dapat diajukan untuk pelunasan dipercepat.');
             }
             $existing = DB::table('layanan_pelunasan')->where('pinjaman_id', $loanId)->lockForUpdate()->first();

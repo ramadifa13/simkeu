@@ -83,12 +83,12 @@ class GetDashboardData
             return ['roleLabel' => 'Anggota', 'intro' => 'Akun ini belum terhubung ke data anggota.', 'cards' => [], 'alerts' => [], 'activity' => collect(), 'periodLabel' => 'Hubungi teller untuk menghubungkan akun Anda.', 'unlinkedMember' => true];
         }
 
-        $loan = DB::table('pinjaman')->where('anggota_id', $member->id)->where('status', 'aktif')->orderBy('jatuh_tempo')->first();
+        $loan = DB::table('pinjaman')->where('anggota_id', $member->id)->whereIn('status', \App\Support\LoanLifecycle::collectibleStatuses())->orderBy('jatuh_tempo')->first();
         $next = $loan ? DB::table('angsuran')->where('pinjaman_id', $loan->id)->where('status', '!=', 'lunas')->orderBy('tanggal_jatuh_tempo')->first() : null;
 
         $savingTypes = DB::table('simpanan as s')->join('jenis_simpanan as j', 'j.id', '=', 's.jenis_simpanan_id')->where('s.anggota_id', $member->id)->where('s.saldo', '>', 0)->whereNotIn('j.kode_jenis', ['ANG', 'BONUS', 'SHU'])->orderBy('j.id')->get(['j.kode_jenis', 'j.nama_jenis', 's.saldo']);
         $memberTransactions = DB::table('transaksi as t')->join('jenis_simpanan as j', 'j.id', '=', 't.jenis_simpanan_id')->where('t.anggota_id', $member->id)->whereNotIn('j.kode_jenis', ['ANG', 'BONUS', 'SHU'])->orderByDesc('t.tanggal_transaksi')->limit(10)->get(['t.kode_transaksi as title', 'j.nama_jenis as detail', 't.jenis_transaksi', 't.jumlah as amount', 't.tanggal_transaksi as occurred_at']);
-        $schedules = DB::table('angsuran as a')->join('pinjaman as p', 'p.id', '=', 'a.pinjaman_id')->where('p.anggota_id', $member->id)->where('p.status', 'aktif')->orderBy('p.id')->orderBy('a.angsuran_ke')->get(['p.kode_pinjaman', 'p.tenor', 'a.angsuran_ke', 'a.tanggal_jatuh_tempo', 'a.jumlah_angsuran', 'a.status']);
+        $schedules = DB::table('angsuran as a')->join('pinjaman as p', 'p.id', '=', 'a.pinjaman_id')->where('p.anggota_id', $member->id)->whereIn('p.status', \App\Support\LoanLifecycle::collectibleStatuses())->orderBy('p.id')->orderBy('a.angsuran_ke')->get(['p.kode_pinjaman', 'p.tenor', 'a.angsuran_ke', 'a.tanggal_jatuh_tempo', 'a.jumlah_angsuran', 'a.status']);
         $memberWaserda = $this->hasTable('waserda_transaksi') ? DB::table('waserda_transaksi')->where('anggota_id', $member->id)->orderByDesc('created_at')->limit(5)->get(['total_bayar as amount', 'created_at as occurred_at', 'items']) : collect();
 
         return [

@@ -9,7 +9,7 @@
                     <td class="px-5 py-3"><x-money :amount="$row->total_shu" /></td>
                     <td class="px-5 py-3"><x-status-badge :status="$row->status_bayar" /></td>
                     <td class="px-5 py-3"><x-status-badge :status="$row->periode_status" /></td>
-                    <td class="px-5 py-3 text-right">@if($row->status_bayar === 'sudah')<a href="{{ route('portal.documents.shu-receipt', ['role' => $role, 'entitlement' => $row->id]) }}" class="text-sm font-semibold text-teal-700">PDF</a>@endif</td>
+                    <td class="px-5 py-3 text-right">@if($row->status_bayar === 'sudah')<a href="{{ route('portal.documents.shu-receipt', ['role' => $role, 'entitlement' => $row->id]) }}" target="_blank" class="text-sm font-semibold text-teal-700">Cetak</a>@endif</td>
                 </tr>
             @empty
                 <tr><td colspan="5" class="p-4"><x-empty-state title="Belum ada hak periode" description="Hak muncul setelah Admin menghitung dan mengesahkan periode SHU." icon="calculator" /></td></tr>

@@ -22,6 +22,7 @@ class RefreshLoanPenaltiesActionTest extends TestCase
             $table->increments('id');
             $table->unsignedInteger('jenis_pinjaman_id');
             $table->decimal('jumlah_pinjaman', 15, 2);
+            $table->string('status')->default('aktif');
         });
         Schema::create('angsuran', function (Blueprint $table): void {
             $table->increments('id');
@@ -47,7 +48,7 @@ class RefreshLoanPenaltiesActionTest extends TestCase
     public function test_refresh_marks_overdue_installment_and_caps_penalty_at_next_due_date(): void
     {
         DB::table('jenis_pinjaman')->insert(['id' => 1, 'memerlukan_jaminan' => false]);
-        DB::table('pinjaman')->insert(['id' => 1, 'jenis_pinjaman_id' => 1, 'jumlah_pinjaman' => 2_000_000]);
+        DB::table('pinjaman')->insert(['id' => 1, 'jenis_pinjaman_id' => 1, 'jumlah_pinjaman' => 2_000_000, 'status' => 'aktif']);
         DB::table('denda_tarif')->insert(['jumlah_pinjaman' => 2_000_000, 'denda_per_hari' => 2500]);
         DB::table('layanan_pengaturan')->insert(['id' => 1, 'denda_jaminan_per_juta' => 5000]);
         DB::table('angsuran')->insert([
@@ -60,5 +61,6 @@ class RefreshLoanPenaltiesActionTest extends TestCase
         $this->assertSame(2, $updated);
         $this->assertDatabaseHas('angsuran', ['id' => 1, 'status' => 'telat', 'keterlambatan_hari' => 11, 'denda' => 17500]);
         $this->assertDatabaseHas('angsuran', ['id' => 2, 'status' => 'telat', 'keterlambatan_hari' => 4, 'denda' => 10000]);
+        $this->assertDatabaseHas('pinjaman', ['id' => 1, 'status' => 'macet']);
     }
 }

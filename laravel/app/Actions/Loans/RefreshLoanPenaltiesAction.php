@@ -2,13 +2,14 @@
 
 namespace App\Actions\Loans;
 
+use App\Support\LoanLifecycle;
 use Illuminate\Support\Facades\DB;
 
 class RefreshLoanPenaltiesAction
 {
     public function __construct(private readonly LoanPenaltyCalculator $calculator) {}
 
-    /** Refreshes non-manual penalties for one loan and returns updated rows. */
+    /** Refreshes non-manual penalties for one loan and syncs aktif/macet from overdue days. */
     public function handle(int $loanId, string $referenceDate): int
     {
         return DB::transaction(function () use ($loanId, $referenceDate): int {
@@ -16,7 +17,7 @@ class RefreshLoanPenaltiesAction
                 ->join('jenis_pinjaman as jp', 'jp.id', '=', 'p.jenis_pinjaman_id')
                 ->where('p.id', $loanId)
                 ->lockForUpdate()
-                ->first(['p.id', 'p.jumlah_pinjaman', 'jp.memerlukan_jaminan']);
+                ->first(['p.id', 'p.status', 'p.jumlah_pinjaman', 'jp.memerlukan_jaminan']);
 
             if (! $loan) {
                 return 0;
@@ -29,7 +30,7 @@ class RefreshLoanPenaltiesAction
                 ->whereIn('status', ['belum_bayar', 'telat'])->orderBy('angsuran_ke')->lockForUpdate()->get();
             $updated = 0;
 
-            foreach ($installments as $index => $installment) {
+            foreach ($installments as $installment) {
                 if ((bool) ($installment->denda_manual ?? false) || $installment->tanggal_jatuh_tempo >= $referenceDate) {
                     continue;
                 }
@@ -51,6 +52,17 @@ class RefreshLoanPenaltiesAction
                     'status' => 'telat',
                 ]);
                 $updated++;
+            }
+
+            if (LoanLifecycle::isCollectible((string) $loan->status)) {
+                $maxLate = (int) DB::table('angsuran')
+                    ->where('pinjaman_id', $loanId)
+                    ->where('status', '<>', 'lunas')
+                    ->max('keterlambatan_hari');
+                $nextStatus = $maxLate >= LoanLifecycle::overdueDaysForMacet() ? 'macet' : 'aktif';
+                if ($nextStatus !== (string) $loan->status) {
+                    DB::table('pinjaman')->where('id', $loanId)->update(['status' => $nextStatus]);
+                }
             }
 
             return $updated;

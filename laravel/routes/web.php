@@ -25,6 +25,7 @@ use App\Http\Controllers\Portal\SavingsCorrectionController;
 use App\Http\Controllers\Portal\ShuController;
 use App\Http\Controllers\Portal\TellerController;
 use App\Http\Controllers\Portal\WaserdaController;
+use App\Http\Controllers\Portal\WhatsAppReminderController;
 use App\Http\Controllers\Public\BrandLogoController;
 use App\Http\Controllers\Public\LandingController;
 use Illuminate\Support\Facades\Route;
@@ -217,6 +218,7 @@ Route::middleware(['auth', 'role'])->prefix('portal')->name('portal.')->group(fu
     Route::get('/{role}/pengaturan-perjanjian/tanda-tangan', [CooperativeSettingsController::class, 'signature'])->where('role', 'admin')->name('settings.agreement.signature');
     Route::put('/{role}/pengaturan-perjanjian', [CooperativeSettingsController::class, 'updateAgreement'])->where('role', 'admin')->name('settings.agreement.update');
     Route::get('/{role}/audit-aktivitas', AuditLogController::class)->where('role', 'admin')->name('audit.index');
+    Route::get('/{role}/pengingat-whatsapp', [WhatsAppReminderController::class, 'index'])->where('role', 'admin')->name('whatsapp.index');
 
     Route::get('/{role}/modul/{module}', ModulePlaceholderController::class)
         ->whereIn('role', ['admin', 'teller', 'anggota'])

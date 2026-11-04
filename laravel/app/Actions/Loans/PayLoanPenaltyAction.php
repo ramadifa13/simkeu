@@ -27,8 +27,8 @@ class PayLoanPenaltyAction
                 throw new DomainException('Angsuran tidak dapat menerima pembayaran denda.');
             }
             $loan = DB::table('pinjaman')->where('id', $installment->pinjaman_id)->lockForUpdate()->first();
-            if (! $loan || $loan->status !== 'aktif') {
-                throw new DomainException('Pinjaman tidak aktif.');
+            if (! $loan || ! \App\Support\LoanLifecycle::isCollectible($loan->status)) {
+                throw new DomainException('Pinjaman tidak aktif atau sudah lunas.');
             }
             $paid = (float) DB::table('layanan_bayar_denda')->where('angsuran_id', $installmentId)->lockForUpdate()->sum('jumlah');
             $remaining = max(0, (float) $installment->denda - $paid);
