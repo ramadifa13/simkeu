@@ -13,6 +13,11 @@ class PhaseEightAuthorizationTest extends TestCase
         $admin = $this->makeUser('admin');
         $this->assertTrue(Gate::forUser($admin)->allows('manage-layanan'));
         $this->assertTrue(Gate::forUser($admin)->allows('decide-layanan'));
+        $this->assertTrue(Gate::forUser($admin)->allows('decide-delay-disbursement'));
+        $this->assertTrue(Gate::forUser($admin)->allows('delete-loan-applications'));
+        $this->assertTrue(Gate::forUser($admin)->allows('reverse-installment-payment'));
+        $this->assertTrue(Gate::forUser($admin)->allows('decide-installment-reversal'));
+        $this->assertTrue(Gate::forUser($admin)->allows('request-installment-reversal'));
         $this->assertTrue(Gate::forUser($admin)->allows('manage-shu'));
         $this->assertTrue(Gate::forUser($admin)->allows('view-own-shu'));
         $this->assertTrue(Gate::forUser($admin)->allows('manage-migration'));
@@ -23,7 +28,12 @@ class PhaseEightAuthorizationTest extends TestCase
     {
         $teller = $this->makeUser('teller');
         $this->assertTrue(Gate::forUser($teller)->allows('manage-layanan'));
+        $this->assertTrue(Gate::forUser($teller)->allows('request-installment-reversal'));
         $this->assertFalse(Gate::forUser($teller)->allows('decide-layanan'));
+        $this->assertFalse(Gate::forUser($teller)->allows('decide-delay-disbursement'));
+        $this->assertFalse(Gate::forUser($teller)->allows('delete-loan-applications'));
+        $this->assertFalse(Gate::forUser($teller)->allows('reverse-installment-payment'));
+        $this->assertFalse(Gate::forUser($teller)->allows('decide-installment-reversal'));
         $this->assertFalse(Gate::forUser($teller)->allows('manage-shu'));
         $this->assertFalse(Gate::forUser($teller)->allows('manage-migration'));
         $this->assertFalse(Gate::forUser($teller)->allows('run-backup'));

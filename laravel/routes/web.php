@@ -14,7 +14,11 @@ use App\Http\Controllers\Portal\FinancialParityController;
 use App\Http\Controllers\Portal\InstallmentClosingController;
 use App\Http\Controllers\Portal\LayananController;
 use App\Http\Controllers\Portal\LoanApplicationController;
+use App\Http\Controllers\Portal\LoanCartController;
+use App\Http\Controllers\Portal\LoanCollateralController;
 use App\Http\Controllers\Portal\LoanController;
+use App\Http\Controllers\Portal\LoanInstallmentController;
+use App\Http\Controllers\Portal\LoanSettlementController;
 use App\Http\Controllers\Portal\MasterDataController;
 use App\Http\Controllers\Portal\MemberController;
 use App\Http\Controllers\Portal\MigrationController;
@@ -40,6 +44,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/akun', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/akun', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/akun/kata-sandi', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
+    Route::get('/akun/foto', [ProfileController::class, 'photo'])->name('profile.photo');
 });
 
 Route::middleware(['auth', 'role'])->prefix('portal')->name('portal.')->group(function (): void {
@@ -77,6 +82,9 @@ Route::middleware(['auth', 'role'])->prefix('portal')->name('portal.')->group(fu
     Route::get('/{role}/anggota/{member}/dokumen/{document}', [MemberController::class, 'document'])
         ->whereIn('role', ['admin', 'teller'])
         ->name('members.documents.show');
+    Route::get('/{role}/anggota/{member}/avatar', [MemberController::class, 'avatar'])
+        ->whereIn('role', ['admin', 'teller'])
+        ->name('members.avatar');
     Route::get('/{role}/anggota-ekspor', [MemberController::class, 'export'])
         ->whereIn('role', ['admin', 'teller'])
         ->name('members.export');
@@ -120,6 +128,7 @@ Route::middleware(['auth', 'role'])->prefix('portal')->name('portal.')->group(fu
     Route::post('/{role}/pinjaman/pengajuan/{application}/cairkan', [LoanApplicationController::class, 'disburse'])->whereIn('role', ['admin', 'teller'])->name('loans.applications.disburse');
     Route::get('/{role}/pinjaman/pengajuan/{application}/cairkan', [LoanApplicationController::class, 'disbursementForm'])->whereIn('role', ['admin', 'teller'])->name('loans.applications.disburse.form');
     Route::post('/{role}/pinjaman/pengajuan/{application}/batalkan', [LoanApplicationController::class, 'cancel'])->where('role', 'admin')->name('loans.applications.cancel');
+    Route::delete('/{role}/pinjaman/pengajuan/{application}', [LoanApplicationController::class, 'destroy'])->where('role', 'admin')->whereNumber('application')->name('loans.applications.destroy');
     Route::get('/{role}/pinjaman/denda', [LoanController::class, 'penalties'])->whereIn('role', ['admin', 'teller'])->name('loans.penalties');
     Route::get('/{role}/pinjaman/pelunasan', [LoanController::class, 'settlements'])->whereIn('role', ['admin', 'teller'])->name('loans.settlements');
     Route::get('/{role}/pinjaman/closing', [InstallmentClosingController::class, 'index'])->whereIn('role', ['admin', 'teller'])->name('loans.closing.index');
@@ -127,28 +136,28 @@ Route::middleware(['auth', 'role'])->prefix('portal')->name('portal.')->group(fu
     Route::post('/{role}/pinjaman/closing', [InstallmentClosingController::class, 'close'])->where('role', 'admin')->name('loans.closing.close');
     Route::post('/{role}/pinjaman/closing/buka', [InstallmentClosingController::class, 'reopen'])->where('role', 'admin')->name('loans.closing.reopen');
     Route::get('/{role}/pinjaman', [LoanController::class, 'index'])->whereIn('role', ['admin', 'teller', 'anggota'])->name('loans.index');
-    Route::get('/{role}/pinjaman/keranjang', [LoanController::class, 'cart'])->whereIn('role', ['admin', 'teller'])->name('loans.cart');
-    Route::post('/{role}/pinjaman/keranjang/simpan', [LoanController::class, 'updateCart'])->whereIn('role', ['admin', 'teller'])->name('loans.cart.update');
-    Route::post('/{role}/pinjaman/keranjang/checkout', [LoanController::class, 'checkoutCart'])->whereIn('role', ['admin', 'teller'])->name('loans.cart.checkout');
-    Route::delete('/{role}/pinjaman/keranjang', [LoanController::class, 'clearCart'])->whereIn('role', ['admin', 'teller'])->name('loans.cart.clear');
-    Route::delete('/{role}/pinjaman/keranjang/{installment}', [LoanController::class, 'removeFromCart'])->whereIn('role', ['admin', 'teller'])->whereNumber('installment')->name('loans.cart.remove');
+    Route::get('/{role}/pinjaman/keranjang', [LoanCartController::class, 'cart'])->whereIn('role', ['admin', 'teller'])->name('loans.cart');
+    Route::post('/{role}/pinjaman/keranjang/simpan', [LoanCartController::class, 'updateCart'])->whereIn('role', ['admin', 'teller'])->name('loans.cart.update');
+    Route::post('/{role}/pinjaman/keranjang/checkout', [LoanCartController::class, 'checkoutCart'])->whereIn('role', ['admin', 'teller'])->name('loans.cart.checkout');
+    Route::delete('/{role}/pinjaman/keranjang', [LoanCartController::class, 'clearCart'])->whereIn('role', ['admin', 'teller'])->name('loans.cart.clear');
+    Route::delete('/{role}/pinjaman/keranjang/{installment}', [LoanCartController::class, 'removeFromCart'])->whereIn('role', ['admin', 'teller'])->whereNumber('installment')->name('loans.cart.remove');
     Route::get('/{role}/pinjaman/{loan}', [LoanController::class, 'show'])->whereIn('role', ['admin', 'teller', 'anggota'])->name('loans.show');
     Route::get('/{role}/pinjaman/{loan}/perjanjian', [LoanController::class, 'agreement'])->whereIn('role', ['admin', 'teller', 'anggota'])->name('loans.agreement');
     Route::post('/{role}/pinjaman/{loan}/foto-pencairan', [LoanController::class, 'completeDisbursementPhotos'])->whereIn('role', ['admin', 'teller'])->name('loans.disbursement.photos');
-    Route::post('/{role}/pinjaman/{loan}/angsuran/{installment}/bayar', [LoanController::class, 'pay'])->whereIn('role', ['admin', 'teller'])->name('loans.installments.pay');
-    Route::post('/{role}/pinjaman/{loan}/angsuran/{installment}/keranjang', [LoanController::class, 'addToCart'])->whereIn('role', ['admin', 'teller'])->name('loans.installments.cart.add');
-    Route::post('/{role}/pinjaman/{loan}/keranjang/bulk', [LoanController::class, 'bulkAddToCart'])->whereIn('role', ['admin', 'teller'])->name('loans.installments.cart.bulk');
-    Route::post('/{role}/pinjaman/{loan}/angsuran/{installment}/batalkan', [LoanController::class, 'reverseInstallment'])->where('role', 'admin')->name('loans.installments.reverse');
-    Route::post('/{role}/pinjaman/{loan}/angsuran/{installment}/pembatalan/ajukan', [LoanController::class, 'requestInstallmentReversal'])->where('role', 'teller')->name('loans.installments.reversal.request');
-    Route::post('/{role}/pinjaman/{loan}/pembatalan/{reversalRequest}/review', [LoanController::class, 'reviewInstallmentReversalRequest'])->where('role', 'admin')->name('loans.installments.reversal.review');
-    Route::post('/{role}/pinjaman/{loan}/angsuran/{installment}/denda', [LoanController::class, 'payPenalty'])->whereIn('role', ['admin', 'teller'])->name('loans.installments.penalty.pay');
-    Route::post('/{role}/pinjaman/{loan}/lunaskan', [LoanController::class, 'settle'])->whereIn('role', ['admin', 'teller'])->name('loans.settle');
-    Route::post('/{role}/pinjaman/{loan}/pelunasan/batalkan', [LoanController::class, 'reverseSettlement'])->where('role', 'admin')->name('loans.settlement.reverse');
-    Route::post('/{role}/pinjaman/{loan}/pelunasan/ajukan', [LoanController::class, 'requestSettlement'])->whereIn('role', ['admin', 'teller'])->name('loans.settlement.request');
-    Route::post('/{role}/pinjaman/{loan}/pelunasan/review', [LoanController::class, 'reviewSettlement'])->where('role', 'admin')->name('loans.settlement.review');
-    Route::post('/{role}/pinjaman/{loan}/jaminan/ajukan', [LoanController::class, 'requestCollateralReturn'])->whereIn('role', ['admin', 'teller'])->name('loans.collateral.request');
-    Route::post('/{role}/pinjaman/{loan}/jaminan/review', [LoanController::class, 'reviewCollateralReturn'])->where('role', 'admin')->name('loans.collateral.review');
-    Route::post('/{role}/pinjaman/{loan}/jaminan/kembalikan', [LoanController::class, 'returnCollateral'])->whereIn('role', ['admin', 'teller'])->name('loans.collateral.return');
+    Route::post('/{role}/pinjaman/{loan}/angsuran/{installment}/bayar', [LoanInstallmentController::class, 'pay'])->whereIn('role', ['admin', 'teller'])->name('loans.installments.pay');
+    Route::post('/{role}/pinjaman/{loan}/angsuran/{installment}/keranjang', [LoanCartController::class, 'addToCart'])->whereIn('role', ['admin', 'teller'])->name('loans.installments.cart.add');
+    Route::post('/{role}/pinjaman/{loan}/keranjang/bulk', [LoanCartController::class, 'bulkAddToCart'])->whereIn('role', ['admin', 'teller'])->name('loans.installments.cart.bulk');
+    Route::post('/{role}/pinjaman/{loan}/angsuran/{installment}/batalkan', [LoanInstallmentController::class, 'reverseInstallment'])->where('role', 'admin')->name('loans.installments.reverse');
+    Route::post('/{role}/pinjaman/{loan}/angsuran/{installment}/pembatalan/ajukan', [LoanInstallmentController::class, 'requestInstallmentReversal'])->where('role', 'teller')->name('loans.installments.reversal.request');
+    Route::post('/{role}/pinjaman/{loan}/pembatalan/{reversalRequest}/review', [LoanInstallmentController::class, 'reviewInstallmentReversalRequest'])->where('role', 'admin')->name('loans.installments.reversal.review');
+    Route::post('/{role}/pinjaman/{loan}/angsuran/{installment}/denda', [LoanInstallmentController::class, 'payPenalty'])->whereIn('role', ['admin', 'teller'])->name('loans.installments.penalty.pay');
+    Route::post('/{role}/pinjaman/{loan}/lunaskan', [LoanSettlementController::class, 'settle'])->whereIn('role', ['admin', 'teller'])->name('loans.settle');
+    Route::post('/{role}/pinjaman/{loan}/pelunasan/batalkan', [LoanSettlementController::class, 'reverseSettlement'])->where('role', 'admin')->name('loans.settlement.reverse');
+    Route::post('/{role}/pinjaman/{loan}/pelunasan/ajukan', [LoanSettlementController::class, 'requestSettlement'])->whereIn('role', ['admin', 'teller'])->name('loans.settlement.request');
+    Route::post('/{role}/pinjaman/{loan}/pelunasan/review', [LoanSettlementController::class, 'reviewSettlement'])->where('role', 'admin')->name('loans.settlement.review');
+    Route::post('/{role}/pinjaman/{loan}/jaminan/ajukan', [LoanCollateralController::class, 'requestCollateralReturn'])->whereIn('role', ['admin', 'teller'])->name('loans.collateral.request');
+    Route::post('/{role}/pinjaman/{loan}/jaminan/review', [LoanCollateralController::class, 'reviewCollateralReturn'])->where('role', 'admin')->name('loans.collateral.review');
+    Route::post('/{role}/pinjaman/{loan}/jaminan/kembalikan', [LoanCollateralController::class, 'returnCollateral'])->whereIn('role', ['admin', 'teller'])->name('loans.collateral.return');
     Route::get('/{role}/pinjaman/{loan}/angsuran/{installment}/bukti', [LoanController::class, 'receipt'])->whereIn('role', ['admin', 'teller', 'anggota'])->name('loans.receipt');
     Route::get('/{role}/pinjaman/{loan}/pelunasan/bukti', [LoanController::class, 'settlementReceipt'])->whereIn('role', ['admin', 'teller', 'anggota'])->name('loans.settlement.receipt');
 

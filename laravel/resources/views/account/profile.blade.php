@@ -12,7 +12,7 @@
         <x-validation-summary />
 
         <div class="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(20rem,.92fr)]">
-            <form method="POST" action="{{ route('profile.update') }}" class="ui-form-section space-y-5">
+            <form method="POST" action="{{ route('profile.update') }}" enctype="multipart/form-data" class="ui-form-section space-y-5">
                 @csrf
                 @method('PUT')
 
@@ -27,6 +27,31 @@
                 <x-required-hint />
 
                 <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="sm:col-span-2 flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                        @if (($avatar['url'] ?? null))
+                            <img src="{{ $avatar['url'] }}?v={{ $avatar['version'] }}" alt="Foto profil" class="size-16 rounded-full object-cover ring-2 ring-white" />
+                        @else
+                            <span class="grid size-16 place-items-center rounded-full bg-teal-100 text-xl font-semibold text-teal-800">{{ mb_substr(auth()->user()->nama_lengkap ?? 'U', 0, 1) }}</span>
+                        @endif
+                        <div class="min-w-0 flex-1 space-y-2">
+                            @if ($role === 'anggota')
+                                <p class="text-sm font-semibold text-slate-900">Foto profil anggota</p>
+                                <p class="text-sm text-slate-600">Dipakai dari <strong>foto pencairan</strong> (nasabah menerima uang). Foto diganti otomatis saat ada pencairan pinjaman baru yang aktif.</p>
+                                @unless ($memberDisbursementPhoto)
+                                    <p class="text-xs text-amber-700">Belum ada foto pencairan. Avatar akan muncul setelah pinjaman dicairkan.</p>
+                                @endunless
+                            @else
+                                <x-image-upload label="Foto profil" name="foto_profil" :required="false" />
+                                @if (filled(auth()->user()->foto_profil))
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                        <input type="checkbox" name="hapus_foto_profil" value="1" class="rounded border-slate-300 text-teal-600">
+                                        Hapus foto profil saat ini
+                                    </label>
+                                @endif
+                                <p class="text-xs text-slate-500">JPG, PNG, atau WebP; maksimal 10 MB.</p>
+                            @endif
+                        </div>
+                    </div>
                     <flux:field class="sm:col-span-2">
                         <flux:label>Nama lengkap <x-required-mark /></flux:label>
                         <flux:input name="nama_lengkap" :value="old('nama_lengkap', auth()->user()->nama_lengkap)" required autocomplete="name" />

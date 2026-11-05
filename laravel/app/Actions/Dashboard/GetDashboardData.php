@@ -122,47 +122,54 @@ class GetDashboardData
      */
     private function staffData(?int $tellerId, string $today): array
     {
-        $members = [
-            'total' => DB::table('anggota')->count(),
-            'active' => DB::table('anggota')->where('status', 'aktif')->count(),
-            'inactive' => DB::table('anggota')->where('status', 'nonaktif')->count(),
-            'today' => DB::table('anggota')->whereDate('tanggal_daftar', $today)->count(),
-        ];
-        $savings = DB::table('transaksi as t')->join('jenis_simpanan as j', 'j.id', '=', 't.jenis_simpanan_id')
-            ->whereNotIn('j.kode_jenis', ['ANG', 'BONUS', 'SHU'])
-            ->selectRaw("COALESCE(SUM(CASE WHEN t.jenis_transaksi = 'setoran' THEN t.jumlah ELSE -t.jumlah END), 0) as total")->value('total');
-        $savingsByType = DB::table('jenis_simpanan as j')->leftJoin('transaksi as t', 't.jenis_simpanan_id', '=', 'j.id')
-            ->where('j.status', 'aktif')->whereNotIn('j.kode_jenis', ['ANG', 'BONUS', 'SHU'])
-            ->groupBy('j.id', 'j.kode_jenis', 'j.nama_jenis')->orderBy('j.id')
-            ->get(['j.kode_jenis', 'j.nama_jenis', DB::raw("COALESCE(SUM(CASE WHEN t.jenis_transaksi = 'setoran' THEN t.jumlah ELSE -t.jumlah END), 0) as total")]);
-        $depositQuery = DB::table('kas as k')->join('transaksi as t', 't.id', '=', 'k.transaksi_id')
-            ->where('k.jenis', 'masuk')->whereDate('k.tanggal', $today)->where(function ($query): void { $query->whereNull('k.keterangan')->orWhere('k.keterangan', '')->orWhere('k.keterangan', 'not like', '%Waserda%'); });
-        if ($tellerId) $depositQuery->where('t.user_id', $tellerId);
-        $deposit = $depositQuery->selectRaw('COUNT(*) as count, COALESCE(SUM(k.jumlah),0) as amount, COUNT(DISTINCT t.anggota_id) as members')->first();
-        $loan = DB::table('pinjaman')->selectRaw("COUNT(*) as total_count, COUNT(CASE WHEN status = 'aktif' THEN 1 END) as active, COUNT(CASE WHEN status = 'lunas' THEN 1 END) as paid, COUNT(CASE WHEN status = 'macet' THEN 1 END) as bad, COALESCE(SUM(jumlah_pinjaman),0) as total, COALESCE(SUM(CASE WHEN status = 'aktif' THEN sisa_pokok ELSE 0 END),0) as principal")->first();
-        $remainingInterest = (float) DB::table('angsuran')->where('status', '!=', 'lunas')->sum('bunga');
-        $waserda = $this->hasTable('waserda_transaksi') ? DB::table('waserda_transaksi')->selectRaw('COUNT(*) as count, COALESCE(SUM(total_bayar),0) as amount')->first() : (object) ['count' => 0, 'amount' => 0];
-        $due = DB::table('angsuran as a')->join('pinjaman as p', 'p.id', '=', 'a.pinjaman_id')->join('anggota as m', 'm.id', '=', 'p.anggota_id')
-            ->whereIn('a.status', ['belum_bayar', 'telat'])->whereBetween('a.tanggal_jatuh_tempo', [$today, now()->addDays(7)->toDateString()])->orderBy('a.tanggal_jatuh_tempo')->limit(8)
-            ->get(['a.angsuran_ke', 'a.tanggal_jatuh_tempo', 'a.jumlah_angsuran', 'a.status', 'm.nama_lengkap', 'm.kode_anggota', 'p.kode_pinjaman']);
-        $applications = DB::table('pengajuan_pinjaman')->selectRaw("COUNT(*) as total, COUNT(CASE WHEN status = 'menunggu' THEN 1 END) as pending, COUNT(CASE WHEN status = 'disetujui' THEN 1 END) as approved, COUNT(CASE WHEN status = 'ditolak' THEN 1 END) as rejected")->first();
-        $readyDisbursement = DB::table('pengajuan_pinjaman as pp')->where('pp.status', 'disetujui')->whereNotExists(fn ($query) => $query->selectRaw(1)->from('pinjaman as p')->whereColumn('p.pengajuan_id', 'pp.id'))->count();
-        $activeLoans = DB::table('pinjaman as p')->join('anggota as m', 'm.id', '=', 'p.anggota_id')->where('p.status', 'aktif')->orderByDesc('p.tanggal_pencairan')->limit(5)
-            ->get(['p.id', 'p.kode_pinjaman', 'p.sisa_pokok', 'm.nama_lengkap', DB::raw("(select count(*) from angsuran where pinjaman_id=p.id and status='lunas') as paid_installments"), DB::raw('(select count(*) from angsuran where pinjaman_id=p.id) as total_installments'), DB::raw("(select coalesce(sum(bunga),0) from angsuran where pinjaman_id=p.id and status != 'lunas') as remaining_interest")]);
-        $transactions = DB::table('transaksi as t')->join('anggota as m', 'm.id', '=', 't.anggota_id')->join('jenis_simpanan as j', 'j.id', '=', 't.jenis_simpanan_id')
-            ->whereNotIn('j.kode_jenis', ['ANG', 'BONUS', 'SHU'])->when($tellerId, fn ($q) => $q->where('t.user_id', $tellerId))->orderByDesc('t.tanggal_transaksi')->limit(6)
-            ->get(['t.kode_transaksi as title', 'm.nama_lengkap as actor', 'j.nama_jenis as detail', 't.jenis_transaksi', 't.jumlah as amount', 't.tanggal_transaksi as occurred_at']);
-        $installments = DB::table('angsuran as a')->join('pinjaman as p', 'p.id', '=', 'a.pinjaman_id')->join('anggota as m', 'm.id', '=', 'p.anggota_id')->whereNotNull('a.tanggal_bayar')->orderByDesc('a.tanggal_bayar')->limit(6)
-            ->get(['m.nama_lengkap', 'p.kode_pinjaman', 'a.angsuran_ke', 'a.jumlah_angsuran', 'a.denda', 'a.tanggal_bayar']);
-        $profit = $this->profit($today);
+        $bust = app(BustDashboardCache::class)->token();
+        $cacheKey = 'dashboard:staff:'.($tellerId ?? 'admin').':'.$today.':'.$bust;
 
-        return compact('members', 'savings', 'savingsByType', 'deposit', 'loan', 'remainingInterest', 'waserda', 'due', 'applications', 'readyDisbursement', 'activeLoans', 'transactions', 'installments', 'profit') + [
-            'savingsTotal' => (float) $savings,
-            'cashBalance' => $this->latestCashBalance(),
-            'loans' => ['total' => (float) $loan->total, 'active' => (int) $loan->active, 'remaining' => (float) $loan->principal + $remainingInterest],
-            'depositToday' => ['count' => (int) $deposit->count, 'amount' => (float) $deposit->amount, 'members' => (int) $deposit->members],
-            'transactionsToday' => $tellerId ? DB::table('kas as k')->leftJoin('transaksi as t', 't.id', '=', 'k.transaksi_id')->whereDate('k.tanggal', $today)->where('t.user_id', $tellerId)->count() : 0,
-        ];
+        return Cache::remember($cacheKey, 90, function () use ($tellerId, $today): array {
+            $members = [
+                'total' => DB::table('anggota')->count(),
+                'active' => DB::table('anggota')->where('status', 'aktif')->count(),
+                'inactive' => DB::table('anggota')->where('status', 'nonaktif')->count(),
+                'today' => DB::table('anggota')->whereDate('tanggal_daftar', $today)->count(),
+            ];
+            $savings = DB::table('transaksi as t')->join('jenis_simpanan as j', 'j.id', '=', 't.jenis_simpanan_id')
+                ->whereNotIn('j.kode_jenis', ['ANG', 'BONUS', 'SHU'])
+                ->selectRaw("COALESCE(SUM(CASE WHEN t.jenis_transaksi = 'setoran' THEN t.jumlah ELSE -t.jumlah END), 0) as total")->value('total');
+            $savingsByType = DB::table('jenis_simpanan as j')->leftJoin('transaksi as t', 't.jenis_simpanan_id', '=', 'j.id')
+                ->where('j.status', 'aktif')->whereNotIn('j.kode_jenis', ['ANG', 'BONUS', 'SHU'])
+                ->groupBy('j.id', 'j.kode_jenis', 'j.nama_jenis')->orderBy('j.id')
+                ->get(['j.kode_jenis', 'j.nama_jenis', DB::raw("COALESCE(SUM(CASE WHEN t.jenis_transaksi = 'setoran' THEN t.jumlah ELSE -t.jumlah END), 0) as total")]);
+            $depositQuery = DB::table('kas as k')->join('transaksi as t', 't.id', '=', 'k.transaksi_id')
+                ->where('k.jenis', 'masuk')->whereDate('k.tanggal', $today)->where(function ($query): void { $query->whereNull('k.keterangan')->orWhere('k.keterangan', '')->orWhere('k.keterangan', 'not like', '%Waserda%'); });
+            if ($tellerId) {
+                $depositQuery->where('t.user_id', $tellerId);
+            }
+            $deposit = $depositQuery->selectRaw('COUNT(*) as count, COALESCE(SUM(k.jumlah),0) as amount, COUNT(DISTINCT t.anggota_id) as members')->first();
+            $loan = DB::table('pinjaman')->selectRaw("COUNT(*) as total_count, COUNT(CASE WHEN status = 'aktif' THEN 1 END) as active, COUNT(CASE WHEN status = 'lunas' THEN 1 END) as paid, COUNT(CASE WHEN status = 'macet' THEN 1 END) as bad, COALESCE(SUM(jumlah_pinjaman),0) as total, COALESCE(SUM(CASE WHEN status = 'aktif' THEN sisa_pokok ELSE 0 END),0) as principal")->first();
+            $remainingInterest = (float) DB::table('angsuran')->where('status', '!=', 'lunas')->sum('bunga');
+            $waserda = $this->hasTable('waserda_transaksi') ? DB::table('waserda_transaksi')->selectRaw('COUNT(*) as count, COALESCE(SUM(total_bayar),0) as amount')->first() : (object) ['count' => 0, 'amount' => 0];
+            $due = DB::table('angsuran as a')->join('pinjaman as p', 'p.id', '=', 'a.pinjaman_id')->join('anggota as m', 'm.id', '=', 'p.anggota_id')
+                ->whereIn('a.status', ['belum_bayar', 'telat'])->whereBetween('a.tanggal_jatuh_tempo', [$today, now()->addDays(7)->toDateString()])->orderBy('a.tanggal_jatuh_tempo')->limit(8)
+                ->get(['a.angsuran_ke', 'a.tanggal_jatuh_tempo', 'a.jumlah_angsuran', 'a.status', 'm.nama_lengkap', 'm.kode_anggota', 'p.kode_pinjaman']);
+            $applications = DB::table('pengajuan_pinjaman')->selectRaw("COUNT(*) as total, COUNT(CASE WHEN status = 'menunggu' THEN 1 END) as pending, COUNT(CASE WHEN status = 'disetujui' THEN 1 END) as approved, COUNT(CASE WHEN status = 'ditolak' THEN 1 END) as rejected")->first();
+            $readyDisbursement = DB::table('pengajuan_pinjaman as pp')->where('pp.status', 'disetujui')->whereNotExists(fn ($query) => $query->selectRaw(1)->from('pinjaman as p')->whereColumn('p.pengajuan_id', 'pp.id'))->count();
+            $activeLoans = DB::table('pinjaman as p')->join('anggota as m', 'm.id', '=', 'p.anggota_id')->where('p.status', 'aktif')->orderByDesc('p.tanggal_pencairan')->limit(5)
+                ->get(['p.id', 'p.kode_pinjaman', 'p.sisa_pokok', 'm.nama_lengkap', DB::raw("(select count(*) from angsuran where pinjaman_id=p.id and status='lunas') as paid_installments"), DB::raw('(select count(*) from angsuran where pinjaman_id=p.id) as total_installments'), DB::raw("(select coalesce(sum(bunga),0) from angsuran where pinjaman_id=p.id and status != 'lunas') as remaining_interest")]);
+            $transactions = DB::table('transaksi as t')->join('anggota as m', 'm.id', '=', 't.anggota_id')->join('jenis_simpanan as j', 'j.id', '=', 't.jenis_simpanan_id')
+                ->whereNotIn('j.kode_jenis', ['ANG', 'BONUS', 'SHU'])->when($tellerId, fn ($q) => $q->where('t.user_id', $tellerId))->orderByDesc('t.tanggal_transaksi')->limit(6)
+                ->get(['t.kode_transaksi as title', 'm.nama_lengkap as actor', 'j.nama_jenis as detail', 't.jenis_transaksi', 't.jumlah as amount', 't.tanggal_transaksi as occurred_at']);
+            $installments = DB::table('angsuran as a')->join('pinjaman as p', 'p.id', '=', 'a.pinjaman_id')->join('anggota as m', 'm.id', '=', 'p.anggota_id')->whereNotNull('a.tanggal_bayar')->orderByDesc('a.tanggal_bayar')->limit(6)
+                ->get(['m.nama_lengkap', 'p.kode_pinjaman', 'a.angsuran_ke', 'a.jumlah_angsuran', 'a.denda', 'a.tanggal_bayar']);
+            $profit = $this->profit($today);
+
+            return compact('members', 'savings', 'savingsByType', 'deposit', 'loan', 'remainingInterest', 'waserda', 'due', 'applications', 'readyDisbursement', 'activeLoans', 'transactions', 'installments', 'profit') + [
+                'savingsTotal' => (float) $savings,
+                'cashBalance' => $this->latestCashBalance(),
+                'loans' => ['total' => (float) $loan->total, 'active' => (int) $loan->active, 'remaining' => (float) $loan->principal + $remainingInterest],
+                'depositToday' => ['count' => (int) $deposit->count, 'amount' => (float) $deposit->amount, 'members' => (int) $deposit->members],
+                'transactionsToday' => $tellerId ? DB::table('kas as k')->leftJoin('transaksi as t', 't.id', '=', 'k.transaksi_id')->whereDate('k.tanggal', $today)->where('t.user_id', $tellerId)->count() : 0,
+            ];
+        });
     }
 
     /** @return list<array<string, mixed>> */

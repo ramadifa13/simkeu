@@ -12,7 +12,9 @@ use ZipArchive;
 /** Admin-only operational SQL dump ZIP without private member/signature files. */
 class CreateOperationalBackupAction
 {
-    /** @return array{token: string, filename: string, tables: int, bytes: int} */
+    public const ROW_LIMIT = 20000;
+
+    /** @return array{token: string, filename: string, tables: int, bytes: int, truncated_tables: list<string>} */
     public function handle(User $actor): array
     {
         if ($actor->role !== 'admin') {
@@ -34,9 +36,14 @@ class CreateOperationalBackupAction
         $token = bin2hex(random_bytes(16));
         $filename = 'backup-operasional-'.now()->format('Ymd-His').'.zip';
         $sqlName = 'dump.sql';
-        $sql = "-- SIMKEU operational backup\n-- Generated at ".now()->toDateTimeString()."\n-- Excludes private member photos/signatures by design.\n\n";
+        $sql = "-- SIMKEU operational backup\n-- Generated at ".now()->toDateTimeString()."\n-- Excludes private member photos/signatures by design.\n-- Per-table row limit: ".self::ROW_LIMIT."\n\n";
+        $truncatedTables = [];
         foreach ($existing as $table) {
-            $sql .= $this->dumpTable($table);
+            [$chunk, $truncated] = $this->dumpTable($table);
+            $sql .= $chunk;
+            if ($truncated) {
+                $truncatedTables[] = $table;
+            }
         }
 
         $tempSql = storage_path('app/private/backups/'.$token.'-'.$sqlName);
@@ -50,7 +57,11 @@ class CreateOperationalBackupAction
             throw new DomainException('Gagal membuat arsip backup.');
         }
         $zip->addFile($tempSql, $sqlName);
-        $zip->addFromString('README.txt', "Backup operasional SIMKEU\nTidak mencakup foto KTP/KK/TTD anggota.\nToken unduhan sekali pakai: {$token}\n");
+        $readme = "Backup operasional SIMKEU\nTidak mencakup foto KTP/KK/TTD anggota.\nToken unduhan sekali pakai: {$token}\nBatas baris per tabel: ".self::ROW_LIMIT."\n";
+        if ($truncatedTables !== []) {
+            $readme .= 'Tabel terpotong (partial): '.implode(', ', $truncatedTables)."\n";
+        }
+        $zip->addFromString('README.txt', $readme);
         $zip->close();
         @unlink($tempSql);
 
@@ -62,6 +73,8 @@ class CreateOperationalBackupAction
             'created_at' => now()->toDateTimeString(),
             'downloaded' => false,
             'tables' => $existing,
+            'truncated_tables' => $truncatedTables,
+            'row_limit' => self::ROW_LIMIT,
         ], JSON_THROW_ON_ERROR));
 
         return [
@@ -69,15 +82,21 @@ class CreateOperationalBackupAction
             'filename' => $filename,
             'tables' => count($existing),
             'bytes' => (int) filesize($tempZip),
+            'truncated_tables' => $truncatedTables,
         ];
     }
 
-    private function dumpTable(string $table): string
+    /** @return array{0: string, 1: bool} */
+    private function dumpTable(string $table): array
     {
-        $rows = DB::table($table)->orderBy('id')->limit(20000)->get();
-        $out = "-- table {$table}\n";
+        $rows = DB::table($table)->orderBy('id')->limit(self::ROW_LIMIT + 1)->get();
+        $truncated = $rows->count() > self::ROW_LIMIT;
+        if ($truncated) {
+            $rows = $rows->take(self::ROW_LIMIT)->values();
+        }
+        $out = '-- table '.$table.($truncated ? ' (TRUNCATED at '.self::ROW_LIMIT.' rows)' : '')."\n";
         if ($rows->isEmpty()) {
-            return $out."-- empty\n\n";
+            return [$out."-- empty\n\n", false];
         }
         foreach ($rows as $row) {
             $values = [];
@@ -94,6 +113,6 @@ class CreateOperationalBackupAction
             $out .= 'INSERT INTO `'.$table.'` ('.implode(',', $columns).') VALUES ('.implode(',', $values).");\n";
         }
 
-        return $out."\n";
+        return [$out."\n", $truncated];
     }
 }

@@ -15,9 +15,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
+    private const EXPORT_ROW_LIMIT = 5000;
+
     private const TYPES = ['simpanan', 'kas', 'anggota', 'waserda', 'denda', 'pinjaman', 'angsuran', 'lunas', 'harian', 'transaksi'];
 
-    private const TELLER_TYPES = ['harian', 'simpanan', 'angsuran', 'pinjaman', 'waserda', 'denda'];
+    /** Mirror native permissions.php: teller may open harian/simpanan/lunas/denda (+ waserda); not pinjaman/angsuran. */
+    private const TELLER_TYPES = ['harian', 'simpanan', 'lunas', 'denda', 'waserda'];
 
     public function index(Request $request, string $role): View
     {
@@ -35,14 +38,17 @@ class ReportController extends Controller
         $this->authorize('view-operational-reports');
         $filters = $this->filters($request, $role);
         $definition = $this->definition($filters);
-        $items = $definition['query']->limit(5000)->get();
+        [$items, $truncated] = $this->exportRows($definition['query']);
 
         $audit->handle($request->user(), 'report.exported', 'laporan', null, [
             'jenis' => $filters['jenis'],
             'count' => $items->count(),
+            'truncated' => $truncated,
             'tanggal_dari' => $filters['tanggal_dari'] ?? null,
             'tanggal_sampai' => $filters['tanggal_sampai'] ?? null,
         ], $request);
+
+        $filename = 'laporan-'.$filters['jenis'].'-'.now()->format('Ymd-His').($truncated ? '-partial' : '').'.csv';
 
         return response()->streamDownload(function () use ($definition, $items): void {
             $handle = fopen('php://output', 'wb');
@@ -52,7 +58,11 @@ class ReportController extends Controller
                 fputcsv($handle, array_map(fn (string $key) => data_get($item, $key), array_keys($definition['columns'])));
             }
             fclose($handle);
-        }, 'laporan-'.$filters['jenis'].'-'.now()->format('Ymd-His').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'X-Export-Truncated' => $truncated ? '1' : '0',
+            'X-Export-Row-Limit' => (string) self::EXPORT_ROW_LIMIT,
+        ]);
     }
 
     public function exportExcel(Request $request, string $role, ExportExcelReportAction $excel, RecordActivity $audit): StreamedResponse
@@ -60,18 +70,39 @@ class ReportController extends Controller
         $this->authorize('view-operational-reports');
         $filters = $this->filters($request, $role);
         $definition = $this->definition($filters);
-        $items = $definition['query']->limit(5000)->get();
+        [$items, $truncated] = $this->exportRows($definition['query']);
         $audit->handle($request->user(), 'report.exported_excel', 'laporan', null, [
             'jenis' => $filters['jenis'],
             'count' => $items->count(),
+            'truncated' => $truncated,
         ], $request);
 
-        return $excel->handle(
+        $filename = 'laporan-'.$filters['jenis'].'-'.now()->format('Ymd-His').($truncated ? '-partial' : '').'.xlsx';
+
+        $response = $excel->handle(
             $definition['title'],
             $definition['columns'],
             $items,
-            'laporan-'.$filters['jenis'].'-'.now()->format('Ymd-His').'.xlsx'
+            $filename
         );
+        $response->headers->set('X-Export-Truncated', $truncated ? '1' : '0');
+        $response->headers->set('X-Export-Row-Limit', (string) self::EXPORT_ROW_LIMIT);
+
+        return $response;
+    }
+
+    /**
+     * @return array{0: \Illuminate\Support\Collection<int, object>, 1: bool}
+     */
+    private function exportRows(Builder $query): array
+    {
+        $items = $query->limit(self::EXPORT_ROW_LIMIT + 1)->get();
+        $truncated = $items->count() > self::EXPORT_ROW_LIMIT;
+        if ($truncated) {
+            $items = $items->take(self::EXPORT_ROW_LIMIT)->values();
+        }
+
+        return [$items, $truncated];
     }
 
     /** @return array<string, mixed> */

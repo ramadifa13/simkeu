@@ -1,6 +1,7 @@
 @props(['role', 'title' => 'SIMKEU', 'breadcrumbs' => []])
 @php
     $user = auth()->user();
+    $portalAvatar = app(\App\Support\PortalAvatar::class)->forUser($user);
     // Cache plain arrays only — serializing Collection caused incomplete-object 500s.
     // Bust token invalidates every role inbox after mutations (RecordActivity).
     $portalNotifications = collect();
@@ -55,7 +56,11 @@
                     title="{{ $user?->nama_lengkap }} · Kelola akun"
                     class="sidebar-account"
                 >
-                    <span class="sidebar-account-avatar">{{ mb_substr($user?->nama_lengkap ?? 'U', 0, 1) }}</span>
+                    @if ($portalAvatar['url'])
+                        <img src="{{ $portalAvatar['url'] }}?v={{ $portalAvatar['version'] }}" alt="" class="sidebar-account-avatar sidebar-account-avatar-image object-cover" />
+                    @else
+                        <span class="sidebar-account-avatar">{{ mb_substr($user?->nama_lengkap ?? 'U', 0, 1) }}</span>
+                    @endif
                     <span class="sidebar-account-copy sidebar-hide-collapsed">
                         <span class="sidebar-account-name">{{ $user?->nama_lengkap }}</span>
                         <span class="sidebar-account-meta">Kelola akun</span>

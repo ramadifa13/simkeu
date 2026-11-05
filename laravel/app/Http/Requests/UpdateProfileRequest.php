@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateProfileRequest extends FormRequest
 {
@@ -24,8 +25,20 @@ class UpdateProfileRequest extends FormRequest
     {
         return [
             'nama_lengkap' => ['required', 'string', 'max:100'],
-            'email' => ['nullable', 'email:rfc,dns', 'max:100'],
+            'email' => ['nullable', 'email', 'max:100'],
             'telepon' => ['nullable', 'string', 'max:30'],
+            'foto_profil' => [
+                Rule::prohibitedIf(fn () => $this->user()?->role === 'anggota'),
+                'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,webp',
+                'max:10240',
+            ],
+            'hapus_foto_profil' => [
+                Rule::prohibitedIf(fn () => $this->user()?->role === 'anggota'),
+                'nullable',
+                'boolean',
+            ],
         ];
     }
 }

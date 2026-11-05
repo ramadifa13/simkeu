@@ -30,7 +30,7 @@ class CreateMemberAction
             $user = User::query()->create([
                 'username' => $username,
                 'nama_lengkap' => $attributes['nama_lengkap'],
-                'email' => $attributes['email'] ?? null,
+                'email' => null,
                 'telepon' => $attributes['telepon'] ?? null,
                 'status' => 'aktif',
             ]);
@@ -40,10 +40,11 @@ class CreateMemberAction
             ])->save();
 
             $member = Anggota::query()->create([
-                ...Arr::except($attributes, ['foto_ktp', 'foto_kk', 'foto_ktp_pasangan', 'kategori_anggota']),
+                ...Arr::except($attributes, ['foto_ktp', 'foto_kk', 'foto_ktp_pasangan', 'kategori_anggota', 'email']),
                 'user_id' => $user->id,
+                'email' => '',
                 'status' => 'aktif',
-                'tanggal_daftar' => now()->toDateString(),
+                'tanggal_daftar' => $attributes['tanggal_daftar'] ?? now()->toDateString(),
             ]);
 
             foreach (['foto_ktp', 'foto_kk', 'foto_ktp_pasangan'] as $documentField) {

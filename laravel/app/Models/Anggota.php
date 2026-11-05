@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Anggota extends Model
 {
@@ -53,5 +54,15 @@ class Anggota extends Model
     public function ketuaKelompok(): BelongsTo
     {
         return $this->belongsTo(self::class, 'ketua_kelompok_id');
+    }
+
+    public function pengajuanPinjaman(): HasMany
+    {
+        return $this->hasMany(PengajuanPinjaman::class, 'anggota_id');
+    }
+
+    public function pinjaman(): HasMany
+    {
+        return $this->hasMany(Pinjaman::class, 'anggota_id');
     }
 }

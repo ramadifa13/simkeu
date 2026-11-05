@@ -18,10 +18,13 @@
             <section class="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
                 <h2 class="text-base font-semibold text-slate-900">Tindakan cepat</h2>
                 <div class="flex flex-wrap gap-2">
+                    <flux:button size="sm" variant="outline" :href="route('portal.loans.show', ['role' => $role, 'loan' => $loan->id])">Bayar angsuran / denda</flux:button>
                     @if($loan->status !== 'lunas')
+                        <flux:button size="sm" variant="outline" :href="route('portal.loans.settlements', ['role' => $role]).'?q='.urlencode($loan->kode_pinjaman)">Pelunasan</flux:button>
                         <flux:modal.trigger name="aksi-lapor-macet"><flux:button size="sm">Lapor macet</flux:button></flux:modal.trigger>
                         <flux:modal.trigger name="aksi-ajukan-hapus-denda"><flux:button size="sm" variant="filled">Ajukan hapus denda</flux:button></flux:modal.trigger>
                     @else
+                        <flux:button size="sm" variant="outline" :href="route('portal.loans.show', ['role' => $role, 'loan' => $loan->id])">Pengembalian jaminan</flux:button>
                         <flux:modal.trigger name="aksi-prioritas"><flux:button size="sm">Ajukan prioritas</flux:button></flux:modal.trigger>
                     @endif
                     @can('decide-layanan')

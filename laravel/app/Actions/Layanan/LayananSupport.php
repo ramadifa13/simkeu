@@ -134,12 +134,11 @@ class LayananSupport
         $principal = (float) $installments->sum('pokok');
         $interest = (float) $installments->sum('bunga');
         $discount = round($interest * max(0, min(100, $discountPercent)) / 100, 2);
-        $penalty = 0.0;
-        $paidPenalty = 0.0;
-        foreach ($installments as $row) {
-            $penalty += (float) $row->denda;
-            $paidPenalty += (float) DB::table('layanan_bayar_denda')->where('angsuran_id', $row->id)->sum('jumlah');
-        }
+        $penalty = (float) $installments->sum('denda');
+        $installmentIds = $installments->pluck('id')->filter()->values()->all();
+        $paidPenalty = $installmentIds === [] || ! Schema::hasTable('layanan_bayar_denda')
+            ? 0.0
+            : (float) DB::table('layanan_bayar_denda')->whereIn('angsuran_id', $installmentIds)->sum('jumlah');
         $credit = Schema::hasTable('layanan_lelang')
             ? (float) DB::table('layanan_lelang')->where('pinjaman_id', $loanId)->value('kredit')
             : 0.0;

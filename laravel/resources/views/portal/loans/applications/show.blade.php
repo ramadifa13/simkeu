@@ -24,6 +24,11 @@
                     @elseif ($role === 'admin' && $application->status === 'disetujui' && ! $loan)
                         <flux:modal.trigger name="cancel-approved-application"><flux:button variant="danger" icon="x-circle">Batalkan pencairan</flux:button></flux:modal.trigger>
                     @endif
+                    @can('delete-loan-applications')
+                        @if (in_array($application->status, ['menunggu', 'ditolak'], true) && ! $loan)
+                            <flux:modal.trigger name="delete-loan-application"><flux:button variant="danger" icon="trash">Hapus pengajuan</flux:button></flux:modal.trigger>
+                        @endif
+                    @endcan
                 </div>
             </x-slot:actions>
         </x-page-header>
@@ -201,6 +206,19 @@
                 />
             </x-confirm-action-modal>
         @endif
+        @can('delete-loan-applications')
+            @if (in_array($application->status, ['menunggu', 'ditolak'], true) && ! $loan)
+                <x-confirm-action-modal
+                    name="delete-loan-application"
+                    title="Hapus pengajuan?"
+                    description="Pengajuan menunggu/ditolak akan dihapus permanen. Data yang dihapus tidak dapat dikembalikan."
+                    confirm-label="Hapus pengajuan"
+                    variant="danger"
+                    method="DELETE"
+                    :action="route('portal.loans.applications.destroy', ['role' => $role, 'application' => $application->id])"
+                />
+            @endif
+        @endcan
         @if ($application->status === 'disetujui' && ! $loan && ! $delayRequest && in_array($role, ['admin', 'teller'], true))
             <x-confirm-action-modal
                 name="ajukan-tunda-cair"

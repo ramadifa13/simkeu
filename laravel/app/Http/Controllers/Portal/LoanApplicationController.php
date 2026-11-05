@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Portal;
 
 use App\Actions\Audit\RecordActivity;
 use App\Actions\Loans\CancelApprovedLoanApplicationAction;
+use App\Actions\Loans\DeleteLoanApplicationAction;
 use App\Actions\Loans\DisburseLoanAction;
 use App\Actions\Loans\ReviewLoanApplicationAction;
 use App\Actions\Loans\SubmitLoanApplicationAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\DisburseLoanRequest;
 use App\Support\ImageStorage;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
@@ -198,26 +200,11 @@ class LoanApplicationController extends Controller
         return back()->with('status', 'Pengajuan berhasil '.($data['decision'] === 'disetujui' ? 'disetujui' : 'ditolak').'.');
     }
 
-    public function disburse(Request $request, string $role, int $application, DisburseLoanAction $disburse, RecordActivity $audit): RedirectResponse
+    public function disburse(DisburseLoanRequest $request, string $role, int $application, DisburseLoanAction $disburse, RecordActivity $audit): RedirectResponse
     {
-        $this->authorize('disburse-loans');
         $applicationRow = DB::table('pengajuan_pinjaman as pp')->join('jenis_pinjaman as jp', 'jp.id', '=', 'pp.jenis_pinjaman_id')->where('pp.id', $application)->first(['pp.*', 'jp.memerlukan_jaminan']);
         abort_unless($applicationRow && $applicationRow->status === 'disetujui', 404);
-        $data = $request->validate([
-            'tanggal_pencairan' => ['required', 'date', 'before_or_equal:today'],
-            'sudah_dibayar' => ['nullable', 'integer', 'min:0'],
-            'foto_nasabah' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_barang_jaminan' => [($applicationRow->memerlukan_jaminan ? 'required' : 'nullable'), 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_nasabah_barang' => [($applicationRow->memerlukan_jaminan ? 'required' : 'nullable'), 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'nama_saksi_1' => ['required', 'string', 'max:100'],
-            'nama_saksi_2' => ['required', 'string', 'max:100'],
-            'ttd_nasabah' => ['required', 'image', 'mimes:webp,png', 'max:1024'],
-            'ttd_teller' => ['required', 'image', 'mimes:webp,png', 'max:1024'],
-            'ttd_saksi_1' => ['required', 'image', 'mimes:webp,png', 'max:1024'],
-            'ttd_saksi_2' => ['required', 'image', 'mimes:webp,png', 'max:1024'],
-            'lampiran' => ['nullable', 'array', 'max:10'],
-            'lampiran.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-        ]);
+        $data = $request->validated();
         $stored = [];
 
         try {
@@ -278,5 +265,20 @@ class LoanApplicationController extends Controller
         $audit->handle($request->user(), 'loan.application.cancelled', 'pengajuan_pinjaman', $application, ['reason' => $data['catatan_admin']], $request);
 
         return back()->with('status', 'Pencairan pengajuan dibatalkan.');
+    }
+
+    public function destroy(Request $request, string $role, int $application, DeleteLoanApplicationAction $delete, RecordActivity $audit): RedirectResponse
+    {
+        $this->authorize('delete-loan-applications');
+        try {
+            $delete->handle($application);
+        } catch (DomainException $exception) {
+            return back()->withErrors(['hapus' => $exception->getMessage()]);
+        }
+        $audit->handle($request->user(), 'loan.application.deleted', 'pengajuan_pinjaman', $application, [], $request);
+
+        return redirect()
+            ->route('portal.loans.applications.index', ['role' => $role])
+            ->with('status', 'Pengajuan pinjaman berhasil dihapus.');
     }
 }

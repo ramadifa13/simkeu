@@ -66,10 +66,17 @@ class PhaseSixReportsTest extends TestCase
             $table->string('metode_bayar');
             $table->dateTime('created_at');
         });
+        Schema::create('jenis_pinjaman', function (Blueprint $table): void {
+            $table->increments('id');
+            $table->string('nama_jenis');
+        });
         Schema::create('pinjaman', function (Blueprint $table): void {
             $table->increments('id');
             $table->string('kode_pinjaman');
             $table->unsignedInteger('anggota_id');
+            $table->unsignedInteger('jenis_pinjaman_id')->nullable();
+            $table->string('status')->default('aktif');
+            $table->date('tanggal_lunas')->nullable();
         });
         Schema::create('angsuran', function (Blueprint $table): void {
             $table->increments('id');
@@ -104,7 +111,15 @@ class PhaseSixReportsTest extends TestCase
         ]);
         DB::table('transaksi')->insert(['kode_transaksi' => 'SET-UJI', 'anggota_id' => 10, 'jenis_simpanan_id' => 1, 'jenis_transaksi' => 'setoran', 'jumlah' => 50000, 'tanggal_transaksi' => '2026-11-04 09:00:00']);
         DB::table('waserda_transaksi')->insert(['kode_transaksi' => 'WSD-UJI', 'anggota_id' => 10, 'total_bayar' => 25000, 'metode_bayar' => 'tunai', 'created_at' => '2026-11-04 09:00:00']);
-        DB::table('pinjaman')->insert(['id' => 1, 'kode_pinjaman' => 'PJN-UJI', 'anggota_id' => 10]);
+        DB::table('jenis_pinjaman')->insert(['id' => 1, 'nama_jenis' => 'Umum']);
+        DB::table('pinjaman')->insert([
+            'id' => 1,
+            'kode_pinjaman' => 'PJN-UJI',
+            'anggota_id' => 10,
+            'jenis_pinjaman_id' => 1,
+            'status' => 'lunas',
+            'tanggal_lunas' => '2026-11-04',
+        ]);
         DB::table('angsuran')->insert(['pinjaman_id' => 1, 'angsuran_ke' => 1, 'denda' => 1000, 'status' => 'terlambat', 'tanggal_jatuh_tempo' => '2026-11-04']);
     }
 
@@ -132,6 +147,30 @@ class PhaseSixReportsTest extends TestCase
 
         $this->actingAs($teller)->get(route('portal.reports.index', ['role' => 'admin']))->assertForbidden();
         $this->actingAs($teller)->get(route('portal.reports.export', ['role' => 'admin']))->assertForbidden();
+    }
+
+    public function test_teller_report_types_match_native_acl(): void
+    {
+        $teller = User::query()->findOrFail(2);
+        $tellerTypes = (new \ReflectionClass(\App\Http\Controllers\Portal\ReportController::class))
+            ->getConstant('TELLER_TYPES');
+
+        $this->assertContains('lunas', $tellerTypes);
+        $this->assertContains('denda', $tellerTypes);
+        $this->assertNotContains('pinjaman', $tellerTypes);
+        $this->assertNotContains('angsuran', $tellerTypes);
+
+        $this->actingAs($teller)
+            ->get(route('portal.reports.index', ['role' => 'teller', 'jenis' => 'denda']))
+            ->assertOk();
+
+        $this->actingAs($teller)
+            ->get(route('portal.reports.index', ['role' => 'teller', 'jenis' => 'pinjaman']))
+            ->assertSessionHasErrors('jenis');
+
+        $this->actingAs($teller)
+            ->get(route('portal.reports.index', ['role' => 'teller', 'jenis' => 'angsuran']))
+            ->assertSessionHasErrors('jenis');
     }
 
     public function test_all_phase_six_report_types_render_for_admin(): void

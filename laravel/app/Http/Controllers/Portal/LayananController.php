@@ -229,7 +229,7 @@ class LayananController extends Controller
 
     public function decideDelay(Request $request, string $role, DecideDelayDisbursementAction $action, RecordActivity $audit): RedirectResponse
     {
-        $this->authorize('decide-layanan');
+        $this->authorize('decide-delay-disbursement');
         $data = $request->validate([
             'tc_id' => ['required', 'integer'],
             'keputusan' => ['required', Rule::in(['disetujui', 'ditolak'])],

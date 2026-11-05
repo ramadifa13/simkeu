@@ -36,7 +36,12 @@ class BackupController extends Controller
         $audit->handle($request->user(), 'backup.created', 'backup', null, $meta, $request);
 
         return redirect()->route('portal.backup.index', ['role' => $role])
-            ->with('status', 'Backup operasional siap diunduh sekali.')
+            ->with(
+                'status',
+                empty($meta['truncated_tables'] ?? [])
+                    ? 'Backup operasional siap diunduh sekali.'
+                    : 'Backup operasional siap diunduh sekali. Perhatian: tabel terpotong (batas '.CreateOperationalBackupAction::ROW_LIMIT.' baris): '.implode(', ', $meta['truncated_tables']).'.'
+            )
             ->with('backup_meta', $meta);
     }
 

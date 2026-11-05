@@ -11,7 +11,19 @@
         @forelse ($this->members as $member)
             <tr wire:key="member-{{ $member->id }}" wire:loading.remove wire:target="search,status,sort,resetFilters" class="hover:bg-slate-50/80">
                 <td class="ui-member-code-cell whitespace-nowrap px-5 py-4 font-mono text-xs text-slate-600">{{ $member->kode_anggota }}</td>
-                <td class="px-5 py-4 font-semibold text-slate-900">{{ $member->nama_lengkap }}<p class="mt-1 text-xs font-normal text-slate-500 md:hidden">{{ $member->kode_anggota }} · {{ $member->telepon ?: '—' }}</p></td>
+                <td class="px-5 py-4 font-semibold text-slate-900">
+                    <div class="flex items-center gap-3">
+                        @if ($member->avatar_url)
+                            <img src="{{ $member->avatar_url }}" alt="" class="size-9 shrink-0 rounded-full object-cover ring-1 ring-slate-200" />
+                        @else
+                            <span class="grid size-9 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{{ mb_substr($member->nama_lengkap, 0, 1) }}</span>
+                        @endif
+                        <div class="min-w-0">
+                            <p class="truncate">{{ $member->nama_lengkap }}</p>
+                            <p class="mt-1 text-xs font-normal text-slate-500 md:hidden">{{ $member->kode_anggota }} · {{ $member->telepon ?: '—' }}</p>
+                        </div>
+                    </div>
+                </td>
                 <td class="hidden whitespace-nowrap px-5 py-4 text-slate-600 md:table-cell">{{ $member->telepon ?: '—' }}</td>
                 <td class="whitespace-nowrap px-5 py-4"><x-status-badge :status="$member->status" /></td>
                 <td class="hidden whitespace-nowrap px-5 py-4 text-slate-600 md:table-cell">{{ $member->tanggal_daftar?->translatedFormat('d M Y') ?: '—' }}</td>

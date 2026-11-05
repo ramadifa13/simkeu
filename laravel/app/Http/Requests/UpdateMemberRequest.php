@@ -23,7 +23,6 @@ class UpdateMemberRequest extends FormRequest
             'nama_lengkap' => ['required', 'string', 'max:100'],
             'alamat' => ['nullable', 'string'],
             'telepon' => ['nullable', 'string', 'max:20'],
-            'email' => ['nullable', 'email', 'max:100'],
             'tempat_lahir' => ['nullable', 'string', 'max:50'],
             'tanggal_lahir' => ['nullable', 'date', 'before_or_equal:today'],
             'jenis_kelamin' => ['nullable', Rule::in(['L', 'P'])],
@@ -34,9 +33,9 @@ class UpdateMemberRequest extends FormRequest
             'ketua_kelompok_id' => ['nullable', 'integer', Rule::exists('anggota', 'id')->where('kategori_shu', 'ketua_kelompok')->where('status', 'aktif')],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
             'nonaktif_jadwal' => ['nullable', 'date', 'after_or_equal:today'],
-            'foto_ktp' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'foto_kk' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'foto_ktp_pasangan' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'foto_ktp' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'foto_kk' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'foto_ktp_pasangan' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
         ];
     }
 }

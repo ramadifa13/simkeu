@@ -55,11 +55,16 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('disburse-loans', fn ($user): bool => in_array($user->role, ['admin', 'teller'], true));
         Gate::define('view-loans', fn ($user): bool => in_array($user->role, ['admin', 'teller', 'anggota'], true));
         Gate::define('collect-installments', fn ($user): bool => in_array($user->role, ['admin', 'teller'], true));
+        Gate::define('reverse-installment-payment', fn ($user): bool => $user->role === 'admin');
+        Gate::define('request-installment-reversal', fn ($user): bool => in_array($user->role, ['admin', 'teller'], true));
+        Gate::define('decide-installment-reversal', fn ($user): bool => $user->role === 'admin');
+        Gate::define('delete-loan-applications', fn ($user): bool => $user->role === 'admin');
         Gate::define('view-installment-closing', fn ($user): bool => in_array($user->role, ['admin', 'teller'], true));
         Gate::define('manage-installment-closing', fn ($user): bool => $user->role === 'admin');
         Gate::define('review-collateral-return', fn ($user): bool => $user->role === 'admin');
         Gate::define('manage-layanan', fn ($user): bool => in_array($user->role, ['admin', 'teller'], true));
         Gate::define('decide-layanan', fn ($user): bool => $user->role === 'admin');
+        Gate::define('decide-delay-disbursement', fn ($user): bool => $user->role === 'admin');
         Gate::define('manage-shu', fn ($user): bool => $user->role === 'admin');
         Gate::define('view-own-shu', fn ($user): bool => in_array($user->role, ['admin', 'anggota'], true));
         Gate::define('manage-migration', fn ($user): bool => $user->role === 'admin');

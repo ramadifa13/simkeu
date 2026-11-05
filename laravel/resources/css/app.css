@@ -3307,6 +3307,13 @@ ui-modal dialog .ui-confirm-modal-desc {
         font-weight: 800;
     }
 
+    img.sidebar-account-avatar-image {
+        display: block;
+        padding: 0;
+        object-fit: cover;
+        background: #0f766e;
+    }
+
     .sidebar-account-copy {
         display: grid;
         min-width: 0;

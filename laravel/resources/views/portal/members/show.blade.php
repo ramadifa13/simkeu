@@ -21,7 +21,7 @@
 
         <section class="ui-member-detail-content mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mt-6 sm:p-6">
             @if ($activeTab === 'profil')
-                <x-members.profile-details :member="$member" />
+                <x-members.profile-details :member="$member" :role="$role" :disbursement-photo="$disbursementPhoto" />
                 @if (false)
                 <dl class="grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach (['Kode anggota' => $member->kode_anggota, 'Kode anggota jaminan' => $member->kode_anggota_jaminan, 'Nama lengkap' => $member->nama_lengkap, 'Status' => ucfirst($member->status), 'Telepon' => $member->telepon, 'Email' => $member->email, 'Alamat' => $member->alamat, 'Tempat, tanggal lahir' => trim(($member->tempat_lahir ? $member->tempat_lahir.', ' : '').($member->tanggal_lahir?->translatedFormat('d F Y') ?? '')), 'Jenis kelamin' => $member->jenis_kelamin === 'L' ? 'Laki-laki' : ($member->jenis_kelamin === 'P' ? 'Perempuan' : null), 'Pekerjaan' => $member->pekerjaan, 'NIK / KTP' => $member->ktp, 'Rekening bank' => $member->rekening_bank, 'Kategori SHU' => $member->kategori_shu === 'ketua_kelompok' ? 'Ketua kelompok' : 'Anggota', 'Ketua kelompok' => $member->ketuaKelompok?->nama_lengkap, 'Nonaktif terjadwal' => $member->nonaktif_jadwal?->translatedFormat('d F Y'), 'Tanggal daftar' => $member->tanggal_daftar?->translatedFormat('d F Y'), 'ID anggota' => $member->id, 'ID akun' => $member->user_id, 'Dibuat pada' => $member->created_at?->translatedFormat('d F Y H:i')] as $label => $value)

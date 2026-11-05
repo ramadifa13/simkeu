@@ -14,7 +14,23 @@
         @endif
         <flux:field><flux:label>Nama lengkap <x-required-mark /></flux:label><flux:input name="nama_lengkap" :value="$value('nama_lengkap')" required /><flux:error name="nama_lengkap" /></flux:field>
         <flux:field><flux:label>Telepon</flux:label><flux:input name="telepon" :value="$value('telepon')" /><flux:error name="telepon" /></flux:field>
-        <flux:field><flux:label>Email</flux:label><flux:input type="email" name="email" :value="$value('email')" /><flux:error name="email" /></flux:field>
+        @if ($editing)
+            <flux:field>
+                <flux:label>Email</flux:label>
+                <flux:input type="email" :value="$member->email" disabled />
+                <flux:description>Email tidak diubah dari formulir (sama seperti PHP native).</flux:description>
+            </flux:field>
+            <flux:field>
+                <flux:label>Tanggal daftar</flux:label>
+                <flux:input type="date" :value="$member?->tanggal_daftar?->format('Y-m-d')" disabled />
+            </flux:field>
+        @else
+            <flux:field>
+                <flux:label>Tanggal daftar <x-required-mark /></flux:label>
+                <flux:input type="date" name="tanggal_daftar" :value="$value('tanggal_daftar', now()->toDateString())" required />
+                <flux:error name="tanggal_daftar" />
+            </flux:field>
+        @endif
         <flux:field class="md:col-span-2"><flux:label>Alamat</flux:label><flux:textarea name="alamat">{{ $value('alamat') }}</flux:textarea><flux:error name="alamat" /></flux:field>
     </div>
 </section>
@@ -28,7 +44,7 @@
         <span class="grid size-9 place-items-center rounded-xl bg-teal-50 text-sm font-bold text-teal-700">4</span>
         <div>
             <h2 class="text-base font-semibold text-slate-900">{{ $editing ? 'Dokumen anggota' : 'Dokumen wajib' }}</h2>
-            <p class="mt-1 text-sm text-slate-600">JPG, PNG, atau WebP; maksimal 5 MB. Anggota biasa wajib KTP, KK, dan KTP pasangan. Anggota jaminan cukup Foto KTP. {{ $editing ? 'Kosongkan bila tidak ingin mengganti file.' : '' }}</p>
+            <p class="mt-1 text-sm text-slate-600">JPG, PNG, atau WebP; maksimal 10 MB (akan dikompres). Anggota biasa wajib KTP, KK, dan KTP pasangan. Anggota jaminan cukup Foto KTP. {{ $editing ? 'Kosongkan bila tidak ingin mengganti file.' : '' }}</p>
         </div>
     </div>
     <div class="mt-5 grid gap-4 md:grid-cols-3">

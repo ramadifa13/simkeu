@@ -2,6 +2,7 @@
 
 namespace App\Actions\Audit;
 
+use App\Actions\Dashboard\BustDashboardCache;
 use App\Actions\Notifications\BustPortalNotificationCache;
 use App\Models\ActivityLog;
 use App\Models\User;
@@ -25,5 +26,6 @@ class RecordActivity
         ]);
 
         app(BustPortalNotificationCache::class)->handle();
+        app(BustDashboardCache::class)->handle();
     }
 }

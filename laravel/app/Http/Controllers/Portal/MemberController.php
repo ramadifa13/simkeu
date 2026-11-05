@@ -6,6 +6,7 @@ use App\Actions\Audit\RecordActivity;
 use App\Actions\Members\CreateMemberAction;
 use App\Actions\Members\GetMemberDetailData;
 use App\Actions\Members\ResetMemberPasswordAction;
+use App\Actions\Members\ResolveMemberDisbursementPhoto;
 use App\Actions\Members\UpdateMemberAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreMemberRequest;
@@ -13,6 +14,7 @@ use App\Http\Requests\UpdateMemberRequest;
 use App\Models\Anggota;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -140,10 +142,11 @@ class MemberController extends Controller
             'role' => $role,
             'tabs' => $tabs,
             'tabData' => $getMemberDetailData->handle($member, $activeTab),
+            'disbursementPhoto' => app(ResolveMemberDisbursementPhoto::class)->handle((int) $member->id),
         ]);
     }
 
-    public function document(Anggota $member, string $document): StreamedResponse
+    public function document(string $role, Anggota $member, string $document): StreamedResponse
     {
         $this->authorize('viewDocument', $member);
 
@@ -153,6 +156,26 @@ class MemberController extends Controller
         abort_unless(str_starts_with($path, "anggota/{$member->id}/") && Storage::disk('local')->exists($path), 404);
 
         return Storage::disk('local')->response($path, basename($path), [
+            'Content-Disposition' => 'inline; filename="'.basename($path).'"',
+        ]);
+    }
+
+    /** Serve foto nasabah menerima uang (foto_pencairan) as member avatar. */
+    public function avatar(string $role, Anggota $member, ResolveMemberDisbursementPhoto $photos): StreamedResponse|Response
+    {
+        $this->authorize('view', $member);
+        $path = $photos->handle((int) $member->id);
+        abort_unless(
+            is_string($path)
+            && $path !== ''
+            && ! str_contains($path, '..')
+            && Storage::disk('local')->exists($path),
+            404
+        );
+
+        return Storage::disk('local')->response($path, basename($path), [
+            'Content-Type' => Storage::disk('local')->mimeType($path) ?: 'image/webp',
+            'Cache-Control' => 'private, max-age=3600',
             'Content-Disposition' => 'inline; filename="'.basename($path).'"',
         ]);
     }

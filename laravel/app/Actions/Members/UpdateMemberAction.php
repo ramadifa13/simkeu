@@ -20,7 +20,8 @@ class UpdateMemberAction
             $documents = ['foto_ktp', 'foto_kk', 'foto_ktp_pasangan'];
             $oldDocuments = [];
 
-            $member->fill(Arr::except($attributes, $documents));
+            // Native freezes email on edit; keep existing value.
+            $member->fill(Arr::except($attributes, [...$documents, 'email', 'tanggal_daftar']));
 
             foreach ($documents as $documentField) {
                 if (! isset($attributes[$documentField])) {
@@ -37,7 +38,6 @@ class UpdateMemberAction
             $member->user?->update([
                 'username' => $member->kode_anggota,
                 'nama_lengkap' => $member->nama_lengkap,
-                'email' => $member->email,
                 'telepon' => $member->telepon,
                 'status' => $member->status,
             ]);
