@@ -1,6 +1,7 @@
 <div class="space-y-4">
     <x-loans.note-field
         name="alasan"
+        label="Alasan pengajuan"
         placeholder="Alasan pengajuan (minimal 5 karakter)"
         :required="true"
         :minlength="5"

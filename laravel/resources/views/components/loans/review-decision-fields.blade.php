@@ -20,6 +20,7 @@
     </flux:field>
     <x-loans.note-field
         :name="$noteName"
+        label="Catatan"
         :placeholder="$notePlaceholder"
         :required="$noteRequired"
     />

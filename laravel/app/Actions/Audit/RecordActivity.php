@@ -2,6 +2,7 @@
 
 namespace App\Actions\Audit;
 
+use App\Actions\Notifications\BustPortalNotificationCache;
 use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -22,5 +23,7 @@ class RecordActivity
             'ip_address' => $request->ip(),
             'user_agent' => str($request->userAgent())->limit(1000)->toString(),
         ]);
+
+        app(BustPortalNotificationCache::class)->handle();
     }
 }

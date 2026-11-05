@@ -89,7 +89,7 @@ class LoanApplicationActionTest extends TestCase
             'frekuensi_diizinkan' => 'mingguan,dua_mingguan',
             'memerlukan_jaminan' => true,
         ]);
-        $actor = new User(['role' => 'teller']);
+        $actor = $this->makeUser('teller');
         $actor->id = 1;
 
         $applicationId = app(SubmitLoanApplicationAction::class)->handle([
@@ -141,7 +141,7 @@ class LoanApplicationActionTest extends TestCase
             'memerlukan_jaminan' => false,
         ]);
         DB::table('jenis_pinjaman_tarif')->insert(['jenis_pinjaman_id' => $productId, 'tenor_bulan' => 6, 'bunga' => 20]);
-        $actor = new User(['role' => 'teller']);
+        $actor = $this->makeUser('teller');
         $actor->id = 1;
 
         $this->expectException(DomainException::class);
@@ -168,7 +168,7 @@ class LoanApplicationActionTest extends TestCase
             'memerlukan_jaminan' => false,
         ]);
         DB::table('jenis_pinjaman_tarif')->insert(['jenis_pinjaman_id' => $productId, 'tenor_bulan' => 3, 'bunga' => 20]);
-        $actor = new User(['role' => 'teller']);
+        $actor = $this->makeUser('teller');
         $actor->id = 1;
 
         $this->expectException(DomainException::class);
@@ -209,7 +209,7 @@ class LoanApplicationActionTest extends TestCase
             'memerlukan_jaminan' => false,
         ]);
         DB::table('jenis_pinjaman_tarif')->insert(['jenis_pinjaman_id' => $productId, 'tenor_bulan' => 6, 'bunga' => 20]);
-        $actor = new User(['role' => 'teller']);
+        $actor = $this->makeUser('teller');
         $actor->id = 1;
 
         $applicationId = app(SubmitLoanApplicationAction::class)->handle([
@@ -247,7 +247,7 @@ class LoanApplicationActionTest extends TestCase
             'memerlukan_jaminan' => false,
         ]);
         DB::table('jenis_pinjaman_tarif')->insert(['jenis_pinjaman_id' => $productId, 'tenor_bulan' => 6, 'bunga' => 20]);
-        $actor = new User(['role' => 'teller']);
+        $actor = $this->makeUser('teller');
         $actor->id = 1;
 
         $this->expectException(DomainException::class);

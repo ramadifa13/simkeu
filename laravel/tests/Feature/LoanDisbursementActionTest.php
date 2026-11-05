@@ -86,7 +86,7 @@ class LoanDisbursementActionTest extends TestCase
         DB::table('pengajuan_pinjaman')->insert(['id' => 1, 'anggota_id' => 1, 'jenis_pinjaman_id' => 1, 'jumlah_pinjaman' => 2000000, 'tenor' => 3, 'bunga' => 35, 'skema_bunga' => 'flat', 'frekuensi' => 'mingguan', 'status' => 'disetujui', 'tanggal_pengajuan' => '2026-11-01 09:00:00']);
         DB::table('jaminan_pinjaman')->insert(['pengajuan_id' => 1]);
         DB::table('kas')->insert(['transaksi_id' => null, 'jenis' => 'masuk', 'jumlah' => 3000000, 'saldo_sebelum' => 0, 'saldo_sesudah' => 3000000, 'keterangan' => 'Modal', 'tanggal' => '2026-11-01 08:00:00']);
-        $actor = new User(['role' => 'admin']);
+        $actor = $this->makeUser('admin');
         $actor->id = 1;
         $result = app(DisburseLoanAction::class)->handle(1, '2026-11-02', $actor);
         $this->assertSame(12, $result['jumlah_cicilan']);

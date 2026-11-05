@@ -49,7 +49,7 @@ class ReverseInstallmentPaymentActionTest extends TestCase
         DB::table('pinjaman')->insert(['id' => 1, 'kode_pinjaman' => 'PJN-UJI', 'status' => 'lunas', 'sisa_pokok' => 0, 'tanggal_lunas' => '2026-11-04']);
         DB::table('angsuran')->insert(['id' => 1, 'pinjaman_id' => 1, 'angsuran_ke' => 1, 'pokok' => 100000, 'denda' => 0, 'status' => 'lunas', 'tanggal_bayar' => '2026-11-04', 'cara_bayar' => 'cicilan', 'keterlambatan_hari' => 0]);
         DB::table('kas')->insert(['transaksi_id' => 1, 'jenis' => 'masuk', 'jumlah' => 110000, 'saldo_sebelum' => 0, 'saldo_sesudah' => 110000, 'keterangan' => 'Pembayaran', 'tanggal' => '2026-11-04 10:00:00']);
-        $admin = new User(['role' => 'admin']);
+        $admin = $this->makeUser('admin');
         $admin->id = 1;
         app(ReverseInstallmentPaymentAction::class)->handle(1, $admin, 'Input nominal keliru');
         $this->assertSame(2, DB::table('kas')->count());

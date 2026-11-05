@@ -83,9 +83,9 @@ class InstallmentReversalRequestFlowTest extends TestCase
             'tanggal' => now(),
         ]);
 
-        $teller = new User(['role' => 'teller']);
+        $teller = $this->makeUser('teller');
         $teller->id = 5;
-        $admin = new User(['role' => 'admin']);
+        $admin = $this->makeUser('admin');
         $admin->id = 1;
 
         app(RequestInstallmentReversalAction::class)->handle(1, 1, $teller, 'Salah nominal input');

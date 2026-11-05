@@ -122,8 +122,8 @@ Route::middleware(['auth', 'role'])->prefix('portal')->name('portal.')->group(fu
     Route::post('/{role}/pinjaman/pengajuan/{application}/batalkan', [LoanApplicationController::class, 'cancel'])->where('role', 'admin')->name('loans.applications.cancel');
     Route::get('/{role}/pinjaman/denda', [LoanController::class, 'penalties'])->whereIn('role', ['admin', 'teller'])->name('loans.penalties');
     Route::get('/{role}/pinjaman/pelunasan', [LoanController::class, 'settlements'])->whereIn('role', ['admin', 'teller'])->name('loans.settlements');
-    Route::get('/{role}/pinjaman/closing', [InstallmentClosingController::class, 'index'])->where('role', 'admin')->name('loans.closing.index');
-    Route::get('/{role}/pinjaman/closing/{closing}', [InstallmentClosingController::class, 'show'])->where('role', 'admin')->whereNumber('closing')->name('loans.closing.show');
+    Route::get('/{role}/pinjaman/closing', [InstallmentClosingController::class, 'index'])->whereIn('role', ['admin', 'teller'])->name('loans.closing.index');
+    Route::get('/{role}/pinjaman/closing/{closing}', [InstallmentClosingController::class, 'show'])->whereIn('role', ['admin', 'teller'])->whereNumber('closing')->name('loans.closing.show');
     Route::post('/{role}/pinjaman/closing', [InstallmentClosingController::class, 'close'])->where('role', 'admin')->name('loans.closing.close');
     Route::post('/{role}/pinjaman/closing/buka', [InstallmentClosingController::class, 'reopen'])->where('role', 'admin')->name('loans.closing.reopen');
     Route::get('/{role}/pinjaman', [LoanController::class, 'index'])->whereIn('role', ['admin', 'teller', 'anggota'])->name('loans.index');
@@ -174,9 +174,10 @@ Route::middleware(['auth', 'role'])->prefix('portal')->name('portal.')->group(fu
     Route::get('/{role}/dokumen/pinjaman/{loan}/angsuran/{installment}/bukti.pdf', [DocumentPdfController::class, 'paymentReceipt'])->whereIn('role', ['admin', 'teller', 'anggota'])->whereNumber('loan')->whereNumber('installment')->name('documents.payment-receipt');
     Route::get('/{role}/dokumen/pinjaman/{loan}/pelunasan.pdf', [DocumentPdfController::class, 'settlementReceipt'])->whereIn('role', ['admin', 'teller', 'anggota'])->whereNumber('loan')->name('documents.settlement-receipt');
     Route::get('/{role}/dokumen/pinjaman/{loan}/bast.pdf', [DocumentPdfController::class, 'bast'])->whereIn('role', ['admin', 'teller', 'anggota'])->whereNumber('loan')->name('documents.bast');
+    Route::get('/{role}/dokumen/layanan/{jenis}/{id}.pdf', [DocumentPdfController::class, 'layananReceipt'])->whereIn('role', ['admin', 'teller'])->whereIn('jenis', ['denda', 'bayar', 'lelang', 'bonus'])->whereNumber('id')->name('documents.layanan-receipt');
     Route::get('/{role}/dokumen/shu/{entitlement}/kwitansi.pdf', [DocumentPdfController::class, 'shuReceipt'])->whereIn('role', ['admin', 'anggota'])->whereNumber('entitlement')->name('documents.shu-receipt');
     Route::get('/{role}/dokumen/shu/periode/{period}/laporan.pdf', [DocumentPdfController::class, 'shuPeriodReport'])->where('role', 'admin')->whereNumber('period')->name('documents.shu-period');
-    Route::get('/{role}/dokumen/laporan.pdf', [DocumentPdfController::class, 'report'])->where('role', 'admin')->name('documents.report');
+    Route::get('/{role}/dokumen/laporan.pdf', [DocumentPdfController::class, 'report'])->whereIn('role', ['admin', 'teller'])->name('documents.report');
 
     Route::get('/{role}/migrasi', [MigrationController::class, 'index'])->where('role', 'admin')->name('migration.index');
     Route::get('/{role}/migrasi/template', [MigrationController::class, 'template'])->where('role', 'admin')->name('migration.template');

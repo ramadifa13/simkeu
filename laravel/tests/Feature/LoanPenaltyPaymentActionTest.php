@@ -59,7 +59,7 @@ class LoanPenaltyPaymentActionTest extends TestCase
     {
         DB::table('pinjaman')->insert(['id' => 1, 'kode_pinjaman' => 'PJN-UJI', 'status' => 'aktif']);
         DB::table('angsuran')->insert(['id' => 1, 'pinjaman_id' => 1, 'angsuran_ke' => 1, 'denda' => 10000, 'status' => 'telat', 'keterlambatan_hari' => 2]);
-        $actor = new User(['role' => 'teller']);
+        $actor = $this->makeUser('teller');
         $actor->id = 9;
 
         $result = app(PayLoanPenaltyAction::class)->handle(1, 6000, 'cash', '2026-11-04', $actor);

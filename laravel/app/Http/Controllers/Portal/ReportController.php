@@ -8,13 +8,14 @@ use App\Http\Controllers\Controller;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
-    private const TYPES = ['simpanan', 'kas', 'anggota', 'waserda', 'denda', 'pinjaman', 'angsuran', 'lunas', 'harian'];
+    private const TYPES = ['simpanan', 'kas', 'anggota', 'waserda', 'denda', 'pinjaman', 'angsuran', 'lunas', 'harian', 'transaksi'];
 
     private const TELLER_TYPES = ['harian', 'simpanan', 'angsuran', 'pinjaman', 'waserda', 'denda'];
 
@@ -80,6 +81,7 @@ class ReportController extends Controller
         $filters = $request->validate([
             'jenis' => ['nullable', Rule::in($allowed)],
             'q' => ['nullable', 'string', 'max:100'],
+            'sumber' => ['nullable', Rule::in(['TABUNGAN', 'PINJAMAN', 'WASERDA', 'KAS_LAIN'])],
             'tanggal_dari' => ['nullable', 'date'],
             'tanggal_sampai' => ['nullable', 'date', 'after_or_equal:tanggal_dari'],
             'per_page' => ['nullable', Rule::in([5, 10, 25, 50])],
@@ -101,8 +103,67 @@ class ReportController extends Controller
             'angsuran' => $this->installmentReport($filters),
             'lunas' => $this->settledLoanReport($filters),
             'harian' => $this->dailyTellerReport($filters),
+            'transaksi' => $this->unifiedTransactionReport($filters),
             default => $this->savingsReport($filters),
         };
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function unifiedTransactionReport(array $filters): array
+    {
+        $parts = [];
+        $parts[] = DB::table('transaksi as t')
+            ->join('anggota as a', 'a.id', '=', 't.anggota_id')
+            ->join('jenis_simpanan as j', 'j.id', '=', 't.jenis_simpanan_id')
+            ->whereIn('t.jenis_transaksi', ['setoran', 'penarikan'])
+            ->selectRaw("t.tanggal_transaksi as tanggal, 'TABUNGAN' as sumber, j.nama_jenis as detail, t.kode_transaksi as kode, a.kode_anggota, a.nama_lengkap as anggota, t.jenis_transaksi as tipe, t.jumlah as nominal");
+
+        $loanDate = Schema::hasColumn('pinjaman', 'tanggal_cair') ? 'p.tanggal_cair' : 'p.tanggal_pencairan';
+        $parts[] = DB::table('pinjaman as p')
+            ->join('anggota as a', 'a.id', '=', 'p.anggota_id')
+            ->join('jenis_pinjaman as jp', 'jp.id', '=', 'p.jenis_pinjaman_id')
+            ->whereNotNull($loanDate)
+            ->selectRaw("{$loanDate} as tanggal, 'PINJAMAN' as sumber, jp.nama_jenis as detail, p.kode_pinjaman as kode, a.kode_anggota, a.nama_lengkap as anggota, 'pencairan' as tipe, p.jumlah_pinjaman as nominal");
+
+        if (Schema::hasTable('waserda_transaksi')) {
+            $parts[] = DB::table('waserda_transaksi as w')
+                ->join('anggota as a', 'a.id', '=', 'w.anggota_id')
+                ->selectRaw("w.created_at as tanggal, 'WASERDA' as sumber, 'Pembelian' as detail, w.kode_transaksi as kode, a.kode_anggota, a.nama_lengkap as anggota, 'waserda' as tipe, w.total_bayar as nominal");
+        }
+
+        $parts[] = DB::table('kas as k')
+            ->leftJoin('transaksi as t', 't.id', '=', 'k.transaksi_id')
+            ->whereNull('t.id')
+            ->selectRaw("k.tanggal as tanggal, 'KAS_LAIN' as sumber, COALESCE(k.keterangan, '-') as detail, CONCAT('KAS-', k.id) as kode, '-' as kode_anggota, '-' as anggota, k.jenis as tipe, k.jumlah as nominal");
+
+        $union = array_shift($parts);
+        foreach ($parts as $part) {
+            $union->unionAll($part);
+        }
+
+        $query = DB::query()->fromSub($union, 'trx');
+        if (filled($filters['sumber'] ?? null)) {
+            $query->where('sumber', $filters['sumber']);
+        }
+        $this->applyDateAndSearch($query, $filters, 'tanggal', ['kode', 'kode_anggota', 'anggota', 'detail', 'tipe', 'sumber']);
+
+        return [
+            'title' => 'Laporan transaksi gabungan',
+            'description' => 'Gabungan mutasi tabungan, pencairan pinjaman, waserda, dan kas lain seperti laporan native.',
+            'columns' => [
+                'tanggal' => 'Tanggal',
+                'sumber' => 'Sumber',
+                'detail' => 'Detail',
+                'kode' => 'Kode',
+                'kode_anggota' => 'Kode anggota',
+                'anggota' => 'Anggota',
+                'tipe' => 'Tipe',
+                'nominal' => 'Nominal',
+            ],
+            'money' => ['nominal'],
+            'dates' => ['tanggal'],
+            'query' => $query->orderByDesc('tanggal'),
+        ];
     }
 
     /** @param array<string, mixed> $filters */
@@ -188,9 +249,9 @@ class ReportController extends Controller
                 'p.jumlah_pinjaman as plafon',
                 'p.sisa_pokok as sisa',
                 'p.status',
-                'p.tanggal_cair as tanggal',
+                'p.tanggal_pencairan as tanggal',
             ]);
-        $this->applyDateAndSearch($query, $filters, 'p.tanggal_cair', ['p.kode_pinjaman', 'a.kode_anggota', 'a.nama_lengkap', 'jp.nama_jenis']);
+        $this->applyDateAndSearch($query, $filters, 'p.tanggal_pencairan', ['p.kode_pinjaman', 'a.kode_anggota', 'a.nama_lengkap', 'jp.nama_jenis']);
 
         return [
             'title' => 'Laporan pinjaman',
@@ -207,7 +268,7 @@ class ReportController extends Controller
             ],
             'money' => ['plafon', 'sisa'],
             'dates' => ['tanggal'],
-            'query' => $query->orderByDesc('p.tanggal_cair')->orderByDesc('p.id'),
+            'query' => $query->orderByDesc('p.tanggal_pencairan')->orderByDesc('p.id'),
         ];
     }
 

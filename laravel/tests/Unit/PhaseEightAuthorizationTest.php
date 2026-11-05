@@ -10,7 +10,7 @@ class PhaseEightAuthorizationTest extends TestCase
 {
     public function test_admin_can_manage_phase_eight_modules(): void
     {
-        $admin = new User(['role' => 'admin']);
+        $admin = $this->makeUser('admin');
         $this->assertTrue(Gate::forUser($admin)->allows('manage-layanan'));
         $this->assertTrue(Gate::forUser($admin)->allows('decide-layanan'));
         $this->assertTrue(Gate::forUser($admin)->allows('manage-shu'));
@@ -21,7 +21,7 @@ class PhaseEightAuthorizationTest extends TestCase
 
     public function test_teller_can_manage_layanan_but_not_admin_only_modules(): void
     {
-        $teller = new User(['role' => 'teller']);
+        $teller = $this->makeUser('teller');
         $this->assertTrue(Gate::forUser($teller)->allows('manage-layanan'));
         $this->assertFalse(Gate::forUser($teller)->allows('decide-layanan'));
         $this->assertFalse(Gate::forUser($teller)->allows('manage-shu'));
@@ -31,7 +31,7 @@ class PhaseEightAuthorizationTest extends TestCase
 
     public function test_member_can_view_own_shu_only(): void
     {
-        $member = new User(['role' => 'anggota']);
+        $member = $this->makeUser('anggota');
         $this->assertFalse(Gate::forUser($member)->allows('manage-layanan'));
         $this->assertTrue(Gate::forUser($member)->allows('view-own-shu'));
         $this->assertFalse(Gate::forUser($member)->allows('manage-shu'));

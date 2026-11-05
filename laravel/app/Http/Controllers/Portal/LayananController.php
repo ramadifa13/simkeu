@@ -119,6 +119,20 @@ class LayananController extends Controller
         $pendingPenaltyPayments = Schema::hasTable('layanan_bayar_denda') && Schema::hasColumn('layanan_bayar_denda', 'approved_by')
             ? DB::table('layanan_bayar_denda')->where('pinjaman_id', $loan)->whereNull('approved_by')->orderByDesc('id')->get()
             : collect();
+        $penaltyReceipts = Schema::hasTable('layanan_bayar_denda')
+            ? DB::table('layanan_bayar_denda')->where('pinjaman_id', $loan)->orderByDesc('id')->limit(20)->get()
+            : collect();
+        $paymentReceipts = Schema::hasTable('layanan_pembayaran')
+            ? DB::table('layanan_pembayaran')->where('pinjaman_id', $loan)->whereNull('dibatalkan_at')->orderByDesc('id')->limit(20)->get()
+            : collect();
+        $auctionReceipts = Schema::hasTable('layanan_lelang')
+            ? DB::table('layanan_lelang')->where('pinjaman_id', $loan)->orderByDesc('id')->get()
+            : collect();
+        $bonusReceipts = Schema::hasTable('layanan_bonus')
+            ? DB::table('layanan_bonus')->where('pinjaman_id', $loan)->orderByDesc('id')->get()
+            : collect();
+        $bastReady = Schema::hasTable('layanan_jaminan_kembali')
+            && DB::table('layanan_jaminan_kembali')->where('pinjaman_id', $loan)->where('status', 'diserahkan')->exists();
 
         return view('portal.layanan.show', [
             'role' => $role,
@@ -134,6 +148,11 @@ class LayananController extends Controller
             'bonus' => $bonus,
             'repeat' => $repeat,
             'pendingPenaltyPayments' => $pendingPenaltyPayments,
+            'penaltyReceipts' => $penaltyReceipts,
+            'paymentReceipts' => $paymentReceipts,
+            'auctionReceipts' => $auctionReceipts,
+            'bonusReceipts' => $bonusReceipts,
+            'bastReady' => $bastReady,
             'pemutihan' => $support->pemutihanEnabled(),
             'priorityEligible' => $support->priorityEligible((int) $detail->anggota_id),
         ]);

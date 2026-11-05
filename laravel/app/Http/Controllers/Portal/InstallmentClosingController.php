@@ -16,7 +16,7 @@ class InstallmentClosingController extends Controller
 {
     public function index(Request $request, string $role, CloseInstallmentPeriodAction $closing): View
     {
-        $this->authorize('manage-master-data');
+        $this->authorize('view-installment-closing');
         $filters = $request->validate(['bulan' => ['nullable', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'], 'q' => ['nullable', 'string', 'max:20'], 'status' => ['nullable', 'in:terkunci,dibuka']]);
         $month = $filters['bulan'] ?? now()->format('Y-m');
         $periods = DB::table('closing_angsuran_bulanan')->when(filled($filters['q'] ?? null), fn ($query) => $query->where('bulan', 'like', '%'.$filters['q'].'%'))->when(filled($filters['status'] ?? null), fn ($query) => $query->where('status', $filters['status']))->orderByDesc('bulan')->paginate(12)->withQueryString();
@@ -26,7 +26,7 @@ class InstallmentClosingController extends Controller
 
     public function show(Request $request, string $role, int $closing): View
     {
-        $this->authorize('manage-master-data');
+        $this->authorize('view-installment-closing');
         $period = DB::table('closing_angsuran_bulanan as c')
             ->leftJoin('users as closer', 'closer.id', '=', 'c.ditutup_oleh')
             ->leftJoin('users as opener', 'opener.id', '=', 'c.dibuka_oleh')
@@ -62,7 +62,7 @@ class InstallmentClosingController extends Controller
 
     public function close(Request $request, string $role, CloseInstallmentPeriodAction $closing, RecordActivity $audit): RedirectResponse
     {
-        $this->authorize('manage-master-data');
+        $this->authorize('manage-installment-closing');
         $data = $request->validate(['bulan' => ['required', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'], 'catatan' => ['nullable', 'string', 'max:500']]);
         try {
             $result = $closing->close($data['bulan'], $request->user(), $data['catatan'] ?? '');
@@ -76,7 +76,7 @@ class InstallmentClosingController extends Controller
 
     public function reopen(Request $request, string $role, CloseInstallmentPeriodAction $closing, RecordActivity $audit): RedirectResponse
     {
-        $this->authorize('manage-master-data');
+        $this->authorize('manage-installment-closing');
         $data = $request->validate(['bulan' => ['required', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'], 'catatan' => ['required', 'string', 'min:5', 'max:500']]);
         try {
             $closing->reopen($data['bulan'], $request->user(), $data['catatan']);

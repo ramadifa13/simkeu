@@ -200,19 +200,28 @@ class LoanController extends Controller
         $this->authorize('collect-installments');
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
         // Penalty accrual runs via `loans:refresh-penalties` / scheduler — not on every list load.
-        $penalties = DB::table('angsuran as i')
+        $penaltiesQuery = DB::table('angsuran as i')
             ->join('pinjaman as p', 'p.id', '=', 'i.pinjaman_id')->join('anggota as a', 'a.id', '=', 'p.anggota_id')
-            ->leftJoin('layanan_bayar_denda as d', 'd.angsuran_id', '=', 'i.id')
             ->whereIn('p.status', \App\Support\LoanLifecycle::collectibleStatuses())->where('i.status', '<>', 'lunas')
             ->when(filled($filters['q'] ?? null), function ($query) use ($filters): void {
                 $term = '%'.$filters['q'].'%';
                 $query->where(fn ($search) => $search->where('a.nama_lengkap', 'like', $term)->orWhere('a.kode_anggota', 'like', $term)->orWhere('p.kode_pinjaman', 'like', $term));
             })
             ->groupBy('i.id', 'i.pinjaman_id', 'i.angsuran_ke', 'i.keterlambatan_hari', 'i.tanggal_jatuh_tempo', 'i.denda', 'p.kode_pinjaman', 'a.kode_anggota', 'a.nama_lengkap')
-            ->havingRaw('i.denda - COALESCE(SUM(d.jumlah), 0) > 0.005')
-            ->select(['i.id', 'i.pinjaman_id', 'i.angsuran_ke', 'i.keterlambatan_hari', 'i.tanggal_jatuh_tempo', 'p.kode_pinjaman', 'a.kode_anggota', 'a.nama_lengkap'])
-            ->selectRaw('i.denda - COALESCE(SUM(d.jumlah), 0) as sisa_denda')
-            ->orderBy('i.tanggal_jatuh_tempo')->paginate(10)->withQueryString();
+            ->select(['i.id', 'i.pinjaman_id', 'i.angsuran_ke', 'i.keterlambatan_hari', 'i.tanggal_jatuh_tempo', 'p.kode_pinjaman', 'a.kode_anggota', 'a.nama_lengkap']);
+
+        if (Schema::hasTable('layanan_bayar_denda')) {
+            $penaltiesQuery
+                ->leftJoin('layanan_bayar_denda as d', 'd.angsuran_id', '=', 'i.id')
+                ->havingRaw('i.denda - COALESCE(SUM(d.jumlah), 0) > 0.005')
+                ->selectRaw('i.denda - COALESCE(SUM(d.jumlah), 0) as sisa_denda');
+        } else {
+            $penaltiesQuery
+                ->havingRaw('i.denda > 0.005')
+                ->selectRaw('i.denda as sisa_denda');
+        }
+
+        $penalties = $penaltiesQuery->orderBy('i.tanggal_jatuh_tempo')->paginate(10)->withQueryString();
 
         return view('portal.loans.penalties', compact('role', 'penalties', 'filters'));
     }
@@ -221,18 +230,25 @@ class LoanController extends Controller
     {
         $this->authorize('collect-installments');
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
-        $loans = DB::table('pinjaman as p')->join('anggota as a', 'a.id', '=', 'p.anggota_id')
+        $loansQuery = DB::table('pinjaman as p')->join('anggota as a', 'a.id', '=', 'p.anggota_id')
             ->leftJoin('angsuran as i', fn ($join) => $join->on('i.pinjaman_id', '=', 'p.id')->where('i.status', '<>', 'lunas'))
-            ->leftJoin('layanan_bayar_denda as d', 'd.angsuran_id', '=', 'i.id')
             ->whereIn('p.status', \App\Support\LoanLifecycle::collectibleStatuses())
             ->when(filled($filters['q'] ?? null), function ($query) use ($filters): void {
                 $term = '%'.$filters['q'].'%';
                 $query->where(fn ($search) => $search->where('a.nama_lengkap', 'like', $term)->orWhere('a.kode_anggota', 'like', $term)->orWhere('p.kode_pinjaman', 'like', $term));
             })
             ->groupBy('p.id', 'p.kode_pinjaman', 'p.sisa_pokok', 'a.kode_anggota', 'a.nama_lengkap')
-            ->select(['p.id', 'p.kode_pinjaman', 'p.sisa_pokok', 'a.kode_anggota', 'a.nama_lengkap'])
-            ->selectRaw('COALESCE(SUM(i.denda), 0) - COALESCE(SUM(d.jumlah), 0) as sisa_denda')
-            ->orderBy('a.nama_lengkap')->paginate(10)->withQueryString();
+            ->select(['p.id', 'p.kode_pinjaman', 'p.sisa_pokok', 'a.kode_anggota', 'a.nama_lengkap']);
+
+        if (Schema::hasTable('layanan_bayar_denda')) {
+            $loansQuery
+                ->leftJoin('layanan_bayar_denda as d', 'd.angsuran_id', '=', 'i.id')
+                ->selectRaw('COALESCE(SUM(i.denda), 0) - COALESCE(SUM(d.jumlah), 0) as sisa_denda');
+        } else {
+            $loansQuery->selectRaw('COALESCE(SUM(i.denda), 0) as sisa_denda');
+        }
+
+        $loans = $loansQuery->orderBy('a.nama_lengkap')->paginate(10)->withQueryString();
 
         return view('portal.loans.settlements', compact('role', 'loans', 'filters'));
     }
@@ -677,9 +693,15 @@ class LoanController extends Controller
         $this->authorize('view-loans');
         $detail = $this->loanForRole($request, $role, $loan);
         abort_unless($detail->status === 'lunas', 404);
-        $settlement = DB::table('layanan_pembayaran')->where('pinjaman_id', $loan)->where('jenis', 'pelunasan')->whereNull('dibatalkan_at')->latest('id')->first();
-        $penalties = DB::table('layanan_bayar_denda')->where('pinjaman_id', $loan)->sum('jumlah');
-        $collateral = DB::table('jaminan_pinjaman')->where('pinjaman_id', $loan)->first(['status_jaminan', 'jenis_barang', 'identitas_barang']);
+        $settlement = Schema::hasTable('layanan_pembayaran')
+            ? DB::table('layanan_pembayaran')->where('pinjaman_id', $loan)->where('jenis', 'pelunasan')->whereNull('dibatalkan_at')->latest('id')->first()
+            : null;
+        $penalties = Schema::hasTable('layanan_bayar_denda')
+            ? (float) DB::table('layanan_bayar_denda')->where('pinjaman_id', $loan)->sum('jumlah')
+            : 0.0;
+        $collateral = Schema::hasTable('jaminan_pinjaman')
+            ? DB::table('jaminan_pinjaman')->where('pinjaman_id', $loan)->first(['status_jaminan', 'jenis_barang', 'identitas_barang'])
+            : null;
 
         return view('portal.loans.settlement-receipt', compact('role', 'detail', 'settlement', 'penalties', 'collateral'));
     }
@@ -834,9 +856,17 @@ class LoanController extends Controller
     /** @return array{gross:float,discount_percent:float,discount_amount:float,total:float,penalty:float,request_status:?string} */
     private function settlementSummary(int $loan): array
     {
-        $rows = DB::table('angsuran as i')->where('i.pinjaman_id', $loan)->where('i.status', '<>', 'lunas')
-            ->select('i.*')
-            ->selectSub(DB::table('layanan_bayar_denda')->selectRaw('COALESCE(SUM(jumlah), 0)')->whereColumn('angsuran_id', 'i.id'), 'denda_dibayar')->get();
+        $query = DB::table('angsuran as i')->where('i.pinjaman_id', $loan)->where('i.status', '<>', 'lunas')->select('i.*');
+        if (Schema::hasTable('layanan_bayar_denda')) {
+            $query->selectSub(
+                DB::table('layanan_bayar_denda')->selectRaw('COALESCE(SUM(jumlah), 0)')->whereColumn('angsuran_id', 'i.id'),
+                'denda_dibayar'
+            );
+        }
+        $rows = $query->get();
+        if (! Schema::hasTable('layanan_bayar_denda')) {
+            $rows->each(fn (object $row) => $row->denda_dibayar = 0);
+        }
         $discount = 0.0;
         $requestStatus = null;
         if (Schema::hasTable('layanan_pelunasan')) {

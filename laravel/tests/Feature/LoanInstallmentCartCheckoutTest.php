@@ -78,7 +78,7 @@ class LoanInstallmentCartCheckoutTest extends TestCase
             ],
         ]);
 
-        $actor = new User(['role' => 'admin']);
+        $actor = $this->makeUser('admin');
         $actor->id = 9;
 
         $results = app(CheckoutInstallmentCartAction::class)->handle([

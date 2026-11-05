@@ -107,6 +107,48 @@
         @endcan
 
         <section class="rounded-2xl border border-slate-200 bg-white p-5">
+            <h2 class="text-base font-semibold text-slate-900">Dokumen & kwitansi</h2>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                @forelse($penaltyReceipts as $receipt)
+                    <a class="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm hover:border-teal-200 hover:bg-teal-50/50" href="{{ route('portal.documents.layanan-receipt', ['role' => $role, 'jenis' => 'denda', 'id' => $receipt->id]) }}" target="_blank">
+                        <span>Kwitansi denda #{{ $receipt->id }} · Rp{{ number_format((float) $receipt->jumlah, 0, ',', '.') }}</span>
+                        <flux:icon name="printer" class="size-4 text-slate-400" />
+                    </a>
+                @empty
+                @endforelse
+                @foreach($paymentReceipts as $receipt)
+                    <a class="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm hover:border-teal-200 hover:bg-teal-50/50" href="{{ route('portal.documents.layanan-receipt', ['role' => $role, 'jenis' => 'bayar', 'id' => $receipt->id]) }}" target="_blank">
+                        <span>Kwitansi {{ str_replace('_', ' ', $receipt->jenis ?? 'bayar') }} #{{ $receipt->id }} · Rp{{ number_format((float) $receipt->jumlah, 0, ',', '.') }}</span>
+                        <flux:icon name="printer" class="size-4 text-slate-400" />
+                    </a>
+                @endforeach
+                @foreach($auctionReceipts as $receipt)
+                    <a class="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm hover:border-teal-200 hover:bg-teal-50/50" href="{{ route('portal.documents.layanan-receipt', ['role' => $role, 'jenis' => 'lelang', 'id' => $receipt->id]) }}" target="_blank">
+                        <span>Bukti lelang #{{ $receipt->id }} · Rp{{ number_format((float) ($receipt->harga_jual ?? 0), 0, ',', '.') }}</span>
+                        <flux:icon name="printer" class="size-4 text-slate-400" />
+                    </a>
+                @endforeach
+                @can('decide-layanan')
+                    @foreach($bonusReceipts as $receipt)
+                        <a class="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm hover:border-teal-200 hover:bg-teal-50/50" href="{{ route('portal.documents.layanan-receipt', ['role' => $role, 'jenis' => 'bonus', 'id' => $receipt->id]) }}" target="_blank">
+                            <span>Kwitansi bonus #{{ $receipt->id }} · Rp{{ number_format((float) $receipt->jumlah, 0, ',', '.') }}</span>
+                            <flux:icon name="printer" class="size-4 text-slate-400" />
+                        </a>
+                    @endforeach
+                @endcan
+                @if($bastReady ?? false)
+                    <a class="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm hover:border-teal-200 hover:bg-teal-50/50" href="{{ route('portal.documents.bast', ['role' => $role, 'loan' => $loan->id]) }}" target="_blank">
+                        <span>BAST pengembalian jaminan</span>
+                        <flux:icon name="printer" class="size-4 text-slate-400" />
+                    </a>
+                @endif
+                @if($penaltyReceipts->isEmpty() && $paymentReceipts->isEmpty() && $auctionReceipts->isEmpty() && $bonusReceipts->isEmpty() && ! ($bastReady ?? false))
+                    <p class="text-sm text-slate-500 sm:col-span-2">Belum ada kwitansi layanan untuk pinjaman ini.</p>
+                @endif
+            </div>
+        </section>
+
+        <section class="rounded-2xl border border-slate-200 bg-white p-5">
             <h2 class="text-base font-semibold text-slate-900">Audit layanan</h2>
             <div class="mt-3 space-y-2">
                 @forelse($audit as $row)
@@ -128,70 +170,115 @@
 
     <x-confirm-action-modal name="aksi-lapor-macet" title="Laporkan nasabah macet?" description="Laporan menunggu keputusan Admin." confirm-label="Kirim laporan" :action="$process">
         <input type="hidden" name="aksi" value="lapor_macet" />
-        <flux:field><flux:label>Catatan</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+        <x-loans.note-field name="catatan" label="Catatan" placeholder="Jelaskan kondisi nasabah" :required="true" :minlength="5" />
     </x-confirm-action-modal>
 
     <x-confirm-action-modal name="aksi-ajukan-hapus-denda" title="Ajukan hapus denda?" description="Pilih angsuran berdenda." confirm-label="Ajukan" :action="$process">
         <input type="hidden" name="aksi" value="ajukan_hapus_denda" />
-        <flux:field><flux:label>Angsuran</flux:label><flux:select name="angsuran_id" required>@foreach($installments->where('status', '!=', 'lunas')->where('denda', '>', 0) as $installment)<option value="{{ $installment->id }}">Ke-{{ $installment->angsuran_ke }} · denda Rp{{ number_format((float) $installment->denda, 0, ',', '.') }}</option>@endforeach</flux:select></flux:field>
-        <flux:field><flux:label>Alasan</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+        <flux:field>
+            <flux:label>Angsuran <x-required-mark /></flux:label>
+            <flux:select name="angsuran_id" required>
+                @foreach($installments->where('status', '!=', 'lunas')->where('denda', '>', 0) as $installment)
+                    <option value="{{ $installment->id }}">Ke-{{ $installment->angsuran_ke }} · denda Rp{{ number_format((float) $installment->denda, 0, ',', '.') }}</option>
+                @endforeach
+            </flux:select>
+        </flux:field>
+        <x-loans.note-field name="catatan" label="Alasan" placeholder="Alasan pengajuan hapus denda" :required="true" :minlength="5" />
     </x-confirm-action-modal>
 
     <x-confirm-action-modal name="aksi-prioritas" title="Ajukan fasilitas prioritas?" description="Hanya untuk nasabah lunas. Kelayakan: {{ $priorityEligible ? 'memenuhi' : 'belum memenuhi' }}." confirm-label="Ajukan" :action="$process">
         <input type="hidden" name="aksi" value="prioritas" />
-        <flux:field><flux:label>Catatan</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+        <x-loans.note-field name="catatan" label="Catatan" placeholder="Catatan pengajuan prioritas" :required="true" :minlength="5" />
     </x-confirm-action-modal>
 
     @can('decide-layanan')
         <x-confirm-action-modal name="aksi-reschedule" title="Geser jadwal angsuran?" description="Semua angsuran terbuka digeser relatif terhadap jatuh tempo terdekat." confirm-label="Reschedule" :action="$process">
             <input type="hidden" name="aksi" value="reschedule" />
-            <flux:field><flux:label>Jatuh tempo baru</flux:label><flux:input type="date" name="tanggal" required /></flux:field>
-            <flux:field><flux:label>Alasan</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+            <flux:field>
+                <flux:label>Jatuh tempo baru <x-required-mark /></flux:label>
+                <flux:input type="date" name="tanggal" required />
+            </flux:field>
+            <x-loans.note-field name="catatan" label="Alasan" placeholder="Alasan reschedule" :required="true" :minlength="5" />
         </x-confirm-action-modal>
 
         <x-confirm-action-modal name="aksi-eksekusi" title="Eksekusi jaminan?" description="Status jaminan menjadi dilelang." confirm-label="Eksekusi" variant="danger" :action="$process">
             <input type="hidden" name="aksi" value="eksekusi" />
-            <flux:field><flux:label>Catatan</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+            <x-loans.note-field name="catatan" label="Catatan" placeholder="Catatan eksekusi jaminan" :required="true" :minlength="5" />
         </x-confirm-action-modal>
 
-        <x-confirm-action-modal name="aksi-jual" title="Catat penjualan jaminan?" description="Hasil penjualan dialokasikan ke angsuran terbuka." confirm-label="Simpan penjualan" variant="danger" :action="$process" enctype="multipart/form-data">
+        <x-confirm-action-modal name="aksi-jual" title="Catat penjualan jaminan?" description="Hasil penjualan dialokasikan ke angsuran terbuka." confirm-label="Simpan penjualan" variant="danger" max-width="xl" :action="$process">
             <input type="hidden" name="aksi" value="jual_jaminan" />
-            <flux:field><flux:label>Harga jual</flux:label><flux:input type="number" name="jumlah" min="1" step="1" required /></flux:field>
-            <flux:field><flux:label>Metode</flux:label><flux:select name="metode" required><option value="cash">Cash</option><option value="transfer">Transfer</option></flux:select></flux:field>
-            <x-image-upload name="bukti" label="Bukti penjualan" required />
-            <flux:field><flux:label>Catatan</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+            <flux:field>
+                <flux:label>Harga jual <x-required-mark /></flux:label>
+                <flux:input type="number" name="jumlah" min="1" step="1" required />
+            </flux:field>
+            <flux:field>
+                <flux:label>Metode <x-required-mark /></flux:label>
+                <flux:select name="metode" required>
+                    <option value="cash">Cash</option>
+                    <option value="transfer">Transfer</option>
+                </flux:select>
+            </flux:field>
+            <x-image-upload name="bukti" label="Bukti penjualan" :required="true" />
+            <x-loans.note-field name="catatan" label="Catatan" placeholder="Catatan penjualan" :required="true" :minlength="5" />
         </x-confirm-action-modal>
 
         <x-confirm-action-modal name="aksi-diskon-denda" title="Diskon / pemutihan denda?" description="Nilai akhir harus antara yang sudah dibayar dan denda saat ini." confirm-label="Simpan" :action="$process">
             <input type="hidden" name="aksi" value="diskon_denda" />
-            <flux:field><flux:label>Angsuran</flux:label><flux:select name="angsuran_id" required>@foreach($installments->where('status', '!=', 'lunas')->where('denda', '>', 0) as $installment)<option value="{{ $installment->id }}">Ke-{{ $installment->angsuran_ke }} · denda Rp{{ number_format((float) $installment->denda, 0, ',', '.') }}</option>@endforeach</flux:select></flux:field>
-            <flux:field><flux:label>Denda akhir</flux:label><flux:input type="number" name="jumlah" min="0" step="0.01" required /></flux:field>
-            <flux:field><flux:label>Catatan</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+            <flux:field>
+                <flux:label>Angsuran <x-required-mark /></flux:label>
+                <flux:select name="angsuran_id" required>
+                    @foreach($installments->where('status', '!=', 'lunas')->where('denda', '>', 0) as $installment)
+                        <option value="{{ $installment->id }}">Ke-{{ $installment->angsuran_ke }} · denda Rp{{ number_format((float) $installment->denda, 0, ',', '.') }}</option>
+                    @endforeach
+                </flux:select>
+            </flux:field>
+            <flux:field>
+                <flux:label>Denda akhir <x-required-mark /></flux:label>
+                <flux:input type="number" name="jumlah" min="0" step="0.01" required />
+            </flux:field>
+            <x-loans.note-field name="catatan" label="Catatan" placeholder="Catatan diskon / pemutihan" :required="true" :minlength="5" />
         </x-confirm-action-modal>
 
-        <x-confirm-action-modal name="aksi-bonus" title="Bayarkan bonus loyalitas?" description="Nominal harus sesuai perhitungan bunga diterima." confirm-label="Bayar bonus" :action="$process" enctype="multipart/form-data">
+        <x-confirm-action-modal name="aksi-bonus" title="Bayarkan bonus loyalitas?" description="Nominal harus sesuai perhitungan bunga diterima." confirm-label="Bayar bonus" max-width="xl" :action="$process">
             <input type="hidden" name="aksi" value="bayar_bonus" />
-            <flux:field><flux:label>Nominal</flux:label><flux:input type="number" name="jumlah" min="1" step="0.01" required /></flux:field>
-            <flux:field><flux:label>Metode</flux:label><flux:select name="metode" required><option value="cash">Cash</option><option value="transfer">Transfer</option></flux:select></flux:field>
-            <x-image-upload name="bukti" label="Bukti" required />
+            <flux:field>
+                <flux:label>Nominal <x-required-mark /></flux:label>
+                <flux:input type="number" name="jumlah" min="1" step="0.01" required />
+            </flux:field>
+            <flux:field>
+                <flux:label>Metode <x-required-mark /></flux:label>
+                <flux:select name="metode" required>
+                    <option value="cash">Cash</option>
+                    <option value="transfer">Transfer</option>
+                </flux:select>
+            </flux:field>
+            <x-image-upload name="bukti" label="Bukti" :required="true" />
         </x-confirm-action-modal>
 
         <x-confirm-action-modal name="aksi-repeat" title="Catat repeat order?" description="Catatan penawaran pinjaman ulang. Setelah disimpan Anda akan diarahkan ke form pengajuan baru." confirm-label="Simpan & buat pengajuan" :action="$process">
             <input type="hidden" name="aksi" value="repeat_order" />
-            <flux:field><flux:label>Catatan</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+            <x-loans.note-field name="catatan" label="Catatan" placeholder="Catatan penawaran pinjaman ulang" :required="true" :minlength="5" />
         </x-confirm-action-modal>
 
-        <x-confirm-action-modal name="aksi-kembali-lebih" title="Kembalikan kelebihan lelang?" description="Mengurangi kas koperasi." confirm-label="Kembalikan" :action="$process" enctype="multipart/form-data">
+        <x-confirm-action-modal name="aksi-kembali-lebih" title="Kembalikan kelebihan lelang?" description="Mengurangi kas koperasi." confirm-label="Kembalikan" :action="$process">
             <input type="hidden" name="aksi" value="kembalikan_lebih" />
-            <x-image-upload name="bukti" label="Bukti pengembalian" required />
+            <x-image-upload name="bukti" label="Bukti pengembalian" :required="true" />
         </x-confirm-action-modal>
 
         @foreach($macet->where('status', 'menunggu') as $laporan)
             <x-confirm-action-modal name="putusan-macet-{{ $laporan->id }}" title="Putuskan laporan macet?" description="{{ $laporan->catatan }}" confirm-label="Simpan keputusan" :action="$process">
                 <input type="hidden" name="aksi" value="keputusan_macet" />
                 <input type="hidden" name="laporan_id" value="{{ $laporan->id }}" />
-                <flux:field><flux:label>Keputusan</flux:label><flux:select name="keputusan" required><option value="ditindaklanjuti">Ditindaklanjuti</option><option value="selesai">Selesai</option><option value="ditolak">Ditolak</option></flux:select></flux:field>
-                <flux:field><flux:label>Catatan</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+                <flux:field>
+                    <flux:label>Keputusan <x-required-mark /></flux:label>
+                    <flux:select name="keputusan" required>
+                        <option value="ditindaklanjuti">Ditindaklanjuti</option>
+                        <option value="selesai">Selesai</option>
+                        <option value="ditolak">Ditolak</option>
+                    </flux:select>
+                </flux:field>
+                <x-loans.note-field name="catatan" label="Catatan" placeholder="Catatan keputusan" :required="true" :minlength="5" />
             </x-confirm-action-modal>
         @endforeach
 
@@ -199,7 +286,13 @@
             <x-confirm-action-modal name="putusan-hapus-{{ $pengajuan->id }}" title="Putuskan hapus denda?" description="{{ $pengajuan->alasan }}" confirm-label="Simpan" :action="$process">
                 <input type="hidden" name="aksi" value="putuskan_hapus_denda" />
                 <input type="hidden" name="pengajuan_id" value="{{ $pengajuan->id }}" />
-                <flux:field><flux:label>Keputusan</flux:label><flux:select name="keputusan" required><option value="setuju">Setuju</option><option value="tolak">Tolak</option></flux:select></flux:field>
+                <flux:field>
+                    <flux:label>Keputusan <x-required-mark /></flux:label>
+                    <flux:select name="keputusan" required>
+                        <option value="setuju">Setuju</option>
+                        <option value="tolak">Tolak</option>
+                    </flux:select>
+                </flux:field>
             </x-confirm-action-modal>
         @endforeach
 
@@ -212,15 +305,15 @@
 
         <x-confirm-action-modal name="approve-prioritas" title="Setujui prioritas?" description="Kelayakan: {{ $priorityEligible ? 'memenuhi' : 'belum memenuhi' }}." confirm-label="Setujui" :action="$process">
             <input type="hidden" name="aksi" value="approve_prioritas" />
-            <flux:field><flux:label>Catatan (opsional)</flux:label><flux:textarea name="catatan" rows="2" /></flux:field>
+            <x-loans.note-field name="catatan" label="Catatan" placeholder="Catatan (opsional)" rows="2" />
         </x-confirm-action-modal>
         <x-confirm-action-modal name="koreksi-prioritas" title="Minta koreksi prioritas?" description="Status menjadi pengecekan." confirm-label="Kirim koreksi" :action="$process">
             <input type="hidden" name="aksi" value="koreksi_prioritas" />
-            <flux:field><flux:label>Catatan</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+            <x-loans.note-field name="catatan" label="Catatan" placeholder="Catatan koreksi" :required="true" :minlength="5" />
         </x-confirm-action-modal>
         <x-confirm-action-modal name="tolak-prioritas" title="Tolak prioritas?" description="Pengajuan ditolak." confirm-label="Tolak" variant="danger" :action="$process">
             <input type="hidden" name="aksi" value="tolak_prioritas" />
-            <flux:field><flux:label>Catatan</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+            <x-loans.note-field name="catatan" label="Catatan" placeholder="Alasan penolakan" :required="true" :minlength="5" />
         </x-confirm-action-modal>
     @endcan
 </x-layouts.portal>

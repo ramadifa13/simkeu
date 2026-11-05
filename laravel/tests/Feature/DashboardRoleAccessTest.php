@@ -59,11 +59,15 @@ class DashboardRoleAccessTest extends TestCase
         $response->assertOk()->assertSee('Filter dashboard diterapkan');
     }
 
+    public function test_teller_cannot_open_cash_ledger_drilldown(): void
+    {
+        $response = $this->actingAs($this->user('teller'))->get('/portal/teller/dashboard/detail/cash');
+
+        $response->assertNotFound();
+    }
+
     private function user(string $role): User
     {
-        $user = new User(['id' => 999, 'nama_lengkap' => 'Pengguna Uji', 'role' => $role, 'status' => 'aktif']);
-        $user->exists = true;
-
-        return $user;
+        return $this->makeUser($role, ['id' => 999, 'nama_lengkap' => 'Pengguna Uji', 'status' => 'aktif'], true);
     }
 }

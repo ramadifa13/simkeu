@@ -71,7 +71,7 @@ class MigrationImportActionTest extends TestCase
         ]);
         (new Xlsx($spreadsheet))->save($path);
 
-        $admin = new User(['role' => 'admin']);
+        $admin = $this->makeUser('admin');
         $admin->id = 1;
         $file = new UploadedFile($path, 'migrasi.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true);
 

@@ -1,6 +1,20 @@
 @props(['columns' => [], 'sortable' => true, 'mobileHidden' => [], 'title' => null, 'count' => null, 'loadingTarget' => null, 'icon' => 'users'])
 
-<div {{ $attributes->merge(['class' => 'ui-table-shell']) }}>
+@php
+    $visibleColumnCount = max(1, count($columns) - count(array_intersect(array_keys($columns), $mobileHidden)));
+    $tableMinWidth = $visibleColumnCount <= 3 ? 'min-w-[22rem] sm:min-w-[28rem]' : ($visibleColumnCount <= 4 ? 'min-w-[28rem] sm:min-w-[34rem]' : 'min-w-[38rem] sm:min-w-[46rem]');
+    $mobileHiddenIndexes = [];
+    $columnIndex = 1;
+    foreach ($columns as $key => $label) {
+        if (in_array($key, $mobileHidden, true)) {
+            $mobileHiddenIndexes[] = $columnIndex;
+        }
+        $columnIndex++;
+    }
+    $tableShellId = 'ui-table-'.substr(md5(implode('|', array_keys($columns)).'|'.implode(',', $mobileHidden)), 0, 10);
+@endphp
+
+<div {{ $attributes->merge(['class' => 'ui-table-shell '.$tableShellId]) }}>
     @if ($title)
         <div class="ui-table-heading">
             <div class="ui-table-title"><span class="ui-table-title-mark"><flux:icon :name="$icon" class="size-4" /></span>{{ $title }} @if (!is_null($count))<span class="ui-table-count">{{ $count }} data</span>@endif</div>
@@ -13,8 +27,18 @@
     @if (isset($loading))
         <div class="ui-table-loading-layer" wire:loading {!! $loadingTarget ? 'wire:target="'.e($loadingTarget).'"' : '' !!}>{{ $loading }}</div>
     @endif
+    @if ($mobileHiddenIndexes !== [])
+        <style>
+            @media (max-width: 767.98px) {
+                @foreach ($mobileHiddenIndexes as $index)
+                    .{{ $tableShellId }} table th:nth-child({{ $index }}),
+                    .{{ $tableShellId }} table td:nth-child({{ $index }}) { display: none !important; }
+                @endforeach
+            }
+        </style>
+    @endif
     <div class="overflow-x-auto">
-        <table class="w-full min-w-[38rem] divide-y divide-slate-200 text-left text-sm sm:min-w-[46rem] lg:min-w-full lg:table-fixed">
+        <table class="w-full {{ $tableMinWidth }} divide-y divide-slate-200 text-left text-sm lg:min-w-full lg:table-fixed">
             <colgroup>
                 @foreach ($columns as $key => $label)
                     <col class="{{ match ($key) {

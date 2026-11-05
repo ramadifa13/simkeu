@@ -46,7 +46,7 @@ class WaserdaTransactionActionTest extends TestCase
     public function test_waserda_entry_and_admin_deletion_keep_cash_ledger_consistent(): void
     {
         $memberId = DB::table('anggota')->insertGetId(['kode_anggota' => 'AGT-TEST', 'status' => 'aktif']);
-        $actor = new User(['role' => 'admin']);
+        $actor = $this->makeUser('admin');
         $actor->id = 1;
 
         $transaction = app(CreateWaserdaTransactionAction::class)->handle([

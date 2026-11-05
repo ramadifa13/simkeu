@@ -71,11 +71,15 @@
                     <flux:input type="number" name="jumlah_baru" :value="$transaction->jumlah" min="0" step="0.01" inputmode="decimal" required />
                     <flux:error name="jumlah_baru" />
                 </flux:field>
-                <flux:field>
-                    <flux:label>Alasan koreksi <x-required-mark /></flux:label>
-                    <flux:textarea name="keterangan_koreksi" rows="3" minlength="5" maxlength="500" required placeholder="Contoh: nominal salah input saat setoran" />
-                    <flux:error name="keterangan_koreksi" />
-                </flux:field>
+                <x-loans.note-field
+                    name="keterangan_koreksi"
+                    label="Alasan koreksi"
+                    placeholder="Contoh: nominal salah input saat setoran"
+                    :required="true"
+                    :minlength="5"
+                    :maxlength="500"
+                />
+                <flux:error name="keterangan_koreksi" />
             </x-confirm-action-modal>
         @endforeach
 

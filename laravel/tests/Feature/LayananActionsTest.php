@@ -162,9 +162,9 @@ class LayananActionsTest extends TestCase
 
     public function test_report_and_decide_default_workflow(): void
     {
-        $teller = new User(['role' => 'teller']);
+        $teller = $this->makeUser('teller');
         $teller->id = 2;
-        $admin = new User(['role' => 'admin']);
+        $admin = $this->makeUser('admin');
         $admin->id = 1;
 
         app(ProcessLayananAction::class)->handle(1, 'lapor_macet', ['catatan' => 'Nasabah tidak merespons telepon'], $teller);
@@ -183,9 +183,9 @@ class LayananActionsTest extends TestCase
 
     public function test_write_off_and_priority_require_admin_for_decision(): void
     {
-        $teller = new User(['role' => 'teller']);
+        $teller = $this->makeUser('teller');
         $teller->id = 2;
-        $admin = new User(['role' => 'admin']);
+        $admin = $this->makeUser('admin');
         $admin->id = 1;
 
         app(ProcessLayananAction::class)->handle(1, 'ajukan_hapus_denda', ['angsuran_id' => 1, 'catatan' => 'Kesulitan ekonomi keluarga'], $teller);
@@ -242,9 +242,9 @@ class LayananActionsTest extends TestCase
             'anggota_id' => 1,
             'status' => 'disetujui',
         ]);
-        $teller = new User(['role' => 'teller']);
+        $teller = $this->makeUser('teller');
         $teller->id = 2;
-        $admin = new User(['role' => 'admin']);
+        $admin = $this->makeUser('admin');
         $admin->id = 1;
 
         app(RequestDelayDisbursementAction::class)->handle(9, 'Nasabah belum siap menerima dana', $teller);
@@ -297,7 +297,7 @@ class LayananActionsTest extends TestCase
 
         DB::table('jenis_pinjaman')->where('id', 1)->update(['memerlukan_jaminan' => true]);
         DB::table('jaminan_pinjaman')->insert(['pinjaman_id' => 1, 'status_jaminan' => 'dititipkan']);
-        $admin = new User(['role' => 'admin']);
+        $admin = $this->makeUser('admin');
         $admin->id = 1;
 
         app(ProcessLayananAction::class)->handle(1, 'eksekusi', ['catatan' => 'Nasabah wanprestasi setelah somasi'], $admin);

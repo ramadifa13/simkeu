@@ -19,6 +19,7 @@
     <x-signature-field label="Tanda tangan teller *" name="ttd_teller" />
     <x-loans.note-field
         name="catatan"
+        label="Catatan kondisi barang"
         rows="2"
         placeholder="Catatan kondisi barang (opsional)"
     />

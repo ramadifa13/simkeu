@@ -63,7 +63,7 @@ class SavingsTransactionActionTest extends TestCase
     {
         $memberId = DB::table('anggota')->insertGetId(['kode_anggota' => 'AGT-TEST', 'status' => 'aktif']);
         $typeId = DB::table('jenis_simpanan')->insertGetId(['kode_jenis' => 'SUKARELA', 'nama_jenis' => 'Sukarela', 'status' => 'aktif', 'minimum' => 10000, 'maksimum' => 0]);
-        $actor = new User(['role' => 'teller']);
+        $actor = $this->makeUser('teller');
         $actor->id = 1;
         $action = app(CreateSavingsTransactionAction::class);
 
@@ -83,7 +83,7 @@ class SavingsTransactionActionTest extends TestCase
         $typeId = DB::table('jenis_simpanan')->insertGetId(['kode_jenis' => 'SUKARELA', 'nama_jenis' => 'Sukarela', 'status' => 'aktif', 'minimum' => 0, 'maksimum' => 0]);
         DB::table('simpanan')->insert(['anggota_id' => $memberId, 'jenis_simpanan_id' => $typeId, 'saldo' => 100000]);
         DB::table('kas')->insert(['transaksi_id' => null, 'jenis' => 'masuk', 'jumlah' => 100000, 'saldo_sebelum' => 0, 'saldo_sesudah' => 100000, 'keterangan' => 'Saldo awal', 'tanggal' => '2026-11-04 08:00:00']);
-        $actor = new User(['role' => 'teller']);
+        $actor = $this->makeUser('teller');
         $actor->id = 1;
         $action = app(CreateSavingsTransactionAction::class);
 

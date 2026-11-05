@@ -12,7 +12,8 @@ class PortalLayoutSmokeTest extends TestCase
 {
     public function test_portal_layout_survives_corrupt_notification_cache_payload(): void
     {
-        Cache::put('portal-notif:999:admin', 'not-an-array', 60);
+        $bust = app(\App\Actions\Notifications\BustPortalNotificationCache::class)->token();
+        Cache::put('portal-notif:'.$bust.':999:admin', 'not-an-array', 60);
 
         $this->mock(GetDashboardData::class, function (MockInterface $mock): void {
             $mock->shouldReceive('handle')->once()->andReturn([
@@ -31,8 +32,7 @@ class PortalLayoutSmokeTest extends TestCase
             ]);
         });
 
-        $user = new User(['id' => 999, 'nama_lengkap' => 'Pengguna Uji', 'role' => 'admin', 'status' => 'aktif']);
-        $user->exists = true;
+        $user = $this->makeUser('admin', ['id' => 999, 'nama_lengkap' => 'Pengguna Uji', 'status' => 'aktif'], true);
 
         $this->actingAs($user)
             ->get('/portal/admin/dashboard')

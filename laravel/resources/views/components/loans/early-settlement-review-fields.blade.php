@@ -12,7 +12,8 @@
     </flux:field>
     <x-loans.note-field
         name="catatan"
+        label="Catatan Admin"
         rows="2"
-        placeholder="Catatan Admin"
+        placeholder="Catatan keputusan (opsional)"
     />
 </div>

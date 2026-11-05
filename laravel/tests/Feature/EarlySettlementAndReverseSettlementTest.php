@@ -86,9 +86,9 @@ class EarlySettlementAndReverseSettlementTest extends TestCase
             ['id' => 2, 'pinjaman_id' => 1, 'angsuran_ke' => 3, 'jumlah_angsuran' => 110000, 'pokok' => 80000, 'bunga' => 10000, 'denda' => 0, 'status' => 'belum_bayar'],
         ]);
 
-        $teller = new User(['role' => 'teller']);
+        $teller = $this->makeUser('teller');
         $teller->id = 2;
-        $admin = new User(['role' => 'admin']);
+        $admin = $this->makeUser('admin');
         $admin->id = 1;
 
         app(RequestEarlySettlementAction::class)->handle(1, $teller, 'Minta diskon bunga');

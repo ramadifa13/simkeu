@@ -50,7 +50,7 @@ class CompleteDisbursementPhotosActionTest extends TestCase
             'status_jaminan' => 'dititipkan',
         ]);
 
-        $actor = new User(['role' => 'teller']);
+        $actor = $this->makeUser('teller');
         $actor->id = 3;
 
         $path = app(CompleteDisbursementPhotosAction::class)->handle(1, $actor, [

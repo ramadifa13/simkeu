@@ -1846,7 +1846,7 @@
     z-index: 60;
     display: flex;
     width: var(--portal-notif-w);
-    max-height: min(70dvh, 28rem);
+    max-height: min(78dvh, 34rem);
     flex-direction: column;
     overflow: hidden;
     border: 1px solid #e2e8f0;
@@ -2592,6 +2592,67 @@ textarea[data-flux-control]:focus {
     border: 1px solid #e2e8f0 !important;
     border-radius: 1.35rem !important;
     box-shadow: 0 28px 80px rgb(15 23 42 / .22) !important;
+}
+
+/*
+ * Flux <dialog> stays in the DOM tree (e.g. inside td.text-right), so text-align
+ * and float/margin inheritance push titles into the absolute close button.
+ */
+ui-modal dialog,
+[data-flux-modal-content] {
+    text-align: start !important;
+    direction: ltr !important;
+}
+
+ui-modal dialog:not([data-flux-modal-overflow]) {
+    position: relative !important;
+    flex-direction: column;
+    align-items: stretch;
+    width: min(100%, var(--ui-modal-width, 32rem));
+    max-width: calc(100vw - 1.5rem);
+    margin-inline: auto;
+}
+
+ui-modal dialog:not([data-flux-modal-overflow])[open] {
+    display: flex !important;
+    max-height: min(90dvh, 46rem);
+    overflow: hidden;
+}
+
+ui-modal dialog.ui-confirm-modal.max-w-md { --ui-modal-width: 28rem; }
+ui-modal dialog.ui-confirm-modal.max-w-lg { --ui-modal-width: 32rem; }
+ui-modal dialog.ui-confirm-modal.max-w-xl { --ui-modal-width: 36rem; }
+ui-modal dialog.ui-confirm-modal.max-w-2xl { --ui-modal-width: 42rem; }
+
+ui-modal dialog:not([data-flux-modal-overflow]) > :not([class*="absolute"]):first-child {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-inline: 0 !important;
+    padding-inline-end: 2.5rem;
+    float: none !important;
+}
+
+[data-flux-modal-content] > :first-child {
+    width: 100% !important;
+    margin-inline: 0 !important;
+    padding-inline-end: 2.5rem;
+}
+
+ui-modal dialog [data-flux-heading],
+ui-modal dialog [data-flux-subheading],
+ui-modal dialog .ui-confirm-modal-title,
+ui-modal dialog .ui-confirm-modal-desc {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    text-align: start !important;
+    float: none !important;
+}
+
+.ui-loan-modals {
+    display: contents;
 }
 
 [data-flux-callout] {
@@ -3707,5 +3768,384 @@ textarea[data-flux-control]:focus {
     .loan-workflow-link {
         padding: .5rem .7rem;
         font-size: .75rem;
+    }
+}
+
+/* Confirm / pay installment modal */
+.ui-confirm-modal-form {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0;
+    max-height: min(86dvh, 42rem);
+    margin: 0 !important;
+    overflow: hidden;
+    text-align: start !important;
+    float: none !important;
+}
+
+.ui-note-field {
+    display: grid;
+    gap: .45rem;
+    width: 100%;
+    min-width: 0;
+}
+
+.ui-note-field-label {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    margin: 0;
+    color: #263f43 !important;
+    font-size: .8125rem;
+    font-weight: 700;
+    line-height: 1.3;
+    text-align: start !important;
+}
+
+.ui-note-field-input,
+textarea.ui-note-field-input {
+    display: block !important;
+    width: 100% !important;
+    min-height: 5.5rem !important;
+    margin: 0 !important;
+    border: 1px solid #bdccc8 !important;
+    border-radius: .85rem !important;
+    background: #fff !important;
+    padding: .7rem .85rem !important;
+    color: #18363a !important;
+    font: inherit;
+    line-height: 1.45 !important;
+    resize: vertical;
+    box-shadow: 0 1px 2px rgb(22 43 47 / .04) !important;
+}
+
+.ui-note-field-input:focus,
+textarea.ui-note-field-input:focus {
+    border-color: #087e74 !important;
+    outline: none !important;
+    box-shadow: 0 0 0 4px rgb(8 126 116 / .14) !important;
+}
+
+.ui-note-field-input::placeholder {
+    color: #94a3b8 !important;
+}
+
+.ui-confirm-modal-head {
+    flex: 0 0 auto;
+    width: 100%;
+    padding-bottom: .85rem;
+    padding-inline-end: 2.25rem;
+    border-bottom: 1px solid #e8eef2;
+    text-align: start !important;
+}
+
+.ui-modal-callout {
+    margin-bottom: 1rem;
+    border: 1px solid #d7e7e1;
+    border-radius: .95rem;
+    background: linear-gradient(180deg, #f4fbf8, #fff);
+    padding: .85rem .95rem;
+}
+
+.ui-modal-callout.is-danger {
+    border-color: #fecdd3;
+    background: linear-gradient(180deg, #fff1f2, #fff);
+}
+
+.ui-modal-callout-title {
+    margin: 0 0 .35rem;
+    font-size: .84rem;
+    font-weight: 700;
+    color: #9f1239;
+}
+
+.ui-modal-callout.is-danger > p:not(.ui-modal-callout-title) {
+    margin: 0;
+    font-size: .8rem;
+    line-height: 1.45;
+    color: #9f1239;
+}
+
+.ui-modal-callout-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .35rem 0;
+    border-bottom: 1px dashed #d9e8e2;
+    font-size: .84rem;
+    color: #334155;
+}
+
+.ui-modal-callout-row:last-of-type {
+    border-bottom: 0;
+}
+
+.ui-modal-callout-row strong {
+    color: #0f766e;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.ui-modal-callout-row.is-warning strong {
+    color: #b45309;
+}
+
+.ui-modal-callout-note {
+    margin: .65rem 0 0;
+    font-size: .75rem;
+    line-height: 1.4;
+    color: #64748b;
+}
+
+.ui-confirm-modal-title {
+    display: block;
+    max-width: 100%;
+    margin: 0;
+    text-align: start !important;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.ui-confirm-modal-desc {
+    display: block;
+    margin-top: .4rem;
+    text-align: start !important;
+}
+
+.ui-confirm-modal-body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: .85rem;
+    min-height: 0;
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 1rem 0 .45rem;
+    text-align: start !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ui-confirm-modal-body.space-y-3 {
+    gap: .85rem;
+}
+
+.ui-confirm-modal-body.space-y-3 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0 !important;
+}
+
+.ui-confirm-modal-body > *,
+.ui-confirm-modal-body .ui-note-field,
+.ui-confirm-modal-body .ui-image-upload,
+.ui-confirm-modal-body [data-flux-field],
+.ui-confirm-modal-body .ui-pay-modal,
+.ui-confirm-modal-body .ui-modal-callout {
+    width: 100%;
+    min-width: 0;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.ui-confirm-modal-body .ui-note-field,
+.ui-confirm-modal-body [data-flux-field] {
+    display: grid !important;
+    gap: .45rem;
+}
+
+.ui-confirm-modal-body [data-flux-label],
+.ui-confirm-modal-body label,
+.ui-confirm-modal-body .ui-note-field-label {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    text-align: start !important;
+}
+
+.ui-confirm-modal-body textarea,
+.ui-confirm-modal-body [data-flux-textarea],
+.ui-confirm-modal-body .ui-note-field-input,
+.ui-confirm-modal-body input[data-flux-control],
+.ui-confirm-modal-body select[data-flux-control],
+.ui-confirm-modal-body [data-flux-control] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.ui-confirm-modal-body textarea,
+.ui-confirm-modal-body [data-flux-textarea],
+.ui-confirm-modal-body .ui-note-field-input {
+    min-height: 5.25rem !important;
+}
+
+.ui-confirm-modal-body input[data-flux-control],
+.ui-confirm-modal-body select[data-flux-control] {
+    min-height: 2.65rem !important;
+}
+
+.ui-confirm-modal-body [data-flux-field],
+.ui-confirm-modal-body [data-flux-label],
+.ui-confirm-modal-body label,
+.ui-confirm-modal-body p,
+.ui-confirm-modal-body .ui-pay-modal {
+    text-align: start !important;
+}
+
+.ui-confirm-modal-actions {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: .65rem;
+    margin-top: .85rem;
+    padding-top: .9rem;
+    border-top: 1px solid #e8eef2;
+}
+
+.ui-pay-modal {
+    width: 100%;
+    text-align: start;
+}
+
+.ui-pay-summary {
+    border: 1px solid #d7e7e1;
+    border-radius: 1rem;
+    background:
+        linear-gradient(180deg, #f4fbf8 0%, #ffffff 58%),
+        #fff;
+    padding: 1rem 1.05rem;
+    box-shadow: 0 10px 28px rgb(15 118 110 / .06);
+    text-align: start;
+}
+
+.ui-pay-summary-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .85rem;
+}
+
+.ui-pay-summary-eyebrow {
+    margin: 0;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #0f766e;
+    text-align: start;
+}
+
+.ui-pay-summary-title {
+    margin: .2rem 0 0;
+    font-size: .95rem;
+    font-weight: 700;
+    color: #17383b;
+    text-align: start;
+}
+
+.ui-pay-summary-total {
+    display: grid;
+    gap: .15rem;
+    min-width: 9.5rem;
+    border-radius: .85rem;
+    background: #0f766e;
+    color: #ecfdf5;
+    padding: .7rem .85rem;
+    text-align: end;
+}
+
+.ui-pay-summary-total span {
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    opacity: .88;
+}
+
+.ui-pay-summary-total strong {
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: -.01em;
+}
+
+.ui-pay-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .45rem;
+    margin: .95rem 0 0;
+}
+
+@media (min-width: 480px) {
+    .ui-pay-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .55rem .85rem;
+    }
+}
+
+.ui-pay-summary-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .75rem;
+    border-radius: .7rem;
+    background: rgb(248 250 252 / .9);
+    padding: .55rem .7rem;
+}
+
+.ui-pay-summary-row dt {
+    margin: 0;
+    font-size: .72rem;
+    font-weight: 600;
+    color: #64748b;
+    text-align: start;
+}
+
+.ui-pay-summary-row dd {
+    margin: 0;
+    font-size: .9rem;
+    font-weight: 700;
+    color: #1e3a3c;
+    text-align: end;
+    white-space: nowrap;
+}
+
+.ui-pay-summary-note {
+    margin: .85rem 0 0;
+    border-radius: .75rem;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    padding: .55rem .7rem;
+    font-size: .75rem;
+    line-height: 1.4;
+    color: #9a3412;
+    text-align: start;
+}
+
+@media (max-width: 640px) {
+    .ui-confirm-modal-form {
+        max-height: min(88dvh, 40rem);
+    }
+
+    .ui-confirm-modal-actions {
+        flex-direction: column-reverse;
+    }
+
+    .ui-confirm-modal-actions > * ,
+    .ui-confirm-modal-actions [data-flux-button] {
+        width: 100%;
+    }
+
+    .ui-pay-summary-total {
+        width: 100%;
+        text-align: start;
     }
 }

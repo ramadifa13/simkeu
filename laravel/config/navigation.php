@@ -49,6 +49,7 @@ return [
             ['label' => 'Denda', 'route' => 'portal.loans.penalties', 'active_when' => ['portal.loans.penalties']],
             ['label' => 'Pelunasan', 'route' => 'portal.loans.settlements', 'active_when' => ['portal.loans.settlements', 'portal.loans.settlement']],
             ['label' => 'Layanan pinjaman', 'route' => 'portal.layanan.index', 'active_when' => ['portal.layanan']],
+            ['label' => 'Penutupan periode', 'route' => 'portal.loans.closing.index', 'active_when' => ['portal.loans.closing']],
         ]],
         ['label' => 'Laporan', 'route' => 'portal.reports.index', 'icon' => 'chart-bar', 'active_when' => ['portal.reports']],
     ],

@@ -51,7 +51,7 @@ class CloseInstallmentPeriodActionTest extends TestCase
             ['id' => 2, 'jumlah_angsuran' => 100000, 'denda' => 0, 'status' => 'lunas', 'cara_bayar' => 'pelunasan', 'tanggal_bayar' => '2026-11-04', 'tanggal_jatuh_tempo' => '2026-11-04'],
             ['id' => 3, 'jumlah_angsuran' => 100000, 'denda' => 0, 'status' => 'lunas', 'cara_bayar' => 'cicilan', 'tanggal_bayar' => '2026-11-04', 'tanggal_jatuh_tempo' => '2026-10-30'],
         ]);
-        $admin = new User(['role' => 'admin']);
+        $admin = $this->makeUser('admin');
         $admin->id = 1;
         $action = app(CloseInstallmentPeriodAction::class);
         $result = $action->close('2026-11', $admin, 'Uji closing');

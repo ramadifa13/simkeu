@@ -61,7 +61,7 @@ class GetDashboardData
             'roleLabel' => 'Teller',
             'intro' => 'Fokus pada antrean dan transaksi operasional hari ini.',
             'cards' => [
-                $this->card('Trx hari ini', (string) $staff['transactionsToday'], 'kas input saya', 'arrows-right-left', 'portal.dashboard.drilldown', 'cash'),
+                $this->card('Trx hari ini', (string) $staff['transactionsToday'], 'kas input saya', 'arrows-right-left', 'portal.dashboard.drilldown', 'deposits-today'),
                 $this->card('Setoran hari ini', $this->money($staff['depositToday']['amount']), $staff['depositToday']['members'].' nasabah · '.$staff['depositToday']['count'].' trx', 'banknotes', 'portal.dashboard.drilldown', 'deposits-today'),
                 $this->card('Anggota aktif', (string) $staff['members']['active'], 'dari '.$staff['members']['total'].' anggota', 'users', 'portal.members.index'),
             ],

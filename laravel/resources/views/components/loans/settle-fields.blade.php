@@ -15,10 +15,14 @@
 <div class="grid gap-4 sm:grid-cols-2" x-data="{ takeCollateral: false }">
     <x-loans.payment-date-field name="tanggal_bayar" label="Tanggal pelunasan" />
     <x-loans.payment-method />
-    <flux:field class="sm:col-span-2">
-        <flux:label>Catatan <span class="font-normal text-slate-500">(opsional)</span></flux:label>
-        <flux:textarea name="catatan" rows="2" placeholder="Catatan pelunasan" />
-    </flux:field>
+    <div class="sm:col-span-2">
+        <x-loans.note-field
+            name="catatan"
+            label="Catatan"
+            rows="2"
+            placeholder="Catatan pelunasan (opsional)"
+        />
+    </div>
     <div class="sm:col-span-2">
         <x-image-upload
             :label="$requiresProof ? 'Bukti pelunasan' : 'Bukti pelunasan (opsional)'"

@@ -194,6 +194,7 @@
             >
                 <x-loans.note-field
                     name="catatan_admin"
+                    label="Alasan pembatalan"
                     placeholder="Alasan pembatalan pencairan"
                     :required="true"
                     :minlength="5"
@@ -209,10 +210,14 @@
                 :action="route('portal.layanan.tunda-cair.request', ['role' => $role])"
             >
                 <input type="hidden" name="pengajuan_id" value="{{ $application->id }}" />
-                <flux:field>
-                    <flux:label>Alasan tunda cair</flux:label>
-                    <flux:textarea name="alasan" rows="3" required minlength="5" maxlength="2000" placeholder="Contoh: nasabah belum siap menerima dana" />
-                </flux:field>
+                <x-loans.note-field
+                    name="alasan"
+                    label="Alasan tunda cair"
+                    placeholder="Contoh: nasabah belum siap menerima dana"
+                    :required="true"
+                    :minlength="5"
+                    :maxlength="2000"
+                />
             </x-confirm-action-modal>
         @endif
     </div>

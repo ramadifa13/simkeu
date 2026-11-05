@@ -43,6 +43,6 @@ class PhaseFiveAuthorizationTest extends TestCase
 
     private function user(string $role): User
     {
-        return new User(['id' => 900, 'nama_lengkap' => 'Pengguna Uji', 'role' => $role, 'status' => 'aktif']);
+        return $this->makeUser($role, ['id' => 900, 'nama_lengkap' => 'Pengguna Uji', 'status' => 'aktif']);
     }
 }

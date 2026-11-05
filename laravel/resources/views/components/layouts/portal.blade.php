@@ -2,9 +2,11 @@
 @php
     $user = auth()->user();
     // Cache plain arrays only — serializing Collection caused incomplete-object 500s.
+    // Bust token invalidates every role inbox after mutations (RecordActivity).
     $portalNotifications = collect();
     if ($user) {
-        $notifKey = 'portal-notif:'.$user->id.':'.$role;
+        $bust = app(\App\Actions\Notifications\BustPortalNotificationCache::class)->token();
+        $notifKey = 'portal-notif:'.$bust.':'.$user->id.':'.$role;
         $cached = cache()->get($notifKey);
         if (is_array($cached)) {
             $portalNotifications = collect($cached);

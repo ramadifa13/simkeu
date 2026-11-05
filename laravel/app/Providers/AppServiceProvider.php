@@ -55,6 +55,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('disburse-loans', fn ($user): bool => in_array($user->role, ['admin', 'teller'], true));
         Gate::define('view-loans', fn ($user): bool => in_array($user->role, ['admin', 'teller', 'anggota'], true));
         Gate::define('collect-installments', fn ($user): bool => in_array($user->role, ['admin', 'teller'], true));
+        Gate::define('view-installment-closing', fn ($user): bool => in_array($user->role, ['admin', 'teller'], true));
+        Gate::define('manage-installment-closing', fn ($user): bool => $user->role === 'admin');
         Gate::define('review-collateral-return', fn ($user): bool => $user->role === 'admin');
         Gate::define('manage-layanan', fn ($user): bool => in_array($user->role, ['admin', 'teller'], true));
         Gate::define('decide-layanan', fn ($user): bool => $user->role === 'admin');

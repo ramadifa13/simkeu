@@ -3,6 +3,7 @@
 use App\Models\Anggota;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -12,6 +13,7 @@ new class extends Component
 
     public string $search = '';
 
+    #[Locked]
     public string $role = '';
 
     public string $status = '';
@@ -24,13 +26,15 @@ new class extends Component
 
     public function mount(string $role): void
     {
-        abort_unless(in_array(auth()->user()?->role, ['admin', 'teller'], true), 403);
+        $this->authorizeStaff();
         $this->role = $role;
     }
 
     #[Computed]
     public function members(): LengthAwarePaginator
     {
+        $this->authorizeStaff();
+
         return Anggota::query()
             ->select(['id', 'kode_anggota', 'kode_anggota_jaminan', 'nama_lengkap', 'telepon', 'kategori_shu', 'status', 'tanggal_daftar'])
             ->when($this->search !== '', function ($query): void {
@@ -78,5 +82,10 @@ new class extends Component
     {
         $this->reset('search', 'status');
         $this->resetPage();
+    }
+
+    private function authorizeStaff(): void
+    {
+        abort_unless(in_array(auth()->user()?->role, ['admin', 'teller'], true), 403);
     }
 };

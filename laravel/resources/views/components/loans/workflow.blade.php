@@ -12,11 +12,10 @@
         ['key' => 'settlement', 'label' => 'Pelunasan', 'icon' => 'check-badge', 'route' => 'portal.loans.settlements', 'params' => []],
         ['key' => 'closing', 'label' => 'Penutupan', 'icon' => 'lock-closed', 'route' => 'portal.loans.closing.index', 'params' => []],
     ];
-    if ($role !== 'admin') {
-        $steps = array_values(array_filter($steps, fn (array $step): bool => $step['key'] !== 'closing'));
-    }
     if ($role === 'anggota') {
         $steps = array_values(array_filter($steps, fn (array $step): bool => $step['key'] === 'installments'));
+    } elseif (! in_array($role, ['admin', 'teller'], true)) {
+        $steps = array_values(array_filter($steps, fn (array $step): bool => $step['key'] !== 'closing'));
     }
 @endphp
 

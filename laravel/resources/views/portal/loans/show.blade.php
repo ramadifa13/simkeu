@@ -16,19 +16,33 @@
             <x-slot:actions>
                 <x-status-badge :status="$loan->status" />
                 @if ($agreement ?? null)
-                    <flux:button :href="route('portal.loans.agreement', ['role' => $role, 'loan' => $loan->id])" variant="outline" icon="document-text">
+                    <flux:button :href="route('portal.loans.agreement', ['role' => $role, 'loan' => $loan->id])" variant="outline" icon="document-text" class="hidden sm:inline-flex">
                         Perjanjian
                     </flux:button>
-                    <flux:button :href="route('portal.documents.agreement', ['role' => $role, 'loan' => $loan->id])" target="_blank" variant="outline" icon="printer">
-                        Cetak perjanjian
-                    </flux:button>
                 @endif
-                <flux:button :href="route('portal.documents.disbursement', ['role' => $role, 'loan' => $loan->id])" target="_blank" variant="outline" icon="banknotes">
-                    Cetak slip
-                </flux:button>
-                <flux:button :href="route('portal.documents.installment-book', ['role' => $role, 'loan' => $loan->id])" target="_blank" variant="outline" icon="book-open">
-                    Cetak buku
-                </flux:button>
+                <div class="hidden flex-wrap gap-2 sm:flex">
+                    @if ($agreement ?? null)
+                        <flux:button :href="route('portal.documents.agreement', ['role' => $role, 'loan' => $loan->id])" target="_blank" variant="outline" icon="printer">
+                            Cetak perjanjian
+                        </flux:button>
+                    @endif
+                    <flux:button :href="route('portal.documents.disbursement', ['role' => $role, 'loan' => $loan->id])" target="_blank" variant="outline" icon="banknotes">
+                        Cetak slip
+                    </flux:button>
+                    <flux:button :href="route('portal.documents.installment-book', ['role' => $role, 'loan' => $loan->id])" target="_blank" variant="outline" icon="book-open">
+                        Cetak buku
+                    </flux:button>
+                </div>
+                <div class="sm:hidden">
+                    <x-action-menu :label="'Dokumen pinjaman '.$loan->kode_pinjaman">
+                        @if ($agreement ?? null)
+                            <a href="{{ route('portal.loans.agreement', ['role' => $role, 'loan' => $loan->id]) }}" role="menuitem" class="block rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-teal-50">Lihat perjanjian</a>
+                            <a href="{{ route('portal.documents.agreement', ['role' => $role, 'loan' => $loan->id]) }}" target="_blank" role="menuitem" class="block rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-teal-50">Cetak perjanjian</a>
+                        @endif
+                        <a href="{{ route('portal.documents.disbursement', ['role' => $role, 'loan' => $loan->id]) }}" target="_blank" role="menuitem" class="block rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-teal-50">Cetak slip pencairan</a>
+                        <a href="{{ route('portal.documents.installment-book', ['role' => $role, 'loan' => $loan->id]) }}" target="_blank" role="menuitem" class="block rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-teal-50">Cetak buku angsuran</a>
+                    </x-action-menu>
+                </div>
                 @if ($role !== 'anggota' && ($cartCount ?? 0) > 0)
                     <flux:button :href="route('portal.loans.cart', ['role' => $role, 'from' => $loan->id])" variant="primary" icon="shopping-cart">
                         Keranjang ({{ $cartCount }})
@@ -112,11 +126,34 @@
             <x-confirm-action-modal
                 name="request-settlement"
                 title="Ajukan pelunasan dipercepat"
-                description="Admin akan meninjau diskon bunga sebelum pelunasan diproses."
+                description="Admin meninjau diskon bunga sebelum pelunasan diproses."
                 confirm-label="Kirim pengajuan"
+                max-width="xl"
                 :action="route('portal.loans.settlement.request', ['role' => $role, 'loan' => $loan->id])"
             >
-                <x-loans.note-field name="catatan" placeholder="Alasan atau catatan (opsional)" />
+                <div class="ui-modal-callout">
+                    <div class="ui-modal-callout-row">
+                        <span>Estimasi pelunasan saat ini</span>
+                        <strong>Rp{{ number_format($settlement['total'], 0, ',', '.') }}</strong>
+                    </div>
+                    <div class="ui-modal-callout-row">
+                        <span>Sebelum diskon</span>
+                        <strong>Rp{{ number_format($settlement['gross'], 0, ',', '.') }}</strong>
+                    </div>
+                    @if (($settlement['penalty'] ?? 0) > 0)
+                        <div class="ui-modal-callout-row is-warning">
+                            <span>Sisa denda</span>
+                            <strong>Rp{{ number_format($settlement['penalty'], 0, ',', '.') }}</strong>
+                        </div>
+                    @endif
+                    <p class="ui-modal-callout-note">Diskon hanya dapat mengurangi sisa bunga, bukan pokok atau denda.</p>
+                </div>
+                <x-loans.note-field
+                    name="catatan"
+                    label="Alasan / catatan"
+                    placeholder="Contoh: nasabah ingin diskon bunga karena pelunasan lebih awal"
+                    rows="3"
+                />
             </x-confirm-action-modal>
             @if ($role === 'admin' && $settlement['request_status'] === 'menunggu')
                 <x-confirm-action-modal
@@ -245,6 +282,7 @@
                     >
                         <x-loans.note-field
                             name="alasan"
+                            label="Alasan pembatalan"
                             placeholder="Alasan pembatalan (minimal 5 karakter)"
                             :required="true"
                             :minlength="5"
@@ -352,39 +390,10 @@
                                         <flux:modal.trigger name="review-reversal-{{ $reversalRequest->id }}">
                                             <x-loans.action-chip type="button" icon="clipboard-document-check">Tinjau</x-loans.action-chip>
                                         </flux:modal.trigger>
-                                        <x-confirm-action-modal
-                                            :name="'review-reversal-'.$reversalRequest->id"
-                                            title="Tinjau pengajuan pembatalan"
-                                            :description="'Teller mengajukan: '.$reversalRequest->alasan"
-                                            confirm-label="Simpan keputusan"
-                                            :action="route('portal.loans.installments.reversal.review', ['role' => $role, 'loan' => $loan->id, 'reversalRequest' => $reversalRequest->id])"
-                                        >
-                                            <x-loans.review-decision-fields
-                                                :options="[
-                                                    'disetujui' => 'Setujui dan buat mutasi pembalik',
-                                                    'ditolak' => 'Tolak pengajuan',
-                                                ]"
-                                            />
-                                        </x-confirm-action-modal>
                                     @else
                                         <flux:modal.trigger name="reverse-{{ $installment->id }}">
                                             <x-loans.action-chip type="button" tone="danger" icon="arrow-uturn-left">Batalkan</x-loans.action-chip>
                                         </flux:modal.trigger>
-                                        <x-confirm-action-modal
-                                            :name="'reverse-'.$installment->id"
-                                            title="Batalkan pembayaran angsuran"
-                                            description="Sistem membuat mutasi kas pembalik; pembayaran awal tidak dihapus."
-                                            confirm-label="Buat pembatalan"
-                                            variant="danger"
-                                            :action="route('portal.loans.installments.reverse', ['role' => $role, 'loan' => $loan->id, 'installment' => $installment->id])"
-                                        >
-                                            <x-loans.note-field
-                                                name="alasan"
-                                                placeholder="Alasan pembatalan (minimal 5 karakter)"
-                                                :required="true"
-                                                :minlength="5"
-                                            />
-                                        </x-confirm-action-modal>
                                     @endif
                                 @elseif ($role === 'teller' && $installment->cara_bayar !== 'pelunasan')
                                     @if ($reversalRequest && $reversalRequest->status === 'menunggu')
@@ -393,20 +402,6 @@
                                         <flux:modal.trigger name="request-reversal-{{ $installment->id }}">
                                             <x-loans.action-chip type="button" tone="danger" icon="arrow-uturn-left">Ajukan batal</x-loans.action-chip>
                                         </flux:modal.trigger>
-                                        <x-confirm-action-modal
-                                            :name="'request-reversal-'.$installment->id"
-                                            title="Ajukan pembatalan pembayaran"
-                                            description="Pembayaran tidak berubah sampai Admin menyetujui pengajuan ini."
-                                            confirm-label="Kirim pengajuan"
-                                            :action="route('portal.loans.installments.reversal.request', ['role' => $role, 'loan' => $loan->id, 'installment' => $installment->id])"
-                                        >
-                                            <x-loans.note-field
-                                                name="alasan"
-                                                placeholder="Alasan pembatalan (minimal 5 karakter)"
-                                                :required="true"
-                                                :minlength="5"
-                                            />
-                                        </x-confirm-action-modal>
                                     @endif
                                 @endif
                             @elseif ($role !== 'anggota')
@@ -414,16 +409,6 @@
                                     <flux:modal.trigger name="penalty-{{ $installment->id }}">
                                         <x-loans.action-chip type="button" icon="exclamation-triangle">Denda</x-loans.action-chip>
                                     </flux:modal.trigger>
-                                    <x-confirm-action-modal
-                                        :name="'penalty-'.$installment->id"
-                                        title="Catat pembayaran denda"
-                                        :description="'Sisa denda: Rp '.number_format($installment->denda - $installment->denda_dibayar, 0, ',', '.')"
-                                        confirm-label="Simpan denda"
-                                        max-width="xl"
-                                        :action="route('portal.loans.installments.penalty.pay', ['role' => $role, 'loan' => $loan->id, 'installment' => $installment->id])"
-                                    >
-                                        <x-loans.pay-penalty-fields :installment="$installment" />
-                                    </x-confirm-action-modal>
                                 @endif
                                 <flux:modal.trigger name="pay-{{ $installment->id }}">
                                     <x-loans.action-chip type="button" tone="primary" icon="banknotes">Bayar</x-loans.action-chip>
@@ -434,16 +419,6 @@
                                     :installment-id="$installment->id"
                                     :in-cart="$inCart"
                                 />
-                                <x-confirm-action-modal
-                                    :name="'pay-'.$installment->id"
-                                    title="Catat pembayaran angsuran"
-                                    :description="'Angsuran ke-'.$installment->angsuran_ke.' akan dibayar dan masuk ke buku kas.'"
-                                    confirm-label="Simpan pembayaran"
-                                    max-width="xl"
-                                    :action="route('portal.loans.installments.pay', ['role' => $role, 'loan' => $loan->id, 'installment' => $installment->id])"
-                                >
-                                    <x-loans.pay-installment-fields :role="$role" :installment="$installment" />
-                                </x-confirm-action-modal>
                             @else
                                 <span class="text-xs text-slate-400">—</span>
                             @endif
@@ -452,6 +427,97 @@
                 </tr>
             @endforeach
         </x-data-table>
+        </div>
+
+        {{-- Modals live outside text-right table cells so Flux dialogs do not inherit alignment. --}}
+        <div class="ui-loan-modals">
+            @foreach ($installments as $installment)
+                @php
+                    $reversalRequest = $reversalRequests->get($installment->id);
+                @endphp
+                @if ($installment->status === 'lunas')
+                    @if ($role === 'admin' && $installment->cara_bayar !== 'pelunasan')
+                        @if ($reversalRequest && $reversalRequest->status === 'menunggu')
+                            <x-confirm-action-modal
+                                :name="'review-reversal-'.$reversalRequest->id"
+                                title="Tinjau pengajuan pembatalan"
+                                :description="'Teller mengajukan: '.$reversalRequest->alasan"
+                                confirm-label="Simpan keputusan"
+                                :action="route('portal.loans.installments.reversal.review', ['role' => $role, 'loan' => $loan->id, 'reversalRequest' => $reversalRequest->id])"
+                            >
+                                <x-loans.review-decision-fields
+                                    :options="[
+                                        'disetujui' => 'Setujui dan buat mutasi pembalik',
+                                        'ditolak' => 'Tolak pengajuan',
+                                    ]"
+                                />
+                            </x-confirm-action-modal>
+                        @else
+                            <x-confirm-action-modal
+                                :name="'reverse-'.$installment->id"
+                                title="Batalkan pembayaran angsuran"
+                                :description="'Angsuran ke-'.$installment->angsuran_ke.' · mutasi kas pembalik akan dibuat; pembayaran awal tetap tersimpan sebagai riwayat.'"
+                                confirm-label="Buat pembatalan"
+                                variant="danger"
+                                max-width="xl"
+                                :action="route('portal.loans.installments.reverse', ['role' => $role, 'loan' => $loan->id, 'installment' => $installment->id])"
+                            >
+                                <div class="ui-modal-callout is-danger">
+                                    <p class="ui-modal-callout-title">Pembatalan tidak menghapus riwayat</p>
+                                    <p>Sistem mencatat mutasi kas pembalik agar saldo kas dan jadwal angsuran kembali konsisten.</p>
+                                </div>
+                                <x-loans.note-field
+                                    name="alasan"
+                                    label="Alasan pembatalan"
+                                    placeholder="Contoh: salah nominal, salah anggota, atau input ganda"
+                                    :required="true"
+                                    :minlength="5"
+                                />
+                            </x-confirm-action-modal>
+                        @endif
+                    @elseif ($role === 'teller' && $installment->cara_bayar !== 'pelunasan' && $installment->tanggal_bayar && \Carbon\Carbon::parse($installment->tanggal_bayar)->isToday() && (! $reversalRequest || $reversalRequest->status !== 'menunggu'))
+                        <x-confirm-action-modal
+                            :name="'request-reversal-'.$installment->id"
+                            title="Ajukan pembatalan pembayaran"
+                            description="Pembayaran tidak berubah sampai Admin menyetujui pengajuan ini."
+                            confirm-label="Kirim pengajuan"
+                            max-width="xl"
+                            :action="route('portal.loans.installments.reversal.request', ['role' => $role, 'loan' => $loan->id, 'installment' => $installment->id])"
+                        >
+                            <x-loans.note-field
+                                name="alasan"
+                                label="Alasan pembatalan"
+                                placeholder="Jelaskan alasan pengajuan (minimal 5 karakter)"
+                                :required="true"
+                                :minlength="5"
+                            />
+                        </x-confirm-action-modal>
+                    @endif
+                @elseif ($role !== 'anggota')
+                    @if ($installment->denda > $installment->denda_dibayar)
+                        <x-confirm-action-modal
+                            :name="'penalty-'.$installment->id"
+                            title="Catat pembayaran denda"
+                            :description="'Sisa denda: Rp '.number_format($installment->denda - $installment->denda_dibayar, 0, ',', '.')"
+                            confirm-label="Simpan denda"
+                            max-width="xl"
+                            :action="route('portal.loans.installments.penalty.pay', ['role' => $role, 'loan' => $loan->id, 'installment' => $installment->id])"
+                        >
+                            <x-loans.pay-penalty-fields :installment="$installment" />
+                        </x-confirm-action-modal>
+                    @endif
+                    <x-confirm-action-modal
+                        :name="'pay-'.$installment->id"
+                        title="Catat pembayaran angsuran"
+                        description="Periksa ringkasan cicilan, lalu isi tanggal, metode, dan bukti bila ada."
+                        confirm-label="Simpan pembayaran"
+                        max-width="2xl"
+                        :action="route('portal.loans.installments.pay', ['role' => $role, 'loan' => $loan->id, 'installment' => $installment->id])"
+                    >
+                        <x-loans.pay-installment-fields :role="$role" :installment="$installment" />
+                    </x-confirm-action-modal>
+                @endif
+            @endforeach
         </div>
 
         <x-loans.cart-bar

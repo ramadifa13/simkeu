@@ -18,20 +18,30 @@
     };
 @endphp
 
-<flux:modal name="{{ $name }}" class="{{ $widthClass }}">
-    <form {!! $action ? 'method="POST" action="'.e($action).'"' : '' !!} enctype="multipart/form-data" class="space-y-4">
+<flux:modal name="{{ $name }}" class="{{ $widthClass }} ui-confirm-modal">
+    <form
+        {!! $action ? 'method="POST" action="'.e($action).'"' : '' !!}
+        enctype="multipart/form-data"
+        class="ui-confirm-modal-form"
+    >
         @if ($action)
             @csrf
             @if (! in_array(strtoupper($method), ['GET', 'POST'], true))
                 @method($method)
             @endif
         @endif
-        <div>
-            <flux:heading size="lg">{{ $title }}</flux:heading>
-            <flux:subheading>{{ $description }}</flux:subheading>
+        <div class="ui-confirm-modal-head">
+            <flux:heading size="lg" class="ui-confirm-modal-title">{{ $title }}</flux:heading>
+            @if (filled($description))
+                <flux:subheading class="ui-confirm-modal-desc">{{ $description }}</flux:subheading>
+            @endif
         </div>
-        {{ $slot }}
-        <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        @if (! $slot->isEmpty())
+            <div class="ui-confirm-modal-body space-y-3">
+                {{ $slot }}
+            </div>
+        @endif
+        <div class="ui-confirm-modal-actions">
             <flux:modal.close>
                 <flux:button type="button" variant="ghost" class="w-full sm:w-auto">Batal</flux:button>
             </flux:modal.close>

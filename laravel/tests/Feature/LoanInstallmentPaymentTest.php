@@ -50,7 +50,7 @@ class LoanInstallmentPaymentTest extends TestCase
     {
         DB::table('pinjaman')->insert(['id' => 1, 'kode_pinjaman' => 'PJN-UJI', 'sisa_pokok' => 100000, 'status' => 'aktif']);
         DB::table('angsuran')->insert(['id' => 1, 'pinjaman_id' => 1, 'angsuran_ke' => 1, 'jumlah_angsuran' => 110000, 'pokok' => 100000, 'denda' => 5000, 'tanggal_jatuh_tempo' => '2026-11-01', 'status' => 'belum_bayar']);
-        $actor = new User(['role' => 'teller']);
+        $actor = $this->makeUser('teller');
         $actor->id = 1;
         $result = app(PayInstallmentAction::class)->handle(1, '2026-11-03', 'cash', $actor);
         $this->assertTrue($result['lunas']);

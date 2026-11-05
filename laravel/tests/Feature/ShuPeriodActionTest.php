@@ -137,7 +137,7 @@ class ShuPeriodActionTest extends TestCase
 
     public function test_create_calculate_and_approve_shu_period(): void
     {
-        $admin = new User(['role' => 'admin']);
+        $admin = $this->makeUser('admin');
         $admin->id = 1;
         $percentages = [
             'persen_simpanan' => 80,

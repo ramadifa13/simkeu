@@ -57,7 +57,7 @@ class SettleLoanActionTest extends TestCase
             ['id' => 1, 'pinjaman_id' => 1, 'angsuran_ke' => 2, 'jumlah_angsuran' => 110000, 'bunga' => 10000, 'denda' => 0, 'status' => 'belum_bayar'],
             ['id' => 2, 'pinjaman_id' => 1, 'angsuran_ke' => 3, 'jumlah_angsuran' => 110000, 'bunga' => 10000, 'denda' => 0, 'status' => 'belum_bayar'],
         ]);
-        $actor = new User(['role' => 'admin']);
+        $actor = $this->makeUser('admin');
         $actor->id = 1;
         $result = app(SettleLoanAction::class)->handle(1, '2026-11-04', 'cash', $actor, 50, 'Uji');
 
@@ -72,7 +72,7 @@ class SettleLoanActionTest extends TestCase
     {
         DB::table('pinjaman')->insert(['id' => 1, 'kode_pinjaman' => 'PJN-UJI', 'status' => 'aktif', 'sisa_pokok' => 100000]);
         DB::table('angsuran')->insert(['id' => 1, 'pinjaman_id' => 1, 'angsuran_ke' => 2, 'jumlah_angsuran' => 110000, 'bunga' => 10000, 'denda' => 5000, 'status' => 'telat']);
-        $actor = new User(['role' => 'teller']);
+        $actor = $this->makeUser('teller');
         $actor->id = 2;
 
         $this->expectException(DomainException::class);

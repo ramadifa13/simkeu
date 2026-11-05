@@ -50,9 +50,9 @@ class CollateralReturnFlowTest extends TestCase
         DB::table('pinjaman')->insert(['id' => 1, 'status' => 'lunas']);
         DB::table('jaminan_pinjaman')->insert(['id' => 1, 'pinjaman_id' => 1, 'status_jaminan' => 'dititipkan', 'foto_barang' => 'jaminan/a.jpg']);
 
-        $teller = new User(['role' => 'teller']);
+        $teller = $this->makeUser('teller');
         $teller->id = 2;
-        $admin = new User(['role' => 'admin']);
+        $admin = $this->makeUser('admin');
         $admin->id = 1;
 
         app(RequestCollateralReturnAction::class)->handle(1, $teller, 'Nasabah mengambil barang', 'jaminan/b.jpg', 'lunas/c.jpg');

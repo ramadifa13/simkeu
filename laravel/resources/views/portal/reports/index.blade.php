@@ -1,6 +1,6 @@
 <x-layouts.portal :role="$role" title="Pusat laporan">
-    @php($activeFilter = collect($filters)->except('jenis')->filter(fn ($value) => filled($value))->isNotEmpty())
-    @php($reportLabels = ['simpanan' => 'Simpanan', 'kas' => 'Kas', 'anggota' => 'Anggota', 'waserda' => 'Waserda', 'denda' => 'Denda', 'pinjaman' => 'Pinjaman', 'angsuran' => 'Angsuran', 'lunas' => 'Lunas', 'harian' => 'Harian teller'])
+    @php($activeFilter = collect($filters)->except(['jenis', 'per_page'])->filter(fn ($value) => filled($value))->isNotEmpty())
+    @php($reportLabels = ['simpanan' => 'Simpanan', 'kas' => 'Kas', 'anggota' => 'Anggota', 'waserda' => 'Waserda', 'denda' => 'Denda', 'pinjaman' => 'Pinjaman', 'angsuran' => 'Angsuran', 'lunas' => 'Lunas', 'harian' => 'Harian teller', 'transaksi' => 'Transaksi gabungan'])
     @php($tabs = collect($availableTypes ?? array_keys($reportLabels))->mapWithKeys(fn ($key) => [$key => $reportLabels[$key] ?? ucfirst($key)]))
 
     <div class="mx-auto max-w-7xl space-y-6">
@@ -11,9 +11,7 @@
                 @endcan
                 <flux:button :href="route('portal.reports.export', array_merge(['role' => $role], request()->query()))" variant="outline" icon="arrow-down-tray">Ekspor CSV</flux:button>
                 <flux:button :href="route('portal.reports.export-excel', array_merge(['role' => $role], request()->query()))" variant="outline" icon="table-cells">Ekspor Excel</flux:button>
-                @can('view-admin-reports')
-                    <flux:button :href="route('portal.documents.report', array_merge(['role' => $role], request()->query()))" variant="outline" icon="document">PDF</flux:button>
-                @endcan
+                <flux:button :href="route('portal.documents.report', array_merge(['role' => $role], request()->query()))" variant="outline" icon="document">PDF</flux:button>
             </x-slot:actions>
         </x-page-header>
 
@@ -25,9 +23,20 @@
 
         <x-data-table title="{{ $definition['title'] }}" :count="$rows->total()" :sortable="false" :columns="$definition['columns']" :mobile-hidden="array_slice(array_keys($definition['columns']), 2, max(0, count($definition['columns']) - 4))">
             <x-slot:filters>
-                <form method="GET" class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+                <form method="GET" class="grid gap-3 p-4 sm:grid-cols-2 {{ $filters['jenis'] === 'transaksi' ? 'lg:grid-cols-6' : 'lg:grid-cols-5' }} lg:items-end">
                     <input type="hidden" name="jenis" value="{{ $filters['jenis'] }}">
                     <flux:field class="lg:col-span-2"><flux:label>Pencarian</flux:label><flux:input type="search" name="q" :value="$filters['q'] ?? ''" placeholder="Cari kode, nama, atau keterangan" /></flux:field>
+                    @if ($filters['jenis'] === 'transaksi')
+                        <flux:field>
+                            <flux:label>Sumber</flux:label>
+                            <flux:select name="sumber">
+                                <option value="">Semua sumber</option>
+                                @foreach (['TABUNGAN' => 'Tabungan', 'PINJAMAN' => 'Pinjaman', 'WASERDA' => 'Waserda', 'KAS_LAIN' => 'Kas lain'] as $value => $label)
+                                    <option value="{{ $value }}" @selected(($filters['sumber'] ?? '') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </flux:select>
+                        </flux:field>
+                    @endif
                     <flux:field><flux:label>Tanggal dari</flux:label><flux:input type="date" name="tanggal_dari" :value="$filters['tanggal_dari'] ?? ''" /></flux:field>
                     <flux:field><flux:label>Tanggal sampai</flux:label><flux:input type="date" name="tanggal_sampai" :value="$filters['tanggal_sampai'] ?? ''" /></flux:field>
                     <div class="flex gap-2"><flux:button type="submit" variant="primary" class="flex-1">Terapkan</flux:button>@if($activeFilter)<flux:button :href="route('portal.reports.index', ['role' => $role, 'jenis' => $filters['jenis']])" variant="ghost">Reset</flux:button>@endif</div>

@@ -15,6 +15,7 @@
     </flux:field>
     <x-loans.note-field
         name="catatan_admin"
+        label="Catatan Admin"
         placeholder="Catatan Admin (minimal 5 karakter)"
         :required="true"
         :minlength="5"

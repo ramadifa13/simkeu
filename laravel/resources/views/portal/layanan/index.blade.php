@@ -35,12 +35,12 @@
                             <x-confirm-action-modal name="tc-approve-{{ $item->id }}" title="Setujui tunda cair?" description="Pengajuan akan ditandai batal cair." confirm-label="Setujui TC" :action="route('portal.layanan.tunda-cair.decide', ['role' => $role])">
                                 <input type="hidden" name="tc_id" value="{{ $item->id }}" />
                                 <input type="hidden" name="keputusan" value="disetujui" />
-                                <flux:field><flux:label>Catatan Admin</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+                                <x-loans.note-field name="catatan" label="Catatan Admin" placeholder="Catatan persetujuan TC" :required="true" :minlength="5" />
                             </x-confirm-action-modal>
                             <x-confirm-action-modal name="tc-reject-{{ $item->id }}" title="Tolak tunda cair?" description="Pengajuan kembali dapat dicairkan." confirm-label="Tolak TC" variant="danger" :action="route('portal.layanan.tunda-cair.decide', ['role' => $role])">
                                 <input type="hidden" name="tc_id" value="{{ $item->id }}" />
                                 <input type="hidden" name="keputusan" value="ditolak" />
-                                <flux:field><flux:label>Catatan Admin</flux:label><flux:textarea name="catatan" rows="3" required minlength="5" /></flux:field>
+                                <x-loans.note-field name="catatan" label="Catatan Admin" placeholder="Catatan penolakan TC" :required="true" :minlength="5" />
                             </x-confirm-action-modal>
                         @endcan
                     @endforeach
