@@ -43,7 +43,10 @@ class CooperativeSettingsController extends Controller
         $path = (string) (DB::table('koperasi')->orderBy('id')->value('logo') ?? '');
 
         abort_unless(
-            Str::startsWith($path, 'koperasi/') && Storage::disk('local')->exists($path),
+            $path !== ''
+            && ! str_contains($path, '..')
+            && Str::startsWith($path, 'koperasi/')
+            && Storage::disk('local')->exists($path),
             404,
         );
 
@@ -60,7 +63,10 @@ class CooperativeSettingsController extends Controller
         $path = (string) (DB::table('pengaturan_perjanjian')->where('id', 1)->value('ttd_admin') ?? '');
 
         abort_unless(
-            Str::startsWith($path, 'perjanjian/tanda-tangan/') && Storage::disk('local')->exists($path),
+            $path !== ''
+            && ! str_contains($path, '..')
+            && Str::startsWith($path, 'perjanjian/tanda-tangan/')
+            && Storage::disk('local')->exists($path),
             404,
         );
 

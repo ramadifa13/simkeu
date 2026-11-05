@@ -63,10 +63,10 @@ class SettleLoanAction
                 'status' => 'lunas', 'tanggal_bayar' => $paymentDate, 'cara_bayar' => 'pelunasan',
             ]);
             DB::table('pinjaman')->where('id', $loanId)->update(['status' => 'lunas', 'sisa_pokok' => 0, 'tanggal_lunas' => $paymentDate]);
-            $cashId = DB::table('kas')->insertGetId([
+            $cashId = DB::table('kas')->insertGetId(\App\Support\CashEntry::attributes([
                 'transaksi_id' => $loanId, 'jenis' => 'masuk', 'jumlah' => $total, 'saldo_sebelum' => $before, 'saldo_sesudah' => $before + $total,
                 'keterangan' => 'Pelunasan '.$loan->kode_pinjaman.($note !== '' ? ' — '.$note : ''), 'tanggal' => $paymentDate.' '.now()->format('H:i:s'),
-            ]);
+            ], \App\Support\CashEntry::PINJAMAN_LUNAS));
 
             if (Schema::hasTable('pelunasan_dini')) {
                 DB::table('pelunasan_dini')->insert(['pinjaman_id' => $loanId, 'jumlah_pelunasan' => $total, 'keterangan' => $note, 'user_id' => $actor->id]);

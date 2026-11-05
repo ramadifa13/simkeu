@@ -50,7 +50,7 @@ class CreateWaserdaTransactionAction
                 'user_id' => $actor->id,
             ]);
 
-            DB::table('kas')->insert([
+            DB::table('kas')->insert(\App\Support\CashEntry::attributes([
                 // Legacy schema uses this generic link even for Waserda rows.
                 'transaksi_id' => $transaction->id,
                 'jenis' => 'masuk',
@@ -58,7 +58,7 @@ class CreateWaserdaTransactionAction
                 'saldo_sebelum' => $cashBefore,
                 'saldo_sesudah' => $cashBefore + $total,
                 'keterangan' => 'Pembelian Waserda - '.$transaction->kode_transaksi.' ('.count($items).' item)',
-            ]);
+            ], \App\Support\CashEntry::WASERDA));
 
             return $transaction;
         }, 3);

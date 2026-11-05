@@ -50,7 +50,7 @@ class ResolveMemberDisbursementPhoto
                 continue;
             }
             $path = trim((string) $row->foto_pencairan);
-            if ($path !== '' && ! str_contains($path, '..')) {
+            if ($path !== '' && ! str_contains($path, '..') && str_starts_with($path, 'pencairan/')) {
                 $map[$memberId] = $path;
             }
         }

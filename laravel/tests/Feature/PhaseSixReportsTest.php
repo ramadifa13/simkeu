@@ -171,6 +171,18 @@ class PhaseSixReportsTest extends TestCase
         $this->actingAs($teller)
             ->get(route('portal.reports.index', ['role' => 'teller', 'jenis' => 'angsuran']))
             ->assertSessionHasErrors('jenis');
+
+        $this->actingAs($teller)
+            ->get(route('portal.documents.report', ['role' => 'teller', 'jenis' => 'pinjaman']))
+            ->assertNotFound();
+
+        $this->actingAs($teller)
+            ->get(route('portal.documents.report', ['role' => 'teller', 'jenis' => 'angsuran']))
+            ->assertNotFound();
+
+        $this->actingAs($teller)
+            ->get(route('portal.documents.report', ['role' => 'teller', 'jenis' => 'denda']))
+            ->assertOk();
     }
 
     public function test_all_phase_six_report_types_render_for_admin(): void

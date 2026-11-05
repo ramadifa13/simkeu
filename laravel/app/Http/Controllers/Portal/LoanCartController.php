@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Portal;
 
 use App\Actions\Audit\RecordActivity;
 use App\Actions\Loans\CheckoutInstallmentCartAction;
-use App\Actions\Loans\RefreshLoanPenaltiesAction;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Portal\Concerns\InteractsWithLoans;
 use DomainException;
@@ -118,7 +117,7 @@ class LoanCartController extends Controller
             ->with('status', count($cart).' item keranjang disimpan.');
     }
 
-    public function checkoutCart(Request $request, string $role, CheckoutInstallmentCartAction $checkout, RecordActivity $audit, RefreshLoanPenaltiesAction $refresh): RedirectResponse
+    public function checkoutCart(Request $request, string $role, CheckoutInstallmentCartAction $checkout, RecordActivity $audit): RedirectResponse
     {
         $this->authorize('collect-installments');
         $cart = $this->persistCartOverrides($request);
@@ -127,12 +126,10 @@ class LoanCartController extends Controller
         }
 
         $payload = [];
-        $loanIds = [];
         foreach ($cart as $item) {
             $date = (string) ($item['tanggal_bayar'] ?: today()->toDateString());
             $method = (string) ($item['metode'] ?: 'cash');
             $this->assertInstallmentMonthOpen($date);
-            $loanIds[(int) $item['loan_id']] = true;
             $payload[] = [
                 'installment_id' => (int) $item['installment_id'],
                 'tanggal_bayar' => $date,
@@ -141,10 +138,7 @@ class LoanCartController extends Controller
             ];
         }
 
-        foreach (array_keys($loanIds) as $loanId) {
-            $refresh->handle((int) $loanId, today()->toDateString());
-        }
-
+        // Penalty refresh runs per cart item date inside CheckoutInstallmentCartAction.
         try {
             $result = $checkout->handle($payload, $request->user());
         } catch (DomainException $e) {

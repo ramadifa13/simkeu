@@ -4,6 +4,7 @@ namespace App\Actions\Loans;
 
 use App\Actions\Cash\RecalculateCashLedgerAction;
 use App\Models\User;
+use App\Support\CashEntry;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,12 @@ class PayInstallmentAction
             if (! $loan || ! \App\Support\LoanLifecycle::isCollectible($loan->status)) {
                 throw new DomainException('Pinjaman tidak aktif atau sudah lunas.');
             }
+            if (Schema::hasTable('closing_angsuran_bulanan')) {
+                $month = CarbonImmutable::parse($paymentDate)->format('Y-m');
+                if (DB::table('closing_angsuran_bulanan')->where('bulan', $month)->where('status', 'terkunci')->exists()) {
+                    throw new DomainException('Periode angsuran '.$month.' sudah dikunci.');
+                }
+            }
             DB::table('kas')->orderByDesc('id')->limit(1)->lockForUpdate()->get();
             $daysLate = max(0, (int) floor((strtotime($paymentDate) - strtotime($installment->tanggal_jatuh_tempo)) / 86400));
             if ($manualPenalty !== null && $actor->role !== 'admin' && abs($manualPenalty - (float) $installment->denda) > 0.005) {
@@ -52,7 +59,15 @@ class PayInstallmentAction
             $unpaid = DB::table('angsuran')->where('pinjaman_id', $loan->id)->where('id', '<>', $installmentId)->where('status', '<>', 'lunas')->exists();
             DB::table('pinjaman')->where('id', $loan->id)->update(['sisa_pokok' => $remaining, 'status' => $unpaid ? 'aktif' : 'lunas', 'tanggal_lunas' => $unpaid ? null : $paymentDate]);
             $before = (float) DB::table('kas')->selectRaw("COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0) as saldo")->value('saldo');
-            $cashId = DB::table('kas')->insertGetId(['transaksi_id' => $installmentId, 'jenis' => 'masuk', 'jumlah' => $total, 'saldo_sebelum' => $before, 'saldo_sesudah' => $before + $total, 'keterangan' => 'Pembayaran angsuran ke-'.$installment->angsuran_ke.' '.$loan->kode_pinjaman, 'tanggal' => $paymentDate.' '.now()->format('H:i:s')]);
+            $cashId = DB::table('kas')->insertGetId(CashEntry::attributes([
+                'transaksi_id' => $installmentId,
+                'jenis' => 'masuk',
+                'jumlah' => $total,
+                'saldo_sebelum' => $before,
+                'saldo_sesudah' => $before + $total,
+                'keterangan' => 'Pembayaran angsuran ke-'.$installment->angsuran_ke.' '.$loan->kode_pinjaman,
+                'tanggal' => $paymentDate.' '.now()->format('H:i:s'),
+            ], CashEntry::ANGSURAN));
             if (Schema::hasTable('layanan_pembayaran')) {
                 DB::table('layanan_pembayaran')->insert(['angsuran_id' => $installmentId, 'pinjaman_id' => $loan->id, 'user_id' => $actor->id, 'jenis' => 'angsuran', 'jumlah' => $total, 'metode' => $method, 'bukti' => $proof]);
             }

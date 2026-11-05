@@ -285,7 +285,7 @@ class ShuSupport
             'user_id' => $actor->id,
             'tanggal_transaksi' => now(),
         ]);
-        DB::table('kas')->insert([
+        DB::table('kas')->insert(\App\Support\CashEntry::attributes([
             'transaksi_id' => $txId,
             'jenis' => 'keluar',
             'jumlah' => $amount,
@@ -293,7 +293,7 @@ class ShuSupport
             'saldo_sesudah' => $before - $amount,
             'keterangan' => $description,
             'tanggal' => now(),
-        ]);
+        ], \App\Support\CashEntry::SHU));
         $this->cashLedger->recalculateLocked();
 
         return $txId;
@@ -317,7 +317,7 @@ class ShuSupport
             'user_id' => $actor->id,
             'tanggal_transaksi' => now(),
         ]);
-        DB::table('kas')->insert([
+        DB::table('kas')->insert(\App\Support\CashEntry::attributes([
             'transaksi_id' => $txId,
             'jenis' => 'masuk',
             'jumlah' => $amount,
@@ -325,7 +325,7 @@ class ShuSupport
             'saldo_sesudah' => $before + $amount,
             'keterangan' => $description,
             'tanggal' => now(),
-        ]);
+        ], \App\Support\CashEntry::SHU));
         $this->cashLedger->recalculateLocked();
 
         return $txId;

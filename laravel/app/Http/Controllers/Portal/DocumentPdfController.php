@@ -222,8 +222,9 @@ class DocumentPdfController extends Controller
     public function report(Request $request, string $role): SymfonyResponse
     {
         $this->authorize('view-operational-reports');
+        // Mirror ReportController::TELLER_TYPES / native permissions.php (teller: no pinjaman/angsuran).
         $allowed = $role === 'teller'
-            ? ['harian', 'simpanan', 'angsuran', 'pinjaman', 'waserda', 'denda']
+            ? ['harian', 'simpanan', 'lunas', 'denda', 'waserda']
             : ['simpanan', 'kas', 'anggota', 'waserda', 'denda', 'pinjaman', 'angsuran', 'lunas', 'harian', 'transaksi'];
         $jenis = (string) $request->query('jenis', $role === 'teller' ? 'harian' : 'simpanan');
         abort_unless(in_array($jenis, $allowed, true), 404);

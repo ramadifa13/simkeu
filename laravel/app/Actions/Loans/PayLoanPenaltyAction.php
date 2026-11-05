@@ -4,6 +4,7 @@ namespace App\Actions\Loans;
 
 use App\Actions\Cash\RecalculateCashLedgerAction;
 use App\Models\User;
+use App\Support\CashEntry;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -38,7 +39,15 @@ class PayLoanPenaltyAction
 
             DB::table('kas')->orderByDesc('id')->limit(1)->lockForUpdate()->get();
             $before = (float) DB::table('kas')->selectRaw("COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0) as saldo")->value('saldo');
-            $cashId = DB::table('kas')->insertGetId(['transaksi_id' => $installmentId, 'jenis' => 'masuk', 'jumlah' => $amount, 'saldo_sebelum' => $before, 'saldo_sesudah' => $before + $amount, 'keterangan' => 'Pembayaran denda angsuran ke-'.$installment->angsuran_ke.' '.$loan->kode_pinjaman, 'tanggal' => $paymentDate.' '.now()->format('H:i:s')]);
+            $cashId = DB::table('kas')->insertGetId(CashEntry::attributes([
+                'transaksi_id' => $installmentId,
+                'jenis' => 'masuk',
+                'jumlah' => $amount,
+                'saldo_sebelum' => $before,
+                'saldo_sesudah' => $before + $amount,
+                'keterangan' => 'Pembayaran denda angsuran ke-'.$installment->angsuran_ke.' '.$loan->kode_pinjaman,
+                'tanggal' => $paymentDate.' '.now()->format('H:i:s'),
+            ], CashEntry::ANGSURAN_DENDA));
             $payment = [
                 'angsuran_id' => $installmentId,
                 'pinjaman_id' => $loan->id,

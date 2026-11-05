@@ -34,7 +34,7 @@ class SecurityHeaders
             ? ' http://localhost:5173 http://127.0.0.1:5173 ws://localhost:5173 ws://127.0.0.1:5173'
             : '';
 
-        return implode('; ', [
+        $directives = [
             "default-src 'self'",
             "base-uri 'self'",
             "form-action 'self'",
@@ -43,8 +43,15 @@ class SecurityHeaders
             "img-src 'self' data: blob:",
             "font-src 'self' data:",
             "style-src 'self' 'unsafe-inline'{$vite}",
+            // Livewire/Flux still need inline + eval; tighten when assets are nonced.
             "script-src 'self' 'unsafe-inline' 'unsafe-eval'{$vite}",
             "connect-src 'self'{$vite}",
-        ]);
+        ];
+
+        if (! app()->environment('local')) {
+            $directives[] = 'upgrade-insecure-requests';
+        }
+
+        return implode('; ', $directives);
     }
 }

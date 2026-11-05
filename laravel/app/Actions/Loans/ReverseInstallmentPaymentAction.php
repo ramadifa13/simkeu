@@ -4,6 +4,7 @@ namespace App\Actions\Loans;
 
 use App\Actions\Cash\RecalculateCashLedgerAction;
 use App\Models\User;
+use App\Support\CashEntry;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -40,13 +41,37 @@ class ReverseInstallmentPaymentAction
             if (Schema::hasTable('layanan_pembayaran') && ! $payment) {
                 throw new DomainException('Catatan pembayaran tidak ditemukan atau sudah dibatalkan.');
             }
-            $cash = DB::table('kas')->where('transaksi_id', $installmentId)->where('jenis', 'masuk')->orderByDesc('id')->lockForUpdate()->first();
+            // Prefer ref_type; fall back to keterangan (legacy rows / shared transaksi_id space).
+            $cashQuery = DB::table('kas')->where('transaksi_id', $installmentId)->where('jenis', 'masuk');
+            if (Schema::hasColumn('kas', 'ref_type')) {
+                $cashQuery->where(function ($query): void {
+                    $query->where('ref_type', CashEntry::ANGSURAN)->orWhereNull('ref_type');
+                });
+            }
+            $cash = $cashQuery
+                ->where(function ($query) use ($installment, $loan): void {
+                    $query->where('keterangan', 'like', 'Pembayaran angsuran ke-'.$installment->angsuran_ke.' '.$loan->kode_pinjaman.'%')
+                        ->orWhere('keterangan', 'like', 'Pembayaran angsuran%')
+                        ->orWhere('keterangan', 'Pembayaran');
+                })
+                ->where('keterangan', 'not like', 'Pembayaran denda%')
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
             if (! $cash) {
                 throw new DomainException('Mutasi kas pembayaran tidak ditemukan.');
             }
             DB::table('kas')->orderByDesc('id')->limit(1)->lockForUpdate()->get();
             $before = (float) DB::table('kas')->selectRaw("COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0) as saldo")->value('saldo');
-            DB::table('kas')->insert(['transaksi_id' => $installmentId, 'jenis' => 'keluar', 'jumlah' => $cash->jumlah, 'saldo_sebelum' => $before, 'saldo_sesudah' => $before - (float) $cash->jumlah, 'keterangan' => 'Pembatalan angsuran ke-'.$installment->angsuran_ke.' '.$loan->kode_pinjaman.' — '.$reason, 'tanggal' => now()]);
+            DB::table('kas')->insert(CashEntry::attributes([
+                'transaksi_id' => $installmentId,
+                'jenis' => 'keluar',
+                'jumlah' => $cash->jumlah,
+                'saldo_sebelum' => $before,
+                'saldo_sesudah' => $before - (float) $cash->jumlah,
+                'keterangan' => 'Pembatalan angsuran ke-'.$installment->angsuran_ke.' '.$loan->kode_pinjaman.' — '.$reason,
+                'tanggal' => now(),
+            ], CashEntry::ANGSURAN_REVERSAL));
             if ($payment) {
                 DB::table('layanan_pembayaran')->where('id', $payment->id)->update(['dibatalkan_at' => now()]);
             }

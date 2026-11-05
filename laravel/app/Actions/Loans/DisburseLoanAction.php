@@ -4,6 +4,7 @@ namespace App\Actions\Loans;
 
 use App\Actions\Cash\RecalculateCashLedgerAction;
 use App\Models\User;
+use App\Support\CashEntry;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -155,8 +156,12 @@ class DisburseLoanAction
             }
             DB::table('jaminan_pinjaman')->where('pengajuan_id', $applicationId)->update($collateralUpdate);
 
+            DB::table('kas')->orderByDesc('id')->limit(1)->lockForUpdate()->get();
             $cashBefore = (float) DB::table('kas')->selectRaw("COALESCE(SUM(CASE WHEN jenis = 'masuk' THEN jumlah ELSE -jumlah END),0) AS saldo")->value('saldo');
-            DB::table('kas')->insert([
+            if ($calculation['pokok'] - $cashBefore > 0.005) {
+                throw new DomainException('Saldo kas tidak cukup untuk pencairan.');
+            }
+            DB::table('kas')->insert(CashEntry::attributes([
                 'transaksi_id' => $loanId,
                 'jenis' => 'keluar',
                 'jumlah' => $calculation['pokok'],
@@ -164,7 +169,7 @@ class DisburseLoanAction
                 'saldo_sesudah' => $cashBefore - $calculation['pokok'],
                 'keterangan' => 'Pencairan pinjaman '.$code,
                 'tanggal' => $disbursementDate.' '.now()->format('H:i:s'),
-            ]);
+            ], CashEntry::PINJAMAN_CAIR));
             DB::table('pengajuan_pinjaman')->where('id', $applicationId)->update(['status' => 'dicairkan']);
 
             if (Schema::hasTable('perjanjian_pinjaman') && $agreement !== []) {

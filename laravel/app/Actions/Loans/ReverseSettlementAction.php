@@ -29,7 +29,13 @@ class ReverseSettlementAction
             if (! $payment) {
                 throw new DomainException('Catatan pelunasan aktif tidak ditemukan.');
             }
-            $cash = DB::table('kas')->where('transaksi_id', $loanId)->where('jenis', 'masuk')->where('keterangan', 'like', 'Pelunasan%')->lockForUpdate()->latest('id')->first();
+            $cashQuery = DB::table('kas')->where('transaksi_id', $loanId)->where('jenis', 'masuk')->where('keterangan', 'like', 'Pelunasan%');
+            if (Schema::hasColumn('kas', 'ref_type')) {
+                $cashQuery->where(function ($query): void {
+                    $query->where('ref_type', \App\Support\CashEntry::PINJAMAN_LUNAS)->orWhereNull('ref_type');
+                });
+            }
+            $cash = $cashQuery->lockForUpdate()->latest('id')->first();
             if (! $cash) {
                 throw new DomainException('Mutasi kas pelunasan tidak ditemukan.');
             }
@@ -39,7 +45,15 @@ class ReverseSettlementAction
             }
             DB::table('kas')->orderByDesc('id')->limit(1)->lockForUpdate()->get();
             $before = (float) DB::table('kas')->selectRaw("COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0) as saldo")->value('saldo');
-            DB::table('kas')->insert(['transaksi_id' => $loanId, 'jenis' => 'keluar', 'jumlah' => $cash->jumlah, 'saldo_sebelum' => $before, 'saldo_sesudah' => $before - (float) $cash->jumlah, 'keterangan' => 'Reversal pelunasan '.$loan->kode_pinjaman.' — '.$reason, 'tanggal' => now()]);
+            DB::table('kas')->insert(\App\Support\CashEntry::attributes([
+                'transaksi_id' => $loanId,
+                'jenis' => 'keluar',
+                'jumlah' => $cash->jumlah,
+                'saldo_sebelum' => $before,
+                'saldo_sesudah' => $before - (float) $cash->jumlah,
+                'keterangan' => 'Reversal pelunasan '.$loan->kode_pinjaman.' — '.$reason,
+                'tanggal' => now(),
+            ], \App\Support\CashEntry::PINJAMAN_LUNAS_REVERSAL));
             DB::table('layanan_pembayaran')->where('id', $payment->id)->update(['dibatalkan_at' => now()]);
             foreach ($rows as $row) {
                 DB::table('angsuran')->where('id', $row->id)->update(['status' => 'belum_bayar', 'tanggal_bayar' => null, 'cara_bayar' => 'cicilan', 'denda' => 0, 'keterlambatan_hari' => 0]);

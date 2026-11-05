@@ -15,7 +15,10 @@ class BrandLogoController extends Controller
         $path = (string) (DB::table('koperasi')->orderBy('id')->value('logo') ?? '');
 
         abort_unless(
-            Str::startsWith($path, 'koperasi/') && Storage::disk('local')->exists($path),
+            $path !== ''
+            && ! str_contains($path, '..')
+            && Str::startsWith($path, 'koperasi/')
+            && Storage::disk('local')->exists($path),
             404,
         );
 

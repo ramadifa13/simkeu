@@ -5,10 +5,14 @@ namespace App\Actions\Loans;
 use App\Models\User;
 use DomainException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class CheckoutInstallmentCartAction
 {
-    public function __construct(private readonly PayInstallmentAction $pay) {}
+    public function __construct(
+        private readonly PayInstallmentAction $pay,
+        private readonly RefreshLoanPenaltiesAction $refreshPenalties,
+    ) {}
 
     /**
      * @param  list<array{installment_id:int,tanggal_bayar:string,metode:string,denda?:float|null}>  $items
@@ -32,6 +36,11 @@ class CheckoutInstallmentCartAction
 
                 if ($id <= 0 || $date === '' || $method === '') {
                     throw new DomainException('Data pembayaran keranjang tidak lengkap.');
+                }
+
+                $loanId = (int) DB::table('angsuran')->where('id', $id)->value('pinjaman_id');
+                if ($loanId > 0 && Schema::hasTable('jenis_pinjaman')) {
+                    $this->refreshPenalties->handle($loanId, $date);
                 }
 
                 $results[] = $this->pay->handle($id, $date, $method, $actor, $penalty);

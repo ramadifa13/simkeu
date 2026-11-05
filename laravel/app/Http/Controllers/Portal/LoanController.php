@@ -6,6 +6,7 @@ use App\Actions\Audit\RecordActivity;
 use App\Actions\Loans\CompleteDisbursementPhotosAction;
 use App\Actions\Loans\MarkInstallmentReversalSeenAction;
 use App\Actions\Loans\RefreshLoanPenaltiesAction;
+use App\Actions\Members\ResolveMemberDisbursementPhoto;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Portal\Concerns\InteractsWithLoans;
 use App\Http\Requests\CompleteDisbursementPhotosRequest;
@@ -56,10 +57,29 @@ class LoanController extends Controller
             $query->where('pp.hari_angsuran', $filters['hari']);
         }
 
+        $loans = $query->orderByDesc('p.tanggal_pencairan')->paginate(10)->withQueryString();
+        $photos = app(ResolveMemberDisbursementPhoto::class)->map(
+            $loans->getCollection()->pluck('anggota_id')->map(fn ($id) => (int) $id)->all()
+        );
+        $loans->getCollection()->transform(function (object $loan) use ($photos, $role): object {
+            $path = $photos[(int) $loan->anggota_id] ?? null;
+            if (! $path || ! str_starts_with($path, 'pencairan/') || ! Storage::disk('local')->exists($path)) {
+                $loan->avatar_url = null;
+
+                return $loan;
+            }
+
+            $loan->avatar_url = $role === 'anggota'
+                ? route('profile.photo').'?v='.md5($path)
+                : route('portal.members.avatar', ['role' => $role, 'member' => $loan->anggota_id]).'?v='.md5($path);
+
+            return $loan;
+        });
+
         return view('portal.loans.index', [
             'role' => $role,
             'filters' => $filters,
-            'loans' => $query->orderByDesc('p.tanggal_pencairan')->paginate(10)->withQueryString(),
+            'loans' => $loans,
         ]);
     }
 

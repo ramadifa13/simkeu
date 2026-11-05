@@ -1,13 +1,14 @@
 # Checklist UAT & cutover SIMKEU Laravel
 
-Gunakan sebelum mematikan write di PHP native.
+Gunakan sebelum mematikan write di PHP native. Setup lokal dulu: lihat [README.md](../README.md).
 
 ## 1. Persiapan environment
 
 - [ ] `NATIVE_REFERENCE_DATABASE` mengarah ke DB native **read-only clone** (bukan DB produksi Laravel)
 - [ ] `QUEUE_CONNECTION=database` (atau `redis`) di produksi; jalankan `php artisan queue:work`
-- [ ] Migrasi Laravel tambahan sudah jalan: `jobs`, `failed_jobs`, `job_batches`, `activity_logs`, `remember_token`, index hot-path
+- [ ] Migrasi Laravel tambahan sudah jalan: `jobs`, `failed_jobs`, `job_batches`, `activity_logs`, `remember_token`, index hot-path, `kas.ref_type`
 - [ ] Schedule aktif: `php artisan schedule:work` / cron `* * * * * php artisan schedule:run`
+- [ ] `php artisan queue:work` berjalan (WA H-1 + `loans:refresh-penalties` antrean)
 - [ ] Reset kata sandi publik **tetap ditutup** (parity native: hanya Admin/Teller yang mereset). Jangan aktifkan `/lupa-kata-sandi` tanpa keputusan produk.
 
 ## 2. Gate otomatis angka
@@ -15,7 +16,7 @@ Gunakan sebelum mematikan write di PHP native.
 ```bash
 php artisan simkeu:uat-gate
 php artisan phase7:loan-parity
-# UI admin: /admin/laporan/validasi-data
+# UI admin: /portal/admin/laporan/validasi-data
 ```
 
 - [ ] Gate lulus tanpa error
@@ -30,7 +31,8 @@ php artisan phase7:loan-parity
 - [ ] Pelunasan + (opsional) pengembalian jaminan
 - [ ] Layanan: macet / TC / prioritas sample
 - [ ] SHU hitung + bayar sample kecil
-- [ ] Laporan teller: harian/simpanan/lunas/denda saja (bukan pinjaman/angsuran)
+- [ ] Laporan teller (UI + PDF): harian/simpanan/lunas/denda/waserda saja (bukan pinjaman/angsuran)
+- [ ] Avatar anggota = foto pencairan (sidebar, daftar anggota, daftar pinjaman)
 - [ ] WA H-1 dry-run (token sandbox) + cek `wa_pengingat_log`
 
 ## 4. Cutover
@@ -48,5 +50,6 @@ php artisan phase7:loan-parity
 | `phase7:uat-check` | Gate pinjaman saja |
 | `phase7:loan-parity` | Cetak ringkasan parity pinjaman |
 | `phase6:repair-parity --apply` | Koreksi known mismatch (hati-hati) |
-| `loans:refresh-penalties` | Hitung ulang denda |
+| `loans:refresh-penalties` | Antrekan refresh denda (butuh `queue:work`) |
+| `loans:refresh-penalties --sync` | Refresh denda langsung tanpa antrean |
 | `wa:remind-due` | Kirim pengingat H-1 |

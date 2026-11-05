@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Portal;
 use App\Actions\Audit\RecordActivity;
 use App\Actions\Savings\CreateSavingsTransactionAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreSavingsTransactionRequest;
 use App\Models\Anggota;
 use App\Models\JenisSimpanan;
 use App\Models\Transaksi;
@@ -112,26 +113,19 @@ class SavingsController extends Controller
         return $this->bookView($request, $role, $member, true);
     }
 
-    public function deposit(Request $request, string $role, CreateSavingsTransactionAction $create, RecordActivity $audit): RedirectResponse
+    public function deposit(StoreSavingsTransactionRequest $request, string $role, CreateSavingsTransactionAction $create, RecordActivity $audit): RedirectResponse
     {
         return $this->store($request, $role, 'setoran', $create, $audit);
     }
 
-    public function withdraw(Request $request, string $role, CreateSavingsTransactionAction $create, RecordActivity $audit): RedirectResponse
+    public function withdraw(StoreSavingsTransactionRequest $request, string $role, CreateSavingsTransactionAction $create, RecordActivity $audit): RedirectResponse
     {
         return $this->store($request, $role, 'penarikan', $create, $audit);
     }
 
-    private function store(Request $request, string $role, string $kind, CreateSavingsTransactionAction $create, RecordActivity $audit): RedirectResponse
+    private function store(StoreSavingsTransactionRequest $request, string $role, string $kind, CreateSavingsTransactionAction $create, RecordActivity $audit): RedirectResponse
     {
-        $this->authorize('manage-savings');
-
-        $data = $request->validate([
-            'anggota_id' => ['required', 'integer', Rule::exists('anggota', 'id')],
-            'jenis_simpanan_id' => ['required', 'integer', Rule::exists('jenis_simpanan', 'id')],
-            'jumlah' => ['required', 'numeric', 'gt:0', 'max:999999999999'],
-            'keterangan' => ['nullable', 'string', 'max:255'],
-        ]);
+        $data = $request->validated();
 
         try {
             $transaction = $create->handle($kind, $data, $request->user());

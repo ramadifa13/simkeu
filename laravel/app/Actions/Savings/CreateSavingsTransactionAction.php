@@ -68,6 +68,9 @@ class CreateSavingsTransactionAction
 
             $balanceAfter = $kind === 'setoran' ? $balanceBefore + $amount : $balanceBefore - $amount;
             $cashBefore = (float) DB::table('kas')->selectRaw("COALESCE(SUM(CASE WHEN jenis = 'masuk' THEN jumlah ELSE -jumlah END), 0) AS saldo")->value('saldo');
+            if ($kind === 'penarikan' && $amount - $cashBefore > 0.005) {
+                throw new DomainException('Saldo kas tidak cukup untuk penarikan.');
+            }
             $cashAfter = $kind === 'setoran' ? $cashBefore + $amount : $cashBefore - $amount;
 
             $transaction = Transaksi::query()->create([
@@ -92,14 +95,14 @@ class CreateSavingsTransactionAction
                 ]);
             }
 
-            DB::table('kas')->insert([
+            DB::table('kas')->insert(\App\Support\CashEntry::attributes([
                 'transaksi_id' => $transaction->id,
                 'jenis' => $kind === 'setoran' ? 'masuk' : 'keluar',
                 'jumlah' => $amount,
                 'saldo_sebelum' => $cashBefore,
                 'saldo_sesudah' => $cashAfter,
                 'keterangan' => $transaction->keterangan ?: ucfirst($kind).' simpanan '.$member->kode_anggota,
-            ]);
+            ], \App\Support\CashEntry::TRANSAKSI));
 
             return $transaction;
         }, 3);

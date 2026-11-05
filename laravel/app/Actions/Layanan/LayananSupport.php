@@ -69,7 +69,7 @@ class LayananSupport
         DB::table('kas')->orderByDesc('id')->limit(1)->lockForUpdate()->get();
         $before = (float) DB::table('kas')->selectRaw("COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0) as saldo")->value('saldo');
 
-        return DB::table('kas')->insertGetId([
+        return DB::table('kas')->insertGetId(\App\Support\CashEntry::attributes([
             'transaksi_id' => $referenceId,
             'jenis' => 'masuk',
             'jumlah' => $amount,
@@ -77,7 +77,7 @@ class LayananSupport
             'saldo_sesudah' => $before + $amount,
             'keterangan' => $note,
             'tanggal' => now(),
-        ]);
+        ], \App\Support\CashEntry::LAYANAN));
     }
 
     public function cashOut(int $memberId, float $amount, string $note, User $actor): int
@@ -114,7 +114,7 @@ class LayananSupport
             'tanggal_transaksi' => now(),
         ]);
 
-        DB::table('kas')->insert([
+        DB::table('kas')->insert(\App\Support\CashEntry::attributes([
             'transaksi_id' => $txId,
             'jenis' => 'keluar',
             'jumlah' => $amount,
@@ -122,7 +122,7 @@ class LayananSupport
             'saldo_sesudah' => $before - $amount,
             'keterangan' => $note,
             'tanggal' => now(),
-        ]);
+        ], \App\Support\CashEntry::LAYANAN));
         $this->cashLedger->recalculateLocked();
 
         return $txId;

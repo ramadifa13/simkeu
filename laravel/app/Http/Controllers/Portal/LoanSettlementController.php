@@ -9,13 +9,14 @@ use App\Actions\Loans\ReviewEarlySettlementAction;
 use App\Actions\Loans\SettleLoanAction;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Portal\Concerns\InteractsWithLoans;
+use App\Http\Requests\RequestSettlementRequest;
+use App\Http\Requests\ReviewSettlementRequest;
+use App\Http\Requests\ReverseSettlementRequest;
 use App\Http\Requests\SettleLoanRequest;
 use App\Support\ImageStorage;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class LoanSettlementController extends Controller
@@ -63,11 +64,10 @@ class LoanSettlementController extends Controller
         return redirect()->route('portal.loans.show', ['role' => $role, 'loan' => $loan])->with('status', 'Pelunasan berhasil dicatat'.($takeCollateral ? ' dan jaminan diserahkan.' : '.'));
     }
 
-    public function requestSettlement(Request $request, string $role, int $loan, RequestEarlySettlementAction $requestSettlement, RecordActivity $audit): RedirectResponse
+    public function requestSettlement(RequestSettlementRequest $request, string $role, int $loan, RequestEarlySettlementAction $requestSettlement, RecordActivity $audit): RedirectResponse
     {
-        $this->authorize('collect-installments');
         $this->loanForRole($request, $role, $loan);
-        $data = $request->validate(['catatan' => ['nullable', 'string', 'max:1000']]);
+        $data = $request->validated();
         try {
             $requestSettlement->handle($loan, $request->user(), $data['catatan'] ?? '');
         } catch (DomainException $e) {
@@ -78,11 +78,10 @@ class LoanSettlementController extends Controller
         return back()->with('status', 'Pengajuan pelunasan dipercepat dikirim ke Admin.');
     }
 
-    public function reviewSettlement(Request $request, string $role, int $loan, ReviewEarlySettlementAction $review, RecordActivity $audit): RedirectResponse
+    public function reviewSettlement(ReviewSettlementRequest $request, string $role, int $loan, ReviewEarlySettlementAction $review, RecordActivity $audit): RedirectResponse
     {
-        $this->authorize('review-loan-applications');
         $this->loanForRole($request, $role, $loan);
-        $data = $request->validate(['decision' => ['required', Rule::in(['disetujui', 'ditolak'])], 'diskon' => ['nullable', 'numeric', 'min:0', 'max:100'], 'catatan' => ['nullable', 'string', 'max:1000']]);
+        $data = $request->validated();
         try {
             $review->handle($loan, $data['decision'], (float) ($data['diskon'] ?? 0), $request->user(), $data['catatan'] ?? '');
         } catch (DomainException $e) {
@@ -93,11 +92,10 @@ class LoanSettlementController extends Controller
         return back()->with('status', 'Pengajuan pelunasan '.($data['decision'] === 'disetujui' ? 'disetujui' : 'ditolak').'.');
     }
 
-    public function reverseSettlement(Request $request, string $role, int $loan, ReverseSettlementAction $reverse, RecordActivity $audit): RedirectResponse
+    public function reverseSettlement(ReverseSettlementRequest $request, string $role, int $loan, ReverseSettlementAction $reverse, RecordActivity $audit): RedirectResponse
     {
-        $this->authorize('review-loan-applications');
         $this->loanForRole($request, $role, $loan);
-        $data = $request->validate(['alasan' => ['required', 'string', 'min:5', 'max:250']]);
+        $data = $request->validated();
         try {
             $amount = $reverse->handle($loan, $request->user(), $data['alasan']);
         } catch (DomainException $e) {

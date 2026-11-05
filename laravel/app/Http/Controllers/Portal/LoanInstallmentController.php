@@ -12,12 +12,14 @@ use App\Actions\Loans\ReviewInstallmentReversalRequestAction;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Portal\Concerns\InteractsWithLoans;
 use App\Http\Requests\PayInstallmentRequest;
+use App\Http\Requests\PayLoanPenaltyRequest;
+use App\Http\Requests\RequestInstallmentReversalRequest;
+use App\Http\Requests\ReverseInstallmentRequest;
+use App\Http\Requests\ReviewInstallmentReversalRequest;
 use App\Support\ImageStorage;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class LoanInstallmentController extends Controller
@@ -52,14 +54,14 @@ class LoanInstallmentController extends Controller
             ->with('status', 'Pembayaran angsuran berhasil dicatat.');
     }
 
-    public function payPenalty(Request $request, string $role, int $loan, int $installment, RefreshLoanPenaltiesAction $refresh, PayLoanPenaltyAction $pay, RecordActivity $audit, ImageStorage $images): RedirectResponse
+    public function payPenalty(PayLoanPenaltyRequest $request, string $role, int $loan, int $installment, RefreshLoanPenaltiesAction $refresh, PayLoanPenaltyAction $pay, RecordActivity $audit, ImageStorage $images): RedirectResponse
     {
-        $this->authorize('collect-installments');
         $this->loanForRole($request, $role, $loan);
         $row = DB::table('angsuran')->where('id', $installment)->where('pinjaman_id', $loan)->first();
         abort_unless($row, 404);
-        $data = $request->validate(['tanggal_bayar' => ['required', 'date', 'before_or_equal:today'], 'metode' => ['required', Rule::in(['cash', 'transfer'])], 'jumlah' => ['required', 'numeric', 'gt:0'], 'bukti' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240']]);
+        $data = $request->validated();
         $refresh->handle($loan, $data['tanggal_bayar']);
+        $this->assertInstallmentMonthOpen($data['tanggal_bayar']);
         try {
             $proof = $images->store($request->file('bukti'), 'pembayaran');
             $result = $pay->handle($installment, (float) $data['jumlah'], $data['metode'], $data['tanggal_bayar'], $request->user(), $proof);
@@ -71,11 +73,10 @@ class LoanInstallmentController extends Controller
         return back()->with('status', 'Pembayaran denda berhasil dicatat. Sisa denda: Rp '.number_format($result['remaining'], 0, ',', '.').'.');
     }
 
-    public function reverseInstallment(Request $request, string $role, int $loan, int $installment, ReverseInstallmentPaymentAction $reverse, RecordActivity $audit): RedirectResponse
+    public function reverseInstallment(ReverseInstallmentRequest $request, string $role, int $loan, int $installment, ReverseInstallmentPaymentAction $reverse, RecordActivity $audit): RedirectResponse
     {
-        $this->authorize('reverse-installment-payment');
         $this->loanForRole($request, $role, $loan);
-        $data = $request->validate(['alasan' => ['required', 'string', 'min:5', 'max:250']]);
+        $data = $request->validated();
         $installmentRow = DB::table('angsuran')->where('id', $installment)->where('pinjaman_id', $loan)->first(['tanggal_bayar']);
         abort_unless($installmentRow, 404);
         if ($installmentRow->tanggal_bayar) {
@@ -91,11 +92,10 @@ class LoanInstallmentController extends Controller
         return back()->with('status', 'Pembayaran angsuran dibatalkan melalui mutasi pembalik.');
     }
 
-    public function requestInstallmentReversal(Request $request, string $role, int $loan, int $installment, RequestInstallmentReversalAction $reversal, RecordActivity $audit): RedirectResponse
+    public function requestInstallmentReversal(RequestInstallmentReversalRequest $request, string $role, int $loan, int $installment, RequestInstallmentReversalAction $reversal, RecordActivity $audit): RedirectResponse
     {
-        $this->authorize('request-installment-reversal');
         $this->loanForRole($request, $role, $loan);
-        $data = $request->validate(['alasan' => ['required', 'string', 'min:5', 'max:250']]);
+        $data = $request->validated();
         try {
             $reversal->handle($loan, $installment, $request->user(), $data['alasan']);
         } catch (DomainException $e) {
@@ -106,11 +106,10 @@ class LoanInstallmentController extends Controller
         return back()->with('status', 'Pengajuan pembatalan dikirim dan menunggu keputusan Admin.');
     }
 
-    public function reviewInstallmentReversalRequest(Request $request, string $role, int $loan, int $reversalRequest, ReviewInstallmentReversalRequestAction $review, RecordActivity $audit): RedirectResponse
+    public function reviewInstallmentReversalRequest(ReviewInstallmentReversalRequest $request, string $role, int $loan, int $reversalRequest, ReviewInstallmentReversalRequestAction $review, RecordActivity $audit): RedirectResponse
     {
-        $this->authorize('decide-installment-reversal');
         $this->loanForRole($request, $role, $loan);
-        $data = $request->validate(['decision' => ['required', Rule::in(['disetujui', 'ditolak'])], 'catatan' => ['nullable', 'string', 'max:500']]);
+        $data = $request->validated();
         if ($data['decision'] === 'disetujui') {
             $paidAt = DB::table('pengajuan_pembatalan_angsuran as r')->join('angsuran as a', 'a.id', '=', 'r.angsuran_id')->where('r.id', $reversalRequest)->where('a.pinjaman_id', $loan)->value('a.tanggal_bayar');
             if ($paidAt) {

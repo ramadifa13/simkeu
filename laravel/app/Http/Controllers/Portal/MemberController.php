@@ -153,7 +153,13 @@ class MemberController extends Controller
         abort_unless(in_array($document, ['foto_ktp', 'foto_kk', 'foto_ktp_pasangan'], true), 404);
 
         $path = (string) $member->{$document};
-        abort_unless(str_starts_with($path, "anggota/{$member->id}/") && Storage::disk('local')->exists($path), 404);
+        abort_unless(
+            $path !== ''
+            && ! str_contains($path, '..')
+            && str_starts_with($path, "anggota/{$member->id}/")
+            && Storage::disk('local')->exists($path),
+            404
+        );
 
         return Storage::disk('local')->response($path, basename($path), [
             'Content-Disposition' => 'inline; filename="'.basename($path).'"',
@@ -169,6 +175,7 @@ class MemberController extends Controller
             is_string($path)
             && $path !== ''
             && ! str_contains($path, '..')
+            && str_starts_with($path, 'pencairan/')
             && Storage::disk('local')->exists($path),
             404
         );

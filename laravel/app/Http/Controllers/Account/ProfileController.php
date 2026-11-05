@@ -88,6 +88,7 @@ class ProfileController extends Controller
                 is_string($path)
                 && $path !== ''
                 && ! str_contains($path, '..')
+                && str_starts_with($path, 'pencairan/')
                 && Storage::disk('local')->exists($path),
                 404
             );
@@ -101,6 +102,7 @@ class ProfileController extends Controller
         $path = (string) ($user->foto_profil ?? '');
         abort_unless(
             $path !== ''
+            && ! str_contains($path, '..')
             && str_starts_with($path, 'users/'.$user->id.'/')
             && Storage::disk('local')->exists($path),
             404

@@ -19,7 +19,16 @@
             @forelse ($loans as $loan)
                 <tr>
                     <td class="px-5 py-3 font-mono text-xs">{{ $loan->kode_pinjaman }}</td>
-                    <td class="px-5 py-3"><span class="font-semibold">{{ $loan->nama_lengkap }}</span><span class="block text-xs text-slate-500">{{ $loan->kode_anggota }}</span></td>
+                    <td class="px-5 py-3">
+                        <div class="flex items-center gap-3">
+                            @if ($loan->avatar_url ?? null)
+                                <img src="{{ $loan->avatar_url }}" alt="" class="size-9 shrink-0 rounded-full object-cover ring-1 ring-slate-200" />
+                            @else
+                                <span class="grid size-9 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{{ mb_substr($loan->nama_lengkap, 0, 1) }}</span>
+                            @endif
+                            <div class="min-w-0"><span class="font-semibold">{{ $loan->nama_lengkap }}</span><span class="block text-xs text-slate-500">{{ $loan->kode_anggota }}</span></div>
+                        </div>
+                    </td>
                     <td class="hidden px-5 py-3 md:table-cell">{{ $loan->nama_jenis }}<span class="block text-xs text-slate-500">{{ $loan->tenor }} bulan · {{ str_replace('_', ' ', $loan->frekuensi) }}</span></td>
                     <td class="hidden px-5 py-3 font-semibold md:table-cell"><x-money :amount="$loan->sisa_pokok" /></td>
                     <td class="px-5 py-3"><x-status-badge :status="$loan->status" /></td>
