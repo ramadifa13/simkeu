@@ -26,7 +26,7 @@
                     </flux:field>
                 </div>
             </x-form-section>
-            <x-form-section number="2" title="Dokumentasi pencairan" description="JPG, PNG, atau WebP; maksimal 1 MB per gambar. Disimpan privat.">
+            <x-form-section number="2" title="Dokumentasi pencairan" description="Foto kamera sampai 40 MB boleh. Hasil simpan maksimal 1 MB dan tetap privat.">
                 <x-loans.disbursement-photos-fields
                     :requires-collateral="(bool) $application->memerlukan_jaminan"
                     :collateral-optional="false"

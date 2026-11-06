@@ -10,6 +10,8 @@ class ImageStorage
 {
     public function store(UploadedFile $file, string $directory): string
     {
+        $this->raiseMemoryForDecode();
+
         // Logo koperasi: jangan ubah PNG/WebP kecil agar alpha tetap utuh.
         if ($this->shouldKeepOriginal($file, $directory)) {
             $extension = $file->getMimeType() === 'image/png' ? 'png' : 'webp';
@@ -49,7 +51,7 @@ class ImageStorage
                 }
                 $contents = ob_get_clean();
 
-                if ($contents !== false && strlen($contents) <= 1024 * 1024) {
+                if ($contents !== false && strlen($contents) <= ImageLimits::STORED_MAX_BYTES) {
                     imagedestroy($target);
                     imagedestroy($source);
                     $path = $directory.'/'.bin2hex(random_bytes(20)).($asPng ? '.png' : '.webp');
@@ -76,7 +78,28 @@ class ImageStorage
 
         return in_array($file->getMimeType(), ['image/png', 'image/webp'], true)
             && (int) $file->getSize() > 0
-            && (int) $file->getSize() <= 1024 * 1024;
+            && (int) $file->getSize() <= ImageLimits::STORED_MAX_BYTES;
+    }
+
+    private function raiseMemoryForDecode(): void
+    {
+        $current = trim((string) ini_get('memory_limit'));
+        if ($current === '-1' || $current === '') {
+            return;
+        }
+
+        $unit = strtolower(substr($current, -1));
+        $number = (int) $current;
+        $bytes = match ($unit) {
+            'g' => $number * 1024 * 1024 * 1024,
+            'm' => $number * 1024 * 1024,
+            'k' => $number * 1024,
+            default => (int) $current,
+        };
+
+        if ($bytes < 2048 * 1024 * 1024) {
+            ini_set('memory_limit', '2048M');
+        }
     }
 
     /**

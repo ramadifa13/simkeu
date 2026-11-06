@@ -11,7 +11,7 @@ if (!defined('FOTO_HASIL_MAKS_BYTE')) {
 }
 if (!defined('FOTO_ASAL_MAKS_BYTE')) {
     // File asli dari kamera/galeri boleh lebih besar; akan dikompres sebelum disimpan.
-    define('FOTO_ASAL_MAKS_BYTE', 10 * 1024 * 1024);
+    define('FOTO_ASAL_MAKS_BYTE', 40 * 1024 * 1024);
 }
 
 if (!function_exists('pastikanDirektoriUpload')) {
@@ -95,7 +95,7 @@ if (!function_exists('validasiFotoUpload')) {
      */
     function validasiFotoUpload($field, $label, $maks_byte = null, $wajib = false) {
         // $maks_byte tetap ada untuk kompatibilitas pemanggil lama (diabaikan).
-        // Batas file asal = 10 MB; hasil simpan selalu ≤ 1 MB via kompresDanSimpanGambar().
+        // Batas file asal = 40 MB (foto kamera flagship); hasil simpan selalu ≤ 1 MB.
         $maks_asal = FOTO_ASAL_MAKS_BYTE;
         $file = isset($_FILES[$field]) ? $_FILES[$field] : null;
         if (!$file || $file['error'] === UPLOAD_ERR_NO_FILE) {
@@ -138,6 +138,15 @@ if (!function_exists('kompresDanSimpanGambar')) {
      * @return bool
      */
     function kompresDanSimpanGambar($sourcePath, &$destPath, $ext, $maxDimension = 1280, $quality = 82) {
+        $batasMemori = trim((string) ini_get('memory_limit'));
+        if ($batasMemori !== '-1' && $batasMemori !== '') {
+            $unit = strtolower(substr($batasMemori, -1));
+            $angka = (int) $batasMemori;
+            $byte = $unit === 'g' ? $angka * 1073741824 : ($unit === 'm' ? $angka * 1048576 : ($unit === 'k' ? $angka * 1024 : (int) $batasMemori));
+            if ($byte < 2048 * 1048576) {
+                @ini_set('memory_limit', '2048M');
+            }
+        }
         $batasByte = defined('FOTO_HASIL_MAKS_BYTE') ? FOTO_HASIL_MAKS_BYTE : (1024 * 1024);
         $parent = dirname($destPath);
         if ($parent !== '' && $parent !== '.' && $parent !== DIRECTORY_SEPARATOR) {

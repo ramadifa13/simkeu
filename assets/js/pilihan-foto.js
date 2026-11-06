@@ -22,7 +22,7 @@
         return true;
     }
 
-    function kompresSatuFoto(file) {
+    function kompresSatuFoto(file, input) {
         if (!file || !/^image\//i.test(file.type)) {
             return Promise.resolve(file);
         }
@@ -31,6 +31,9 @@
                 'Foto terlalu besar untuk diproses di perangkat (' + formatUkuran(file.size)
                 + '). Pilih foto di bawah 40 MB.'
             ));
+        }
+        if (input && input.name === 'logo') {
+            return Promise.resolve(file);
         }
         // Sudah ≤ 1 MB — tidak perlu dikompres lagi di browser.
         if (file.size <= BATAS_FOTO) {
@@ -51,7 +54,7 @@
                     var ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     canvas.toBlob(function (blob) {
-                        if (!blob) return reject(new Error('Browser tidak dapat memproses foto.'));
+                        if (!blob) return resolve(file);
                         if (blob.size <= TARGET_FOTO || (blob.size <= BATAS_FOTO && kualitas <= 0.45)) {
                             resolve(new File(
                                 [blob],
@@ -61,7 +64,7 @@
                             return;
                         }
                         if (blob.size > BATAS_FOTO && sisi <= 720 && kualitas <= 0.40) {
-                            return reject(new Error('Foto tidak dapat dikompres hingga maksimal 1 MB. Pilih foto lain.'));
+                            return resolve(file);
                         }
                         kualitas -= 0.08;
                         if (kualitas < 0.48 && sisi > 720) {
@@ -69,7 +72,7 @@
                             sisi = Math.max(720, Math.round(sisi * 0.75));
                         }
                         if (sisi <= 720 && kualitas <= 0.38) {
-                            return reject(new Error('Foto tidak dapat dikompres hingga maksimal 1 MB. Pilih foto lain.'));
+                            return resolve(file);
                         }
                         coba();
                     }, 'image/jpeg', Math.max(0.35, kualitas));
@@ -78,6 +81,10 @@
             };
             img.onerror = function () {
                 URL.revokeObjectURL(url);
+                if (file.size <= ASAL_MAKS_BYTE) {
+                    resolve(file);
+                    return;
+                }
                 reject(new Error('Foto tidak dapat dibaca.'));
             };
             img.src = url;
@@ -88,13 +95,7 @@
         if (!input || !input.files || !input.files.length) return;
         var files = [];
         for (var i = 0; i < input.files.length; i++) {
-            files.push(await kompresSatuFoto(input.files[i]));
-        }
-        // Tolak bila masih ada yang > 1 MB
-        for (var j = 0; j < files.length; j++) {
-            if (files[j] && /^image\//i.test(files[j].type) && files[j].size > BATAS_FOTO) {
-                throw new Error('Foto "' + (files[j].name || '') + '" masih melebihi 1 MB setelah dikompres.');
-            }
+            files.push(await kompresSatuFoto(input.files[i], input));
         }
         var changed = files.some(function (file, i) { return file !== input.files[i]; });
         if (changed) setInputFiles(input, files);

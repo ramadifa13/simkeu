@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Portal;
 
 use App\Actions\Audit\RecordActivity;
 use App\Http\Controllers\Controller;
+use App\Support\ImageLimits;
 use App\Support\ImageStorage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -87,7 +88,7 @@ class CooperativeSettingsController extends Controller
             'telepon' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
             'rekening_bank' => ['nullable', 'string', 'max:255'],
-            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
         ]);
 
         $oldLogo = $cooperative?->logo;

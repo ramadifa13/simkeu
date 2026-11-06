@@ -8,6 +8,7 @@ use App\Actions\Loans\ReturnCollateralAction;
 use App\Actions\Loans\ReviewCollateralReturnAction;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Portal\Concerns\InteractsWithLoans;
+use App\Support\ImageLimits;
 use App\Support\ImageStorage;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
@@ -26,8 +27,8 @@ class LoanCollateralController extends Controller
         $this->loanForRole($request, $role, $loan);
         $data = $request->validate([
             'alasan' => ['required', 'string', 'min:5', 'max:2000'],
-            'bukti_jaminan' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'bukti_lunas' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'bukti_jaminan' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
+            'bukti_lunas' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
         ]);
         $collateralProof = $images->store($request->file('bukti_jaminan'), 'jaminan_kembali');
         $settlementProof = $images->store($request->file('bukti_lunas'), 'jaminan_kembali');
@@ -70,7 +71,7 @@ class LoanCollateralController extends Controller
         $this->authorize('collect-installments');
         $this->loanForRole($request, $role, $loan);
         $data = $request->validate([
-            'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
             'ttd_nasabah' => ['required', 'image', 'mimes:webp', 'max:1024'],
             'ttd_teller' => ['required', 'image', 'mimes:webp', 'max:1024'],
             'cek_fisik' => ['accepted'],

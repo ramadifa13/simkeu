@@ -338,7 +338,7 @@ $fmtPersen = static function ($v) {
                 <div>
                     <label class="form-label" for="shuBukti">Foto bukti pembayaran</label>
                     <input name="bukti" id="shuBukti" type="file" class="form-control" accept="image/jpeg,image/png,image/webp" required>
-                    <div class="form-text">JPG, PNG, atau WEBP · maks. 5 MB</div>
+                    <div class="form-text">JPG, PNG, atau WEBP. Foto kamera sampai 40 MB boleh; hasil simpan maksimal 1 MB.</div>
                 </div>
             </div>
             <div class="modal-footer border-0 pt-0">

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ImageLimits;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 
@@ -24,9 +25,9 @@ class CompleteDisbursementPhotosRequest extends FormRequest
             ->value('jp.memerlukan_jaminan');
 
         return [
-            'foto_nasabah' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_barang_jaminan' => [$needsCollateral ? 'nullable' : 'prohibited', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_nasabah_barang' => [$needsCollateral ? 'nullable' : 'prohibited', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'foto_nasabah' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
+            'foto_barang_jaminan' => [$needsCollateral ? 'nullable' : 'prohibited', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
+            'foto_nasabah_barang' => [$needsCollateral ? 'nullable' : 'prohibited', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
         ];
     }
 }

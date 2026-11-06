@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ImageLimits;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -32,7 +33,7 @@ class UpdateProfileRequest extends FormRequest
                 'nullable',
                 'file',
                 'mimes:jpg,jpeg,png,webp',
-                'max:10240',
+                'max:'.ImageLimits::SOURCE_MAX_KILOBYTES,
             ],
             'hapus_foto_profil' => [
                 Rule::prohibitedIf(fn () => $this->user()?->role === 'anggota'),

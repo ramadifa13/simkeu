@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ImageLimits;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -53,8 +54,8 @@ class StoreLoanApplicationRequest extends FormRequest
             'emas_kadar' => ['nullable', 'string', 'max:50'],
             'emas_bentuk_ciri' => ['nullable', 'string', 'max:255'],
             'emas_surat_nota' => ['nullable', 'string', 'max:255'],
-            'foto_kk' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_ktp_pasangan' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'foto_kk' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
+            'foto_ktp_pasangan' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
             'jaminan' => ['nullable', 'array'],
             'jaminan.jenis_barang' => ['nullable', 'string', 'max:100'],
             'jaminan.identitas_barang' => ['nullable', 'string', 'max:100'],

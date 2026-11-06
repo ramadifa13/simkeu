@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Support\ImageLimits;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use LogicException;
@@ -32,6 +34,16 @@ class AppServiceProvider extends ServiceProvider
         if (app()->isProduction() && filled($nativeReferenceDatabase) && $currentDatabase === $nativeReferenceDatabase) {
             throw new LogicException('Laravel tidak boleh menggunakan database referensi native sebagai koneksi produksi.');
         }
+
+        Validator::replacer('max', function (string $message, string $attribute, string $rule, array $parameters): string {
+            if ((int) ($parameters[0] ?? 0) === ImageLimits::SOURCE_MAX_KILOBYTES) {
+                return 'Gambar paling besar 40 MB. Hasil yang disimpan maksimal 1 MB.';
+            }
+
+            $max = (string) ($parameters[0] ?? '');
+
+            return str_replace([':max', ':value'], [$max, $max], $message);
+        });
 
         RateLimiter::for('login', function (Request $request): Limit {
             return Limit::perMinute(5)->by(Str::lower((string) $request->input('username')).'|'.$request->ip());

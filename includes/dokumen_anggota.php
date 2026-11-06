@@ -5,7 +5,7 @@ require_once __DIR__ . '/upload_foto.php';
  * Upload dokumen anggota (KTP, KK, KTP suami/istri).
  *
  * - Tipe divalidasi di server dengan finfo (bukan dari ekstensi/nama file).
- * - File asal maksimal 10 MB (jpg/jpeg/png/webp); hasil disimpan maksimal 1 MB (kompres otomatis).
+ * - File asal maksimal 40 MB (jpg/jpeg/png/webp); hasil disimpan maksimal 1 MB (kompres otomatis).
  * - Nama file acak, disimpan di uploads/anggota/{id_anggota}/ (eksekusi script
  *   diblokir oleh uploads/anggota/.htaccess).
  * - File foto_ktp lama (sebelum revisi) tetap dibaca dari assets/uploads/ktp/.
@@ -19,7 +19,7 @@ if (!defined('DOKUMEN_ANGGOTA_WAJIB')) {
     define('DOKUMEN_ANGGOTA_WAJIB', ['foto_ktp', 'foto_kk', 'foto_ktp_pasangan']);
 }
 if (!defined('DOKUMEN_MAKS_BYTE')) {
-    define('DOKUMEN_MAKS_BYTE', 10 * 1024 * 1024);
+    define('DOKUMEN_MAKS_BYTE', 40 * 1024 * 1024);
 }
 
 if (!function_exists('daftarDokumenAnggota')) {
@@ -144,7 +144,7 @@ if (!function_exists('cekPostMelebihiBatas')) {
         $_SESSION['error'] = $pesan !== null && $pesan !== ''
             ? $pesan
             : ('Ukuran total unggahan (~' . $ukuranMb . ' MB) melebihi batas server (post_max_size = '
-                . ini_get('post_max_size') . '). Perkecil file (gambar maks. 10 MB per file) lalu coba lagi.');
+                . ini_get('post_max_size') . '). Perkecil file (gambar maks. 40 MB per file) lalu coba lagi.');
         return true;
     }
 }
@@ -194,14 +194,14 @@ if (!function_exists('validasiDokumenAnggota')) {
             }
 
             if ($file['error'] === UPLOAD_ERR_INI_SIZE || $file['error'] === UPLOAD_ERR_FORM_SIZE) {
-                throw new Exception("$label melebihi batas ukuran (maksimal 10 MB; batas server: "
+                throw new Exception("$label melebihi batas ukuran (maksimal 40 MB; batas server: "
                     . ini_get('upload_max_filesize') . ")");
             }
             if ($file['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) {
                 throw new Exception("$label gagal diunggah (kode error " . (int) $file['error'] . ")");
             }
             if ($file['size'] > DOKUMEN_MAKS_BYTE) {
-                throw new Exception("$label melebihi 10 MB");
+                throw new Exception("$label melebihi 40 MB");
             }
             if (!class_exists('finfo')) {
                 throw new Exception("Ekstensi PHP fileinfo belum aktif di server; hubungi administrator");

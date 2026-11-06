@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ImageLimits;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 
@@ -26,9 +27,9 @@ class DisburseLoanRequest extends FormRequest
         return [
             'tanggal_pencairan' => ['required', 'date', 'before_or_equal:today'],
             'sudah_dibayar' => ['nullable', 'integer', 'min:0'],
-            'foto_nasabah' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_barang_jaminan' => [$needsCollateral ? 'required' : 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_nasabah_barang' => [$needsCollateral ? 'required' : 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'foto_nasabah' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
+            'foto_barang_jaminan' => [$needsCollateral ? 'required' : 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
+            'foto_nasabah_barang' => [$needsCollateral ? 'required' : 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
             'nama_saksi_1' => ['required', 'string', 'max:100'],
             'nama_saksi_2' => ['required', 'string', 'max:100'],
             'ttd_nasabah' => ['required', 'image', 'mimes:webp,png', 'max:1024'],
@@ -36,7 +37,7 @@ class DisburseLoanRequest extends FormRequest
             'ttd_saksi_1' => ['required', 'image', 'mimes:webp,png', 'max:1024'],
             'ttd_saksi_2' => ['required', 'image', 'mimes:webp,png', 'max:1024'],
             'lampiran' => ['nullable', 'array', 'max:10'],
-            'lampiran.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'lampiran.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
         ];
     }
 }

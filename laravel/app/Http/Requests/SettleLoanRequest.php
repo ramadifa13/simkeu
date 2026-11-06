@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ImageLimits;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -40,11 +41,11 @@ class SettleLoanRequest extends FormRequest
             'tanggal_bayar' => ['required', 'date', 'before_or_equal:today'],
             'metode' => ['required', Rule::in(['cash', 'transfer'])],
             'catatan' => ['nullable', 'string', 'max:1000'],
-            'bukti' => [$earlyApproved ? 'required' : 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'bukti' => [$earlyApproved ? 'required' : 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
             'cek_fisik' => [$requiresPhysicalCheck ? 'accepted' : 'nullable'],
             'ambil_jaminan_langsung' => ['nullable', 'boolean'],
             'cek_jaminan_nasabah' => [$takeCollateral ? 'accepted' : 'nullable'],
-            'foto_serah_terima_jaminan' => [$takeCollateral ? 'required' : 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'foto_serah_terima_jaminan' => [$takeCollateral ? 'required' : 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
             'ttd_jaminan_nasabah' => [$takeCollateral ? 'required' : 'nullable', 'image', 'mimes:webp', 'max:1024'],
             'ttd_jaminan_teller' => [$takeCollateral ? 'required' : 'nullable', 'image', 'mimes:webp', 'max:1024'],
             'mode_cetak_akad' => [$takeCollateral ? 'required' : 'nullable', Rule::in(['otomatis', 'manual'])],

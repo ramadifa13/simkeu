@@ -9,6 +9,7 @@ use App\Actions\Shu\ShuSupport;
 use App\Actions\Shu\SyncLoanShuEntitlementsAction;
 use App\Http\Controllers\Controller;
 use App\Models\Anggota;
+use App\Support\ImageLimits;
 use App\Support\ImageStorage;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
@@ -94,7 +95,7 @@ class ShuController extends Controller
             'pembayaran_id' => ['nullable', 'integer'],
             'alasan' => ['nullable', 'string', 'max:500'],
             'uang_kembali' => ['nullable'],
-            'bukti' => ['nullable', 'image', 'max:5120'],
+            'bukti' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
         ] + collect(array_keys(ShuSupport::CATEGORIES))->mapWithKeys(fn ($key) => ['persen_'.$key => ['nullable', 'numeric']])->all());
 
         $input = $data;
@@ -132,7 +133,7 @@ class ShuController extends Controller
             'hak_id' => ['required', 'integer'],
             'metode' => ['required', Rule::in(['cash', 'transfer'])],
             'referensi' => ['required', 'string', 'min:3', 'max:100'],
-            'bukti' => ['required', 'image', 'max:5120'],
+            'bukti' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
         ]);
         $proof = $images->store($request->file('bukti'), 'shu/bukti');
         try {

@@ -359,8 +359,8 @@ Pastikan database target adalah `simkeu_laravel` (atau nama DB Laravel Anda), bu
 PHP `php.ini` (contoh XAMPP) yang disarankan:
 
 ```ini
-upload_max_filesize = 10M
-post_max_size = 80M
+upload_max_filesize = 64M
+post_max_size = 160M
 extension=fileinfo
 extension=gd
 extension=zip

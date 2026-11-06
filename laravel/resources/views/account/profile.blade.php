@@ -48,7 +48,7 @@
                                         Hapus foto profil saat ini
                                     </label>
                                 @endif
-                                <p class="text-xs text-slate-500">JPG, PNG, atau WebP; maksimal 10 MB.</p>
+                                <p class="text-xs text-slate-500">Foto kamera sampai 40 MB boleh. Yang disimpan maksimal 1 MB.</p>
                             @endif
                         </div>
                     </div>

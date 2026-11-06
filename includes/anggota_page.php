@@ -75,7 +75,7 @@ if ($_POST) {
                 $db->beginTransaction();
                 list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, 0, $kategori_shu_input, $ketua_kelompok_input);
                 
-                // Validasi dokumen (finfo, maks. 10 MB) sebelum data disimpan
+                // Validasi dokumen (finfo, maks. 40 MB) sebelum data disimpan
                 $dokumen = validasiDokumenAnggota(null, $kategori_anggota === 'jaminan');
                 
                 // Check if kode anggota already exists

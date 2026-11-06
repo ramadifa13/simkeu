@@ -92,7 +92,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_logo'])) {
         $upload_dir = pastikanFolderUpload('logo') . DIRECTORY_SEPARATOR;
         $filename = 'logo_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $logo['ext'];
         $upload_path = $upload_dir . $filename;
-        if (!kompresDanSimpanGambar($logo['tmp'], $upload_path, $logo['ext'])) {
+        $ukuranLogo = filesize($logo['tmp']);
+        $simpanUtuh = in_array($logo['ext'], ['png', 'webp'], true)
+            && $ukuranLogo !== false
+            && $ukuranLogo <= FOTO_HASIL_MAKS_BYTE;
+        if ($simpanUtuh) {
+            if (!@move_uploaded_file($logo['tmp'], $upload_path) && !@copy($logo['tmp'], $upload_path)) {
+                throw new Exception('Gagal menyimpan logo.');
+            }
+        } elseif (!kompresDanSimpanGambar($logo['tmp'], $upload_path, $logo['ext'])) {
             throw new Exception('Gagal menyimpan logo (hasil akhir maksimal 1 MB).');
         }
         // kompres bisa mengubah ekstensi (mis. PNG → JPG); simpan nama file aktual.
@@ -384,7 +392,7 @@ $logoAda = !empty($koperasi['logo']) && is_file($logoPath);
                                     <input type="hidden" name="upload_logo" value="1">
                                     <label class="form-label" for="kop_logo">Upload logo baru</label>
                                     <input type="file" id="kop_logo" name="logo" class="form-control" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" required>
-                                    <div class="form-text mb-3">JPEG / PNG / WEBP · hasil akhir dikompres maks. 1 MB</div>
+                                    <div class="form-text mb-3">PNG/WebP sampai 1 MB disimpan utuh. Logo yang lebih besar dikecilkan otomatis.</div>
                                     <button type="submit" class="btn btn-primary w-100">
                                         <i class="ti ti-upload me-1" aria-hidden="true"></i>Upload logo
                                     </button>

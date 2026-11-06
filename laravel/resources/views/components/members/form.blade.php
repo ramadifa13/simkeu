@@ -44,7 +44,7 @@
         <span class="grid size-9 place-items-center rounded-xl bg-teal-50 text-sm font-bold text-teal-700">4</span>
         <div>
             <h2 class="text-base font-semibold text-slate-900">{{ $editing ? 'Dokumen anggota' : 'Dokumen wajib' }}</h2>
-            <p class="mt-1 text-sm text-slate-600">JPG, PNG, atau WebP; maksimal 10 MB (akan dikompres). Anggota biasa wajib KTP, KK, dan KTP pasangan. Anggota jaminan cukup Foto KTP. {{ $editing ? 'Kosongkan bila tidak ingin mengganti file.' : '' }}</p>
+            <p class="mt-1 text-sm text-slate-600">JPG, PNG, atau WebP. Foto kamera sampai 40 MB boleh; yang disimpan maksimal 1 MB. Anggota biasa wajib KTP, KK, dan KTP pasangan. Anggota jaminan cukup Foto KTP. {{ $editing ? 'Kosongkan bila tidak ingin mengganti file.' : '' }}</p>
         </div>
     </div>
     <div class="mt-5 grid gap-4 md:grid-cols-3">

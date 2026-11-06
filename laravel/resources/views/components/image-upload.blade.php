@@ -9,8 +9,8 @@
 
 @php
     $description ??= $preserveAlpha
-        ? 'PNG/WebP transparan disimpan apa adanya (maks. 1 MB) agar latar tetap bening.'
-        : 'JPG, PNG, atau WebP. Gambar dioptimalkan otomatis menjadi maksimal 1 MB saat dipilih.';
+        ? 'PNG atau WebP sampai 1 MB disimpan utuh agar latar tetap bening. Logo yang lebih besar dikecilkan otomatis.'
+        : 'JPG, PNG, atau WebP. Foto kamera sampai 40 MB tetap bisa dipilih; yang disimpan maksimal 1 MB.';
     $accept = $preserveAlpha
         ? 'image/png,image/webp,.png,.webp'
         : 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ImageLimits;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -21,7 +22,7 @@ class PayLoanPenaltyRequest extends FormRequest
             'tanggal_bayar' => ['required', 'date', 'before_or_equal:today'],
             'metode' => ['required', Rule::in(['cash', 'transfer'])],
             'jumlah' => ['required', 'numeric', 'gt:0'],
-            'bukti' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'bukti' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
         ];
     }
 }

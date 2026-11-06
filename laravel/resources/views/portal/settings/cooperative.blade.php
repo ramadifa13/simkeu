@@ -47,7 +47,7 @@
 
                 <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <h2 class="text-base font-semibold text-slate-950">Logo koperasi</h2>
-                    <p class="mt-1 text-sm text-slate-500">JPG, PNG, atau WebP. Maksimum 5 MB; disimpan privat dan teroptimasi.</p>
+                    <p class="mt-1 text-sm text-slate-500">PNG atau WebP sampai 1 MB disimpan utuh. Logo yang lebih besar dikecilkan otomatis dan tetap privat.</p>
                     @if (filled($cooperative?->logo))
                         <figure class="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <img

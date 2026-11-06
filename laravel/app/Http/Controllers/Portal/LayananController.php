@@ -8,6 +8,7 @@ use App\Actions\Layanan\LayananSupport;
 use App\Actions\Layanan\ProcessLayananAction;
 use App\Actions\Layanan\RequestDelayDisbursementAction;
 use App\Http\Controllers\Controller;
+use App\Support\ImageLimits;
 use App\Support\ImageStorage;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
@@ -176,7 +177,7 @@ class LayananController extends Controller
             'laporan_id' => ['nullable', 'integer'],
             'pengajuan_id' => ['nullable', 'integer'],
             'bayar_id' => ['nullable', 'integer'],
-            'bukti' => ['nullable', 'image', 'max:1024'],
+            'bukti' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
         ]);
 
         $adminOnly = ['keputusan_macet', 'reschedule', 'eksekusi', 'diskon_denda', 'approve_denda', 'putuskan_hapus_denda', 'koreksi_prioritas', 'approve_prioritas', 'tolak_prioritas', 'jual_jaminan', 'kembalikan_lebih', 'bayar_bonus', 'repeat_order'];

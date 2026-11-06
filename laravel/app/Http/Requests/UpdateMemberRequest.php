@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ImageLimits;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -33,9 +34,9 @@ class UpdateMemberRequest extends FormRequest
             'ketua_kelompok_id' => ['nullable', 'integer', Rule::exists('anggota', 'id')->where('kategori_shu', 'ketua_kelompok')->where('status', 'aktif')],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
             'nonaktif_jadwal' => ['nullable', 'date', 'after_or_equal:today'],
-            'foto_ktp' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_kk' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_ktp_pasangan' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'foto_ktp' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
+            'foto_kk' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
+            'foto_ktp_pasangan' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
         ];
     }
 }

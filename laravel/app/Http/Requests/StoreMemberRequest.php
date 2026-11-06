@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ImageLimits;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -33,9 +34,9 @@ class StoreMemberRequest extends FormRequest
             'rekening_bank' => ['nullable', 'string', 'max:100'],
             'kategori_shu' => ['required', Rule::in(['anggota', 'ketua_kelompok'])],
             'ketua_kelompok_id' => ['nullable', 'integer', Rule::exists('anggota', 'id')->where('kategori_shu', 'ketua_kelompok')->where('status', 'aktif')],
-            'foto_ktp' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_kk' => [Rule::requiredIf(fn () => $this->input('kategori_anggota') === 'biasa'), 'nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'foto_ktp_pasangan' => [Rule::requiredIf(fn () => $this->input('kategori_anggota') === 'biasa'), 'nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'foto_ktp' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
+            'foto_kk' => [Rule::requiredIf(fn () => $this->input('kategori_anggota') === 'biasa'), 'nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
+            'foto_ktp_pasangan' => [Rule::requiredIf(fn () => $this->input('kategori_anggota') === 'biasa'), 'nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.ImageLimits::SOURCE_MAX_KILOBYTES],
         ];
     }
 }

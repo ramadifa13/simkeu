@@ -233,33 +233,49 @@ const repositionActionPopovers = () => openActionPopovers().forEach((popover) =>
 window.addEventListener('resize', repositionActionPopovers);
 window.addEventListener('scroll', repositionActionPopovers, true);
 
+const SOURCE_MAX_BYTES = 40 * 1024 * 1024;
+const STORED_MAX_BYTES = 1024 * 1024;
+
 const compressImage = async (file, { preserveAlpha = false } = {}) => {
+    if (file.size > SOURCE_MAX_BYTES) {
+        throw new Error('Gambar melebihi 40 MB. Pilih foto yang lebih kecil.');
+    }
+
     // Logo PNG/WebP kecil disimpan apa adanya agar transparansi tidak hilang.
-    if (preserveAlpha && ['image/png', 'image/webp'].includes(file.type) && file.size <= 1024 * 1024) {
+    if (preserveAlpha && ['image/png', 'image/webp'].includes(file.type) && file.size <= STORED_MAX_BYTES) {
         return file;
     }
 
-    const bitmap = await createImageBitmap(file);
-    let scale = Math.min(1, 2200 / Math.max(bitmap.width, bitmap.height));
-    let quality = 0.86;
-    let result;
-    const outputType = preserveAlpha ? 'image/png' : 'image/webp';
-    do {
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-        const context = canvas.getContext('2d', { alpha: true });
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-        result = await new Promise((resolve) => canvas.toBlob(resolve, outputType, preserveAlpha ? undefined : quality));
-        if (result && result.size <= 1024 * 1024) break;
-        if (!preserveAlpha && quality > 0.48) quality -= 0.12;
-        else scale *= 0.75;
-    } while (scale > 0.08);
-    bitmap.close();
-    if (!result || result.size > 1024 * 1024) throw new Error('Gambar tidak dapat dipadatkan hingga 1 MB.');
-    const extension = outputType === 'image/png' ? 'png' : 'webp';
-    return new File([result], `${file.name.replace(/\.[^.]+$/, '')}.${extension}`, { type: outputType });
+    try {
+        const bitmap = await createImageBitmap(file);
+        let scale = Math.min(1, 2200 / Math.max(bitmap.width, bitmap.height));
+        let quality = 0.86;
+        let result;
+        const outputType = preserveAlpha ? 'image/png' : 'image/webp';
+        do {
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+            const context = canvas.getContext('2d', { alpha: true });
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            result = await new Promise((resolve) => canvas.toBlob(resolve, outputType, preserveAlpha ? undefined : quality));
+            if (result && result.size <= STORED_MAX_BYTES) break;
+            if (!preserveAlpha && quality > 0.48) quality -= 0.12;
+            else scale *= 0.75;
+        } while (scale > 0.08);
+        bitmap.close();
+        if (!result || result.size > STORED_MAX_BYTES) {
+            return file;
+        }
+        const extension = outputType === 'image/png' ? 'png' : 'webp';
+        return new File([result], `${file.name.replace(/\.[^.]+$/, '')}.${extension}`, { type: outputType });
+    } catch (error) {
+        if (String(error?.message || '').includes('40 MB')) {
+            throw error;
+        }
+        return file;
+    }
 };
 
 document.querySelectorAll('[data-image-upload]').forEach((wrapper) => {
@@ -294,9 +310,16 @@ document.querySelectorAll('[data-image-upload]').forEach((wrapper) => {
                 const transfer = new DataTransfer();
                 optimizedFiles.forEach((file) => transfer.items.add(file));
                 input.files = transfer.files;
+                const passthrough = (file) => file.size > STORED_MAX_BYTES;
                 if (message) {
-                    if (preserveAlpha && optimizedFiles[0]) {
+                    if (preserveAlpha && optimizedFiles[0] && !passthrough(optimizedFiles[0])) {
                         message.textContent = `${optimizedFiles[0].name} · ${(optimizedFiles[0].size / 1024).toFixed(0)} KB, transparansi dipertahankan`;
+                    } else if (optimizedFiles.some(passthrough)) {
+                        const totalMb = optimizedFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024);
+                        const label = optimizedFiles.length > 1
+                            ? `${optimizedFiles.length} gambar (${totalMb.toFixed(1)} MB)`
+                            : `Gambar ${totalMb.toFixed(1)} MB`;
+                        message.textContent = `${label} akan dikecilkan di server. Hasil simpan maksimal 1 MB.`;
                     } else if (optimizedFiles.length > 1) {
                         const totalKb = optimizedFiles.reduce((sum, file) => sum + file.size, 0) / 1024;
                         message.textContent = `${optimizedFiles.length} file siap · ${totalKb.toFixed(0)} KB total`;
