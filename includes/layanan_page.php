@@ -65,7 +65,7 @@ if ($layananMode === 'detail' && $id <= 0) {
 redirectJikaPostMelebihiBatas(
     ($layananMode === 'detail' && $id > 0)
         ? ('detail_layanan.php?id=' . $id . '&tab=' . rawurlencode($tab))
-        : ('layanan.php?tab=' . rawurlencode($tab))
+        : ($tab === 'denda' ? 'denda.php' : 'layanan.php?tab=' . rawurlencode($tab))
 );
 if ($_SERVER['REQUEST_METHOD']==='POST') {
     $files=[];
@@ -97,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     if ($postId > 0) {
         header('Location: detail_layanan.php?id=' . $postId . '&tab=' . rawurlencode($tab));
     } else {
-        $listTarget = ($tab==='lunas'?'laporan_lunas.php':($tab==='denda' && str_contains(basename($_SERVER['PHP_SELF'] ?? ''),'laporan_denda')?'laporan_denda.php':'layanan.php'));
+        $listTarget = ($tab==='lunas'?'laporan_lunas.php':($tab==='denda'?(str_contains(basename($_SERVER['PHP_SELF'] ?? ''),'laporan_denda')?'laporan_denda.php':'denda.php'):'layanan.php'));
         header('Location: '.$listTarget.'?tab='.$tab);
     }
     exit;
@@ -109,7 +109,7 @@ if ($siap) {
     if ($tab === 'denda' && isset($_GET['hitung_ulang'])) {
         $nDenda = perbaruiDendaOtomatis($db, true);
         $_SESSION['success'] = 'Denda otomatis dihitung ulang: ' . (int) $nDenda . ' cicilan diperbarui.';
-        header('Location: ' . ($id ? ('detail_layanan.php?id=' . $id . '&tab=denda') : 'layanan.php?tab=denda') . (isset($_GET['q']) && $_GET['q'] !== '' ? '&q=' . rawurlencode((string)$_GET['q']) : ''));
+        header('Location: ' . ($id ? ('detail_layanan.php?id=' . $id . '&tab=denda') : 'denda.php') . (isset($_GET['q']) && $_GET['q'] !== '' ? ($id ? '&q=' : '?q=') . rawurlencode((string)$_GET['q']) : ''));
         exit;
     }
     perbaruiDendaOtomatis($db,true);
@@ -123,12 +123,6 @@ if ($siap) {
         $r['sisa_denda']=max(0,$r['sisa_denda']-($dendaPaid[$r['id']] ?? 0));
         if ((int)$r['id']===$id) $selected=$r;
     } unset($r);
-}
-if ($siap && $tab==='denda' && !isAdmin()) {
-    $owned=$db->prepare('SELECT DISTINCT pinjaman_id FROM layanan_bayar_denda WHERE user_id=?');
-    $owned->execute([$_SESSION['user_id']]);$owned=array_flip($owned->fetchAll(PDO::FETCH_COLUMN));
-    $rows=array_values(array_filter($rows,function($r)use($owned){return (int)$r['dicairkan_oleh']===(int)$_SESSION['user_id'] || isset($owned[$r['id']]);}));
-    $selected=null;foreach($rows as $r)if((int)$r['id']===$id)$selected=$r;
 }
 $q=trim($_GET['q'] ?? '');$hari=$tab==='lunas'?0:(int)($_GET['hari'] ?? 0);
 $totalMacet=0;$uangMacet=0;$lancar=0;$totalAktif=0;$lunas=0;
@@ -289,7 +283,7 @@ canvas.signature { touch-action:none;border:1px solid #777;max-width:100% }
 if ($tab === 'lunas') {
     $detailListHref = 'laporan_lunas.php';
 } elseif ($tab === 'denda') {
-    $detailListHref = 'layanan.php?tab=denda';
+    $detailListHref = 'denda.php';
 } else {
     $detailListHref = 'layanan.php?tab=' . rawurlencode($tab);
 }
@@ -330,7 +324,7 @@ $lyTitle = $lyTitles[$tab] ?? $lyTitles['macet'];
 </header>
 <nav class="ui-ly-tabs no-print" aria-label="Bagian layanan pinjaman">
 <?php foreach (['macet'=>['Nasabah & Macet','ti-users'],'denda'=>['Denda','ti-clock'],'lunas'=>['Laporan Lunas','ti-circle-check']] as $key=>$info): ?>
-<a class="ui-ly-tab<?= $tab===$key?' is-active':'' ?>" <?= $tab===$key?'aria-current="page"':'' ?> href="<?= $key==='lunas'?'laporan_lunas.php':'layanan.php?tab='.$key ?>"><i class="ti <?= $info[1] ?>" aria-hidden="true"></i><?= $info[0] ?></a>
+<a class="ui-ly-tab<?= $tab===$key?' is-active':'' ?>" <?= $tab===$key?'aria-current="page"':'' ?> href="<?= $key==='lunas'?'laporan_lunas.php':($key==='denda'?'denda.php':'layanan.php?tab=macet') ?>"><i class="ti <?= $info[1] ?>" aria-hidden="true"></i><?= $info[0] ?></a>
 <?php endforeach; ?>
 <?php if (isAdmin()): ?>
 <a class="ui-ly-tab<?= $tab==='pengaturan'?' is-active':'' ?>" <?= $tab==='pengaturan'?'aria-current="page"':'' ?> href="layanan.php?tab=pengaturan"><i class="ti ti-adjustments" aria-hidden="true"></i>Pengaturan</a>
