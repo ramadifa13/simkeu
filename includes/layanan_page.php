@@ -27,25 +27,6 @@ function layananStatusBadgeHtml($status) {
     return '<span class="badge bg-' . $warna . ($warna === 'warning' ? ' text-dark' : '') . '">' . layananEscape($label) . '</span>';
 }
 
-?>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.badge').forEach(function (badge) {
-        var status = badge.textContent.trim().toLowerCase();
-        if (status === 'ditolak') {
-            badge.classList.remove('bg-warning', 'text-dark');
-            badge.classList.add('bg-danger');
-        } else if (status === 'disetujui' || status === 'diserahkan') {
-            badge.classList.remove('bg-warning', 'text-dark');
-            badge.classList.add('bg-success');
-        } else if (status === 'pengecekan' || status === 'koreksi') {
-            badge.classList.remove('bg-success', 'bg-danger');
-            badge.classList.add('bg-warning', 'text-dark');
-        }
-    });
-});
-</script>
-<?php
 $layananMode = $layananMode ?? 'list';
 $tab=$_GET['tab'] ?? 'macet';
 if (!in_array($tab,['macet','denda','lunas','pengaturan'],true)) $tab='macet';
@@ -581,6 +562,21 @@ $stmt=$db->prepare('SELECT * FROM layanan_pembayaran WHERE pinjaman_id=? AND dib
 <?php layananRenderModals(); ?>
 <script src="../assets/js/denda-form.js?v=1"></script>
 <script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.badge').forEach(function (badge) {
+        var status = badge.textContent.trim().toLowerCase();
+        if (status === 'ditolak') {
+            badge.classList.remove('bg-warning', 'text-dark');
+            badge.classList.add('bg-danger');
+        } else if (status === 'disetujui' || status === 'diserahkan') {
+            badge.classList.remove('bg-warning', 'text-dark');
+            badge.classList.add('bg-success');
+        } else if (status === 'pengecekan' || status === 'koreksi') {
+            badge.classList.remove('bg-success', 'bg-danger');
+            badge.classList.add('bg-warning', 'text-dark');
+        }
+    });
+});
 (function () {
   // Modal dokumen dll. yang masih di dalam card/flex → pindah ke body.
   document.querySelectorAll('.page .modal, .ui-tx-page .modal, .ui-ly-detail .modal').forEach(function (el) {

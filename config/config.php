@@ -62,4 +62,3 @@ if (!function_exists('getInitials')) {
         return substr($initials, 0, 2);
     }
 }
-?>
