@@ -14,9 +14,9 @@ $routes = [
         'persetujuan' => 'admin/persetujuan.php',
         'tunda_cair' => 'admin/pencairan.php',
         'pembatalan' => 'admin/angsuran.php',
-        // Semua notifikasi layanan Admin dibuka melalui laporan lunas Admin,
-        // bukan halaman pinjaman/layanan milik Teller.
-        'hapus_denda' => 'admin/laporan_lunas.php?tab=lunas',
+        // Penghapusan denda dibuka pada detail pinjaman; layanan pelunasan
+        // dan pengembalian jaminan tetap menuju laporan lunas.
+        'hapus_denda' => 'admin/detail_layanan.php?tab=denda',
         'pelunasan_dini' => 'admin/laporan_lunas.php?tab=lunas',
         'jaminan_kembali' => 'admin/laporan_lunas.php?tab=lunas',
         'prioritas' => 'admin/laporan_lunas.php?tab=lunas',

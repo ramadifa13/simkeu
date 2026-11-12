@@ -86,7 +86,9 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             $db->prepare('UPDATE layanan_pengaturan SET surat_lunas=?,bast_jaminan=? WHERE id=1')->execute([$surat,$bast]);
             layananAudit($db,0,'pengaturan',json_encode(['diskon'=>$diskon,'pemutihan'=>!empty($_POST['pemutihan']),'tarif_jaminan'=>$tarifJaminan,'wa_denda'=>$wd,'wa_lunas'=>$wl,'surat_lunas'=>$surat,'bast'=>$bast],JSON_UNESCAPED_UNICODE));
         } else prosesLayanan($db,$_POST['aksi'] ?? '',(int)($_POST['pinjaman_id'] ?? 0),$files);
-        $db->commit();$_SESSION['success']='Tindakan berhasil dicatat.';
+        $db->commit();$_SESSION['success']=($_POST['aksi'] ?? '') === 'ajukan_hapus_denda'
+            ? 'Pengajuan penghapusan denda berhasil dikirim ke Admin.'
+            : 'Tindakan berhasil dicatat.';
     } catch (Exception $e) {
         if ($db->inTransaction()) $db->rollBack();
         foreach ($files as $file) hapusFotoUpload($file);
@@ -94,7 +96,9 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         $_SESSION['error']=$e instanceof PDOException?'Data gagal disimpan. Periksa apakah pengajuan sudah ada atau migrasi belum lengkap.':$e->getMessage();
     }
     $postId = (int)($_POST['pinjaman_id'] ?? $id);
-    if ($postId > 0) {
+    if (($_POST['aksi'] ?? '') === 'ajukan_hapus_denda') {
+        header('Location: denda.php');
+    } elseif ($postId > 0) {
         header('Location: detail_layanan.php?id=' . $postId . '&tab=' . rawurlencode($tab));
     } else {
         $listTarget = ($tab==='lunas'?'laporan_lunas.php':($tab==='denda'?(str_contains(basename($_SERVER['PHP_SELF'] ?? ''),'laporan_denda')?'laporan_denda.php':'denda.php'):'layanan.php'));
