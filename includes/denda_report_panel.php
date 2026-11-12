@@ -3,8 +3,8 @@ if (!is_array($settings ?? null)) {
     $settings = [];
 }
 $waDendaTpl = (string) ($settings['wa_denda'] ?? 'Yth {nama}, Anda telat {hari} hari, denda Rp {denda}. Mohon segera dibayar.');
-$dueScope = isAdmin() ? '' : ' AND p.dicairkan_oleh=' . (int)$_SESSION['user_id'];
-$hanyaSisa = !isset($_GET['semua_jt']); // default: tampilkan yang masih punya sisa denda / sudah telat
+$dueScope = ''; // Teller dapat menangani seluruh nasabah yang telat.
+$hanyaSisa = isset($_GET['hanya_sisa']);
 $dueStmt = $db->query(
     "SELECT a.*,ag.nama_lengkap,ag.telepon,p.kode_pinjaman,p.jumlah_pinjaman,jp.memerlukan_jaminan,
      COALESCE((SELECT SUM(b.jumlah) FROM layanan_bayar_denda b WHERE b.angsuran_id=a.id),0) dibayar
@@ -29,15 +29,11 @@ foreach ($fineDueRows as $fd) {
     $fd['_calc'] = $calc;
     $fd['_denda_tampil'] = $dendaTampil;
     $fd['_sisa'] = $fineRemaining;
-    if ($hanyaSisa && $fineRemaining <= 0.005) {
-        continue;
-    }
+    $nasabahTelat[$fd['pinjaman_id']] = true;
+    $cicilanBelumLunas++;
+    if ($hanyaSisa && $fineRemaining <= 0.005) continue;
     $fineDueVisible[] = $fd;
     $totalSisaDenda += $fineRemaining;
-    if ($fineRemaining > 0.005) {
-        $nasabahTelat[$fd['nama_lengkap']] = true;
-        $cicilanBelumLunas++;
-    }
 }
 
 $paymentScope = isAdmin() ? '' : ' AND b.user_id=' . (int)$_SESSION['user_id'];
@@ -66,23 +62,23 @@ foreach ($fineDueVisible as $fd) {
 ?>
 <div class="ui-ly-denda-kpi mb-3">
 <?php ui_stat_grid([
-    ['label' => 'Nasabah telat', 'value' => count($nasabahTelat), 'tone' => 'danger', 'icon' => 'ti ti-users', 'hint' => $hanyaSisa ? 'Ada sisa denda' : 'Semua cicilan telat'],
+    ['label' => 'Nasabah telat', 'value' => count($nasabahTelat), 'tone' => 'danger', 'icon' => 'ti ti-users', 'hint' => 'Semua cicilan telat'],
     ['label' => 'Sisa denda', 'value' => formatRupiah($totalSisaDenda), 'tone' => 'warning', 'icon' => 'ti ti-coin', 'hint' => 'Total belum dibayar'],
-    ['label' => 'Cicilan tertagih', 'value' => (int)$cicilanBelumLunas, 'tone' => 'info', 'icon' => 'ti ti-calendar-due', 'hint' => 'Belum lunas denda'],
+    ['label' => 'Cicilan telat', 'value' => (int)$cicilanBelumLunas, 'tone' => 'info', 'icon' => 'ti ti-calendar-due', 'hint' => 'Belum lunas angsuran'],
     ['label' => 'Menunggu review', 'value' => (int)$menungguReview, 'tone' => 'primary', 'icon' => 'ti ti-hourglass', 'hint' => 'Pembayaran denda'],
 ]); ?>
 </div>
 
 <div class="ui-ly-toolbar no-print mb-3">
     <div>
-        <strong>Tagihan denda jatuh tempo<?= isAdmin() ? '' : ' — nasabah saya' ?></strong>
+        <strong>Tagihan denda jatuh tempo</strong>
         <span>Dihitung otomatis dari tarif Master Denda / gadai.</span>
     </div>
     <div class="d-flex flex-wrap gap-2">
         <?php if ($hanyaSisa): ?>
-            <a class="btn btn-sm btn-outline-secondary" href="?tab=denda&amp;semua_jt=1">Semua cicilan telat</a>
+            <a class="btn btn-sm btn-outline-secondary" href="?tab=denda">Semua cicilan telat</a>
         <?php else: ?>
-            <a class="btn btn-sm btn-outline-primary" href="?tab=denda">Hanya sisa denda</a>
+            <a class="btn btn-sm btn-outline-primary" href="?tab=denda&amp;hanya_sisa=1">Hanya sisa denda</a>
         <?php endif; ?>
         <a class="btn btn-sm btn-outline-warning" href="?tab=denda&amp;hitung_ulang=1"><i class="ti ti-refresh me-1"></i>Hitung ulang</a>
     </div>

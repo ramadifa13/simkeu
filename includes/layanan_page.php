@@ -136,6 +136,7 @@ foreach ($rows as $r) {
     if ($q!=='' && stripos($r['nama_lengkap'].' '.$r['ktp'].' '.$r['kode_anggota'].' '.$r['kode_pinjaman'],$q)===false) continue;
     if ($tab==='lunas' && $r['status']!=='lunas') continue;
     if ($tab!=='lunas' && $r['status']==='lunas') continue;
+    if ($tab==='macet' && ((int)$r['hari_telat']<7 || (int)$r['sisa_cicilan']<=0)) continue;
     if ($tab==='denda' && $r['sisa_denda']<=0) continue;
     if ($hari && ($hari===90 ? $r['hari_telat']<=90 : $r['hari_telat']<$hari)) continue;
     $list[]=$r;
