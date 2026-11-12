@@ -16,11 +16,8 @@ if (!isAdmin() && !isTeller()) {
     exit('Akses ditolak.');
 }
 
-if (function_exists('pulihkanGraceNonaktifTerbaru') && empty($_SESSION['_grace_shu_pulih'])) {
-    pulihkanGraceNonaktifTerbaru($db);
-    $_SESSION['_grace_shu_pulih'] = 1;
-}
 if (function_exists('prosesJadwalNonaktifAnggota')) {
+    jadwalkanAnggotaLunasLama($db);
     prosesJadwalNonaktifAnggota($db);
 }
 
@@ -253,6 +250,7 @@ if ($_POST) {
                 ktp = :ktp, 
                 rekening_bank = :rekening_bank, 
                 status = :status,
+                nonaktif_jadwal = NULL,
                 kategori_shu = :kategori_shu,
                 ketua_kelompok_id = :ketua_kelompok_id
                 WHERE id = :id";

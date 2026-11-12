@@ -117,10 +117,6 @@ function checkAnggota() {
     global $db;
     if (isLoggedIn() && isAnggota() && $db) {
         if (function_exists('prosesJadwalNonaktifAnggota')) {
-            if (empty($_SESSION['_grace_shu_pulih']) && function_exists('pulihkanGraceNonaktifTerbaru')) {
-                pulihkanGraceNonaktifTerbaru($db);
-                $_SESSION['_grace_shu_pulih'] = 1;
-            }
             $aid = $db->prepare("SELECT id FROM anggota WHERE user_id = ? LIMIT 1");
             $aid->execute([$_SESSION['user_id']]);
             $anggotaId = (int) $aid->fetchColumn();

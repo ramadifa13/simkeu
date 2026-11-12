@@ -529,6 +529,22 @@ if (!function_exists('prosesJadwalNonaktifAnggota')) {
     }
 }
 
+if (!function_exists('jadwalkanAnggotaLunasLama')) {
+    /** Lengkapi jadwal untuk data lunas lama tanpa mengubah anggota yang dinonaktifkan manual. */
+    function jadwalkanAnggotaLunasLama($db) {
+        pastikanKolomNonaktifJadwal($db);
+        if (!kolomAda($db, 'pinjaman', 'tanggal_lunas')) return 0;
+        $hari = (int) ANGGOTA_GRACE_NONAKTIF_HARI;
+        return $db->exec("UPDATE anggota a
+            SET a.nonaktif_jadwal = (SELECT DATE_ADD(MAX(p.tanggal_lunas), INTERVAL {$hari} DAY)
+                                      FROM pinjaman p WHERE p.anggota_id = a.id)
+            WHERE a.status = 'aktif' AND a.nonaktif_jadwal IS NULL
+              AND EXISTS (SELECT 1 FROM pinjaman p WHERE p.anggota_id = a.id AND p.status = 'lunas' AND p.tanggal_lunas IS NOT NULL)
+              AND NOT EXISTS (SELECT 1 FROM pinjaman p WHERE p.anggota_id = a.id AND p.status <> 'lunas')
+              AND NOT EXISTS (SELECT 1 FROM pengajuan_pinjaman pp WHERE pp.anggota_id = a.id AND pp.status IN ('menunggu','disetujui'))");
+    }
+}
+
 if (!function_exists('pulihkanGraceNonaktifTerbaru')) {
     /**
      * Pulihkan anggota yang baru saja dinonaktifkan karena lunas (masih dalam jendela grace)

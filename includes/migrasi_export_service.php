@@ -63,7 +63,7 @@ function migrasiExportBackupExcel(PDO $db, $backupDir) {
     }
 
     $nasabahRows = [];
-    $anggotaCols = 'id, kode_anggota, ktp, nama_lengkap, alamat, telepon, status, foto_ktp';
+    $anggotaCols = 'id, kode_anggota, ktp, nama_lengkap, alamat, telepon, tempat_lahir, tanggal_lahir, pekerjaan, rekening_bank, status, foto_ktp';
     if (kolomAda($db, 'anggota', 'foto_kk')) {
         $anggotaCols .= ', foto_kk';
     }
@@ -83,6 +83,10 @@ function migrasiExportBackupExcel(PDO $db, $backupDir) {
             'Nama Lengkap*' => $a['nama_lengkap'],
             'Alamat*' => $a['alamat'] ?? '',
             'No. HP' => $a['telepon'] ?? '',
+            'Tempat Lahir' => $a['tempat_lahir'] ?? '',
+            'Tanggal Lahir' => $a['tanggal_lahir'] ?? '',
+            'Pekerjaan' => $a['pekerjaan'] ?? '',
+            'No. Rekening Bank' => $a['rekening_bank'] ?? '',
             'Status' => $a['status'] ?? 'aktif',
             'Catatan' => '',
             'Foto KTP (opsional)' => ($a['foto_ktp'] ?: ($doc['foto'] ?? '')) ?: '',
@@ -358,7 +362,7 @@ function migrasiExportBackupExcel(PDO $db, $backupDir) {
         ],
         'Nasabah' => [
             'title' => 'DATA NASABAH',
-            'headers' => ['ID Nasabah Lama*', 'NIK*', 'Nama Lengkap*', 'Alamat*', 'No. HP', 'Status', 'Catatan', 'Foto KTP (opsional)', 'Foto KK (opsional)', 'Foto KTP Pasangan (opsional)', 'TTD (opsional)'],
+            'headers' => ['ID Nasabah Lama*', 'NIK*', 'Nama Lengkap*', 'Alamat*', 'No. HP', 'Tempat Lahir', 'Tanggal Lahir', 'Pekerjaan', 'No. Rekening Bank', 'Status', 'Catatan', 'Foto KTP (opsional)', 'Foto KK (opsional)', 'Foto KTP Pasangan (opsional)', 'TTD (opsional)'],
             'rows' => $nasabahRows,
         ],
         'Pinjaman' => [

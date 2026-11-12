@@ -123,11 +123,13 @@ function migrasiImportFinal(PDO $db,$path,$userId=null){
                 $ttd=migrasiPathUpload($ttd);
             }
             $vals=[trim((string)$r['Nama Lengkap*']),trim((string)$r['NIK*']),isset($r['Alamat*'])?$r['Alamat*']:null,isset($r['No. HP'])?$r['No. HP']:null,migrasiStatus(isset($r['Status'])?$r['Status']:'aktif')];
+            $profil=['tempat_lahir'=>trim((string)($r['Tempat Lahir']??'')), 'tanggal_lahir'=>migrasiTanggal($r['Tanggal Lahir']??''), 'pekerjaan'=>trim((string)($r['Pekerjaan']??'')), 'rekening_bank'=>trim((string)($r['No. Rekening Bank']??''))];
             if($id){
                 $sql='UPDATE anggota SET nama_lengkap=?,ktp=?,alamat=?,telepon=?,status=?,foto_ktp=COALESCE(NULLIF(?,\'\'),foto_ktp)';
                 $params=array_merge($vals,[$foto]);
                 if(kolomAda($db,'anggota','foto_kk')){ $sql.=',foto_kk=COALESCE(NULLIF(?,\'\'),foto_kk)'; $params[]=$fotoKk; }
                 if(kolomAda($db,'anggota','foto_ktp_pasangan')){ $sql.=',foto_ktp_pasangan=COALESCE(NULLIF(?,\'\'),foto_ktp_pasangan)'; $params[]=$fotoPasangan; }
+                foreach($profil as $kolom=>$nilai){if($nilai!=='' && $nilai!==null){$sql.=",$kolom=?";$params[]=$nilai;}}
                 $sql.=' WHERE id=?'; $params[]=$id;
                 $db->prepare($sql)->execute($params);
             }else{
@@ -135,6 +137,7 @@ function migrasiImportFinal(PDO $db,$path,$userId=null){
                 $ins=array_merge([$old],$vals,[($foto!==''?$foto:null)]);
                 if(kolomAda($db,'anggota','foto_kk')){ $cols.=',foto_kk'; $ph.=',?'; $ins[]=($fotoKk!==''?$fotoKk:null); }
                 if(kolomAda($db,'anggota','foto_ktp_pasangan')){ $cols.=',foto_ktp_pasangan'; $ph.=',?'; $ins[]=($fotoPasangan!==''?$fotoPasangan:null); }
+                foreach($profil as $kolom=>$nilai){$cols.=",$kolom";$ph.=',?';$ins[]=($nilai===''?null:$nilai);}
                 $db->prepare("INSERT INTO anggota($cols,tanggal_daftar) VALUES($ph,CURDATE())")->execute($ins);
                 $id=$db->lastInsertId();
             }
