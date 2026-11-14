@@ -23,7 +23,7 @@ function dendaUntukPembayaran($input, $otomatis, $tersimpan, $manual, $bolehUbah
     $ketetapan=$manual?(float)$tersimpan:(float)$otomatis;
     if (!$bolehUbah) {
         if ($input!=='' && (!is_numeric($input) || !is_finite((float)$input) || abs((float)$input-$ketetapan)>0.005)) {
-            throw new Exception('Teller tidak dapat mengubah denda. Diskon atau pemutihan harus diputuskan Admin.');
+            throw new Exception('Akun ini tidak dapat mengubah denda.');
         }
         return ['denda'=>$ketetapan,'manual'=>$manual?1:0];
     }

@@ -35,6 +35,16 @@ $stmt_pinjaman->bindParam(':anggota_id', $anggota_data['id']);
 $stmt_pinjaman->execute();
 $pinjaman_list = $stmt_pinjaman->fetchAll(PDO::FETCH_ASSOC);
 
+// Halaman anggota tidak melewati penyegaran global di includes/header.php
+// (penyegaran global memang hanya untuk Admin/Teller). Segarkan setiap pinjaman
+// milik anggota sebelum jadwal angsuran dibaca, agar keterlambatan yang baru
+// berjalan satu hari langsung menampilkan denda pada kunjungan pertama.
+foreach ($pinjaman_list as $pinjaman_row) {
+    if (in_array((string) ($pinjaman_row['status'] ?? ''), ['aktif', 'macet'], true)) {
+        perbaruiDendaOtomatis($db, true, (int) $pinjaman_row['id']);
+    }
+}
+
 $detailMap = [];
 foreach ($pinjaman_list as &$pinjaman_row) {
     $pinjaman_row['label_bunga'] = labelBungaRow($pinjaman_row);

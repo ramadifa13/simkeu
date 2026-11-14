@@ -2209,6 +2209,7 @@ button.ui-dash-btn-add:hover{
 .ui-pc-sign{height:100%}
 .ui-pc-footer{gap:.5rem}
 #pencairanModal .signature-canvas-wrap{padding:10px;overflow:hidden}
+#pencairanModal .ui-pc-sign .signature-canvas-wrap{margin-top:6px}
 #pencairanModal .signature-pad{
   display:block;width:100%!important;margin:0;height:160px!important;
   touch-action:none!important;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
@@ -2218,6 +2219,12 @@ button.ui-dash-btn-add:hover{
   #pencairanModal .signature-pad{height:140px!important}
   /* Satu kolom di tablet supaya area di luar canvas tetap bisa di-geser */
   #pencairanModal .ui-pc-form .row > [class*="col-md-6"]{flex:0 0 100%;max-width:100%}
+}
+/* Tablet membutuhkan bidang gores yang lebih tinggi agar tanda tangan tidak
+   melebar dan terpotong seperti pada canvas pendek. */
+@media (min-width:577px) and (max-width:991.98px){
+  #pencairanModal .signature-pad{height:210px!important}
+  #pencairanModal .ui-pc-sign .signature-canvas-wrap{margin-top:10px}
 }
 @media (max-width:767.98px){
   .ui-pc-hero{grid-template-columns:1fr}

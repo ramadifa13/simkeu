@@ -71,10 +71,12 @@ function checkoutItemAngsuran(PDO $db, int $id, string $denda_input, string $met
     if ($a['status'] === 'lunas') throw new Exception('Angsuran ke-'.$a['angsuran_ke'].' sudah dibayar.');
 
     $otomatis = hitungDendaAngsuran($db, $a, $a['jumlah_pinjaman']);
-    $nilai = dendaUntukPembayaran($denda_input, $otomatis['denda'], $a['denda'], !empty($a['denda_manual']), isAdmin());
+    // Kebijakan operasional sementara: Admin dan Teller boleh menetapkan nominal
+    // dari modal pembayaran. Perubahan tetap tersimpan sebagai denda manual dan diaudit.
+    $nilai = dendaUntukPembayaran($denda_input, $otomatis['denda'], $a['denda'], !empty($a['denda_manual']), isAdmin() || isTeller());
     $denda = (float) $nilai['denda'];
     $ketetapan = !empty($a['denda_manual']) ? (float)$a['denda'] : (float)$otomatis['denda'];
-    if (isAdmin() && $denda < $ketetapan && !$db->query('SELECT pemutihan FROM layanan_pengaturan WHERE id=1')->fetchColumn()) {
+    if ($denda < $ketetapan && !$db->query('SELECT pemutihan FROM layanan_pengaturan WHERE id=1')->fetchColumn()) {
         throw new Exception('Pemutihan sedang dinonaktifkan.');
     }
     $cek = $db->prepare('SELECT COALESCE(SUM(jumlah),0) FROM layanan_bayar_denda WHERE angsuran_id=?');
@@ -290,11 +292,11 @@ if ($_POST) {
 
             // Hitung denda otomatis; nilai berbeda dari hitungan = manual
             $denda_auto = hitungDendaAngsuran($db, $angsuran_data, $angsuran_data['jumlah_pinjaman']);
-            $nilaiDenda=dendaUntukPembayaran($denda_input,$denda_auto['denda'],$angsuran_data['denda'],!empty($angsuran_data['denda_manual']),isAdmin());
+            $nilaiDenda=dendaUntukPembayaran($denda_input,$denda_auto['denda'],$angsuran_data['denda'],!empty($angsuran_data['denda_manual']),isAdmin() || isTeller());
             $denda=$nilaiDenda['denda'];
             $denda_manual=$nilaiDenda['manual'];
             $ketetapanDenda=!empty($angsuran_data['denda_manual'])?(float)$angsuran_data['denda']:$denda_auto['denda'];
-            if (isAdmin() && $denda<$ketetapanDenda && !$db->query('SELECT pemutihan FROM layanan_pengaturan WHERE id=1')->fetchColumn()) {
+            if ($denda<$ketetapanDenda && !$db->query('SELECT pemutihan FROM layanan_pengaturan WHERE id=1')->fetchColumn()) {
                 throw new Exception('Pemutihan sedang dinonaktifkan.');
             }
             $cekDenda=$db->prepare('SELECT COALESCE(SUM(jumlah),0) FROM layanan_bayar_denda WHERE angsuran_id=?');
@@ -608,6 +610,7 @@ function angsuranItemAksiMenu(PDO $db, array $angsuran, array $keranjangIds, $pb
             'data-total' => $angsuran['jumlah_angsuran'],
             'data-denda_auto' => $d_auto['denda'],
             'data-denda' => $d_nilai,
+            'data-denda_manual' => !empty($angsuran['denda_manual']) ? '1' : '0',
             'data-lelang' => layananSiap($db) ? layananKreditLelang($db, $angsuran['pinjaman_id']) : 0,
             'data-kredit' => (float) $angsuran['denda_dibayar'],
             'data-denda_info' => $d_info,
@@ -1181,8 +1184,8 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                         <section class="ui-form-section ui-pj-section ui-ag-section">
                             <h6 class="ui-form-section-title"><i class="ti ti-alert-triangle" aria-hidden="true"></i>2. Denda</h6>
                             <div class="mb-0">
-                                <label for="bayar_denda" class="form-label">Denda<?php echo isAdmin() ? '' : ' (otomatis)'; ?></label>
-                                <input type="number" class="form-control" id="bayar_denda" name="denda" <?php echo isAdmin()?'':'readonly'; ?> value="0" min="0" step="1">
+                                <label for="bayar_denda" class="form-label" id="bayar_denda_label">Denda (dapat diubah)</label>
+                                <input type="number" class="form-control" id="bayar_denda" name="denda" value="0" min="0" step="1">
                                 <div class="form-text" id="bayar_denda_info"></div>
                             </div>
                         </section>
@@ -1398,9 +1401,21 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                 bayarModal.dataset.kredit = kredit;
                 document.getElementById('bayar_total').value = 'Rp ' + total.toLocaleString('id-ID');
                 var denda = Number(button.getAttribute('data-denda'));
+                var dendaManual = button.getAttribute('data-denda_manual') === '1';
                 bayarModal.dataset.dendaOtomatis = button.getAttribute('data-denda_auto');
                 document.getElementById('bayar_denda').value = denda;
-                document.getElementById('bayar_denda_info').textContent = button.getAttribute('data-denda_info') || '';
+                var dendaLabel = document.getElementById('bayar_denda_label');
+                if (dendaLabel) {
+                    dendaLabel.textContent = dendaManual
+                        ? 'Denda (ketetapan Admin)'
+                        : 'Denda (dapat diubah)';
+                }
+                var dendaInfo = button.getAttribute('data-denda_info') || '';
+                if (dendaManual) {
+                    dendaInfo = 'Nilai ditetapkan Admin sebesar Rp ' + denda.toLocaleString('id-ID')
+                        + ' dan tidak ditimpa otomatis. Acuan saat ini: ' + dendaInfo;
+                }
+                document.getElementById('bayar_denda_info').textContent = dendaInfo;
             });
             var dendaInput = document.getElementById('bayar_denda');
             if (dendaInput) {

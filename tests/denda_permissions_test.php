@@ -20,6 +20,8 @@ rejectDenda('1e999',90000,90000,false,false);
 rejectDenda([],90000,90000,false,false);
 expectDenda(dendaUntukPembayaran('50000',90000,90000,false,true),['denda'=>50000.0,'manual'=>1],'Admin boleh menetapkan denda');
 expectDenda(dendaUntukPembayaran('',90000,50000,true,true),['denda'=>90000.0,'manual'=>0],'Admin boleh kembali ke otomatis');
+expectDenda(dendaUntukPembayaran('50000',90000,90000,false,true),['denda'=>50000.0,'manual'=>1],'Teller berizin sementara menetapkan denda');
+expectDenda(dendaUntukPembayaran('',90000,50000,true,true),['denda'=>90000.0,'manual'=>0],'Teller berizin sementara kembali ke otomatis');
 rejectDenda('-1',90000,90000,false,true);
 rejectDenda('1e999',90000,90000,false,true);
 echo "Semua $count pengujian hak nominal denda lulus.\n";
