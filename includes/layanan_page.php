@@ -560,7 +560,7 @@ $stmt=$db->prepare('SELECT * FROM layanan_pembayaran WHERE pinjaman_id=? AND dib
 </div><!-- /.ui-tx-page -->
 <?php include __DIR__ . '/layout/shell_end.php'; ?>
 <?php layananRenderModals(); ?>
-<script src="../assets/js/denda-form.js?v=1"></script>
+<script src="../assets/js/denda-form.js?v=2"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.badge').forEach(function (badge) {

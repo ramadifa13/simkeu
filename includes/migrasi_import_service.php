@@ -349,17 +349,14 @@ function migrasiImportFinal(PDO $db,$path,$userId=null){
         foreach($data['Pendanaan_Dapin']??[] as $r){$code=trim((string)$r['ID Dapin*']);if($code==='')continue;migrasiKas($db,'dapin-'.$code,'masuk',migrasiUang($r['Modal Diterima (Rp)*']),migrasiTanggal($r['Tanggal Dana Diterima*'],'tanggal Dapin'),'Modal pendanaan Dapin '.$code);}
         // Status nasabah mengikuti sheet Nasabah (jangan timpa nonaktif yang disengaja).
         // Setelah Reset Total, isi Status=aktif di Excel untuk nasabah yang masih beroperasi.
-        // Cut-off migrasi: bekukan denda berjalan di cicilan belum lunas (0 + manual)
-        // supaya Laporan Denda hanya menampilkan riwayat historis yang diimpor
-        // (mis. Solikah 25/09 & Maslukah 15/10), bukan tagihan otomatis dari hari ini.
+        // Cicilan existing yang masih terbuka harus langsung mengikuti denda otomatis.
+        // Batasi ke pinjaman hasil import agar proses import tidak mengubah pinjaman lain.
         if (kolomAda($db, 'angsuran', 'denda_manual')) {
             $db->exec(
-                "UPDATE angsuran
-                 SET denda = 0,
-                     keterlambatan_hari = 0,
-                     denda_manual = 1,
-                     status = CASE WHEN status = 'telat' THEN 'belum_bayar' ELSE status END
-                 WHERE status IN ('belum_bayar', 'telat')"
+                "UPDATE angsuran a
+                 JOIN migrasi_import_item mi ON mi.jenis = 'pinjaman' AND mi.target_id = a.pinjaman_id
+                 SET a.denda_manual = 0
+                 WHERE a.status IN ('belum_bayar', 'telat')"
             );
         }
         migrasiRekalkulasiKas($db);

@@ -124,6 +124,35 @@ if (!function_exists('perbaruiDendaOtomatis')) {
             return 0;
         }
         $hari_ini = date('Y-m-d');
+
+        // Versi import lama membekukan semua cicilan existing sebagai denda manual Rp 0.
+        // Lepaskan sekali saja khusus pinjaman hasil import. Keputusan diskon/pemutihan
+        // Admin dikecualikan agar tidak hidup kembali.
+        try {
+            if (!($db instanceof PDO)) {
+                throw new RuntimeException('Normalisasi hanya dijalankan pada koneksi PDO.');
+            }
+            $sudah_normal = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'denda_import_otomatis_v2'");
+            $sudah_normal->execute();
+            if ($sudah_normal->fetchColumn() !== '1') {
+                $db->exec("UPDATE angsuran a
+                           JOIN migrasi_import_item mi ON mi.jenis = 'pinjaman' AND mi.target_id = a.pinjaman_id
+                           SET a.denda_manual = 0
+                           WHERE a.status IN ('belum_bayar','telat')
+                             AND a.denda_manual = 1 AND a.denda = 0
+                             AND NOT EXISTS (
+                                 SELECT 1 FROM layanan_audit la
+                                 WHERE la.pinjaman_id = a.pinjaman_id
+                                   AND la.aksi IN ('diskon_denda','putuskan_hapus_denda')
+                             )");
+                $db->prepare("INSERT INTO settings (setting_key, setting_value)
+                              VALUES ('denda_import_otomatis_v2', '1')
+                              ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)")->execute();
+            }
+        } catch (Throwable $e) {
+            // Instalasi yang belum memiliki tabel migrasi tetap memakai alur lama.
+        }
+
         if (!$paksa && $pinjaman_id === null) {
             $stmt = $db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'denda_dihitung_tanggal'");
             $stmt->execute();
