@@ -28,17 +28,7 @@ function prosesLayanan($db, $aksi, $id, &$files) {
         $db->prepare("UPDATE layanan_laporan_macet SET status=?,keputusan=?,admin_id=?,diputuskan_at=NOW() WHERE id=? AND pinjaman_id=? AND status='menunggu'")->execute([$keputusan,$catatan,$uid,(int)$_POST['laporan_id'],$id]);
     } elseif ($aksi === 'reschedule') {
         layananAdmin();
-        $tanggal = $_POST['tanggal'] ?? '';
-        $dt = DateTime::createFromFormat('!Y-m-d',$tanggal);
-        if (!$dt || $dt->format('Y-m-d') !== $tanggal || $tanggal <= date('Y-m-d') || strlen($catatan) < 5) throw new Exception('Isi jatuh tempo baru setelah hari ini dan alasan perpanjangan.');
-        if ($p['status'] === 'lunas') throw new Exception('Pinjaman sudah lunas.');
-        $s = $db->prepare("SELECT MIN(tanggal_jatuh_tempo) FROM angsuran WHERE pinjaman_id=? AND status<>'lunas'"); $s->execute([$id]); $lama=$s->fetchColumn();
-        if (!$lama || $tanggal <= $lama) throw new Exception('Tanggal baru harus setelah jatuh tempo lama.');
-        $geser=(new DateTime($lama))->diff(new DateTime($tanggal))->days;
-        // Pertahankan denda yang sudah terutang; reschedule tidak memutihkan diam-diam.
-        $db->prepare("UPDATE angsuran SET tanggal_jatuh_tempo=DATE_ADD(tanggal_jatuh_tempo,INTERVAL $geser DAY),denda_manual=1,status='belum_bayar' WHERE pinjaman_id=? AND status<>'lunas'")->execute([$id]);
-        $db->prepare('UPDATE pinjaman SET jatuh_tempo=(SELECT MAX(tanggal_jatuh_tempo) FROM angsuran WHERE pinjaman_id=?) WHERE id=?')->execute([$id,$id]);
-        $catatan='Jadwal digeser '.$geser.' hari. '.$catatan;
+        throw new Exception('Rescheduling sementara dinonaktifkan. Gunakan proses rescheduling baru setelah jadwal, sisa keuntungan, pembebasan denda, dan audit dibuat dalam satu transaksi.');
     } elseif ($aksi === 'eksekusi') {
         layananAdmin();
         if ($p['status']==='lunas' || !$p['memerlukan_jaminan'] || strlen($catatan)<5) throw new Exception('Eksekusi membutuhkan pinjaman belum lunas dengan jaminan dan catatan keputusan.');

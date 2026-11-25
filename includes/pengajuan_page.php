@@ -27,6 +27,7 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
     $tenor = (int) $_POST['tenor'];
     $frekuensi = isset($_POST['frekuensi']) ? $_POST['frekuensi'] : '';
     $tujuan_pinjaman = $_POST['tujuan_pinjaman'];
+    $kelompok_angsuran_input = (int)($_POST['kelompok_angsuran_id'] ?? 0);
     $user_id = $_SESSION['user_id'];
     $kategori_shu_input = $_POST['kategori_shu'] ?? 'anggota';
     $ketua_kelompok_input = $_POST['ketua_kelompok_id'] ?? 0;
@@ -76,6 +77,12 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
             }
         }
         list($kategori_shu, $ketua_kelompok_id) = shuValidasiProfil($db, $anggota_id, $kategori_shu_input, $ketua_kelompok_input);
+        $kelompok_angsuran_id = null;
+        if ($kelompok_angsuran_input > 0) {
+            $qKelompok=$db->prepare("SELECT id FROM kelompok_angsuran WHERE id=? AND status='aktif'");$qKelompok->execute([$kelompok_angsuran_input]);
+            if(!$qKelompok->fetchColumn())throw new InvalidArgumentException('Kelompok angsuran tidak aktif atau tidak ditemukan.');
+            $kelompok_angsuran_id=$kelompok_angsuran_input;
+        }
 
         // Satu anggota maksimal satu pinjaman belum lunas untuk setiap kategori:
         // satu tanpa jaminan dan satu gadai boleh berjalan bersamaan.
@@ -141,13 +148,11 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
             throw new Exception("Jumlah pinjaman harus berupa angka rupiah penuh lebih dari 0");
         }
 
+        $batas_pengajuan = batasNominalPinjaman($db, (int)$anggota_id, (float)$jenis_info['maksimal_pinjaman']);
+        validasiNominalPinjaman((float)$jumlah_pinjaman, $batas_pengajuan);
+
         $fasilitas_prioritas=empty($_POST['fasilitas_prioritas'])?0:1;
         layananValidasiPrioritas($db,$anggota_id,$jumlah_pinjaman,$kategori_gadai,$fasilitas_prioritas);
-        // Validate maksimal pinjaman
-        if ($jumlah_pinjaman > $jenis_info['maksimal_pinjaman']) {
-            throw new Exception("Jumlah pinjaman melebihi batas maksimal. Maksimal: " . formatRupiah($jenis_info['maksimal_pinjaman']));
-        }
-        
         // Validate tenor & bunga: hanya tenor yang punya tarif flat di jenis pinjaman ini
         $tarif = !empty($jenis_info['memerlukan_jaminan'])
             ? [1 => 15, 2 => 15, 3 => 15, 4 => 15, 5 => 15, 6 => 15]
@@ -200,10 +205,11 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
                 $nomor_seri = $wajib('hp_nomor_seri', 'Nomor seri HP');
                 $nomor_model = $wajib('hp_nomor_model', 'Nomor model HP');
                 $kelengkapan = $wajib('hp_kelengkapan', 'Kelengkapan HP');
+                $kapasitasMemori = $wajib('hp_kapasitas_memori', 'Kapasitas memori HP');
                 $kondisi = $wajib('hp_kondisi', 'Kondisi HP');
                 $jenis_barang = 'HP - ' . $jenis;
                 $identitas_barang = 'IMEI: ' . $imei;
-                $deskripsi_barang = "Merk/tipe: $merk\nWarna: $warna\nNomor seri: $nomor_seri\nNomor model: $nomor_model\nKelengkapan: $kelengkapan\nKondisi: $kondisi";
+                $deskripsi_barang = "Merk/tipe: $merk\nWarna: $warna\nKapasitas memori: $kapasitasMemori\nNomor seri: $nomor_seri\nNomor model: $nomor_model\nKelengkapan: $kelengkapan\nKondisi: $kondisi";
             } elseif ($kategori === 'sepeda_motor') {
                 $jenis = $wajib('motor_jenis_kendaraan', 'Jenis kendaraan');
                 $merk = $wajib('motor_merk_tipe', 'Merk/tipe kendaraan');
@@ -212,12 +218,11 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
                 $rangka = $wajib('motor_no_rangka', 'Nomor rangka');
                 $mesin = $wajib('motor_no_mesin', 'Nomor mesin');
                 $warna = $wajib('motor_warna', 'Warna kendaraan');
-                $atas_nama = $wajib('motor_atas_nama_bpkb', 'Atas nama BPKB');
-                $no_bpkb = $wajib('motor_no_bpkb', 'Nomor BPKB');
+                $pemilikStnk = $wajib('motor_nama_pemilik_stnk', 'Nama pemilik STNK');
                 $kondisi = $wajib('motor_kondisi', 'Kondisi sepeda motor');
                 $jenis_barang = 'Sepeda Motor - ' . $jenis;
-                $identitas_barang = "Nopol: $nopol; BPKB: $no_bpkb";
-                $deskripsi_barang = "Merk/tipe: $merk\nTahun: $tahun\nNo. rangka: $rangka\nNo. mesin: $mesin\nWarna: $warna\nAtas nama BPKB: $atas_nama\nKondisi: $kondisi";
+                $identitas_barang = "Nopol: $nopol; Nama pemilik STNK: $pemilikStnk";
+                $deskripsi_barang = "Merk/tipe: $merk\nTahun: $tahun\nNo. rangka: $rangka\nNo. mesin: $mesin\nWarna: $warna\nNama pemilik STNK: $pemilikStnk\nKondisi: $kondisi";
             } elseif ($kategori === 'emas') {
                 $jenis = $wajib('emas_jenis_barang', 'Jenis barang emas');
                 $berat = $wajib('emas_berat', 'Berat emas');
@@ -237,6 +242,8 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
                 // Kolom lama tetap diisi 0 agar kompatibel dengan database yang
                 // mewajibkan nilai, tetapi tidak lagi dipakai oleh proses bisnis.
                 'nilai_taksiran' => 0,
+                'kapasitas_memori' => $kategori === 'hp' ? $kapasitasMemori : null,
+                'nama_pemilik_stnk' => $kategori === 'sepeda_motor' ? $pemilikStnk : null,
             ];
         }
 
@@ -264,15 +271,18 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
 
         // Insert pengajuan (skema flat)
         $query = "INSERT INTO pengajuan_pinjaman (kode_pengajuan, anggota_id, jenis_pinjaman_id,
-                  jumlah_pinjaman, tenor, bunga, skema_bunga, frekuensi, tujuan_pinjaman, user_id, tanggal_pengajuan, hari_angsuran, fasilitas_prioritas, kategori_shu, ketua_kelompok_id)
+                  jumlah_pinjaman, tenor, bunga, skema_bunga, frekuensi, tujuan_pinjaman, user_id, tanggal_pengajuan, hari_angsuran, kelompok_angsuran_id, fasilitas_prioritas, kategori_shu, ketua_kelompok_id, batas_pinjaman_snapshot, nasabah_lanjutan)
                   VALUES (:kode_pengajuan, :anggota_id, :jenis_pinjaman_id,
-                  :jumlah_pinjaman, :tenor, :bunga, 'flat', :frekuensi, :tujuan_pinjaman, :user_id, :tanggal_pengajuan, :hari_angsuran, :fasilitas_prioritas, :kategori_shu, :ketua_kelompok_id)";
+                  :jumlah_pinjaman, :tenor, :bunga, 'flat', :frekuensi, :tujuan_pinjaman, :user_id, :tanggal_pengajuan, :hari_angsuran, :kelompok_angsuran_id, :fasilitas_prioritas, :kategori_shu, :ketua_kelompok_id, :batas_pinjaman_snapshot, :nasabah_lanjutan)";
         $stmt = $db->prepare($query);
         $stmt->bindValue(':fasilitas_prioritas',$fasilitas_prioritas,PDO::PARAM_INT);
         $stmt->bindValue(':kategori_shu',$kategori_shu);
         $stmt->bindValue(':ketua_kelompok_id',$ketua_kelompok_id,$ketua_kelompok_id===null?PDO::PARAM_NULL:PDO::PARAM_INT);
+        $stmt->bindValue(':batas_pinjaman_snapshot',(float)$batas_pengajuan['maksimum']);
+        $stmt->bindValue(':nasabah_lanjutan',(int)$batas_pengajuan['lanjutan'],PDO::PARAM_INT);
         $stmt->bindParam(':tanggal_pengajuan', $waktu_ajuan);
         $stmt->bindValue(':hari_angsuran', $hari_angsuran, $hari_angsuran === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->bindValue(':kelompok_angsuran_id', $kelompok_angsuran_id, $kelompok_angsuran_id === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
         $stmt->bindParam(':kode_pengajuan', $kode_pengajuan);
         $stmt->bindParam(':anggota_id', $anggota_id);
         $stmt->bindParam(':jenis_pinjaman_id', $jenis_pinjaman_id);
@@ -286,10 +296,10 @@ if ($_POST && isset($_POST['ajukan_pinjaman'])) {
         $pengajuan_id = $db->lastInsertId();
         if ($jaminan !== null) {
             $stmt_jaminan = $db->prepare("INSERT INTO jaminan_pinjaman
-                (pengajuan_id, jenis_barang, identitas_barang, deskripsi_barang, nilai_taksiran, status_jaminan)
-                VALUES (?, ?, ?, ?, ?, 'dititipkan')");
+                (pengajuan_id, jenis_barang, identitas_barang, deskripsi_barang, nilai_taksiran, status_jaminan, kapasitas_memori, nama_pemilik_stnk)
+                VALUES (?, ?, ?, ?, ?, 'dititipkan', ?, ?)");
             $stmt_jaminan->execute([$pengajuan_id, $jaminan['jenis_barang'], $jaminan['identitas_barang'],
-                $jaminan['deskripsi_barang'], $jaminan['nilai_taksiran']]);
+                $jaminan['deskripsi_barang'], $jaminan['nilai_taksiran'], $jaminan['kapasitas_memori'], $jaminan['nama_pemilik_stnk']]);
         }
         if ($dokumenAgtj) simpanDokumenAnggota($db, $anggota_id, $dokumenAgtj, $anggota_info);
 
@@ -313,7 +323,14 @@ $query_anggota = "SELECT * FROM anggota ORDER BY status = 'aktif' DESC, nama_len
 $stmt_anggota = $db->prepare($query_anggota);
 $stmt_anggota->execute();
 $anggota_list = $stmt_anggota->fetchAll(PDO::FETCH_ASSOC);
+$limitAnggotaQ = $db->query("SELECT a.id,
+    (SELECT p.jumlah_pinjaman FROM pinjaman p WHERE p.anggota_id=a.id AND p.status='lunas' ORDER BY COALESCE(p.tanggal_lunas,p.tanggal_pencairan) DESC,p.id DESC LIMIT 1) AS terakhir_lunas,
+    (SELECT l.batas_maksimum FROM pengajuan_limit_pinjaman l WHERE l.anggota_id=a.id AND l.aktif=1 ORDER BY l.dibuat_pada DESC,l.id DESC LIMIT 1) AS limit_admin
+    FROM anggota a");
+$limitAnggota = [];
+foreach($limitAnggotaQ->fetchAll(PDO::FETCH_ASSOC) as $li) $limitAnggota[(int)$li['id']]=$li;
 $ketua_kelompok_list = array_values(array_filter($anggota_list, function($a){ return ($a['kategori_shu'] ?? 'anggota') === 'ketua_kelompok'; }));
+$kelompok_angsuran_list = $db->query("SELECT id,kode,nama FROM kelompok_angsuran WHERE status='aktif' ORDER BY nama")->fetchAll(PDO::FETCH_ASSOC);
 
 $query_jenis = "SELECT * FROM jenis_pinjaman WHERE status = 'aktif' ORDER BY nama_jenis";
 $stmt_jenis = $db->prepare($query_jenis);
@@ -534,6 +551,8 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
                                             <option value="">-- Pilih anggota --</option>
                                             <?php foreach ($anggota_list as $anggota): ?>
                                             <option value="<?= (int)$anggota['id'] ?>"
+                                                    data-terakhir-lunas="<?= htmlspecialchars((string)($limitAnggota[(int)$anggota['id']]['terakhir_lunas'] ?? ''), ENT_QUOTES) ?>"
+                                                    data-limit-admin="<?= htmlspecialchars((string)($limitAnggota[(int)$anggota['id']]['limit_admin'] ?? ''), ENT_QUOTES) ?>"
                                                     data-kategori-shu="<?= htmlspecialchars($anggota['kategori_shu'] ?? 'anggota') ?>"
                                                     data-ketua-id="<?= (int)($anggota['ketua_kelompok_id'] ?? 0) ?>"
                                                     data-kode-utama="<?= htmlspecialchars($anggota['kode_anggota'] ?? '') ?>"
@@ -643,6 +662,7 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
                                         </div>
                                         <input type="hidden" name="jumlah_pinjaman" id="jumlahPinjaman" value="">
                                         <small class="text-muted" id="maxInfo"></small>
+                                        <div class="alert alert-warning py-2 mt-2 mb-0" id="limitPeringatan" hidden></div>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label" for="tenorSelect">Tenor *</label>
@@ -680,6 +700,7 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
                                         <div class="col-md-6"><label class="form-label">Nomor seri *</label><input class="form-control detail-required" name="hp_nomor_seri"></div>
                                         <div class="col-md-6"><label class="form-label">Nomor model *</label><input class="form-control detail-required" name="hp_nomor_model"></div>
                                         <div class="col-md-6"><label class="form-label">Kelengkapan *</label><input class="form-control detail-required" name="hp_kelengkapan"></div>
+                                        <div class="col-md-6"><label class="form-label">Kapasitas memori *</label><input class="form-control detail-required" name="hp_kapasitas_memori" placeholder="128 GB"></div>
                                         <div class="col-md-6"><label class="form-label">Kondisi *</label><input class="form-control detail-required" name="hp_kondisi"></div>
                                     </div>
                                 </div>
@@ -692,8 +713,7 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
                                         <div class="col-md-4"><label class="form-label">Warna *</label><input class="form-control detail-required" name="motor_warna"></div>
                                         <div class="col-md-6"><label class="form-label">No. rangka *</label><input class="form-control detail-required" name="motor_no_rangka"></div>
                                         <div class="col-md-6"><label class="form-label">No. mesin *</label><input class="form-control detail-required" name="motor_no_mesin"></div>
-                                        <div class="col-md-6"><label class="form-label">Atas nama BPKB *</label><input class="form-control detail-required" name="motor_atas_nama_bpkb"></div>
-                                        <div class="col-md-6"><label class="form-label">No. BPKB *</label><input class="form-control detail-required" name="motor_no_bpkb"></div>
+                                        <div class="col-md-6"><label class="form-label">Nama pemilik STNK *</label><input class="form-control detail-required" name="motor_nama_pemilik_stnk"></div>
                                         <div class="col-12"><label class="form-label">Kondisi *</label><input class="form-control detail-required" name="motor_kondisi"></div>
                                     </div>
                                 </div>
@@ -737,6 +757,14 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
                                             <?php endforeach; ?>
                                         </select>
                                         <small class="text-muted">Untuk filter menu Angsuran</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="kelompokAngsuran">Kelompok penagihan</label>
+                                        <select name="kelompok_angsuran_id" id="kelompokAngsuran" class="form-select">
+                                            <option value="0">Belum ditetapkan</option>
+                                            <?php foreach($kelompok_angsuran_list as $kelompok): ?><option value="<?= (int)$kelompok['id'] ?>"><?= htmlspecialchars($kelompok['kode'].' · '.$kelompok['nama']) ?></option><?php endforeach; ?>
+                                        </select>
+                                        <small class="text-muted"><?= $kelompok_angsuran_list ? 'Opsional; dapat diubah melalui permohonan mutasi kelompok.' : 'Belum ada kelompok aktif. Admin dapat membuatnya di menu Kelompok Angsuran.' ?></small>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label" for="tanggalPengajuan">Tanggal pengajuan *</label>
@@ -915,6 +943,29 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
             jumlahHidden.value = n > 0 ? String(n) : '';
             jumlahDisplay.value = n ? n.toLocaleString('id-ID') : '';
             updateCalculation();
+        }
+
+        function batasAktif() {
+            const produk = jenisSelect.options[jenisSelect.selectedIndex];
+            const anggota = anggotaSelect.options[anggotaSelect.selectedIndex];
+            if (!produk || !produk.value || !anggota || !anggota.value) return {minimum:0,maksimum:0,produk:0};
+            const productMax = Number(produk.getAttribute('data-maksimal')) || 0;
+            const last = Number(anggota.getAttribute('data-terakhir-lunas')) || 0;
+            const adminRaw = anggota.getAttribute('data-limit-admin');
+            const policyMax = last > 0 ? last + 2000000 : 2000000;
+            return {minimum:last > 0 ? 500000 : 1000000, maksimum:Math.min(productMax,policyMax,adminRaw ? Number(adminRaw) : Infinity),produk:productMax,policy:policyMax,admin:adminRaw ? Number(adminRaw) : Infinity};
+        }
+        function tampilkanBatasAktif() {
+            const b=batasAktif();
+            const info=document.getElementById('maxInfo');
+            const alert=document.getElementById('limitPeringatan');
+            if(!b.maksimum){info.textContent='Pilih anggota dan jenis pinjaman untuk melihat batas.';alert.hidden=true;return b;}
+            info.textContent='Minimum: '+formatRp(b.minimum)+' · Maksimal yang dapat diajukan: '+formatRp(b.maksimum)+' · Kelipatan Rp500.000';
+            const dibatasi=b.maksimum < b.produk;
+            alert.hidden=!dibatasi;
+            if(dibatasi) alert.textContent='Peringatan: batas kebijakan nasabah atau limit Admin membatasi produk ini sampai '+formatRp(b.maksimum)+'. Pengajuan di atas batas akan ditolak.';
+            jumlahHidden.setAttribute('max',String(b.maksimum));
+            return b;
         }
         function getTarifTerpilih() {
             const opt = jenisSelect.selectedOptions[0];
@@ -1111,13 +1162,11 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
                 updateCalculation();
                 return;
             }
-            const maksimal = parseInt(selectedOption.getAttribute('data-maksimal'), 10) || 0;
+            const maksimal = tampilkanBatasAktif().maksimum;
             const tarif = getTarifTerpilih();
             const frekuensi = (selectedOption.getAttribute('data-frekuensi') || 'bulanan').split(',');
 
-            document.getElementById('maxInfo').textContent = 'Maksimal: ' + formatRp(maksimal);
             document.getElementById('tenorInfo').textContent = 'Tenor tersedia: ' + Object.keys(tarif).join(', ') + ' bulan';
-            jumlahHidden.setAttribute('max', String(maksimal));
             setAmount(maksimal);
 
             Object.keys(tarif).forEach(function (t) {
@@ -1179,7 +1228,7 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
                 }
                 const akhir = h.rincian[h.rincian.length - 1].jumlah;
                 document.getElementById('displayBunga').textContent = gadai
-                    ? tarif[tenor] + '% + Rp ' + h.biayaMingguanGadai.toLocaleString('id-ID') + '/minggu'
+                    ? tarif[tenor] + '% + Rp ' + h.biayaMingguanGadai.toLocaleString('id-ID') + '/minggu' + (h.tambahanTenorGadai > 0 ? ' + biaya tenor Rp ' + h.tambahanTenorGadai.toLocaleString('id-ID') : '')
                     : (frekuensi === 'dua_mingguan' ? '45%' : tarif[tenor] + '%');
                 document.getElementById('displayTotal').textContent = formatRp(h.total);
                 document.getElementById('labelAngsuran').textContent = 'Angsuran/' + labelPeriode(frekuensi);
@@ -1196,10 +1245,12 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
             if (!anggotaSelect.value) { window.uiToast && uiToast('warning', 'Pilih anggota terlebih dahulu'); return false; }
             if (!jenisSelect.value) { window.uiToast && uiToast('warning', 'Pilih jenis pinjaman terlebih dahulu'); return false; }
             const selectedOption = jenisSelect.options[jenisSelect.selectedIndex];
-            const maksimal = selectedOption ? parseInt(selectedOption.getAttribute('data-maksimal'), 10) : 0;
+            const batas = tampilkanBatasAktif();
+            const maksimal = batas.maksimum;
             const jumlah = parseRp(jumlahHidden.value);
             const tenor = parseInt(tenorSelect.value, 10) || 0;
-            if (jumlah <= 0) { window.uiToast && uiToast('warning', 'Jumlah pinjaman harus lebih dari 0'); jumlahDisplay.focus(); return false; }
+            if (jumlah < batas.minimum) { window.uiToast && uiToast('warning', 'Minimum pengajuan untuk nasabah ini ' + formatRp(batas.minimum)); jumlahDisplay.focus(); return false; }
+            if (jumlah % 500000 !== 0) { window.uiToast && uiToast('warning', 'Nominal harus kelipatan Rp500.000'); jumlahDisplay.focus(); return false; }
             if (jumlah > maksimal) { window.uiToast && uiToast('warning', 'Jumlah melebihi maksimal ' + formatRp(maksimal)); jumlahDisplay.focus(); return false; }
             if (!tenor) { window.uiToast && uiToast('warning', 'Pilih tenor'); return false; }
             const gadai = selectedOption && selectedOption.getAttribute('data-jaminan') === '1';
@@ -1264,7 +1315,7 @@ $prefillAnggotaId = isset($_GET['anggota_id']) && is_numeric($_GET['anggota_id']
         }
 
         jumlahDisplay.addEventListener('input', function () { setAmount(parseRp(this.value)); });
-        anggotaSelect.addEventListener('change', function () { sesuaikanPeranShu(true); sesuaikanDokumenAgtjAgt(); });
+        anggotaSelect.addEventListener('change', function () { sesuaikanPeranShu(true); sesuaikanDokumenAgtjAgt(); if(jenisSelect.value) updateJenisMeta(); });
         document.getElementById('kategori_shu_pengajuan').addEventListener('change', function () { sesuaikanPeranShu(false); });
         jenisSelect.addEventListener('change', updateJenisMeta);
         tenorSelect.addEventListener('change', updateCalculation);

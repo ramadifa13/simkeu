@@ -3,7 +3,7 @@
  * Denda keterlambatan angsuran.
  *
  * Aturan (klien, Okt 2026):
- *  - Dengan jaminan: Rp 5.000/hari per Rp 1 juta pinjaman (kelipatan juta penuh).
+ *  - Dengan jaminan AGTJ: Rp 10.000/minggu per Rp 1 juta pinjaman; pecahan minggu dibulatkan ke atas.
  *  - Tanpa jaminan: denda nominal tetap PER HARI menurut tabel denda_tarif:
  *    Rp 1 jt = 1.500/hari, Rp 2 jt = 2.500/hari, Rp 3 jt = 3.500/hari.
  *  - Hari keterlambatan dihitung mulai hari SETELAH jatuh tempo, sampai jatuh tempo cicilan
@@ -49,9 +49,10 @@ if (!function_exists('dendaPerHari')) {
         if ($memerlukan_jaminan) {
             // Pengajuan gadai hanya menerima kelipatan Rp 1 juta. Data lama di luar
             // kelipatan mengikuti tingkat juta di bawahnya, minimal satu tingkat.
-            $tarif_jaminan=5000.0;
+            $tarif_jaminan=10000.0;
             if (function_exists('layananSiap') && layananSiap($db)) {
                 $tarif_jaminan=(float)$db->query('SELECT denda_jaminan_per_juta FROM layanan_pengaturan WHERE id=1')->fetchColumn();
+                if ($tarif_jaminan <= 5000) $tarif_jaminan = 10000;
             }
             return max(1, floor((float) $jumlah_pinjaman / 1000000)) * $tarif_jaminan;
         }
@@ -102,12 +103,23 @@ if (!function_exists('hitungDendaAngsuran')) {
             $batas = (int) $jatuh_tempo->diff(new DateTime($berikutnya))->format('%a');
         }
 
-        $hasil = dendaDariParameter($per_hari, $hari_telat, $batas);
+        $mingguDitagih=null;
+        if (!empty($a['memerlukan_jaminan'])) {
+            // AGTJ dikenakan per minggu kalender keterlambatan; 1–6 hari = 1 minggu.
+            $hariDitagih = max(0, min($hari_telat, $batas ?? $hari_telat));
+            $mingguDitagih=(int)ceil($hariDitagih/7);
+            $hasil = ['hari_dihitung'=>$hariDitagih,'denda'=>$per_hari*$mingguDitagih];
+        } else {
+            $hasil = dendaDariParameter($per_hari, $hari_telat, $batas);
+        }
         return array(
             'hari_telat' => max(0, $hari_telat),
             'hari_dihitung' => $hasil['hari_dihitung'],
             'per_hari' => $per_hari,
             'denda' => $hasil['denda'],
+            'memerlukan_jaminan' => !empty($a['memerlukan_jaminan']),
+            'satuan_tarif' => !empty($a['memerlukan_jaminan']) ? 'minggu' : 'hari',
+            'minggu_dihitung' => $mingguDitagih,
         );
     }
 }

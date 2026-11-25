@@ -52,7 +52,7 @@ if (!function_exists('biayaMingguanGadai')) {
 
 if (!function_exists('hitungPinjamanGadai')) {
     /**
-     * Gadai: bunga dasar flat (umumnya 15%) + biaya mingguan x (tenor bulan x 4).
+     * Gadai: bunga dasar flat + biaya mingguan sesuai jumlah cicilan + biaya tenor >2 bulan.
      * Hasil tetap memakai hitungPinjaman agar pembulatan jadwal konsisten.
      */
     function hitungPinjamanGadai($pokok, $bunga_dasar, $tenor_bulan, $frekuensi) {
@@ -60,13 +60,20 @@ if (!function_exists('hitungPinjamanGadai')) {
         if ($biaya_mingguan === null) {
             throw new InvalidArgumentException('Nominal pinjaman gadai harus kelipatan Rp 1 juta');
         }
-        $tambahan = $biaya_mingguan * ((int) $tenor_bulan * 4);
+        // Tarif biaya tetap mingguan sepanjang tenor, tidak mengikuti frekuensi setoran.
+        // Contoh kontrak 6 bulan memakai 24 minggu meski angsuran dibayar bulanan/2 mingguan.
+        $jumlahMingguTenor = max(0, (int)$tenor_bulan) * 4;
+        $tambahan_mingguan = $biaya_mingguan * $jumlahMingguTenor;
+        $tambahan_tenor = (int)$tenor_bulan > 2 ? ((float)$pokok / 1000000) * 10000 * (int)$tenor_bulan : 0;
+        $tambahan = $tambahan_mingguan + $tambahan_tenor;
         $bunga_dasar_nominal = round((float) $pokok * (float) $bunga_dasar / 100);
         $bunga_efektif = (($bunga_dasar_nominal + $tambahan) / (float) $pokok) * 100;
         $hasil = hitungPinjaman($pokok, $bunga_efektif, $tenor_bulan, $frekuensi, 'flat');
         $hasil['bunga_dasar_persen'] = (float) $bunga_dasar;
         $hasil['biaya_mingguan_gadai'] = $biaya_mingguan;
         $hasil['tambahan_gadai'] = $tambahan;
+        $hasil['tambahan_tenor_gadai'] = $tambahan_tenor;
+        $hasil['tambahan_mingguan_gadai'] = $tambahan_mingguan;
         return $hasil;
     }
 }
@@ -295,14 +302,15 @@ if (!function_exists('buatPinjamanDanJadwal')) {
         $stmt = $db->prepare("INSERT INTO pinjaman
             (pengajuan_id, kode_pinjaman, anggota_id, jenis_pinjaman_id, jumlah_pinjaman, sisa_pokok,
              tenor, bunga, skema_bunga, frekuensi, jumlah_cicilan, total_pinjaman, angsuran_per_bulan,
-             tanggal_pencairan, jatuh_tempo, kategori_shu, ketua_kelompok_id, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'aktif')");
+             tanggal_pencairan, jatuh_tempo, kategori_shu, ketua_kelompok_id, kelompok_angsuran_id, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'aktif')");
         $stmt->execute([
             $pengajuan['id'], $kode_sementara, $pengajuan['anggota_id'], $pengajuan['jenis_pinjaman_id'],
             $hitung['pokok'], $hitung['pokok'], $hitung['tenor'], $hitung['bunga_persen'],
             $hitung['skema'], $hitung['frekuensi'], $n, $hitung['total'], $hitung['angsuran'],
             $tanggal_pencairan, $jatuh_tempo_akhir,
             shuKategoriAnggota($pengajuan['kategori_shu'] ?? 'anggota'), $pengajuan['ketua_kelompok_id'] ?: null,
+            !empty($pengajuan['kelompok_angsuran_id']) ? (int)$pengajuan['kelompok_angsuran_id'] : null,
         ]);
         $pinjaman_id = (int)$db->lastInsertId();
         $kode_pinjaman = 'PJN-' . date('Ymd') . '-' . str_pad((string)$pinjaman_id, 4, '0', STR_PAD_LEFT);

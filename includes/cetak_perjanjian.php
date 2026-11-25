@@ -7,11 +7,13 @@ $kodeCek = trim((string)($_GET['kode'] ?? ''));
 // Ambil pinjaman hidup dulu — cegah salah cetak karena bingung pengajuan_id vs pinjaman_id
 // (kode PJN-…-0021 = pengajuan 21, nomor 021/SPHP = pinjaman 21; sering beda orang).
 $stmtPinjaman = $db->prepare("SELECT p.*, a.nama_lengkap, a.kode_anggota, a.kode_anggota_jaminan, a.ktp, a.alamat, a.telepon,
-        a.tempat_lahir, a.tanggal_lahir, jp.nama_jenis, jp.memerlukan_jaminan, pp.tujuan_pinjaman
+        a.tempat_lahir, a.tanggal_lahir, jp.nama_jenis, jp.memerlukan_jaminan, pp.tujuan_pinjaman,
+        j.kapasitas_memori AS jaminan_kapasitas_memori, j.nama_pemilik_stnk AS jaminan_nama_pemilik_stnk
     FROM pinjaman p
     JOIN anggota a ON a.id = p.anggota_id
     JOIN jenis_pinjaman jp ON jp.id = p.jenis_pinjaman_id
     LEFT JOIN pengajuan_pinjaman pp ON pp.id = p.pengajuan_id
+    LEFT JOIN jaminan_pinjaman j ON j.pengajuan_id = pp.id
     WHERE p.id = ?");
 $stmtPinjaman->execute([$pinjamanId]);
 $pinjamanLive = $stmtPinjaman->fetch(PDO::FETCH_ASSOC);
@@ -33,6 +35,10 @@ if (!$surat) {
 }
 $data = json_decode($surat['snapshot_json'], true);
 if (!is_array($data)) die('Arsip perjanjian tidak valid.');
+if (!empty($data['jaminan']['ada'])) {
+    $data['jaminan']['kapasitas_memori'] = $data['jaminan']['kapasitas_memori'] ?? ($pinjamanLive['jaminan_kapasitas_memori'] ?? null);
+    $data['jaminan']['nama_pemilik_stnk'] = $data['jaminan']['nama_pemilik_stnk'] ?? ($pinjamanLive['jaminan_nama_pemilik_stnk'] ?? null);
+}
 $e = function($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
 $rp = function($v){ return 'Rp ' . number_format((float)$v, 0, ',', '.'); };
 
@@ -182,8 +188,14 @@ $html .= '<h4>RINCIAN PINJAMAN</h4>'
     . $barisPdf('Jatuh Tempo', '<b>' . $e(date('d/m/Y', strtotime($p['jatuh_tempo']))) . '</b>')
     . '</table>';
 if (!empty($data['jaminan']['ada'])) {
+    $detailJaminan=(string)($data['jaminan']['detail']??'');
+    $kapasitasMemori=trim((string)($data['jaminan']['kapasitas_memori']??''));
+    $pemilikStnk=trim((string)($data['jaminan']['nama_pemilik_stnk']??''));
+    $labelKapasitas=$kapasitasMemori!==''&&stripos($detailJaminan,'Kapasitas memori:')===false?'<br><b>Kapasitas memori:</b> '.$e($kapasitasMemori):'';
+    $labelStnk=$pemilikStnk!==''&&stripos($detailJaminan,'Nama pemilik STNK:')===false?'<br><b>Nama pemilik STNK:</b> '.$e($pemilikStnk):'';
     $html .= '<h4>PASAL 3 - JAMINAN</h4><p>Sebagai jaminan atas hutang tersebut, PIHAK KEDUA menyerahkan jaminan berupa:<br><b>Jenis:</b> '
-        . $e($data['jaminan']['jenis']) . '<br>' . nl2br($e($data['jaminan']['detail']))
+        . $e($data['jaminan']['jenis']) . '<br>' . nl2br($e($detailJaminan))
+        . $labelKapasitas . $labelStnk
         . '<br>Jaminan dikembalikan sepenuhnya setelah seluruh hutang dan bunga lunas 100%.</p>';
     $html .= '<h4>PASAL 4 - WANPRESTASI</h4><p>Apabila PIHAK KEDUA tidak melunasi pada tanggal jatuh tempo, PIHAK PERTAMA berhak menjual atau mengalihkan jaminan untuk pelunasan hutang. Kelebihan hasil penjualan dikembalikan kepada PIHAK KEDUA; kekurangannya tetap menjadi kewajiban PIHAK KEDUA.</p>';
     $html .= '<h4>PASAL 5 - PENYELESAIAN SENGKETA</h4><p>Perselisihan diselesaikan terlebih dahulu secara musyawarah mufakat. Jika tidak tercapai, diselesaikan melalui jalur hukum yang berlaku.</p>';

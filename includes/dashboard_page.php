@@ -123,6 +123,8 @@ $quickActions = $isAdmin
         ['href' => 'anggota.php', 'label' => 'Anggota', 'icon' => 'ti ti-users', 'class' => 'btn-outline-info'],
         ['href' => 'pembelian.php', 'label' => 'Waserda', 'icon' => 'ti ti-building-store', 'class' => 'btn-outline-success'],
         ['href' => 'laporan_kas.php', 'label' => 'Laporan kas', 'icon' => 'ti ti-wallet', 'class' => 'btn-outline-secondary'],
+        ['href' => 'kol.php', 'label' => 'Monitoring KOL', 'icon' => 'ti ti-chart-dots', 'class' => 'btn-outline-danger'],
+        ['href' => 'laporan_laba.php', 'label' => 'Laba & kas pinjaman', 'icon' => 'ti ti-chart-histogram', 'class' => 'btn-outline-info'],
     ]
     : [
         ['href' => 'setoran.php', 'label' => 'Setoran', 'icon' => 'ti ti-cash-banknote', 'class' => 'btn-outline-success'],

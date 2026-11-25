@@ -3,7 +3,7 @@
     <div class="card-header ui-dash-sec">
         <div>
             <span class="ui-dash-sec-title"><i class="ti ti-adjustments" aria-hidden="true"></i>Kebijakan pinjaman &amp; loyalitas</span>
-            <p class="text-muted small mb-0 mt-1">Tarif, pemutihan, dan template pesan â€” simpan sekali di akhir.</p>
+            <p class="text-muted small mb-0 mt-1">Tarif, pemutihan, dan template pesan — simpan sekali di akhir.</p>
         </div>
         <span class="badge bg-primary">Khusus Admin</span>
     </div>
@@ -23,9 +23,9 @@
                     <p class="form-text">Usulan diskon saat Admin meninjau permohonan pelunasan.</p>
                 </div>
                 <div>
-                    <label for="tarif_jaminan" class="form-label">Denda jaminan per hari</label>
-                    <div class="input-group"><span class="input-group-text">Rp</span><input id="tarif_jaminan" name="tarif_jaminan" type="number" class="form-control" min="0" step="0.01" value="<?= layananEscape($settings['denda_jaminan_per_juta']) ?>" required></div>
-                    <p class="form-text">Per Rp 1 juta pinjaman. Denda tanpa jaminan di <a href="pengaturan_pinjaman.php">Pengaturan Pinjaman</a>.</p>
+                    <label for="tarif_jaminan" class="form-label">Denda AGTJ per minggu per Rp1 juta</label>
+                    <div class="input-group"><span class="input-group-text">Rp</span><input id="tarif_jaminan" name="tarif_jaminan" type="number" class="form-control" min="10000" step="1000" value="<?= layananEscape($settings['denda_jaminan_per_juta']) ?>" required></div>
+                    <p class="form-text">Keterlambatan 1–6 hari dihitung 1 minggu. Denda tanpa jaminan di <a href="pengaturan_pinjaman.php">Pengaturan Pinjaman</a>.</p>
                 </div>
                 <div class="ui-ly-toggle-policy">
                     <label for="pemutihan" class="ui-ly-check"><input id="pemutihan" type="checkbox" name="pemutihan" value="1" <?= $settings['pemutihan']?'checked':'' ?>> Izinkan pemutihan denda</label>

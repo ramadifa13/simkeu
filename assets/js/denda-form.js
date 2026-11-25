@@ -7,7 +7,12 @@ document.querySelectorAll('.denda-auto-fields').forEach(function (fields) {
         const row = data[select.value];
         if (!row) return;
         fields.querySelectorAll('[data-denda-field]').forEach(function (input) {
-            input.value = Number(row[input.dataset.dendaField]).toLocaleString('id-ID');
+            const key = input.dataset.dendaField;
+            if (key === 'tarif') {
+                input.value = Number(row.tarif).toLocaleString('id-ID') + ' / ' + row.satuan + (row.satuan === 'minggu' ? ' (' + (Number(row.minggu) || 0) + ' minggu)' : '');
+            } else {
+                input.value = Number(row[key]).toLocaleString('id-ID');
+            }
         });
         const remaining = Math.max(0, Number(row.sisa) || 0);
         amount.max = remaining;

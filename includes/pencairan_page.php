@@ -147,7 +147,7 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         $db->beginTransaction();
 
         $stmt = $db->prepare("SELECT pp.*, jp.memerlukan_jaminan, jp.nama_jenis, j.id AS jaminan_id, j.jenis_barang,
-                                     j.identitas_barang, j.deskripsi_barang, a.nama_lengkap, a.kode_anggota, a.kode_anggota_jaminan,
+                                     j.identitas_barang, j.deskripsi_barang, j.kapasitas_memori, j.nama_pemilik_stnk, a.nama_lengkap, a.kode_anggota, a.kode_anggota_jaminan,
                                      a.ktp, a.alamat, a.telepon, a.tempat_lahir, a.tanggal_lahir
                               FROM pengajuan_pinjaman pp
                               JOIN jenis_pinjaman jp ON jp.id = pp.jenis_pinjaman_id
@@ -227,6 +227,7 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         if (!$pinjaman_id) {
             throw new Exception("Pinjaman gagal dibuat");
         }
+        perbaruiJadwalHariLibur($db,(int)$pinjaman_id);
         $db->prepare("UPDATE pinjaman SET foto_pencairan = ?, dicairkan_oleh = ?, input_mundur = ? WHERE id = ?")
            ->execute([$foto_path, $_SESSION['user_id'], $mundur, $pinjaman_id]);
         if ($adalah_gadai) {
@@ -249,13 +250,18 @@ if ($_POST && isset($_POST['proses_pencairan'])) {
         $stmtJadwal->execute([$pinjaman_id]);
         $jadwal_surat = $stmtJadwal->fetchAll(PDO::FETCH_ASSOC);
         $jatuh_tempo_akhir = $jadwal_surat ? end($jadwal_surat)['tanggal_jatuh_tempo'] : $tgl_cair;
+        $isiPerjanjian = $versi_perjanjian==='lengkap'?$aturan_surat['isi_lengkap']:$aturan_surat['isi_ringkas'];
+        if ($adalah_gadai) {
+            $tarifDendaMingguan = dendaPerHari($db,(float)$hitung_surat['pokok'],true);
+            $isiPerjanjian .= "\n\nKetentuan denda AGTJ: denda keterlambatan sebesar ".formatRupiah($tarifDendaMingguan)." per minggu untuk pinjaman ini. Keterlambatan 1 sampai 6 hari dibulatkan menjadi 1 minggu. Biaya pembiayaan mingguan dan biaya tenor merupakan komponen terpisah dari denda keterlambatan.";
+        }
         $snapshot = [
             'koperasi'=>$koperasi, 'anggota'=>['nama'=>$pengajuan['nama_lengkap'],'kode'=>$adalah_gadai?($pengajuan['kode_anggota_jaminan'] ?: $pengajuan['kode_anggota']):$pengajuan['kode_anggota'],'nik'=>$pengajuan['ktp'],'alamat'=>$pengajuan['alamat'],'telepon'=>$pengajuan['telepon'],'tempat_lahir'=>$pengajuan['tempat_lahir'],'tanggal_lahir'=>$pengajuan['tanggal_lahir']],
             'pihak_pertama'=>['nama'=>$aturan_surat['nama_pihak_pertama'] ?: $koperasi['nama'],'nik'=>$aturan_surat['nik_pihak_pertama'],'alamat'=>$aturan_surat['alamat_pihak_pertama'] ?? '','telepon'=>$aturan_surat['telepon_pihak_pertama'] ?? ''],
             'pinjaman'=>['id'=>$pinjaman_id,'jenis'=>$pengajuan['nama_jenis'],'jumlah'=>$hitung_surat['pokok'],'tenor'=>$hitung_surat['tenor'],'bunga'=>$hitung_surat['bunga_persen'],'total'=>$hitung_surat['total'],'angsuran'=>$hitung_surat['angsuran'],'frekuensi'=>$hitung_surat['frekuensi'],'jumlah_cicilan'=>$hitung_surat['jumlah_cicilan'],'tanggal_pencairan'=>$tgl_cair,'jatuh_tempo'=>$jatuh_tempo_akhir,'tujuan'=>$pengajuan['tujuan_pinjaman'],'hari_angsuran'=>$pengajuan['hari_angsuran']],
             'jadwal_angsuran'=>$jadwal_surat,
-            'jaminan'=>['ada'=>$adalah_gadai,'jenis'=>$pengajuan['jenis_barang'] ?? null,'detail'=>trim(($pengajuan['identitas_barang'] ?? '').' '.($pengajuan['deskripsi_barang'] ?? ''))],
-            'isi_perjanjian'=>$versi_perjanjian==='lengkap'?$aturan_surat['isi_lengkap']:$aturan_surat['isi_ringkas'],
+            'jaminan'=>['ada'=>$adalah_gadai,'jenis'=>$pengajuan['jenis_barang'] ?? null,'detail'=>trim(($pengajuan['identitas_barang'] ?? '').' '.($pengajuan['deskripsi_barang'] ?? '')),'kapasitas_memori'=>$pengajuan['kapasitas_memori']??null,'nama_pemilik_stnk'=>$pengajuan['nama_pemilik_stnk']??null],
+            'isi_perjanjian'=>$isiPerjanjian,
             'penandatangan'=>['nasabah'=>$pengajuan['nama_lengkap'],'teller'=>$nama_teller,'admin'=>$nama_admin_ttd,'jabatan_admin'=>$aturan_surat['jabatan_admin'],'saksi_1'=>$nama_saksi_1,'saksi_2'=>$nama_saksi_2],
             'foto'=>['pencairan'=>$foto_path,'barang'=>$foto_barang_path,'nasabah_barang'=>$foto_nasabah_barang_path], 'dibuat_pada'=>date('Y-m-d H:i:s')
         ];

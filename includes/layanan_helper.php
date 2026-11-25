@@ -23,12 +23,13 @@ function tombolWhatsApp($nomor, $pesan = '', $label = 'WhatsApp') {
 function statusKolektibilitas($hari) {
     $hari = max(0, (int) $hari);
     // [label, bootstrap bg class] — kontras teks diatur CSS .ui-shell .badge
-    if ($hari <= 3) return ['Lancar', 'success'];
-    if ($hari < 7) return ['Terlambat', 'warning'];
-    if ($hari < 30) return ['Macet Ringan', 'warning'];
-    if ($hari <= 90) return ['Macet Berat', 'danger'];
-    return ['Gagal Bayar', 'dark'];
+    if ($hari === 0) return ['KOL 1 - Lancar', 'success'];
+    if ($hari <= 90) return ['KOL 2 - Dalam Perhatian Khusus', 'warning'];
+    if ($hari <= 120) return ['KOL 3 - Kurang Lancar', 'warning'];
+    if ($hari <= 180) return ['KOL 4 - Diragukan', 'danger'];
+    return ['KOL 5 - Macet', 'dark'];
 }
+
 function statusKolektibilitasBadgeHtml($hari): string {
     [$label, $warna] = statusKolektibilitas($hari);
     $extra = ($warna === 'warning') ? ' text-dark' : '';
@@ -113,7 +114,7 @@ function layananPastikanPengaturan($db) {
         $db->prepare(
             'INSERT INTO layanan_pengaturan
              (id, diskon_pelunasan, pemutihan, wa_denda, wa_lunas, denda_jaminan_per_juta, surat_lunas, bast_jaminan, bonus_persen)
-             VALUES (1, 10, 1, ?, ?, 5000, ?, ?, 0)'
+             VALUES (1, 10, 1, ?, ?, 10000, ?, ?, 0)'
         )->execute([$waDenda, $waLunas, $surat, $bast]);
         return true;
     }

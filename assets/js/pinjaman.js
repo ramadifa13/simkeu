@@ -17,12 +17,17 @@ function biayaMingguanGadai(pokok) {
 function hitungPinjamanGadai(pokok, bungaDasar, tenorBulan, frekuensi) {
     var biaya = biayaMingguanGadai(pokok);
     if (biaya === null) return null;
-    var tambahan = biaya * tenorBulan * 4;
+    // Biaya tetap dihitung untuk setiap minggu tenor, terlepas dari frekuensi setoran.
+    var tambahanMingguan = biaya * Math.max(0, parseInt(tenorBulan, 10) || 0) * 4;
+    var tambahanTenor = tenorBulan > 2 ? (pokok / 1000000) * 10000 * tenorBulan : 0;
+    var tambahan = tambahanMingguan + tambahanTenor;
     var bungaDasarNominal = Math.round(pokok * bungaDasar / 100);
     var bungaEfektif = ((bungaDasarNominal + tambahan) / pokok) * 100;
     var hasil = hitungPinjaman(pokok, bungaEfektif, tenorBulan, frekuensi, 'flat');
     hasil.biayaMingguanGadai = biaya;
     hasil.tambahanGadai = tambahan;
+    hasil.tambahanMingguanGadai = tambahanMingguan;
+    hasil.tambahanTenorGadai = tambahanTenor;
     return hasil;
 }
 

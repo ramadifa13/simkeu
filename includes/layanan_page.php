@@ -58,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             layananAdmin();
             $diskon=layananNominal($_POST['diskon'] ?? '',true);
             $tarifJaminan=layananNominal($_POST['tarif_jaminan'] ?? '',true);
+            if ($tarifJaminan < 10000) throw new Exception('Denda AGTJ minimal Rp10.000 per Rp1 juta per minggu.');
             if ($diskon>100) throw new Exception('Diskon maksimal 100%.');
             $wd=trim($_POST['wa_denda'] ?? '');$wl=trim($_POST['wa_lunas'] ?? '');
             $surat=trim($_POST['surat_lunas'] ?? '');$bast=trim($_POST['bast_jaminan'] ?? '');
@@ -458,12 +459,12 @@ $pilihAngsuran='<div class="ui-ly-field"><label class="form-label">Angsuran</lab
 $dendaData=[];
 foreach ($histori as $ha) {
     $dh=hitungDendaAngsuran($db,$ha,$p['jumlah_pinjaman']);
-    $dendaData[$ha['id']]=['hari'=>$dh['hari_telat'],'tarif'=>$dh['per_hari'],'total'=>(float)$ha['denda'],'sisa'=>max(0,$ha['denda']-$ha['denda_dibayar'])];
+    $dendaData[$ha['id']]=['hari'=>$dh['hari_telat'],'tarif'=>$dh['per_hari'],'satuan'=>$dh['satuan_tarif'],'minggu'=>$dh['minggu_dihitung'],'total'=>(float)$ha['denda'],'sisa'=>max(0,$ha['denda']-$ha['denda_dibayar'])];
 }
 $dendaRingkasan='<div class="ui-ly-field"><label class="form-label">Nama nasabah</label><input class="form-control" readonly value="'.layananEscape($p['nama_lengkap']).'"></div>'
     .'<div class="denda-auto-fields ui-ly-denda-grid" data-denda="'.layananEscape(json_encode($dendaData)).'">'
     .'<div class="ui-ly-field"><label class="form-label">Telat (hari)</label><input class="form-control" data-denda-field="hari" readonly></div>'
-    .'<div class="ui-ly-field"><label class="form-label">Tarif / hari</label><input class="form-control" data-denda-field="tarif" readonly></div>'
+    .'<div class="ui-ly-field"><label class="form-label">Tarif</label><input class="form-control" data-denda-field="tarif" readonly></div>'
     .'<div class="ui-ly-field"><label class="form-label">Total denda</label><input class="form-control" data-denda-field="total" readonly></div>'
     .'<div class="ui-ly-field"><label class="form-label">Sisa denda</label><input class="form-control" data-denda-field="sisa" readonly></div></div>'
     .'<div class="ui-ly-field"><label class="form-label">Diskon</label><input class="form-control" value="Hanya melalui keputusan Admin" disabled></div>';
@@ -481,7 +482,7 @@ $dendaRingkasan='<div class="ui-ly-field"><label class="form-label">Nama nasabah
 <?php if($options) layananForm('bayar_denda',$id,'Bayar Denda',$pilihAngsuran.$dendaRingkasan.'<div class="ui-ly-field"><label class="form-label">Nominal bayar denda</label><input name="jumlah" class="form-control" type="number" min="0.01" step="0.01" required></div>'.$metodeField.$buktiField,'success'); ?>
 <?php if(isAdmin()): ?>
 <?php layananForm('diskon_denda',$id,'Diskon / Pemutihan Denda',$pilihAngsuran.'<div class="ui-ly-field"><label class="form-label">Total denda akhir (termasuk yang sudah dibayar)</label><input type="number" name="jumlah" class="form-control" min="0" step="0.01" required></div>'.$catatanField,'warning'); ?>
-<?php layananForm('reschedule',$id,'Perpanjang Jadwal','<div class="ui-ly-field"><label class="form-label">Jatuh tempo baru (cicilan belum lunas pertama)</label><input name="tanggal" type="date" class="form-control" min="'.date('Y-m-d',strtotime('+1 day')).'" required></div>'.$catatanField); ?>
+<div class="alert alert-warning">Rescheduling mengikuti perhitungan sisa pokok dan keuntungan serta memulai jadwal baru. Form lama dinonaktifkan agar tidak menggeser tanggal tanpa perhitungan. Hubungi pengembang untuk alur rescheduling baru.</div>
 <?php if($p['memerlukan_jaminan']) layananForm('eksekusi',$id,'Putuskan Eksekusi Jaminan',$catatanField,'danger'); ?>
 <?php endif; ?>
 <?php $stmt=$db->prepare('SELECT * FROM layanan_pelunasan WHERE pinjaman_id=?');$stmt->execute([$id]);$approval=$stmt->fetch(PDO::FETCH_ASSOC); ?>

@@ -406,6 +406,175 @@ CREATE TABLE IF NOT EXISTS shu_hak_audit (
  CONSTRAINT fk_shu_hak_audit FOREIGN KEY (hak_id) REFERENCES shu_hak_pinjaman(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Kelompok penagihan independen dari relasi SHU ketua_kelompok_id.
+CREATE TABLE IF NOT EXISTS kelompok_angsuran (
+  id INT(11) NOT NULL AUTO_INCREMENT,
+  kode VARCHAR(24) NOT NULL,
+  nama VARCHAR(120) NOT NULL,
+  keterangan VARCHAR(500) DEFAULT NULL,
+  status ENUM('aktif','nonaktif') NOT NULL DEFAULT 'aktif',
+  dibuat_oleh INT(11) NOT NULL,
+  dibuat_pada DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  diperbarui_pada DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_kelompok_angsuran_kode (kode),
+  UNIQUE KEY uq_kelompok_angsuran_nama (nama)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE pengajuan_pinjaman ADD COLUMN IF NOT EXISTS kelompok_angsuran_id INT(11) DEFAULT NULL AFTER hari_angsuran;
+ALTER TABLE pinjaman ADD COLUMN IF NOT EXISTS kelompok_angsuran_id INT(11) DEFAULT NULL AFTER ketua_kelompok_id;
+
+SET @idx_pengajuan_kelompok=(SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='pengajuan_pinjaman' AND index_name='idx_pengajuan_kelompok');
+SET @sql_pengajuan_kelompok=IF(@idx_pengajuan_kelompok=0,'ALTER TABLE pengajuan_pinjaman ADD KEY idx_pengajuan_kelompok (kelompok_angsuran_id)','SELECT 1');
+PREPARE stmt_pengajuan_kelompok FROM @sql_pengajuan_kelompok; EXECUTE stmt_pengajuan_kelompok; DEALLOCATE PREPARE stmt_pengajuan_kelompok;
+
+SET @idx_pinjaman_kelompok=(SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='pinjaman' AND index_name='idx_pinjaman_kelompok');
+SET @sql_pinjaman_kelompok=IF(@idx_pinjaman_kelompok=0,'ALTER TABLE pinjaman ADD KEY idx_pinjaman_kelompok (kelompok_angsuran_id)','SELECT 1');
+PREPARE stmt_pinjaman_kelompok FROM @sql_pinjaman_kelompok; EXECUTE stmt_pinjaman_kelompok; DEALLOCATE PREPARE stmt_pinjaman_kelompok;
+
+SET @fk_pinjaman_kelompok=(SELECT COUNT(*) FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND table_name='pinjaman' AND constraint_name='fk_pinjaman_kelompok');
+SET @sql_fk_pinjaman_kelompok=IF(@fk_pinjaman_kelompok=0,'ALTER TABLE pinjaman ADD CONSTRAINT fk_pinjaman_kelompok FOREIGN KEY (kelompok_angsuran_id) REFERENCES kelompok_angsuran(id) ON DELETE SET NULL','SELECT 1');
+PREPARE stmt_fk_pinjaman_kelompok FROM @sql_fk_pinjaman_kelompok; EXECUTE stmt_fk_pinjaman_kelompok; DEALLOCATE PREPARE stmt_fk_pinjaman_kelompok;
+
+SET @fk_pengajuan_kelompok=(SELECT COUNT(*) FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND table_name='pengajuan_pinjaman' AND constraint_name='fk_pengajuan_kelompok');
+SET @sql_fk_pengajuan_kelompok=IF(@fk_pengajuan_kelompok=0,'ALTER TABLE pengajuan_pinjaman ADD CONSTRAINT fk_pengajuan_kelompok FOREIGN KEY (kelompok_angsuran_id) REFERENCES kelompok_angsuran(id) ON DELETE SET NULL','SELECT 1');
+PREPARE stmt_fk_pengajuan_kelompok FROM @sql_fk_pengajuan_kelompok; EXECUTE stmt_fk_pengajuan_kelompok; DEALLOCATE PREPARE stmt_fk_pengajuan_kelompok;
+
+-- Pembaruan sistem koperasi berdasarkan kebutuhan November 2026.
+ALTER TABLE pengajuan_pinjaman
+  ADD COLUMN IF NOT EXISTS batas_pinjaman_snapshot DECIMAL(15,2) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS nasabah_lanjutan TINYINT(1) NOT NULL DEFAULT 0;
+
+ALTER TABLE pinjaman
+  ADD COLUMN IF NOT EXISTS reschedule_parent_id INT(11) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS is_rescheduling TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tanggal_mulai_tunggakan DATE DEFAULT NULL;
+
+SET @pinjaman_status_type=(SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pinjaman' AND COLUMN_NAME='status');
+SET @sql_pinjaman_status=IF(@pinjaman_status_type LIKE '%''reschedule''%','SELECT 1','ALTER TABLE pinjaman MODIFY status ENUM(''aktif'',''lunas'',''macet'',''reschedule'') DEFAULT ''aktif''');
+PREPARE stmt_pinjaman_status FROM @sql_pinjaman_status; EXECUTE stmt_pinjaman_status; DEALLOCATE PREPARE stmt_pinjaman_status;
+
+SET @idx_reschedule_parent=(SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='pinjaman' AND index_name='idx_pinjaman_reschedule_parent');
+SET @sql_reschedule_parent=IF(@idx_reschedule_parent=0,'ALTER TABLE pinjaman ADD KEY idx_pinjaman_reschedule_parent (reschedule_parent_id)','SELECT 1');
+PREPARE stmt_reschedule_parent FROM @sql_reschedule_parent; EXECUTE stmt_reschedule_parent; DEALLOCATE PREPARE stmt_reschedule_parent;
+
+ALTER TABLE angsuran
+  ADD COLUMN IF NOT EXISTS jumlah_terbayar DECIMAL(15,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tanggal_jatuh_tempo_asal DATE DEFAULT NULL;
+
+UPDATE angsuran SET jumlah_terbayar=jumlah_angsuran WHERE status='lunas' AND jumlah_terbayar=0;
+UPDATE angsuran SET tanggal_jatuh_tempo_asal=tanggal_jatuh_tempo WHERE tanggal_jatuh_tempo_asal IS NULL;
+
+ALTER TABLE jaminan_pinjaman
+  ADD COLUMN IF NOT EXISTS kapasitas_memori VARCHAR(40) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS nama_pemilik_stnk VARCHAR(120) DEFAULT NULL;
+
+ALTER TABLE layanan_pembayaran
+  ADD COLUMN IF NOT EXISTS pembayaran_angsuran_id BIGINT(20) DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS kalender_libur_angsuran (
+  id INT(11) NOT NULL AUTO_INCREMENT,
+  tanggal DATE NOT NULL,
+  nama VARCHAR(160) NOT NULL,
+  sumber ENUM('idulfitri','iduladha','eksternal') NOT NULL DEFAULT 'eksternal',
+  aktif TINYINT(1) NOT NULL DEFAULT 1,
+  dibuat_oleh INT(11) DEFAULT NULL,
+  dibuat_pada DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), UNIQUE KEY uq_libur_tanggal (tanggal), KEY idx_libur_aktif_tanggal (aktif,tanggal)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pengajuan_limit_pinjaman (
+  id INT(11) NOT NULL AUTO_INCREMENT,
+  anggota_id INT(11) NOT NULL,
+  batas_maksimum DECIMAL(15,2) NOT NULL,
+  alasan VARCHAR(255) NOT NULL,
+  aktif TINYINT(1) NOT NULL DEFAULT 1,
+  dibuat_oleh INT(11) NOT NULL,
+  dibuat_pada DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), KEY idx_limit_anggota_aktif (anggota_id,aktif,dibuat_pada)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pengajuan_mutasi_angsuran (
+  id BIGINT(20) NOT NULL AUTO_INCREMENT,
+  anggota_id INT(11) NOT NULL,
+  pinjaman_id INT(11) NOT NULL,
+  jenis ENUM('hari','kelompok') NOT NULL,
+  hari_lama TINYINT(1) DEFAULT NULL,
+  hari_baru TINYINT(1) DEFAULT NULL,
+  kelompok_lama_id INT(11) DEFAULT NULL,
+  kelompok_baru_id INT(11) DEFAULT NULL,
+  alasan TEXT NOT NULL,
+  status ENUM('menunggu','disetujui','ditolak') NOT NULL DEFAULT 'menunggu',
+  diajukan_oleh INT(11) NOT NULL,
+  diputuskan_oleh INT(11) DEFAULT NULL,
+  catatan_admin TEXT DEFAULT NULL,
+  tanggal_efektif DATE DEFAULT NULL,
+  diajukan_pada DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  diputuskan_pada DATETIME DEFAULT NULL,
+  PRIMARY KEY (id), KEY idx_mutasi_status (status,diajukan_pada), KEY idx_mutasi_anggota (anggota_id), KEY idx_mutasi_pinjaman (pinjaman_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pembayaran_angsuran (
+  id BIGINT(20) NOT NULL AUTO_INCREMENT,
+  kode_pembayaran VARCHAR(40) NOT NULL,
+  anggota_id INT(11) NOT NULL,
+  pinjaman_id INT(11) NOT NULL,
+  jumlah DECIMAL(15,2) NOT NULL,
+  metode ENUM('cash','transfer') NOT NULL,
+  status ENUM('menunggu','diterima','ditolak') NOT NULL DEFAULT 'menunggu',
+  jenis ENUM('petugas','anggota') NOT NULL DEFAULT 'petugas',
+  referensi VARCHAR(120) DEFAULT NULL,
+  bukti VARCHAR(255) DEFAULT NULL,
+  idempotency_key CHAR(64) DEFAULT NULL,
+  user_id INT(11) NOT NULL,
+  diverifikasi_oleh INT(11) DEFAULT NULL,
+  catatan TEXT DEFAULT NULL,
+  transaksi_id INT(11) DEFAULT NULL,
+  dibuat_pada DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  diverifikasi_pada DATETIME DEFAULT NULL,
+  PRIMARY KEY (id), UNIQUE KEY uq_pembayaran_kode (kode_pembayaran), UNIQUE KEY uq_pembayaran_idempotency (idempotency_key),
+  KEY idx_bayar_anggota_status (anggota_id,status,dibuat_pada), KEY idx_bayar_pinjaman (pinjaman_id), KEY idx_bayar_status (status,dibuat_pada)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pembayaran_angsuran_alokasi (
+  id BIGINT(20) NOT NULL AUTO_INCREMENT,
+  pembayaran_id BIGINT(20) NOT NULL,
+  angsuran_id INT(11) NOT NULL,
+  jumlah DECIMAL(15,2) NOT NULL,
+  pokok DECIMAL(15,2) NOT NULL DEFAULT 0,
+  bunga DECIMAL(15,2) NOT NULL DEFAULT 0,
+  dibuat_pada DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), UNIQUE KEY uq_pembayaran_angsuran (pembayaran_id,angsuran_id), KEY idx_alokasi_angsuran (angsuran_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS audit_rescheduling (
+  id BIGINT(20) NOT NULL AUTO_INCREMENT,
+  pinjaman_asal_id INT(11) NOT NULL,
+  pinjaman_baru_id INT(11) NOT NULL,
+  admin_id INT(11) NOT NULL,
+  snapshot_json LONGTEXT NOT NULL,
+  dibuat_pada DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), UNIQUE KEY uq_rescheduling_pinjaman_baru (pinjaman_baru_id), KEY idx_rescheduling_asal (pinjaman_asal_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS lookup_internal_audit (
+  id BIGINT(20) NOT NULL AUTO_INCREMENT,
+  user_id INT(11) NOT NULL,
+  anggota_id INT(11) DEFAULT NULL,
+  hasil ENUM('cocok','tidak_cocok') NOT NULL,
+  nik_4_terakhir CHAR(4) NOT NULL,
+  dibuat_pada DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), KEY idx_lookup_user_date (user_id,dibuat_pada)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET @fk_alokasi_pembayaran=(SELECT COUNT(*) FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND table_name='pembayaran_angsuran_alokasi' AND constraint_name='fk_alokasi_pembayaran');
+SET @sql_alokasi_pembayaran=IF(@fk_alokasi_pembayaran=0,'ALTER TABLE pembayaran_angsuran_alokasi ADD CONSTRAINT fk_alokasi_pembayaran FOREIGN KEY (pembayaran_id) REFERENCES pembayaran_angsuran(id) ON DELETE CASCADE','SELECT 1');
+PREPARE stmt_alokasi_pembayaran FROM @sql_alokasi_pembayaran; EXECUTE stmt_alokasi_pembayaran; DEALLOCATE PREPARE stmt_alokasi_pembayaran;
+
+SET @fk_alokasi_angsuran=(SELECT COUNT(*) FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND table_name='pembayaran_angsuran_alokasi' AND constraint_name='fk_alokasi_angsuran');
+SET @sql_alokasi_angsuran=IF(@fk_alokasi_angsuran=0,'ALTER TABLE pembayaran_angsuran_alokasi ADD CONSTRAINT fk_alokasi_angsuran FOREIGN KEY (angsuran_id) REFERENCES angsuran(id) ON DELETE RESTRICT','SELECT 1');
+PREPARE stmt_alokasi_angsuran FROM @sql_alokasi_angsuran; EXECUTE stmt_alokasi_angsuran; DEALLOCATE PREPARE stmt_alokasi_angsuran;
+
 -- Import migrasi historis: identitas sumber menjamin import dapat diulang.
 CREATE TABLE IF NOT EXISTS migrasi_import_item (
  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, jenis VARCHAR(32) NOT NULL, source_key VARCHAR(100) NOT NULL, target_id BIGINT UNSIGNED NOT NULL,

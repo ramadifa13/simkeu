@@ -104,7 +104,7 @@ foreach ($fineDueVisible as $fd) {
     <td>
         <strong class="ui-ly-member"><?= layananEscape($fd['nama_lengkap']) ?></strong>
         <small class="ui-ly-kode"><?= layananEscape($fd['kode_pinjaman']) ?> · cicilan <?= (int)$fd['angsuran_ke'] ?><?= !empty($fd['memerlukan_jaminan']) ? ' · Gadai' : '' ?></small>
-        <small class="ui-ly-kode d-block">Denda <?= formatRupiah($fd['_denda_tampil']) ?> · dibayar <?= formatRupiah($fd['dibayar']) ?> · <?= formatRupiah($calc['per_hari']) ?>/hari</small>
+        <small class="ui-ly-kode d-block">Denda <?= formatRupiah($fd['_denda_tampil']) ?> · dibayar <?= formatRupiah($fd['dibayar']) ?> · tarif <?= formatRupiah($calc['per_hari']) ?>/<?= layananEscape($calc['satuan_tarif']) ?><?= !empty($calc['memerlukan_jaminan']) ? ' · '.$calc['minggu_dihitung'].' minggu dihitung' : '' ?></small>
     </td>
     <td><?= layananEscape(formatTanggalUi($fd['tanggal_jatuh_tempo'])) ?></td>
     <td><span class="badge bg-<?= $calc['hari_telat'] > 7 ? 'danger' : ($calc['hari_telat'] > 0 ? 'warning text-dark' : 'secondary') ?>"><?= (int)$calc['hari_telat'] ?> hari</span></td>

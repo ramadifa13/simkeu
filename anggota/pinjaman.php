@@ -23,7 +23,7 @@ $query_pinjaman = "SELECT p.*, jp.nama_jenis, jp.memerlukan_jaminan,
                           (SELECT COALESCE(SUM(pokok), 0) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') AS total_pokok_dibayar,
                           (SELECT COALESCE(SUM(bunga), 0) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') AS total_bunga_dibayar,
                           (SELECT COALESCE(SUM(denda), 0) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') AS total_denda_dibayar,
-                          (SELECT COALESCE(SUM(bunga), 0) FROM angsuran WHERE pinjaman_id = p.id AND status != 'lunas') AS sisa_bunga
+                          CASE WHEN p.status='reschedule' THEN 0 ELSE (SELECT COALESCE(SUM(bunga), 0) FROM angsuran WHERE pinjaman_id = p.id AND status != 'lunas') END AS sisa_bunga
                    FROM pinjaman p
                    JOIN jenis_pinjaman jp ON p.jenis_pinjaman_id = jp.id
                    LEFT JOIN jaminan_pinjaman jk ON jk.pinjaman_id = p.id

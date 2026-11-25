@@ -31,18 +31,18 @@ class DendaJaminanDatabase {
 
 $db = new DendaJaminanDatabase();
 foreach ([1, 2, 3, 4, 10, 25] as $juta) {
-    pastikanDenda($juta * 5000, dendaPerHari($db, $juta * 1000000, true), 'Tarif jaminan ' . $juta . ' juta');
+    pastikanDenda($juta * 10000, dendaPerHari($db, $juta * 1000000, true), 'Tarif mingguan jaminan ' . $juta . ' juta');
 }
 pastikanDenda(1500, dendaPerHari($db, 1000000), 'Tanpa jaminan tetap tarif lama');
 pastikanDenda(3500, dendaPerHari($db, 3000000), 'Tanpa jaminan 3 juta');
 $a = ['pinjaman_id' => 7, 'angsuran_ke' => 1, 'tanggal_jatuh_tempo' => '2026-10-10'];
-foreach (['2026-10-09' => 0, '2026-10-10' => 0, '2026-10-11' => 15000, '2026-10-13' => 45000, '2026-10-18' => 105000] as $date => $expected) {
+foreach (['2026-10-09' => 0, '2026-10-10' => 0, '2026-10-11' => 30000, '2026-10-13' => 30000, '2026-10-16' => 30000, '2026-10-17' => 30000, '2026-10-18' => 30000] as $date => $expected) {
     $hasil = hitungDendaAngsuran($db, $a, 3000000, $date);
     pastikanDenda($expected, $hasil['denda'], 'Denda jaminan tanggal ' . $date);
 }
 $db->berikutnya = false;
 $hasil = hitungDendaAngsuran($db, $a, 3000000, '2026-10-30');
-pastikanDenda(300000, $hasil['denda'], 'Cicilan terakhir terus berjalan');
+pastikanDenda(90000, $hasil['denda'], 'Cicilan terakhir terus berjalan per minggu');
 $db->jaminan = 0;
 $hasil = hitungDendaAngsuran($db, $a, 3000000, '2026-10-11');
 pastikanDenda(3500, $hasil['denda'], 'Deteksi tanpa jaminan dari pinjaman');

@@ -17,9 +17,9 @@ if (!isAdmin() && !isTeller()) {
 }
 require_can_page(basename(str_replace('\\', '/', $_SERVER['SCRIPT_FILENAME'] ?? 'angsuran.php')));
 
-$page_title = "Pembayaran Angsuran";
-
 $angsuranMode = $angsuranMode ?? 'list';
+$page_title = $angsuranMode === 'rescheduling' ? 'Angsuran Rescheduling' : 'Pembayaran Angsuran';
+$routeAngsuran = $angsuranMode === 'rescheduling' ? 'angsuran_rescheduling.php' : 'angsuran.php';
 if ($angsuranMode === 'list' && isset($_GET['pinjaman_id']) && (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST')) {
     $qs = $_GET;
     header('Location: detail_angsuran.php?' . http_build_query($qs));
@@ -53,7 +53,7 @@ function normalisasiTanggalProsesAngsuran(?string $input): string {
     return $tgl;
 }
 
-function checkoutItemAngsuran(PDO $db, int $id, string $denda_input, string $metode, int $user_id, ?string $tanggal_proses = null): array {
+function checkoutItemAngsuran(PDO $db, int $id, string $denda_input, string $metode, int $user_id, ?string $tanggal_proses = null, ?float $jumlahInput = null, ?string $idempotencyKey = null): array {
     if (!in_array($metode, ['cash', 'transfer'], true)) throw new Exception('Metode pembayaran tidak valid.');
     $tanggal_bayar = normalisasiTanggalProsesAngsuran($tanggal_proses);
     $waktu_proses = $tanggal_bayar . ' ' . date('H:i:s');
@@ -69,6 +69,10 @@ function checkoutItemAngsuran(PDO $db, int $id, string $denda_input, string $met
     if (!$a) throw new Exception('Data angsuran tidak ditemukan.');
     pastikanBulanBelumTerkunci($db, $tanggal_bayar);
     if ($a['status'] === 'lunas') throw new Exception('Angsuran ke-'.$a['angsuran_ke'].' sudah dibayar.');
+
+    if ($jumlahInput !== null && $jumlahInput > 0) {
+        return terapkanPembayaranAngsuran($db,(int)$a['pinjaman_id'],$jumlahInput,$user_id,$metode,'petugas',null,$idempotencyKey);
+    }
 
     $otomatis = hitungDendaAngsuran($db, $a, $a['jumlah_pinjaman']);
     // Kebijakan operasional sementara: Admin dan Teller boleh menetapkan nominal
@@ -123,7 +127,7 @@ perbaruiDendaOtomatis($db, true);
 
 // Handle payment
 if ($_POST) {
-    try { layananValidasiToken(); } catch (Exception $e) { $_SESSION['error']=$e->getMessage();header('Location: angsuran.php');exit; }
+    try { layananValidasiToken(); } catch (Exception $e) { $_SESSION['error']=$e->getMessage();header('Location: '.$routeAngsuran);exit; }
     $cartKey = 'keranjang_angsuran_' . (int)$_SESSION['user_id'];
     if (!isset($_SESSION[$cartKey]) || !is_array($_SESSION[$cartKey])) $_SESSION[$cartKey] = [];
     $returnFilters = [];
@@ -140,7 +144,7 @@ if ($_POST) {
         : (int) ($_POST['pinjaman_id'] ?? 0);
     $redirectAngsuran = $pinjamanRedirectId > 0
         ? ('detail_angsuran.php?' . http_build_query(['pinjaman_id' => $pinjamanRedirectId] + $returnFilters))
-        : ('angsuran.php' . ($returnFilters ? '?' . http_build_query($returnFilters) : ''));
+        : ($routeAngsuran . ($returnFilters ? '?' . http_build_query($returnFilters) : ''));
     // Kembali ke jadwal/tabel agar sort DataTables (stateSave) tetap terlihat setelah reload.
     $redirectAngsuranJadwal = $redirectAngsuran . '#tabelJadwalAngsuran';
     $redirectAngsuranKeranjang = $redirectAngsuran . '#keranjangAngsuran';
@@ -153,10 +157,12 @@ if ($_POST) {
             $q->execute([$id]); $item=$q->fetch(PDO::FETCH_ASSOC);
             if (!$item || $item['status']==='lunas') throw new Exception('Angsuran tidak tersedia atau sudah dibayar.');
             $dendaInput = (string)($_POST['denda'] ?? '');
+            $jumlahInput = trim((string)($_POST['jumlah_bayar_fifo'] ?? ''));
+            $jumlahInput = $jumlahInput === '' ? null : (float)$jumlahInput;
             if (isset($_POST['bayar_langsung'])) {
                 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                 $db->beginTransaction();
-                $hasil = checkoutItemAngsuran($db, $id, $dendaInput, $metode, (int)$_SESSION['user_id'], $tanggalProses);
+                $hasil = checkoutItemAngsuran($db, $id, $dendaInput, $metode, (int)$_SESSION['user_id'], $tanggalProses, $jumlahInput, (string)($_POST['idempotency_key']??''));
                 $db->commit();
                 unset($_SESSION[$cartKey][$id]);
                 $_SESSION['success'] = 'Pembayaran angsuran ke-' . (int)$item['angsuran_ke'] . ' (' . $item['nama_lengkap'] . ') berhasil diproses. Total ' . formatRupiah((float)$hasil['total']) . '.';
@@ -164,7 +170,7 @@ if ($_POST) {
                 if (isset($_SESSION[$cartKey][$id])) {
                     throw new Exception('Angsuran ini sudah ada di daftar pembayaran.');
                 }
-                $_SESSION[$cartKey][$id] = ['id'=>$id,'nama'=>$item['nama_lengkap'],'kode'=>$item['kode_pinjaman'],'angsuran_ke'=>$item['angsuran_ke'],'jumlah'=>(float)$item['jumlah_angsuran'],'denda_input'=>$dendaInput,'denda_tampil'=>is_numeric($dendaInput) ? (float)$dendaInput : (float)$item['denda'],'metode'=>$metode,'tanggal_proses'=>$tanggalProses];
+                $_SESSION[$cartKey][$id] = ['id'=>$id,'nama'=>$item['nama_lengkap'],'kode'=>$item['kode_pinjaman'],'angsuran_ke'=>$item['angsuran_ke'],'jumlah'=>(float)$item['jumlah_angsuran'],'jumlah_bayar_fifo'=>$jumlahInput,'idempotency_key'=>(string)($_POST['idempotency_key']??''),'denda_input'=>$dendaInput,'denda_tampil'=>is_numeric($dendaInput) ? (float)$dendaInput : (float)$item['denda'],'metode'=>$metode,'tanggal_proses'=>$tanggalProses];
                 $_SESSION['success']='Angsuran '.$item['nama_lengkap'].' ditambahkan ke daftar pembayaran. Proses kas saat checkout.';
             }
         } catch (Throwable $e) {
@@ -184,7 +190,7 @@ if ($_POST) {
         try {
             if (!$_SESSION[$cartKey]) throw new Exception('Daftar pembayaran masih kosong.');
             $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); $db->beginTransaction();
-            $hasil=[]; foreach ($_SESSION[$cartKey] as $item) $hasil[]=checkoutItemAngsuran($db,(int)$item['id'],(string)$item['denda_input'],(string)$item['metode'],(int)$_SESSION['user_id'], $item['tanggal_proses'] ?? null);
+            $hasil=[]; foreach ($_SESSION[$cartKey] as $item) $hasil[]=checkoutItemAngsuran($db,(int)$item['id'],(string)$item['denda_input'],(string)$item['metode'],(int)$_SESSION['user_id'], $item['tanggal_proses'] ?? null, isset($item['jumlah_bayar_fifo']) ? (float)$item['jumlah_bayar_fifo'] : null, (string)($item['idempotency_key']??''));
             $db->commit(); $_SESSION[$cartKey]=[];
             $_SESSION['success']=count($hasil).' pembayaran berhasil diproses sekaligus. Total: '.formatRupiah(array_sum(array_column($hasil,'total')));
         } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); $_SESSION['error']='Checkout dibatalkan. Tidak ada pembayaran yang dicatat: '.$e->getMessage(); }
@@ -194,7 +200,7 @@ if ($_POST) {
     if (isset($_POST['batalkan_bayar'])) {
         if (!can('angsuran.batal_langsung')) {
             $_SESSION['error'] = 'Hanya Admin yang dapat membatalkan pembayaran secara langsung.';
-            header('Location: ' . (isset($_GET['pinjaman_id']) ? ('detail_angsuran.php?pinjaman_id=' . (int)$_GET['pinjaman_id']) : 'angsuran.php'));
+            header('Location: ' . (isset($_GET['pinjaman_id']) ? ('detail_angsuran.php?pinjaman_id=' . (int)$_GET['pinjaman_id']) : $routeAngsuran));
             exit;
         }
         try {
@@ -207,7 +213,7 @@ if ($_POST) {
         } catch (Exception $e) {
             $_SESSION['error'] = "Gagal membatalkan pembayaran: " . $e->getMessage();
         }
-        header("Location: " . (isset($_GET['pinjaman_id']) ? ("detail_angsuran.php?pinjaman_id=" . (int)$_GET['pinjaman_id']) : "angsuran.php"));
+        header("Location: " . (isset($_GET['pinjaman_id']) ? ("detail_angsuran.php?pinjaman_id=" . (int)$_GET['pinjaman_id']) : $routeAngsuran));
         exit();
     }
 
@@ -223,7 +229,7 @@ if ($_POST) {
         } catch (Exception $e) {
             $_SESSION['error'] = "Gagal mengajukan pembatalan: " . $e->getMessage();
         }
-        header("Location: " . (isset($_GET['pinjaman_id']) ? ("detail_angsuran.php?pinjaman_id=" . (int)$_GET['pinjaman_id']) : "angsuran.php"));
+        header("Location: " . (isset($_GET['pinjaman_id']) ? ("detail_angsuran.php?pinjaman_id=" . (int)$_GET['pinjaman_id']) : $routeAngsuran));
         exit();
     }
 
@@ -231,7 +237,7 @@ if ($_POST) {
     if (isset($_POST['putuskan_pembatalan'])) {
         if (!can('angsuran.putuskan_batal')) {
             $_SESSION['error'] = 'Hanya Admin yang dapat memutuskan pengajuan pembatalan.';
-            header('Location: ' . (isset($_GET['pinjaman_id']) ? ('detail_angsuran.php?pinjaman_id=' . (int)$_GET['pinjaman_id']) : 'angsuran.php'));
+            header('Location: ' . (isset($_GET['pinjaman_id']) ? ('detail_angsuran.php?pinjaman_id=' . (int)$_GET['pinjaman_id']) : $routeAngsuran));
             exit;
         }
         try {
@@ -434,7 +440,7 @@ if ($_POST) {
         }
         
         // Redirect untuk menghindari resubmission
-        header("Location: " . (empty($pinjaman_selesai) && isset($_GET['pinjaman_id']) ? "detail_angsuran.php?pinjaman_id=" . (int)$_GET['pinjaman_id'] : "angsuran.php"));
+        header("Location: " . (empty($pinjaman_selesai) && isset($_GET['pinjaman_id']) ? "detail_angsuran.php?pinjaman_id=" . (int)$_GET['pinjaman_id'] : $routeAngsuran));
         exit();
     }
 }
@@ -464,13 +470,14 @@ $kolom_hari = "COALESCE(
     ) AS hari_angsuran,";
 $kolom_tanggal_belum = "(SELECT GROUP_CONCAT(DISTINCT DATE(ah3.tanggal_jatuh_tempo) ORDER BY ah3.tanggal_jatuh_tempo)
                            FROM angsuran ah3 WHERE ah3.pinjaman_id = p.id AND ah3.status <> 'lunas') AS tanggal_angsuran_belum,";
+$filterJenisPinjaman = $angsuranMode === 'rescheduling' ? ' AND p.is_rescheduling=1' : ' AND COALESCE(p.is_rescheduling,0)=0';
 $query_pinjaman = "SELECT p.*, a.nama_lengkap, a.kode_anggota, a.ktp, jp.nama_jenis, jp.memerlukan_jaminan, $kolom_hari $kolom_tanggal_belum
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id) as total_angsuran,
                           (SELECT COUNT(*) FROM angsuran WHERE pinjaman_id = p.id AND status = 'lunas') as angsuran_lunas
                    FROM pinjaman p
                    JOIN anggota a ON p.anggota_id = a.id
                    JOIN jenis_pinjaman jp ON p.jenis_pinjaman_id = jp.id
-                   WHERE p.status IN ('aktif', 'macet')
+                   WHERE p.status IN ('aktif', 'macet') $filterJenisPinjaman
                    AND EXISTS (SELECT 1 FROM angsuran ax WHERE ax.pinjaman_id = p.id AND ax.status <> 'lunas')
                    ORDER BY p.tanggal_pencairan DESC";
 
@@ -599,7 +606,9 @@ function angsuranItemAksiMenu(PDO $db, array $angsuran, array $keranjangIds, $pb
         $d_auto = hitungDendaAngsuran($db, $angsuran, $angsuran['jumlah_pinjaman']);
         $d_nilai = !empty($angsuran['denda_manual']) ? $angsuran['denda'] : $d_auto['denda'];
         $d_info = $d_auto['hari_dihitung'] > 0
-            ? 'Otomatis: Rp ' . number_format($d_auto['per_hari'], 0, ',', '.') . '/hari x ' . $d_auto['hari_dihitung'] . ' hari terlambat = Rp ' . number_format($d_auto['denda'], 0, ',', '.')
+            ? (!empty($d_auto['memerlukan_jaminan'])
+                ? 'Otomatis: Rp ' . number_format($d_auto['per_hari'], 0, ',', '.') . '/minggu x ' . $d_auto['minggu_dihitung'] . ' minggu (' . $d_auto['hari_telat'] . ' hari telat) = Rp ' . number_format($d_auto['denda'], 0, ',', '.')
+                : 'Otomatis: Rp ' . number_format($d_auto['per_hari'], 0, ',', '.') . '/hari x ' . $d_auto['hari_dihitung'] . ' hari terlambat = Rp ' . number_format($d_auto['denda'], 0, ',', '.'))
             : 'Belum terlambat, denda otomatis Rp 0';
         $inCart = in_array((int) $angsuran['id'], $keranjangIds, true);
         $payAttrs = [
@@ -1151,6 +1160,7 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" id="formBayarAngsuran">
+                    <input type="hidden" name="idempotency_key" value="<?php echo htmlspecialchars(hash('sha256', session_id() . '|' . bin2hex(random_bytes(16))), ENT_QUOTES, 'UTF-8'); ?>">
                     <div class="modal-header">
                         <div>
                             <div class="text-uppercase small text-white-50 fw-semibold" id="bayar_mode_label">Pembayaran</div>
@@ -1179,6 +1189,11 @@ $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                             <div class="mb-3">
                                 <label class="form-label">Total dibayar</label>
                                 <input type="text" class="form-control form-control-lg fw-semibold" id="bayar_total" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="jumlah_bayar_fifo">Nominal setoran FIFO (opsional)</label>
+                                <input type="number" class="form-control" name="jumlah_bayar_fifo" id="jumlah_bayar_fifo" min="1" step="1" inputmode="numeric">
+                                <div class="form-text">Isi untuk mencatat pembayaran sebagian. Setoran dialokasikan ke angsuran tertua yang belum lunas.</div>
                             </div>
                         </section>
                         <section class="ui-form-section ui-pj-section ui-ag-section">

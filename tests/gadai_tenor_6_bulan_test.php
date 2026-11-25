@@ -32,7 +32,9 @@ pastikan($g1['biaya_mingguan_gadai'] === 10000, 'biaya gadai Rp 1 juta harus Rp 
 $g2 = hitungPinjamanGadai(2000000, 15, 1, 'mingguan');
 pastikan($g2['total'] === 2360000.0, 'gadai Rp 2 juta/1 bulan harus kembali Rp 2,36 juta');
 $g2dua = hitungPinjamanGadai(2000000, 15, 2, 'dua_mingguan');
-pastikan($g2dua['tambahan_gadai'] === 120000, 'gadai Rp 2 juta/2 bulan harus mendapat tambahan Rp 120 ribu');
+pastikan($g2dua['tambahan_mingguan_gadai'] === 120000, 'biaya mingguan Rp 2 juta/2 bulan dihitung untuk 8 minggu, terlepas dari frekuensi setoran');
+pastikan($g2dua['tambahan_tenor_gadai'] === 0, 'biaya tambahan bulanan tidak berlaku untuk tenor 2 bulan');
+pastikan($g2dua['tambahan_gadai'] === 120000, 'total biaya tambahan gadai Rp 2 juta/2 bulan harus Rp 120 ribu');
 pastikan($g2dua['total'] === 2420000.0, 'gadai Rp 2 juta/2 bulan harus kembali Rp 2,42 juta');
 pastikan($g2dua['jumlah_cicilan'] === 4, 'gadai 2 bulan/2 mingguan harus 4 cicilan');
 pastikan($g2dua['angsuran'] === 605000.0, 'gadai Rp 2 juta/2 bulan harus Rp 605 ribu per cicilan');
@@ -42,9 +44,15 @@ $g4 = hitungPinjamanGadai(4000000, 15, 1, 'mingguan');
 pastikan($g4['biaya_mingguan_gadai'] === 25000, 'pola biaya gadai Rp 4 juta harus Rp 25 ribu/minggu');
 $g6dua = hitungPinjamanGadai(2000000, 15, 6, 'dua_mingguan');
 pastikan($g6dua['jumlah_cicilan'] === 12, 'gadai 6 bulan/2 mingguan harus 12 cicilan');
-pastikan($g6dua['total'] === 2660000.0, 'gadai Rp 2 juta/6 bulan harus kembali Rp 2,66 juta');
+pastikan($g6dua['tambahan_mingguan_gadai'] === 360000, 'biaya mingguan Rp 2 juta/6 bulan dihitung untuk 24 minggu');
+pastikan($g6dua['tambahan_tenor_gadai'] === 120000.0, 'biaya tenor Rp 2 juta/6 bulan dihitung Rp 10 ribu per Rp 1 juta per bulan');
+pastikan($g6dua['total'] === 2780000.0, 'gadai Rp 2 juta/6 bulan harus kembali Rp 2,78 juta');
 $g6bulan = hitungPinjamanGadai(2000000, 15, 6, 'bulanan');
 pastikan($g6bulan['jumlah_cicilan'] === 6, 'gadai 6 bulan/bulanan harus 6 cicilan');
-pastikan($g6bulan['total'] === $g6dua['total'], 'total gadai tidak boleh berubah karena pilihan frekuensi bayar');
+pastikan($g6bulan['total'] === $g6dua['total'], 'biaya dihitung menurut lama tenor, bukan banyaknya setoran');
+$g1enam = hitungPinjamanGadai(1000000, 15, 6, 'bulanan');
+pastikan($g1enam['tambahan_mingguan_gadai'] === 240000, 'contoh resmi Rp 1 juta/6 bulan memakai biaya mingguan Rp 240 ribu');
+pastikan($g1enam['tambahan_tenor_gadai'] === 60000.0, 'contoh resmi Rp 1 juta/6 bulan memakai tambahan tenor Rp 60 ribu');
+pastikan($g1enam['total'] === 1450000.0, 'contoh resmi Rp 1 juta/6 bulan harus total Rp 1,45 juta');
 
 echo "OK: tabel 45% tanpa jaminan dan rumus gadai semua frekuensi valid.\n";

@@ -16,7 +16,7 @@ try {
     checkLayanan(nomorWhatsApp('0812-3456-7890')==='6281234567890','Normalisasi nomor WhatsApp');
     checkLayanan(nomorWhatsApp('+62 812 3456 7890')==='6281234567890','Nomor internasional WhatsApp');
     checkLayanan(nomorWhatsApp('abc')==='','Nomor tidak valid tidak membuat tautan');
-    foreach([0=>'Lancar',3=>'Lancar',4=>'Terlambat',6=>'Terlambat',7=>'Macet Ringan',14=>'Macet Ringan',29=>'Macet Ringan',30=>'Macet Berat',90=>'Macet Berat',91=>'Gagal Bayar'] as $h=>$status)checkLayanan(statusKolektibilitas($h)[0]===$status,'Batas status '.$h.' hari');
+    foreach([0=>'KOL 1 - Lancar',1=>'KOL 2 - Dalam Perhatian Khusus',90=>'KOL 2 - Dalam Perhatian Khusus',91=>'KOL 3 - Kurang Lancar',120=>'KOL 3 - Kurang Lancar',121=>'KOL 4 - Diragukan',180=>'KOL 4 - Diragukan',181=>'KOL 5 - Macet'] as $h=>$status)checkLayanan(statusKolektibilitas($h)[0]===$status,'Batas KOL '.$h.' hari');
     ditolakLayanan(function(){layananNominal('-1');},'Nominal');
     ditolakLayanan(function(){layananNominal('1e6');},'Nominal');
     $_SESSION=['role'=>'teller','user_id'=>0,'layanan_csrf'=>'abc'];$_POST=['csrf'=>'salah'];
@@ -53,8 +53,9 @@ try {
     $db->prepare("INSERT INTO layanan_bayar_denda (angsuran_id,pinjaman_id,user_id,jumlah,metode,bukti,transaksi_id) VALUES (?,?,?,1000,'cash','test.jpg',?)")->execute([$a,$id,$teller,$tid]);
     $sesudah=layananSisa($db,$id,10);checkLayanan(abs($s['total']-$sesudah['total']-1000)<0.01,'Denda terpisah tidak ditagih ulang');
     $_SESSION=['role'=>'admin','user_id'=>$admin];$_POST=['angsuran_id'=>$a,'jumlah'=>'0','catatan'=>'Pemutihan penuh'];ditolakLayanan(function()use($db,$id,&$files){prosesLayanan($db,'diskon_denda',$id,$files);},'antara jumlah yang sudah dibayar');
-    $_POST=['tanggal'=>date('Y-m-d',strtotime('+7 days')),'catatan'=>'Perpanjangan disetujui'];prosesLayanan($db,'reschedule',$id,$files);
-    checkLayanan(abs(layananSisa($db,$id,10)['total']-$sesudah['total'])<0.01,'Reschedule tidak menghapus denda terutang');
+    $_POST=['tanggal'=>date('Y-m-d',strtotime('+7 days')),'catatan'=>'Perpanjangan disetujui'];
+    ditolakLayanan(function()use($db,$id,&$files){prosesLayanan($db,'reschedule',$id,$files);},'Rescheduling sementara dinonaktifkan');
+    checkLayanan(abs(layananSisa($db,$id,10)['total']-$sesudah['total'])<0.01,'Jalur reschedule lama tidak mengubah saldo');
     // Pelunasan langsung memakai tampilan lama tanpa menghilangkan pencatatan kas.
     $db->exec('SAVEPOINT uji_pelunasan_langsung');
     $db->prepare('DELETE FROM layanan_pelunasan WHERE pinjaman_id=?')->execute([$id]);
